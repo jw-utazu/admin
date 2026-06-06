@@ -1,1 +1,1732 @@
-<h1>hello!<h1>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>管理アプリ</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="シフト管理">
+<meta name="mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#18181b;--ink2:#52525b;--ink3:#a1a1aa;
+  --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
+  --border:#e4e4e7;--border2:#d4d4d8;
+  --blue:#2563eb;--blue-l:#eff6ff;--blue-d:#1d4ed8;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --amber:#d97706;--amber-l:#fffbeb;
+  --red:#dc2626;--red-l:#fef2f2;
+  --purple:#7c3aed;--purple-l:#f5f3ff;
+  --teal:#0d9488;--teal-l:#f0fdfa;
+  --r:8px;--r-lg:12px;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Noto Sans JP',sans-serif;
+  --sh:0 1px 2px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.1);
+  --sh-lg:0 4px 6px rgba(0,0,0,.07),0 10px 15px rgba(0,0,0,.1);
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.6;min-height:100vh;}
+
+/* AUTH */
+#auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:44px 36px;width:100%;max-width:340px;text-align:center;box-shadow:var(--sh-lg);}
+.auth-logo{width:48px;height:48px;background:var(--blue);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:22px;color:#fff;}
+.auth-title{font-size:17px;font-weight:700;margin-bottom:6px;}
+.auth-sub{font-size:12px;color:var(--ink2);margin-bottom:24px;line-height:1.8;}
+.g-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 20px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;}
+.g-btn:hover{background:var(--blue-d);}
+.auth-err{display:none;background:var(--red-l);color:var(--red);border-radius:var(--r);padding:10px 12px;font-size:12px;margin-top:14px;text-align:left;}
+.auth-err.show{display:block;}
+
+/* APP */
+#app{display:none;flex-direction:column;min-height:100vh;}
+
+/* HEADER */
+.hdr{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;position:sticky;top:0;z-index:100;}
+.hdr-logo{width:28px;height:28px;border-radius:7px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--blue);color:#fff;font-size:14px;}
+.hdr-logo img{width:100%;height:100%;object-fit:cover;}
+/* 年月タイトル（クリックで年月選択） */
+.ym-title{display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;padding:4px 8px;border-radius:var(--r);transition:background .12s;min-width:0;}
+.ym-title:hover{background:var(--bg);}
+.ym-title-text{font-size:18px;font-weight:700;white-space:nowrap;letter-spacing:-.02em;}
+.ym-title-caret{color:var(--ink3);font-size:11px;}
+/* 受付状況バッジ */
+.status-badge{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;flex-shrink:0;}
+.sb-open{background:#dcfce7;color:#15803d;}
+.sb-prep{background:#f4f4f5;color:#71717a;}
+.sb-end{background:#fee2e2;color:#dc2626;}
+.sb-dot{width:7px;height:7px;border-radius:50%;}
+.sb-dot-open{background:#16a34a;}
+.sb-dot-prep{background:#a1a1aa;}
+.sb-dot-end{background:#dc2626;}
+.av{width:26px;height:26px;border-radius:50%;background:var(--blue-l);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;overflow:hidden;flex-shrink:0;}
+.av img{width:100%;height:100%;object-fit:cover;}
+.so-btn{font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);}
+
+/* 年月選択ドロップダウン */
+.ym-dropdown{position:absolute;top:54px;left:0;right:0;z-index:200;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 14px;display:none;box-shadow:var(--sh);}
+.ym-dropdown.open{display:flex;align-items:center;gap:10px;}
+.ym-dd-label{font-size:12px;color:var(--ink2);white-space:nowrap;}
+.ym-dd-sel{border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-family:var(--sans);font-size:13px;font-weight:700;color:var(--ink);background:var(--surface);outline:none;appearance:none;}
+.ym-dd-btn{padding:6px 14px;border:none;border-radius:var(--r);background:var(--blue);color:#fff;font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:1fr 272px;flex:1;min-height:calc(100vh - 50px);}
+@media(max-width:780px){.layout{grid-template-columns:1fr;}.sb{border-left:none;border-top:1px solid var(--border);}}
+
+/* CAL PANEL */
+.cp{overflow-y:auto;display:flex;flex-direction:column;}
+
+/* Tabs */
+.tabs{display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;position:sticky;top:50px;z-index:50;}
+.tb{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);transition:all .15s;white-space:nowrap;}
+.tb.on{color:var(--blue);border-bottom-color:var(--blue);font-weight:700;}
+
+/* カレンダーコンテナ（スクロール可） */
+.cal-scroll-area{height:420px;overflow-y:auto;padding:14px;border-bottom:1px solid var(--border);}
+.cal-month-block{margin-bottom:20px;}
+.cal-month-label{display:none;}
+.cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-bottom:1px solid var(--border);}
+.cal-ym-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.cal-ym-nav-btn:hover{background:var(--border);}
+.mini-cal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.cal-dows{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface2);border-bottom:1px solid var(--border);}
+.cdow{text-align:center;padding:6px 2px;font-size:10px;font-weight:700;color:var(--ink3);}
+.cdow.sat{color:var(--blue);}.cdow.sun{color:var(--red);}
+.cal-body{display:grid;grid-template-columns:repeat(7,1fr);}
+.cc{min-height:44px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:3px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;position:relative;cursor:default;}
+.cc:nth-child(7n){border-right:none;}
+.cc.sat .cn{color:var(--blue);}.cc.sun .cn{color:var(--red);}
+.cc.today-c{background:#e0e9ff;}
+.cc.other{opacity:.28;}
+.cn{font-size:11px;font-weight:500;color:var(--ink);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;}
+.today-c .cn{background:#93c5fd;color:#1e3a8a;font-size:10px;font-weight:700;}
+/* 申込期間中のハイライト */
+.cc.in-period{background:transparent;}
+.cc.period-start{background:transparent;}
+.cc.period-end{background:transparent;}
+/* 実施日クリック可能 */
+.cc.has-slot{cursor:pointer;}
+.cc.has-slot:hover{background:var(--purple-l);}
+.cc.slot-active{background:var(--purple-l);outline:2px solid var(--purple);outline-offset:-2px;}
+/* チップ */
+.chip{font-size:8px;font-weight:700;border-radius:3px;padding:1px 3px;width:100%;text-align:center;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chip.apply{background:var(--green-l);color:var(--green);}
+.chip.deadline{background:var(--red-l);color:var(--red);}
+.chip.open{background:var(--blue-l);color:var(--blue);}
+.chip.slot{background:var(--purple-l);color:var(--purple);cursor:pointer;}
+/* 期間バー */
+.period-bar{position:absolute;bottom:2px;left:0;right:0;height:4px;background:#f59e0b;border-radius:2px;}
+.period-bar.start{left:50%;border-radius:2px 0 0 2px;background:linear-gradient(to right,transparent,#f59e0b);}
+.period-bar.end{right:50%;border-radius:0 2px 2px 0;background:linear-gradient(to left,transparent,#f59e0b);}
+.period-bar.middle{background:#f59e0b;}
+
+/* カレンダー下の情報エリア */
+.cal-info-area{padding:0 14px 14px;}
+/* 受付情報カード */
+.info-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:10px;}
+.info-card-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.info-card-title{font-size:11px;font-weight:700;color:var(--ink2);}
+.info-rows{padding:8px 12px;display:flex;flex-direction:column;gap:6px;}
+.info-row{display:flex;align-items:center;gap:10px;font-size:12px;}
+.info-label{width:72px;font-size:11px;color:var(--ink3);flex-shrink:0;}
+.info-val{font-weight:700;color:var(--ink);}
+.info-val.green{color:var(--green);}.info-val.amber{color:var(--amber);}.info-val.blue{color:var(--blue);}
+/* 実施日詳細カード */
+.slot-detail-card{background:var(--surface);border:1.5px solid var(--purple);border-radius:var(--r-lg);overflow:hidden;margin-bottom:10px;display:none;}
+.slot-detail-card.show{display:block;}
+.sdc-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--purple-l);border-bottom:1px solid var(--border);}
+.sdc-title{font-size:12px;font-weight:700;color:var(--purple);}
+.sdc-close{border:none;background:none;cursor:pointer;color:var(--purple);font-size:16px;padding:0 2px;}
+.sdc-body{padding:8px 12px;display:flex;flex-direction:column;gap:4px;}
+.sdc-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);}
+.sdc-row:last-child{border-bottom:none;}
+.sdc-time{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--purple);flex:1;}
+.sdc-intv{font-size:11px;color:var(--ink3);}
+/* 実施日一覧カード */
+.slot-list-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:10px;}
+.slc-group{border-bottom:1px solid var(--border);}
+.slc-group:last-child{border-bottom:none;}
+.slc-date-row{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--surface2);}
+.slc-date{font-size:12px;font-weight:700;}
+.slc-week{font-size:10px;color:var(--ink3);}
+.slc-times{padding:4px 12px 7px;display:flex;flex-wrap:wrap;gap:4px;}
+.slc-chip{font-family:var(--mono);font-size:11px;background:var(--purple-l);color:var(--purple);padding:2px 8px;border-radius:4px;}
+
+/* 設定タブ */
+.set-panel{padding:14px;display:flex;flex-direction:column;gap:14px;}
+
+/* 日程設定 */
+.dsp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.dsp-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.dsp-title{font-size:12px;font-weight:700;}
+.edit-toggle-btn{font-size:11px;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;font-family:var(--sans);transition:all .12s;}
+.edit-toggle-btn.view-mode{color:var(--blue);background:var(--blue-l);}
+.edit-toggle-btn.edit-mode{color:var(--red);background:var(--red-l);}
+/* 日程表示行 */
+.date-rows{padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+.date-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--r);border:1px solid var(--border);cursor:pointer;transition:all .12s;}
+.date-row.active{border-color:var(--blue);background:var(--blue-l);}
+.date-row.selected-g{border-color:var(--green);background:var(--green-l);}
+.date-row.selected-a{border-color:var(--amber);background:var(--amber-l);}
+.date-row.selected-b{border-color:var(--blue);background:var(--blue-l);}
+.dr-icon{font-size:14px;flex-shrink:0;}
+.dr-label{font-size:11px;font-weight:700;flex-shrink:0;width:54px;}
+.dr-label.g{color:var(--green);}.dr-label.a{color:var(--amber);}.dr-label.b{color:var(--blue);}
+.dr-val{font-size:12px;font-weight:700;flex:1;}
+.dr-hint{font-size:10px;color:var(--ink3);}
+/* 編集時のカレンダー */
+.date-edit-cal{border-top:1px solid var(--border);}
+.cal-nav2{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.cal-nav2 span{font-size:12px;font-weight:700;}
+.nb{width:26px;height:26px;border:none;background:none;cursor:pointer;border-radius:5px;font-size:15px;color:var(--ink2);display:flex;align-items:center;justify-content:center;}
+.nb:hover{background:var(--border);}
+.dsp-ft{padding:8px 12px;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-top:1px solid var(--border);}
+.dsp-hint{font-size:11px;color:var(--ink3);}
+/* 編集モードのセル */
+.cc.date-mode:not(.other){cursor:pointer;}
+.cc.date-mode:not(.other):hover{background:var(--blue-l);}
+.cc.sel-apply{background:var(--green-l)!important;outline:2px solid var(--green);outline-offset:-2px;}
+.cc.sel-deadline{background:var(--amber-l)!important;outline:2px solid var(--amber);outline-offset:-2px;}
+.cc.sel-open{background:var(--blue-l)!important;outline:2px solid var(--blue);outline-offset:-2px;}
+
+/* 実施日設定 */
+.slot-set-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.slot-set-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.slot-set-title{font-size:12px;font-weight:700;}
+.slot-toggle-btn{font-size:11px;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;font-family:var(--sans);}
+.slot-toggle-btn.off{color:var(--purple);background:var(--purple-l);}
+.slot-toggle-btn.on{color:#fff;background:var(--purple);}
+/* 実施日設定カレンダー（日程設定と共用） */
+.slot-hint{padding:5px 12px;font-size:10px;color:var(--ink3);background:var(--purple-l);}
+.cc.slm:not(.other){cursor:crosshair;outline:1px dashed #c4b5fd;outline-offset:-1px;}
+.cc.slm:not(.other):hover{background:#f5f3ff;}
+.cc.slot-picked{background:var(--purple-l)!important;outline:2px solid var(--purple)!important;outline-offset:-2px;}
+/* ポップアップ（インライン） */
+.sp-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-lg);overflow:hidden;margin:8px 12px;}
+.sp-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.sp-title{font-size:12px;font-weight:700;}
+.sp-week-badge{font-size:10px;color:var(--purple);background:var(--purple-l);padding:1px 7px;border-radius:10px;font-weight:700;}
+.sp-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+/* 時間帯行（ドロップダウン版） */
+.sp-time-row{display:grid;grid-template-columns:1fr 14px 1fr auto auto;align-items:center;gap:6px;}
+.time-sel{border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--surface);outline:none;appearance:none;text-align:center;-webkit-appearance:none;width:100%;}
+.time-sel:focus{border-color:var(--blue);}
+.time-wave{text-align:center;color:var(--ink3);font-size:12px;}
+.intv-sel{border:1px solid var(--border);border-radius:var(--r);padding:6px 6px;font-family:var(--sans);font-size:11px;color:var(--ink);background:var(--surface);outline:none;width:66px;appearance:none;}
+.sp-del-btn{width:24px;height:24px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;color:var(--ink3);font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sp-del-btn:hover{background:var(--red-l);border-color:var(--red);color:var(--red);}
+.sp-add-btn{font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-l);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:var(--sans);}
+.sp-ft{padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px;justify-content:flex-end;background:var(--surface2);}
+/* 実施日一覧（設定タブ） */
+.slot-set-list{max-height:240px;overflow-y:auto;}
+.sdg{border-bottom:1px solid var(--border);}
+.sdg:last-child{border-bottom:none;}
+.sdg-hd{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--surface2);}
+.sdg-date{font-size:12px;font-weight:700;color:var(--purple);}
+.sdg-wk{font-size:10px;color:var(--purple);background:var(--purple-l);padding:1px 6px;border-radius:10px;font-weight:700;}
+.sdg-times{padding:5px 12px;display:flex;flex-wrap:wrap;gap:4px;}
+.stime{font-family:var(--mono);font-size:11px;background:var(--purple-l);color:var(--purple);padding:2px 7px;border-radius:4px;}
+.sintv{font-size:10px;color:var(--ink3);margin-left:2px;}
+.sdel{border:none;background:none;cursor:pointer;color:var(--ink3);font-size:11px;padding:2px 4px;}
+.sdel:hover{color:var(--red);}
+.slot-empty{padding:14px;text-align:center;font-size:12px;color:var(--ink3);}
+.slot-set-ft{padding:8px 12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;background:var(--surface2);}
+
+/* SIDEBAR */
+.sb{border-left:1px solid var(--border);background:var(--surface);padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
+.plbl{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--ink3);text-transform:uppercase;margin-bottom:5px;}
+.ag{display:flex;flex-direction:column;gap:4px;}
+.abtn{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);cursor:pointer;text-align:left;width:100%;font-family:var(--sans);transition:all .12s;}
+.abtn:hover{border-color:var(--border2);background:var(--surface);}
+.ab-ic{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.ic-g{background:var(--green-l);}.ic-a{background:var(--amber-l);}.ic-p{background:var(--purple-l);}.ic-t{background:var(--teal-l);}
+.ab-tx{flex:1;}
+.ab-n{font-size:12px;font-weight:700;color:var(--ink);display:block;}
+.ab-d{font-size:10px;color:var(--ink2);display:block;margin-top:1px;}
+.ab-ar{color:var(--ink3);font-size:12px;}
+.url-row{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;display:flex;align-items:center;gap:6px;}
+.url-txt{flex:1;font-size:11px;color:var(--blue);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.copy-btn-s{font-size:10px;padding:3px 7px;border:1px solid var(--border);border-radius:5px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+
+/* MODAL */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px);}
+.ov.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--r-lg);width:100%;max-width:500px;max-height:88vh;overflow-y:auto;box-shadow:var(--sh-lg);animation:m-in .18s ease;}
+.modal.sm{max-width:360px;}
+@keyframes m-in{from{opacity:0;transform:translateY(10px) scale(.98);}}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;}
+.mt{font-size:13px;font-weight:700;}
+.mx{width:26px;height:26px;border:none;background:none;border-radius:5px;cursor:pointer;font-size:16px;color:var(--ink2);display:flex;align-items:center;justify-content:center;line-height:1;}
+.mx:hover{background:var(--surface2);}
+.mbd{padding:14px 16px;}
+.mft{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;position:sticky;bottom:0;background:var(--surface);}
+
+/* Steps */
+.steps{display:flex;align-items:center;margin-bottom:14px;}
+.si{display:flex;align-items:center;gap:4px;}
+.sc{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--ink3);flex-shrink:0;transition:all .2s;}
+.sc.on{border-color:var(--blue);background:var(--blue);color:#fff;}
+.sc.dn{border-color:var(--green);background:var(--green);color:#fff;}
+.sl{font-size:9px;color:var(--ink3);white-space:nowrap;}
+.sl.on{color:var(--blue);font-weight:700;}
+.sln{flex:1;height:1px;background:var(--border);margin:0 4px;}
+.sln.dn{background:var(--green);}
+
+/* Form */
+.fg{margin-bottom:11px;}
+.fl{font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:4px;display:block;}
+.fsel,.finp{width:100%;border:1px solid var(--border);border-radius:var(--r);padding:6px 9px;font-family:var(--sans);font-size:12px;color:var(--ink);background:var(--surface);outline:none;appearance:none;}
+.fsel:focus,.finp:focus{border-color:var(--blue);}
+.sheet-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;}
+.sheet-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer;font-size:12px;transition:all .12s;}
+.sheet-opt:has(input:checked){border-color:var(--blue);background:var(--blue-l);}
+.sheet-opt input{accent-color:var(--blue);}
+
+/* 紐付け */
+.map-date-hd{font-size:11px;font-weight:700;background:var(--blue-l);color:var(--blue);padding:4px 9px;border-radius:5px;margin-bottom:5px;}
+.map-row{display:grid;grid-template-columns:100px 14px 1fr;align-items:center;gap:7px;margin-bottom:4px;}
+.map-cur{font-family:var(--mono);font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 7px;}
+.map-arr{text-align:center;color:var(--ink3);font-size:12px;}
+
+/* Buttons */
+.btn{padding:7px 14px;border:none;border-radius:var(--r);font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-p{background:var(--blue);color:#fff;}
+.btn-p:hover:not(:disabled){background:var(--blue-d);}
+.btn-g{background:var(--surface2);color:var(--ink2);border:1px solid var(--border);}
+.btn-g:hover{color:var(--ink);}
+.btn-d{background:var(--red);color:#fff;}
+.btn-s{background:var(--green);color:#fff;}
+.save-btn-sm{padding:5px 12px;border:none;border-radius:var(--r);background:var(--blue);color:#fff;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;}
+.save-slot-btn{padding:8px 18px;border:none;border-radius:var(--r);background:var(--teal);color:#fff;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.cancel-btn-sm{padding:5px 12px;border:1px solid var(--border);border-radius:var(--r);background:none;color:var(--ink2);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;}
+
+/* サマリー */
+.sumbox{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+.sumrow{display:flex;align-items:center;gap:8px;font-size:12px;}
+.sumk{color:var(--ink2);width:76px;flex-shrink:0;}
+.sumv{font-weight:700;}
+
+/* 警告 */
+.warn{background:var(--amber-l);border:1px solid #fcd34d;border-radius:var(--r);padding:8px 11px;font-size:12px;color:var(--amber);margin-bottom:10px;}
+
+/* Loading */
+.loading-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);padding:8px 0;}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.exec-st{display:none;align-items:center;gap:8px;font-size:12px;color:var(--ink2);padding:8px 0;}
+.exec-st.show{display:flex;}
+
+/* Done */
+.done-box{text-align:center;padding:20px 0 8px;}
+.done-icon{font-size:40px;margin-bottom:8px;}
+.done-title{font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px;}
+.done-sub{font-size:12px;color:var(--ink2);}
+
+/* Toast */
+.ta{position:fixed;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:5px;}
+.toast{background:var(--ink);color:#fff;border-radius:var(--r);padding:8px 13px;font-size:12px;display:flex;align-items:center;gap:7px;animation:t-up .18s ease;box-shadow:var(--sh-lg);max-width:280px;}
+.toast.s{background:var(--green);}.toast.e{background:var(--red);}
+@keyframes t-up{from{opacity:0;transform:translateY(8px);}}
+
+/* 時間選択用selectの見た目 */
+.time-sel option{font-family:var(--mono);}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth">
+  <div class="auth-card">
+    <div class="auth-logo" style="background:none;padding:0;overflow:hidden;"><img src="logo.png" alt="PW" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.parentNode.style.background='var(--blue)';this.parentNode.textContent='PW'"></div>
+    <div class="auth-title">PW管理</div>
+    <div class="auth-sub">管理者アカウントでログインしてください。<br>許可されたアカウントのみアクセスできます。</div>
+    <button class="g-btn" onclick="signIn()">
+      <svg width="16" height="16" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.075 17.64 11.767 17.64 9.2z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+      Googleでログイン
+    </button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-logo" id="hdr-logo"><img src="logo.png" alt="PW" onerror="this.parentNode.textContent='PW'"></div>
+    <span style="font-size:14px;font-weight:700;color:var(--ink);margin-right:auto;padding-left:8px;">管理アプリ</span>
+    <!-- 受付状況 -->
+    <div class="status-badge sb-prep" id="status-badge">
+      <div class="sb-dot sb-dot-prep" id="status-dot"></div>
+      <span id="status-text">--</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="av" id="av"></div>
+      <button class="so-btn" onclick="signOut()">ログアウト</button>
+    </div>
+  </header>
+
+  <!-- 年月ドロップダウン -->
+  <div class="ym-dropdown" id="ym-dropdown">
+    <span class="ym-dd-label">対象年月：</span>
+    <select class="ym-dd-sel" id="ym-year"></select>
+    <select class="ym-dd-sel" id="ym-month"></select>
+    <button class="ym-dd-btn" onclick="applyYmChange()">適用</button>
+    <button onclick="toggleYmDropdown()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);background:none;cursor:pointer;font-family:var(--sans);font-size:12px;">閉じる</button>
+  </div>
+
+  <div class="layout">
+    <!-- CAL PANEL -->
+    <div class="cp">
+      <!-- タブなし（カレンダーのみ） -->
+      <div id="tab-cal" style="display:flex;flex-direction:column;flex:1;">
+        <!-- 年月ヘッダー -->
+        <div class="cal-ym-header">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="cal-ym-nav-btn" onclick="chM(-1)">&#8249;</button>
+            <span id="cal-ym-label">読み込み中...</span>
+            <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
+          </div>
+          <button class="save-slot-btn" onclick="confirmSlotSave()">保存・再生成</button>
+        </div>
+        <!-- スクロールエリア（2ヶ月） -->
+        <div class="cal-scroll-area" id="cal-scroll-area"></div>
+        <!-- カレンダー下 情報エリア -->
+        <div class="cal-info-area">
+          <!-- 実施日クリック詳細 -->
+          <div class="slot-detail-card" id="slot-detail-card">
+            <div class="sdc-hd">
+              <span class="sdc-title" id="sdc-title"></span>
+              <button class="sdc-close" onclick="closeSlotDetail()">&#10005;</button>
+            </div>
+            <div class="sdc-body" id="sdc-body"></div>
+          </div>
+          <!-- 受付日程表示カード（カレンダータブ内） -->
+          <div class="dsp-card" style="margin-top:10px;">
+            <div class="dsp-hd">
+              <span class="dsp-title">受付日程</span>
+            </div>
+            <div class="date-rows" id="date-view">
+              <div class="date-row selected-g"><span class="dr-icon">&#128203;</span><span class="dr-label g">申込開始</span><span class="dr-val" id="dv-apply">未設定</span></div>
+              <div class="date-row selected-a"><span class="dr-icon">&#9203;</span><span class="dr-label a" style="color:var(--red);">締切</span><span class="dr-val" id="dv-deadline" style="color:var(--red);">未設定</span></div>
+              <div class="date-row selected-b"><span class="dr-icon">&#128226;</span><span class="dr-label b">シフト公開</span><span class="dr-val" id="dv-open">未設定</span></div>
+            </div>
+          </div>
+          <!-- 実施日設定エリア（カレンダータブ内） -->
+          <div style="margin-top:10px;">
+            <div class="slot-set-card">
+              <div id="popup-area"></div>
+              <div class="slot-set-list" id="slot-set-list">
+                <div class="slot-empty">実施日がありません</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sb">
+      <div>
+        <div class="plbl">処理メニュー</div>
+        <div class="ag">
+          <button class="abtn" onclick="openCalPubModal()">
+            <div class="ab-ic ic-a">&#128197;</div>
+            <div class="ab-tx"><span class="ab-n">予定表公開</span><span class="ab-d">予定表を外部ファイルへコピー</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openFormModal()">
+            <div class="ab-ic ic-p">&#128221;</div>
+            <div class="ab-tx"><span class="ab-n">シフトフォーム作成</span><span class="ab-d">スロット紐付け・シート配置</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openAutoModal()">
+            <div class="ab-ic ic-t">&#9881;</div>
+            <div class="ab-tx"><span class="ab-n">シフト作成枠作成</span><span class="ab-d">シフト作成シートを生成</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openShiftPubModal()">
+            <div class="ab-ic ic-g">&#128228;</div>
+            <div class="ab-tx"><span class="ab-n">シフト公開</span><span class="ab-d">シートを公開用ファイルへコピー</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="plbl">フォームURL</div>
+        <div class="url-row">
+          <a href="https://jw-utazu.github.io/shift-form/" target="_blank" class="url-txt">https://jw-utazu.github.io/shift-form/</a>
+          <button class="copy-btn-s" onclick="copyUrl()">コピー</button>
+        </div>
+      </div>
+      <div>
+        <div class="plbl">アプリ</div>
+        <button onclick="openPwaModal()" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--blue-l);border:1.5px solid var(--blue);border-radius:var(--r);cursor:pointer;font-family:var(--sans);color:var(--blue);font-size:12px;font-weight:700;"><span style="font-size:15px;">📲</span><span>ホーム画面に追加</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="ov" id="m-pwa">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">📲 ホーム画面に追加</span><button class="mx" onclick="closeM('m-pwa')">&#10005;</button></div>
+    <div class="mbd">
+      <div id="pwa-auto-section" style="display:none;margin-bottom:14px;">
+        <p style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:8px;">✓ このブラウザはワンタップでインストールできます</p>
+        <button onclick="pwaTriggerInstall()" style="width:100%;padding:11px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;">インストールする</button>
+        <hr style="margin:14px 0;border:none;border-top:1px solid var(--border);">
+      </div>
+      <p style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:10px;">手順</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px;">Android (Chrome)</div>
+          <div style="font-size:12px;color:var(--ink2);line-height:1.7;">右上の <b>⋮</b> メニュー →「<b>ホーム画面に追加</b>」→「<b>インストール</b>」を選択</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:4px;">iPhone / iPad (Safari)</div>
+          <div style="font-size:12px;color:var(--ink2);line-height:1.7;">下部の <b>共有ボタン（□↑）</b> →「<b>ホーム画面に追加</b>」→「<b>追加</b>」を選択<br><span style="color:var(--amber);font-size:11px;">※ Safariで開いている必要があります</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mft"><button class="btn btn-g" onclick="closeM('m-pwa')">閉じる</button></div>
+  </div>
+</div>
+<!-- シフトフォーム作成 -->
+<div class="ov" id="m-form">
+  <div class="modal">
+    <div class="mhd"><span class="mt">&#128221; シフトフォーム作成</span><button class="mx" onclick="closeMReset('m-form','resetFC')">&#10005;</button></div>
+    <div class="mbd" id="m-form-body">
+      <div class="loading-row"><div class="spin"></div>データを読み込み中...</div>
+    </div>
+    <div class="mft" id="m-form-ft">
+      <button class="btn btn-g" onclick="closeMReset('m-form','resetFC')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- シフト公開 -->
+<div class="ov" id="m-shift-pub">
+  <div class="modal">
+    <div class="mhd"><span class="mt">&#128228; シフト公開</span><button class="mx" onclick="closeM('m-shift-pub')">&#10005;</button></div>
+    <div class="mbd" id="m-sp-body">
+      <div class="loading-row"><div class="spin"></div>シート一覧を取得中...</div>
+    </div>
+    <div class="mft" id="m-sp-ft">
+      <button class="btn btn-g" onclick="closeM('m-shift-pub')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 予定表公開 -->
+<div class="ov" id="m-cal-pub">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">&#128197; 予定表公開</span><button class="mx" onclick="closeM('m-cal-pub')">&#10005;</button></div>
+    <div class="mbd" id="m-cp-body">
+      <div class="loading-row"><div class="spin"></div>情報を取得中...</div>
+    </div>
+    <div class="mft" id="m-cp-ft">
+      <button class="btn btn-g" onclick="closeM('m-cal-pub')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 予定表自動作成 -->
+<div class="ov" id="m-auto">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">&#9881; 予定表自動作成</span><button class="mx" onclick="closeM('m-auto')">&#10005;</button></div>
+    <div class="mbd" id="m-auto-body">
+      <div class="loading-row"><div class="spin"></div>情報を取得中...</div>
+    </div>
+    <div class="mft" id="m-auto-ft">
+      <button class="btn btn-g" onclick="closeM('m-auto')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- スロット保存確認 -->
+<div class="ov" id="m-slot-confirm">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">実施日設定の保存</span><button class="mx" onclick="closeM('m-slot-confirm')">&#10005;</button></div>
+    <div class="mbd">
+      <div class="warn">&#9888; スロットを保存するとカレンダーシートが更新され、カレンダーが再生成されます。</div>
+      <p style="font-size:13px;color:var(--ink2);">この操作は元に戻せません。よろしいですか？</p>
+      <div class="exec-st" id="sc-st"><div class="spin"></div>保存・再生成中...</div>
+      <div class="done-box" id="sc-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">保存完了</div></div>
+    </div>
+    <div class="mft" id="sc-ft">
+      <button class="btn btn-g" onclick="closeM('m-slot-confirm')">キャンセル</button>
+      <button class="btn btn-d" id="sc-exec-btn" onclick="execSlotSave()">保存してカレンダー再生成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 日付クリック: 設定種別選択モーダル -->
+<div class="ov" id="m-day-select">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt" id="m-day-select-title">日付の設定</span><button class="mx" onclick="closeM('m-day-select')">&#10005;</button></div>
+    <div class="mbd">
+      <p style="font-size:12px;color:var(--ink2);margin-bottom:12px;">この日付に何を設定しますか？</p>
+      <div style="display:flex;flex-direction:column;gap:6px;" id="m-day-select-btns"></div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-g" onclick="closeM('m-day-select')">キャンセル</button>
+      <button class="btn btn-d" id="m-day-reset-btn" onclick="resetDaySettings()" style="display:none;">リセット</button>
+    </div>
+  </div>
+</div>
+
+<div class="ta" id="ta"></div>
+
+<script>
+// ============================================================
+// 設定
+// ============================================================
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbx1SnmwmKJrrzcVyuJIFiZrCwmRErBKxgxKpmvPrLuKLIvTGVp9aa4p4hrrgknjpPgetw/exec';
+const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
+const ALLOWED   = ['simamodehu@gmail.com','hiroshirie1994@gmail.com','r.trk11021022@gmail.com','maitaki.teppei@gmail.com','jw.utazu@gmail.com'];
+const DOW7      = ['月','火','水','木','金','土','日'];
+// 時間の選択肢 0〜23
+const HOURS_LIST = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
+const MINS_LIST  = ['00','15','30','45'];
+const INTV_LIST  = [5,10,15,20,30];
+
+// ============================================================
+// 状態
+// ============================================================
+let curY=2026, curM=7;   // 対象月（当月をデフォルト）
+let scY=2026, scM=7;     // 日程設定カレンダー月
+let slotY=2026, slotM=7; // 実施日カレンダー月
+let adminData   = null;
+let activeKind  = null;  // 'apply'|'deadline'|'open'|null
+let dateEditMode = false;
+let slotMode    = false;
+let slots       = [];    // [{y,m,d,time,interval}]
+let dates       = {apply:null, deadline:null, open:null};
+let datesBak    = null;  // キャンセル用バックアップ
+let popupDay    = null;
+let popupTimes  = [];
+let sheetListData = [];
+let fcN         = 1;
+let mappingResult = {};
+let fcAdminData = null;  // フォーム作成時に取得したデータ
+
+// ============================================================
+// Google OAuth
+// ============================================================
+function signIn() {
+  const tc = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID, scope: 'email profile openid',
+    callback: r => {
+      if (r.error) { showAuthErr('ログインに失敗しました。'); return; }
+      fetchUser(r.access_token);
+    }
+  });
+  // prompt: '' で前回アカウントを自動選択、初回は選択画面
+  tc.requestAccessToken({ prompt: '' });
+}
+
+// 自動ログイン（One Tap → localStorageフォールバック）
+function tryAutoLogin() {
+  // まずlocalStorageに保存済みユーザーがあれば即復元
+  try {
+    const saved = localStorage.getItem('adminUser');
+    if (saved) {
+      const u = JSON.parse(saved);
+      if (u && u.email && ALLOWED.includes(u.email)) {
+        processUser(u, false); // 保存しなおさない
+        return;
+      }
+    }
+  } catch(e) {}
+
+  // One Tap（PCブラウザ向け）
+  if (!window.google || !google.accounts) return;
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID,
+    callback: r => {
+      try {
+        const p = JSON.parse(atob(r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+        processUser({ email: p.email, name: p.name, picture: p.picture });
+      } catch(e) {}
+    },
+    auto_select: true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.prompt();
+}
+setTimeout(tryAutoLogin, 800);
+function fetchUser(token) {
+  fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(u => processUser({ email: u.email, name: u.name, picture: u.picture }))
+    .catch(() => showAuthErr('ユーザー情報の取得に失敗しました。'));
+}
+function processUser(u, save = true) {
+  if (!ALLOWED.includes(u.email)) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
+  // ログイン情報をlocalStorageに保存（次回自動ログイン用）
+  if (save) {
+    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture })); } catch(e) {}
+  }
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('app').style.display  = 'flex';
+  const av = document.getElementById('av');
+  if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
+  else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
+  // デフォルトを翌月に設定
+  const now = new Date();
+  const nextM = now.getMonth() + 2; // 翌月（1ベース）
+  curY = nextM > 12 ? now.getFullYear() + 1 : now.getFullYear();
+  curM = nextM > 12 ? 1 : nextM;
+  scY = curY; scM = curM;
+  slotY = curY; slotM = curM;
+  loadAdminData();
+}
+function signOut() {
+  try { localStorage.removeItem('adminUser'); } catch(e) {}
+  google.accounts.id.disableAutoSelect();
+  document.getElementById('app').style.display  = 'none';
+  document.getElementById('auth').style.display = 'flex';
+}
+function showAuthErr(msg) { const el=document.getElementById('auth-err'); el.textContent=msg; el.classList.add('show'); }
+
+// ============================================================
+// JSONP通信
+// ============================================================
+function jsonp(url, cb) {
+  const n = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  window[n] = d => { delete window[n]; document.head.removeChild(sc); cb(null,d); };
+  const sc = document.createElement('script');
+  sc.onerror = () => { delete window[n]; cb(new Error('通信エラー')); };
+  sc.src = url+'&callback='+n; document.head.appendChild(sc);
+}
+function gasGet(action, params) {
+  return new Promise((resolve,reject) => {
+    let url = GAS_URL+'?action='+action;
+    if (params) url += '&params='+encodeURIComponent(JSON.stringify(params));
+
+    // fetch API を優先（スマホ対応）
+    if (window.fetch) {
+      const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const fetchUrl = url + '&callback='+cbName;
+      let done = false;
+      const timer = setTimeout(() => {
+        if(done) return; done=true;
+        delete window[cbName];
+        reject(new Error('通信タイムアウト（GASが応答しませんでした）'));
+      }, 180000);
+
+      // まずJSONPスクリプト方式で試み、失敗時はfetchで再試行
+      const sc = document.createElement('script');
+      window[cbName] = d => {
+        if(done) return; done=true;
+        clearTimeout(timer);
+        delete window[cbName];
+        if(sc.parentNode) sc.parentNode.removeChild(sc);
+        if (d && d.error && !d.ok) return reject(new Error(d.error));
+        resolve(d);
+      };
+      sc.onerror = () => {
+        if(done) return; done=true;
+        clearTimeout(timer);
+        delete window[cbName];
+        // fetchフォールバック
+        fetch(url+'&callback=noop', {mode:'no-cors'}).catch(()=>{});
+        // no-corsでは結果が取れないのでfetch+json試行
+        fetch(url).then(r=>r.json()).then(d=>{
+          if (d && d.error && !d.ok) return reject(new Error(d.error));
+          resolve(d);
+        }).catch(()=>reject(new Error('通信エラー（GASへの接続に失敗）')));
+      };
+      sc.src = fetchUrl;
+      document.head.appendChild(sc);
+      return;
+    }
+
+    // fetch未対応環境は従来のJSONP
+    const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    let done = false;
+    const timer = setTimeout(() => {
+      if(done) return; done=true;
+      delete window[cbName];
+      reject(new Error('通信タイムアウト（GASが応答しませんでした）'));
+    }, 180000);
+    window[cbName] = d => {
+      if(done) return; done=true;
+      clearTimeout(timer);
+      delete window[cbName];
+      if(sc.parentNode) sc.parentNode.removeChild(sc);
+      if (d && d.error && !d.ok) return reject(new Error(d.error));
+      resolve(d);
+    };
+    const sc = document.createElement('script');
+    sc.onerror = () => {
+      if(done) return; done=true;
+      clearTimeout(timer);
+      delete window[cbName];
+      reject(new Error('通信エラー（GASへの接続に失敗）'));
+    };
+    sc.src = url+'&callback='+cbName;
+    document.head.appendChild(sc);
+  });
+}
+
+// ============================================================
+// データ読み込み
+// ============================================================
+async function loadAdminData() {
+  updYmTitle();
+  let d;
+  try {
+    d = await gasGet('adminData');
+  } catch(e) {
+    toast('データの読み込みに失敗しました: '+e.message,'e');
+    return;
+  }
+  adminData = d;
+  // GASのD3/F3の年月を取得（ただしUI上の対象月はcurY/curMを使う）
+  // slots・datesはGASから読み取る
+  if (d.eventDates) {
+    const toObj = str => {
+      if (!str) return null;
+      const p = str.split('/');
+      return p.length===2 ? {y:curY, m:parseInt(p[0]), d:parseInt(p[1])} : null;
+    };
+    dates.apply    = toObj(d.eventDates['申込開始']);
+    dates.deadline = toObj(d.eventDates['締切']);
+    dates.open     = toObj(d.eventDates['シフト公開']);
+  }
+  if (d.currentSlots) {
+    slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
+  }
+  renderAll();
+}
+
+function renderAll() {
+  updYmTitle();
+  updStatus();
+  updDateViews();
+  buildCalScroll();
+  buildSlotSetList();
+  buildInfoArea();
+}
+
+// ============================================================
+// 年月タイトル・ドロップダウン
+// ============================================================
+function updYmTitle() {
+  const t = curY+'年'+curM+'月';
+  const el1 = document.getElementById('ym-title-text');
+  if(el1) el1.textContent = t+' PW';
+  const el2 = document.getElementById('cal-ym-label');
+  if(el2) el2.textContent = t;
+}
+function toggleYmDropdown() {
+  const dd = document.getElementById('ym-dropdown');
+  if (!dd.classList.contains('open')) {
+    // セレクト初期化
+    const yr = document.getElementById('ym-year');
+    const mo = document.getElementById('ym-month');
+    yr.innerHTML=''; mo.innerHTML='';
+    for(let y=curY-2;y<=curY+3;y++) yr.innerHTML+=`<option value="${y}"${y===curY?' selected':''}>${y}年</option>`;
+    for(let m=1;m<=12;m++) mo.innerHTML+=`<option value="${m}"${m===curM?' selected':''}>${m}月</option>`;
+    dd.classList.add('open');
+  } else {
+    dd.classList.remove('open');
+  }
+}
+function applyYmChange() {
+  curY = parseInt(document.getElementById('ym-year').value);
+  curM = parseInt(document.getElementById('ym-month').value);
+  scY=curY; scM=curM; slotY=curY; slotM=curM;
+  document.getElementById('ym-dropdown').classList.remove('open');
+  loadAdminData();
+}
+
+// ============================================================
+// 受付状況
+// ============================================================
+function updStatus() {
+  const badge = document.getElementById('status-badge');
+  const dot   = document.getElementById('status-dot');
+  const txt   = document.getElementById('status-text');
+  const s     = calcStatus();
+  badge.className = 'status-badge ' + (s==='受付中'?'sb-open':s==='受付終了'?'sb-end':'sb-prep');
+  dot.className   = 'sb-dot '       + (s==='受付中'?'sb-dot-open':s==='受付終了'?'sb-dot-end':'sb-dot-prep');
+  txt.textContent = s;
+}
+function calcStatus() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const t = today.getTime();
+  const toDate = obj => obj ? new Date(obj.y,obj.m-1,obj.d).getTime() : null;
+  const ap = toDate(dates.apply), dl = toDate(dates.deadline);
+  const nextM = new Date(curM===12?curY+1:curY, curM===12?0:curM, 1).getTime();
+  if (!ap || t < ap) return '準備中';
+  if (t >= nextM) return '準備中';
+  if (ap && dl && t >= ap && t <= dl) return '受付中';
+  if (dl && t > dl) return '受付終了';
+  return '準備中';
+}
+
+// ============================================================
+// カレンダースクロール（3ヶ月表示: 前月・当月・翌月）
+// ============================================================
+function buildCalScroll() {
+  const area = document.getElementById('cal-scroll-area');
+  area.innerHTML = '';
+  // 前月・当月の2ヶ月を描画
+  const months = [ prevMonth(curY,curM), {y:curY,m:curM} ];
+  months.forEach(({y,m}) => {
+    const block = document.createElement('div');
+    block.className = 'cal-month-block';
+    block.id = 'cal-block-'+y+'-'+m;
+    const lbl = document.createElement('div');
+    lbl.style.cssText='font-size:11px;font-weight:700;color:var(--ink3);padding:0 2px 4px;';
+    lbl.textContent = y+'年'+m+'月';
+    const cal = document.createElement('div');
+    cal.className = 'mini-cal';
+    cal.innerHTML = '<div class="cal-dows"><div class="cdow">月</div><div class="cdow">火</div><div class="cdow">水</div><div class="cdow">木</div><div class="cdow">金</div><div class="cdow sat">土</div><div class="cdow sun">日</div></div><div class="cal-body" id="cg-'+y+'-'+m+'"></div>';
+    block.appendChild(lbl);
+    block.appendChild(cal);
+    area.appendChild(block);
+    buildCalGrid('cg-'+y+'-'+m, y, m, 'main');
+  });
+  // 先頭（前月）にスクロール
+  area.scrollTop = 0;
+}
+
+function prevMonth(y,m){ return m===1?{y:y-1,m:12}:{y,m:m-1}; }
+function nextMonth(y,m){ return m===12?{y:y+1,m:1}:{y,m:m+1}; }
+
+function chM(dir) {
+  curM += dir;
+  if (curM > 12) { curM = 1; curY++; }
+  if (curM < 1)  { curM = 12; curY--; }
+  scY = curY; scM = curM;
+  slotY = curY; slotM = curM;
+  updYmTitle();
+  buildCalScroll();
+  buildInfoArea();
+}
+
+// ============================================================
+// カレンダーグリッド描画
+// ============================================================
+function buildCalGrid(gid, y, m, mode) {
+  const g = document.getElementById(gid); if(!g) return;
+  const first = new Date(y,m-1,1), last = new Date(y,m,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const fDow = first.getDay(), off = fDow===0?6:fDow-1;
+  const toDate = obj => obj ? new Date(obj.y,obj.m-1,obj.d).getTime() : null;
+  const ap = toDate(dates.apply), dl = toDate(dates.deadline), op = toDate(dates.open);
+  let h='';
+  for(let i=0;i<off;i++) h+='<div class="cc other"></div>';
+  for(let d=1;d<=last.getDate();d++){
+    const dt=new Date(y,m-1,d), dow=dt.getDay(), t=dt.getTime();
+    const isSat=dow===6, isSun=dow===0, isToday=t===today.getTime();
+    const isApply=ap&&t===ap, isDL=dl&&t===dl, isOpen=op&&t===op;
+    const inPeriod=ap&&dl&&t>ap&&t<dl;
+    const daySlots=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
+    const hasSlot=daySlots.length>0;
+    let cls='cc'+(isSun?' sun':isSat?' sat':'')+(isToday?' today-c':'');
+    if(isApply) cls+=' period-start';
+    else if(isDL) cls+=' period-end';
+    else if(inPeriod) cls+=' in-period';
+    if(hasSlot) cls+=' has-slot'+(mode==='main'&&hasSlot?' slot-picked':'');
+    if(mode==='sched') cls+=' date-mode';
+    if(mode==='slot'&&slotMode) cls+=' slm';
+    if(mode==='slot'&&hasSlot) cls+=' slot-picked';
+    // 日程設定モード中のハイライト
+    if(mode==='sched'&&isApply&&dateEditMode) cls+=' sel-apply';
+    if(mode==='sched'&&isDL&&dateEditMode) cls+=' sel-deadline';
+    if(mode==='sched'&&isOpen&&dateEditMode) cls+=' sel-open';
+    let chips='<div class="cn">'+d+'</div>';
+    if(isApply) chips+='<div class="chip apply">申込</div>';
+    if(isDL) chips+='<div class="chip deadline">締切</div>';
+    if(isOpen) chips+='<div class="chip open">公開</div>';
+    if(hasSlot&&!isApply&&!isDL&&!isOpen) chips+='<div class="chip slot">&#9679;'+daySlots.length+'</div>';
+    // 期間バー
+    if(inPeriod) chips+='<div class="period-bar middle"></div>';
+    if(isApply) chips+='<div class="period-bar start"></div>';
+    if(isDL) chips+='<div class="period-bar end"></div>';
+    let oc='';
+    if(mode==='main') oc=`onclick="openDaySelectModal(${y},${m},${d})"`;
+    if(mode==='sched'&&dateEditMode) oc=`onclick="onScClick(${y},${m},${d})"`;
+    if(mode==='slot'&&slotMode) oc=`onclick="onSlotClick(${y},${m},${d},this)"`;
+    // メインモードでは全日付クリック可能
+    if(mode==='main') cls+=' has-slot'; // カーソルpointer
+    h+=`<div class="${cls}" ${oc}>${chips}</div>`;
+  }
+  g.innerHTML=h;
+}
+
+// ============================================================
+// タブ切り替え
+// ============================================================
+function swTab(id,btn){
+  // 設定タブ廃止 - カレンダー統合
+}
+
+// ============================================================
+// 実施日クリック詳細
+// ============================================================
+function showSlotDetail(y,m,d) {
+  const daySlots = slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
+  const dt = new Date(y,m-1,d);
+  const dow = DOW7[dt.getDay()===0?6:dt.getDay()-1];
+  const wn = getWeekNum(y,m,d);
+  document.getElementById('sdc-title').textContent = m+'/'+d+'（'+dow+'）第'+wn+'週';
+  document.getElementById('sdc-body').innerHTML = daySlots.map(s=>
+    `<div class="sdc-row"><span class="sdc-time">${s.time}</span><span class="sdc-intv">${s.interval}分刻み</span></div>`
+  ).join('');
+  document.getElementById('slot-detail-card').classList.add('show');
+}
+function closeSlotDetail(){
+  document.getElementById('slot-detail-card').classList.remove('show');
+}
+
+// ============================================================
+// 日付クリック → 設定種別選択モーダル
+// ============================================================
+let daySelectTarget = null;
+
+function openDaySelectModal(y,m,d) {
+  if(d < 1) return; // 空白セルは無視
+  daySelectTarget = {y,m,d};
+  const dt = new Date(y,m-1,d);
+  const dow = DOW7[dt.getDay()===0?6:dt.getDay()-1];
+  document.getElementById('m-day-select-title').textContent = m+'/'+d+'（'+dow+'） の設定';
+
+  const isApply    = dates.apply    && dates.apply.y===y    && dates.apply.m===m    && dates.apply.d===d;
+  const isDeadline = dates.deadline && dates.deadline.y===y && dates.deadline.m===m && dates.deadline.d===d;
+  const isOpen     = dates.open     && dates.open.y===y     && dates.open.m===m     && dates.open.d===d;
+  const hasSlot    = slots.some(s=>s.y===y&&s.m===m&&s.d===d);
+  const hasAny     = isApply||isDeadline||isOpen||hasSlot;
+
+  const btn = document.getElementById('m-day-reset-btn');
+  btn.style.display = hasAny ? 'inline-flex' : 'none';
+
+  const btnsEl = document.getElementById('m-day-select-btns');
+  btnsEl.innerHTML = `
+    <button class="abtn" onclick="setDayAs('apply')" style="border-color:${isApply?'var(--green)':'var(--border)'};background:${isApply?'var(--green-l)':''};">
+      <div class="ab-ic ic-g">&#128203;</div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--green);">申込開始日</span><span class="ab-d">${isApply?'✓ 設定済み':'この日を申込開始日にする'}</span></div>
+    </button>
+    <button class="abtn" onclick="setDayAs('deadline')" style="border-color:${isDeadline?'var(--red)':'var(--border)'};background:${isDeadline?'var(--red-l)':''};">
+      <div class="ab-ic" style="background:var(--red-l);">&#9203;</div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--red);">締切日</span><span class="ab-d">${isDeadline?'✓ 設定済み':'この日を締切日にする'}</span></div>
+    </button>
+    <button class="abtn" onclick="setDayAs('open')" style="border-color:${isOpen?'var(--blue)':'var(--border)'};background:${isOpen?'var(--blue-l)':''};">
+      <div class="ab-ic ic-p">&#128226;</div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--blue);">シフト公開日</span><span class="ab-d">${isOpen?'✓ 設定済み':'この日をシフト公開日にする'}</span></div>
+    </button>
+    <button class="abtn" onclick="setDayAsSlot()" style="border-color:${hasSlot?'var(--purple)':'var(--border)'};background:${hasSlot?'var(--purple-l)':''};">
+      <div class="ab-ic ic-t">&#127775;</div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--purple);">実施日</span><span class="ab-d">${hasSlot?'✓ 設定済み（クリックで時間帯編集）':'この日を実施日にする'}</span></div>
+    </button>`;
+  openM('m-day-select');
+}
+
+function setDayAs(kind) {
+  if(!daySelectTarget) return;
+  const {y,m,d} = daySelectTarget;
+  datesBak = JSON.parse(JSON.stringify(dates));
+  dates[kind] = {y,m,d};
+  closeM('m-day-select');
+  updDateViews();
+  buildCalScroll();
+  buildInfoArea();
+  // GASに即時保存
+  gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
+    .then(()=>toast((kind==='apply'?'申込開始日':kind==='deadline'?'締切日':'シフト公開日')+'を保存しました','s'))
+    .catch(e=>toast('保存に失敗しました: '+e.message,'e'));
+}
+
+function setDayAsSlot() {
+  if(!daySelectTarget) return;
+  const {y,m,d} = daySelectTarget;
+  closeM('m-day-select');
+  // 既存スロットから読み込み
+  popupDay = {y,m,d};
+  const exist = slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
+  popupTimes = exist.length>0
+    ? exist.map(s=>parseTimeStr(s.time,s.interval))
+    : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
+  renderPopup(y,m,d);
+  // popup-areaが見えるようにスクロール
+  setTimeout(()=>{
+    const el=document.getElementById('popup-area');
+    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },100);
+}
+
+function resetDaySettings() {
+  if(!daySelectTarget) return;
+  const {y,m,d} = daySelectTarget;
+  // 受付日程リセット
+  ['apply','deadline','open'].forEach(k=>{
+    if(dates[k]&&dates[k].y===y&&dates[k].m===m&&dates[k].d===d) dates[k]=null;
+  });
+  // スロットリセット
+  slots = slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+  closeM('m-day-select');
+  updDateViews();
+  buildCalScroll();
+  buildSlotSetList();
+  buildInfoArea();
+  // GASに保存
+  gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
+    .then(()=>toast('設定をリセットしました','s'))
+    .catch(e=>toast('保存に失敗しました: '+e.message,'e'));
+}
+
+// ============================================================
+// カレンダー下の情報エリア
+// ============================================================
+function buildInfoArea() {
+  // 受付日程カード
+  const datesCard = document.getElementById('info-dates-card');
+  const datesRows = document.getElementById('info-dates-rows');
+  const fmt = obj => {
+    if(!obj) return '<span style="color:var(--ink3)">未設定</span>';
+    const dt=new Date(obj.y,obj.m-1,obj.d);
+    const dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];
+    return obj.m+'/'+obj.d+'（'+dow+'）';
+  };
+  if(datesCard && datesRows && (dates.apply||dates.deadline||dates.open)){
+    datesCard.style.display='block';
+    datesRows.innerHTML=`
+      <div class="info-row"><span class="info-label">申込開始</span><span class="info-val green">${fmt(dates.apply)}</span></div>
+      <div class="info-row"><span class="info-label">締切</span><span class="info-val amber">${fmt(dates.deadline)}</span></div>
+      <div class="info-row"><span class="info-label">シフト公開</span><span class="info-val blue">${fmt(dates.open)}</span></div>`;
+  }
+  // 実施日一覧カード
+  const slotsCard = document.getElementById('info-slots-card');
+  const slotsBody = document.getElementById('info-slots-body');
+  if(slotsCard && slotsBody && slots.length>0){
+    slotsCard.style.display='block';
+    const groups={};
+    slots.forEach(s=>{const k=s.y+'/'+s.m+'/'+s.d;if(!groups[k])groups[k]={y:s.y,m:s.m,d:s.d,times:[]};groups[k].times.push(s);});
+    slotsBody.innerHTML=Object.values(groups).map(g=>{
+      const dt=new Date(g.y,g.m-1,g.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];
+      const wn=getWeekNum(g.y,g.m,g.d);
+      return `<div class="slc-group">
+        <div class="slc-date-row"><span class="slc-date">${g.m}/${g.d}（${dow}）</span><span class="slc-week">第${wn}週</span></div>
+        <div class="slc-times">${g.times.map(t=>`<span class="slc-chip">${t.time}</span>`).join('')}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ============================================================
+// 日程設定
+// ============================================================
+function updDateViews() {
+  const fmt = obj => {
+    if(!obj) return '未設定';
+    const dt=new Date(obj.y,obj.m-1,obj.d);
+    return obj.m+'/'+obj.d+'（'+DOW7[dt.getDay()===0?6:dt.getDay()-1]+'）';
+  };
+  // 通常表示
+  document.getElementById('dv-apply').textContent    = fmt(dates.apply);
+  document.getElementById('dv-deadline').textContent = fmt(dates.deadline);
+  document.getElementById('dv-open').textContent     = fmt(dates.open);
+  // 編集表示
+  const fmtE = (obj, id) => {
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.textContent=obj?fmt(obj):'クリックして選択';
+    el.style.color=obj?'var(--ink)':'var(--ink3)';
+  };
+  fmtE(dates.apply,    'de-apply');
+  fmtE(dates.deadline, 'de-deadline');
+  fmtE(dates.open,     'de-open');
+}
+function toggleDateEdit() {
+  if(!dateEditMode){
+    datesBak = JSON.parse(JSON.stringify(dates));
+    dateEditMode=true;
+    document.getElementById('date-view').style.display='none';
+    document.getElementById('date-edit').style.display='block';
+    document.getElementById('date-edit-btn').className='edit-toggle-btn edit-mode';
+    document.getElementById('date-edit-btn').textContent='✕ 閉じる';
+    document.getElementById('sc-lbl').textContent=scY+'年'+scM+'月';
+    buildCalGrid('cg-sched',scY,scM,'sched');
+  } else {
+    cancelDateEdit();
+  }
+}
+function cancelDateEdit() {
+  if(datesBak) dates=JSON.parse(JSON.stringify(datesBak));
+  dateEditMode=false;
+  activeKind=null;
+  document.getElementById('date-view').style.display='block';
+  document.getElementById('date-edit').style.display='none';
+  document.getElementById('date-edit-btn').className='edit-toggle-btn view-mode';
+  document.getElementById('date-edit-btn').textContent='✎ 編集';
+  updDateViews();
+  buildCalScroll();
+}
+function setActiveKind(k) {
+  activeKind=k;
+  document.querySelectorAll('#date-edit-rows .date-row').forEach(el=>el.classList.remove('active'));
+  document.getElementById('dr-'+k).classList.add('active');
+  document.getElementById('dsp-hint').textContent={apply:'申込開始日をカレンダーから選択',deadline:'締切日をカレンダーから選択',open:'シフト公開日をカレンダーから選択'}[k];
+}
+function onScClick(y,m,d) {
+  if(!activeKind) return;
+  dates[activeKind]={y,m,d};
+  updDateViews();
+  buildCalGrid('cg-sched',scY,scM,'sched');
+}
+function chScM(dir){
+  scM+=dir; if(scM>12){scM=1;scY++;} if(scM<1){scM=12;scY--;}
+  document.getElementById('sc-lbl').textContent=scY+'年'+scM+'月';
+  buildCalGrid('cg-sched',scY,scM,'sched');
+}
+async function saveDates() {
+  try {
+    await gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open});
+    toast('日程を保存しました','s');
+    cancelDateEdit();
+    buildInfoArea();
+    buildCalScroll();
+    updStatus();
+  } catch(e){ toast('保存に失敗しました: '+e.message,'e'); }
+}
+
+// ============================================================
+// 実施日設定
+// ============================================================
+function toggleSlotMode() {
+  slotMode=!slotMode;
+  const btn=document.getElementById('slot-mode-btn');
+  const area=document.getElementById('slot-cal-area');
+  btn.className='slot-toggle-btn '+(slotMode?'on':'off');
+  btn.innerHTML=slotMode?'&#10005; 選択を終了':'&#128197; 実施日を選択';
+  area.style.display=slotMode?'block':'none';
+  if(slotMode){
+    document.getElementById('slot-mlbl').textContent=slotY+'年'+slotM+'月';
+    buildCalGrid('cg-slot',slotY,slotM,'slot');
+  } else {
+    closePopup();
+  }
+}
+function chSlotM(dir){
+  slotM+=dir; if(slotM>12){slotM=1;slotY++;} if(slotM<1){slotM=12;slotY--;}
+  document.getElementById('slot-mlbl').textContent=slotY+'年'+slotM+'月';
+  buildCalGrid('cg-slot',slotY,slotM,'slot');
+}
+function onSlotClick(y,m,d,el) {
+  if(!slotMode) return;
+  popupDay={y,m,d};
+  const exist=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
+  popupTimes=exist.length>0
+    ? exist.map(s=>parseTimeStr(s.time,s.interval))
+    : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
+  renderPopup(y,m,d);
+}
+function parseTimeStr(timeStr,interval){
+  const p=timeStr.match(/(\d{1,2}):(\d{2})[~〜](\d{1,2}):(\d{2})/);
+  if(!p) return {sh:'07',sm:'00',eh:'08',em:'30',intv:parseInt(interval)||15};
+  return {sh:p[1].padStart(2,'0'),sm:p[2],eh:p[3].padStart(2,'0'),em:p[4],intv:parseInt(interval)||15};
+}
+function renderPopup(y,m,d){
+  const area=document.getElementById('popup-area');
+  const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
+  const timeOpts = h => HOURS_LIST.map(v=>`<option value="${v}"${v===h?' selected':''}>${v}</option>`).join('');
+  const minOpts  = m => MINS_LIST.map(v=>`<option value="${v}"${v===m?' selected':''}>${v}</option>`).join('');
+  const intvOpts = i => INTV_LIST.map(v=>`<option value="${v}"${v===i?' selected':''}>${v}分</option>`).join('');
+  const rowsHtml=popupTimes.map((t,i)=>`
+    <div class="sp-time-row">
+      <div style="display:flex;gap:2px;">
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sh=this.value">${timeOpts(t.sh)}</select>
+        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sm=this.value">${minOpts(t.sm)}</select>
+      </div>
+      <span class="time-wave">〜</span>
+      <div style="display:flex;gap:2px;">
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].eh=this.value">${timeOpts(t.eh)}</select>
+        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].em=this.value">${minOpts(t.em)}</select>
+      </div>
+      <select class="intv-sel" onchange="popupTimes[${i}].intv=parseInt(this.value)">${intvOpts(t.intv)}</select>
+      <button class="sp-del-btn" onclick="delSpTime(${i})">&#10005;</button>
+    </div>`).join('');
+  area.innerHTML=`<div class="sp-wrap">
+    <div class="sp-hd">
+      <span class="sp-title">${m}/${d}（${dow}）</span>
+      <span class="sp-week-badge">第${wn}週</span>
+    </div>
+    <div class="sp-body">${rowsHtml}</div>
+    <div style="padding:6px 12px;">
+      <button class="sp-add-btn" onclick="addSpTime()">&#65291; 時間帯を追加</button>
+    </div>
+    <div class="sp-ft">
+      <button class="btn btn-g" onclick="closePopup()" style="font-size:11px;padding:5px 12px;">キャンセル</button>
+      <button class="btn btn-p" onclick="confirmSlot()" style="font-size:11px;padding:5px 12px;">確定</button>
+    </div>
+  </div>`;
+}
+function addSpTime(){
+  popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
+  renderPopup(popupDay.y,popupDay.m,popupDay.d);
+}
+function delSpTime(i){
+  popupTimes.splice(i,1);
+  if(popupTimes.length===0) popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
+  renderPopup(popupDay.y,popupDay.m,popupDay.d);
+}
+function closePopup(){document.getElementById('popup-area').innerHTML='';popupDay=null;}
+function confirmSlot(){
+  const{y,m,d}=popupDay;
+  slots=slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+  popupTimes.forEach(t=>{
+    const time=parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em;
+    // intervalは必ず整数に
+    slots.push({y,m,d,time,interval:parseInt(t.intv)||15});
+  });
+  closePopup();
+  buildCalGrid('cg-slot',slotY,slotM,'slot');
+  buildCalScroll();
+  buildSlotSetList();
+  buildInfoArea();
+}
+function buildSlotSetList(){
+  const el=document.getElementById('slot-set-list');
+  if(slots.length===0){el.innerHTML='<div class="slot-empty">実施日がありません。「実施日を選択」から追加してください。</div>';return;}
+  const groups={};
+  slots.forEach(s=>{const k=s.y+'/'+s.m+'/'+s.d;if(!groups[k])groups[k]={y:s.y,m:s.m,d:s.d,times:[]};groups[k].times.push(s);});
+  el.innerHTML=Object.values(groups).map(g=>{
+    const dt=new Date(g.y,g.m-1,g.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(g.y,g.m,g.d);
+    const k=g.y+'/'+g.m+'/'+g.d;
+    return `<div class="sdg">
+      <div class="sdg-hd"><span class="sdg-date">${g.m}/${g.d}（${dow}）</span><span class="sdg-wk">第${wn}週</span></div>
+      <div class="sdg-times">${g.times.map((t,i)=>`<span class="stime">${t.time}</span><span class="sintv">${t.interval}分</span><button class="sdel" onclick="delSlot('${k}',${i})">✕</button>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+function delSlot(key,idx){
+  const[y,m,d]=key.split('/').map(Number);
+  const ds=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
+  slots=slots.filter(s=>s!==ds[idx]);
+  buildSlotSetList(); buildCalScroll(); buildInfoArea();
+}
+function confirmSlotSave(){
+  document.getElementById('sc-done').style.display='none';
+  document.getElementById('sc-st').classList.remove('show');
+  document.getElementById('sc-exec-btn').disabled=false;
+  document.getElementById('sc-ft').innerHTML=`
+    <button class="btn btn-g" onclick="closeM('m-slot-confirm')">キャンセル</button>
+    <button class="btn btn-d" id="sc-exec-btn" onclick="execSlotSave()">保存してカレンダー再生成</button>`;
+  openM('m-slot-confirm');
+}
+async function execSlotSave(){
+  document.getElementById('sc-exec-btn').disabled=true;
+  document.getElementById('sc-st').classList.add('show');
+  try {
+    // intervalを必ず整数として送信
+    const cleanSlots=slots.map(s=>({...s,interval:parseInt(s.interval)||15,y:parseInt(s.y),m:parseInt(s.m),d:parseInt(s.d)}));
+    await gasGet('updateCalendarSlots',{slots:cleanSlots,year:curY,month:curM});
+    document.getElementById('sc-st').classList.remove('show');
+    document.getElementById('sc-done').style.display='block';
+    document.getElementById('sc-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-slot-confirm');loadAdminData()">閉じて更新</button>`;
+    toast('スロットを保存しカレンダーを再生成しました','s');
+  } catch(e){
+    document.getElementById('sc-st').classList.remove('show');
+    document.getElementById('sc-exec-btn').disabled=false;
+    toast('保存に失敗しました: '+e.message,'e');
+  }
+}
+
+// ============================================================
+// シフトフォーム作成（ボタン押下時にデータ取得）
+// ============================================================
+async function openFormModal(){
+  openM('m-form');
+  document.getElementById('m-form-body').innerHTML='<div class="loading-row"><div class="spin"></div>データを読み込み中...</div>';
+  document.getElementById('m-form-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-form\')">閉じる</button>';
+  try {
+    const d = await gasGet('adminData');
+    fcAdminData = d;
+    fcN=1;
+    renderFormModal(d);
+  } catch(e){ document.getElementById('m-form-body').innerHTML='<div style="color:var(--red);font-size:12px;">読み込みに失敗しました: '+e.message+'</div>'; }
+}
+function renderFormModal(d){
+  // 対象月選択
+  let ymOpts='';
+  for(let y=curY-1;y<=curY+2;y++) for(let m=1;m<=12;m++){
+    const sel=(y===curY&&m===curM);
+    ymOpts+=`<option value="${y}-${m}"${sel?' selected':''}>${y}年${m}月</option>`;
+  }
+  // 紐付けUI
+  const curSlots=d.currentSlots||[], prevSlots=d.prevSlots||[];
+  const groups={};
+  curSlots.forEach(s=>{const k=s.dateLabel;if(!groups[k])groups[k]={dl:s.dateLabel,wk:s.week,times:[]};groups[k].times.push(s.time);});
+  const prevGroups={};
+  prevSlots.forEach(s=>{const k=s.dateLabel;if(!prevGroups[k])prevGroups[k]={dl:s.dateLabel,wk:s.week,times:[]};prevGroups[k].times.push(s.time);});
+  mappingResult={};
+  curSlots.forEach(cs=>{
+    const key=cs.week+' '+cs.dateLabel+' '+cs.time;
+    const matched=prevSlots.find(ps=>ps.time===cs.time);
+    mappingResult[key]=matched?matched.week+' '+matched.dateLabel+' '+matched.time:'';
+  });
+  let mapHtml='';
+  if(prevSlots.length===0){
+    // 前月データなくても手動入力エリアを提供
+    mapHtml='<div style="color:var(--ink2);font-size:12px;padding:8px 10px;background:var(--amber-l);border:1px solid #fcd34d;border-radius:var(--r);margin-bottom:8px;">前月のシートが見つかりませんでした。紐付けは不要です。</div>';
+  } else {
+    Object.values(groups).forEach(g=>{
+      mapHtml+=`<div class="map-date-hd">&#128197; ${g.dl} <span style="font-size:10px;opacity:.7;">${g.wk}</span></div>`;
+      g.times.forEach(time=>{
+        const key=g.wk+' '+g.dl+' '+time;
+        const def=mappingResult[key]||'';
+        let opts='<option value="">（なし）</option>';
+        Object.values(prevGroups).forEach(pg=>{
+          opts+=`<optgroup label="${pg.wk}　${pg.dl}">`;
+          pg.times.forEach(pt=>{const pk=pg.wk+' '+pg.dl+' '+pt;opts+=`<option value="${pk}"${pk===def?' selected':''}>${pg.dl}　${pt}</option>`;});
+          opts+='</optgroup>';
+        });
+        mapHtml+=`<div class="map-row"><div class="map-cur">${time}</div><div class="map-arr">&#8594;</div><select class="fsel map-sel" data-key="${key}" style="font-size:11px;padding:4px 7px;">${opts}</select></div>`;
+      });
+      mapHtml+='<div style="height:6px;"></div>';
+    });
+  }
+  // シート配置
+  const newName=curY+'.'+String(curM).padStart(2,'0')+'シフト希望';
+  const existing=(d.sheetNames||[]).filter(n=>n!==newName);
+  const pos=Math.min(3,existing.length+1);
+  sheetListData=[...existing]; sheetListData.splice(pos-1,0,{name:newName,isNew:true});
+  // スロット一覧
+  const slotSummary=slots.length>0
+    ? slots.map(s=>`<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;border-bottom:1px solid var(--border);"><span style="font-family:var(--mono);">${s.m}/${s.d} ${s.time}</span><span style="color:var(--ink3);">${parseInt(s.interval)||15}分</span></div>`).join('')
+    : '<div style="color:var(--ink3);font-size:11px;">実施日が設定されていません</div>';
+
+  document.getElementById('m-form-body').innerHTML=`
+    <div class="steps">
+      <div class="si"><div class="sc on" id="s1">1</div><div class="sl on" id="sl1">年月</div></div>
+      <div class="sln" id="ln1"></div>
+      <div class="si"><div class="sc" id="s2">2</div><div class="sl" id="sl2">紐付け</div></div>
+      <div class="sln" id="ln2"></div>
+      <div class="si"><div class="sc" id="s3">3</div><div class="sl" id="sl3">配置</div></div>
+      <div class="sln" id="ln3"></div>
+      <div class="si"><div class="sc" id="s4">4</div><div class="sl" id="sl4">確認</div></div>
+    </div>
+    <div id="p1">
+      <div class="fg"><label class="fl">対象年月</label><select class="fsel" id="fc-ym-sel">${ymOpts}</select></div>
+    </div>
+    <div id="p2" style="display:none;">
+      <p style="font-size:12px;color:var(--ink2);margin-bottom:9px;">各日付・時間帯と前月の対応スロットを紐付けてください。</p>
+      ${mapHtml}
+    </div>
+    <div id="p3" style="display:none;">
+      <p style="font-size:12px;color:var(--ink2);margin-bottom:9px;">&#9650;&#9660; で新規シートの配置順を変更してください。</p>
+      <div id="sheet-place-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+    <div id="p4" style="display:none;">
+      <div class="sumbox">
+        <div class="sumrow"><span class="sumk">対象月</span><span class="sumv" id="fc-s-ym">--</span></div>
+        <div class="sumrow"><span class="sumk">紐付け</span><span class="sumv" id="fc-s-map">--</span></div>
+        <div class="sumrow"><span class="sumk">シート位置</span><span class="sumv" id="fc-s-pos">--</span></div>
+      </div>
+      <div class="fg">
+        <label class="fl">実施日一覧</label>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;max-height:120px;overflow-y:auto;">${slotSummary}</div>
+      </div>
+      <div class="exec-st" id="fc-st"><div class="spin"></div>処理中...</div>
+      <div class="done-box" id="fc-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">作成完了</div><div class="done-sub" id="fc-done-sub"></div></div>
+    </div>`;
+  document.getElementById('m-form-ft').innerHTML=`
+    <button class="btn btn-g" id="fc-bk" style="display:none;" onclick="fcStep(-1)">戻る</button>
+    <button class="btn btn-g" onclick="closeMReset('m-form','resetFC')">キャンセル</button>
+    <button class="btn btn-p" id="fc-nx" onclick="fcStep(1)">次へ</button>`;
+  renderSheetPlace();
+  updFcSteps();
+}
+function renderSheetPlace(){
+  const el=document.getElementById('sheet-place-list'); if(!el) return;
+  el.innerHTML=sheetListData.map((o,i)=>{
+    const nm=typeof o==='string'?o:o.name, isNew=o.isNew||false;
+    return `<div style="display:flex;align-items:center;gap:7px;padding:7px 10px;border:${isNew?'1.5px solid var(--blue)':'1px solid var(--border)'};border-radius:var(--r);font-size:12px;background:${isNew?'var(--blue-l)':'var(--surface2)'};${isNew?'font-weight:700;color:var(--blue)':''};">
+      <span style="font-size:10px;color:${isNew?'var(--blue)':'var(--ink3)'};width:38px;text-align:right;">${i+1}番目</span>
+      <span style="flex:1;">${nm}</span>
+      ${isNew?`<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 7px;border-radius:10px;">新規</span>`:''}
+      ${isNew?`<div style="display:flex;flex-direction:column;gap:2px;">
+        <button onclick="moveSheet(-1)" style="width:20px;height:18px;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;font-size:10px;"${i===0?' disabled':''}>&#9650;</button>
+        <button onclick="moveSheet(1)" style="width:20px;height:18px;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;font-size:10px;"${i===sheetListData.length-1?' disabled':''}>&#9660;</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+function moveSheet(dir){
+  const idx=sheetListData.findIndex(o=>o.isNew);
+  const t=idx+dir; if(t<0||t>=sheetListData.length) return;
+  const tmp=sheetListData[idx]; sheetListData[idx]=sheetListData[t]; sheetListData[t]=tmp;
+  renderSheetPlace();
+}
+function fcStep(dir){
+  if(dir===1&&fcN===4){execFormCreate();return;}
+  if(dir===1&&fcN===2) document.querySelectorAll('.map-sel').forEach(s=>{mappingResult[s.dataset.key]=s.value;});
+  if(dir===1&&fcN===3){
+    const pos=sheetListData.findIndex(o=>o.isNew)+1;
+    const ymVal=document.getElementById('fc-ym-sel')?.value||curY+'-'+curM;
+    const[fy,fm]=ymVal.split('-').map(Number);
+    const cnt=Object.values(mappingResult).filter(v=>v).length;
+    document.getElementById('fc-s-ym').textContent=fy+'年'+fm+'月';
+    document.getElementById('fc-s-map').textContent=cnt+'件';
+    document.getElementById('fc-s-pos').textContent=pos+'番目';
+  }
+  fcN=Math.min(4,Math.max(1,fcN+dir));
+  updFcSteps();
+}
+function updFcSteps(){
+  for(let i=1;i<=4;i++){
+    const p=document.getElementById('p'+i); if(p) p.style.display=i===fcN?'block':'none';
+    const c=document.getElementById('s'+i),l=document.getElementById('sl'+i);
+    if(c){c.className='sc'+(i<fcN?' dn':i===fcN?' on':'');c.innerHTML=i<fcN?'&#10003;':i;}
+    if(l) l.className='sl'+(i===fcN?' on':'');
+    if(i<4){const ln=document.getElementById('ln'+i);if(ln)ln.className='sln'+(i<fcN?' dn':'');}
+  }
+  const nx=document.getElementById('fc-nx'),bk=document.getElementById('fc-bk');
+  if(nx){nx.textContent=fcN===4?'作成する':'次へ';nx.className='btn '+(fcN===4?'btn-d':'btn-p');}
+  if(bk) bk.style.display=fcN>1?'inline-flex':'none';
+}
+function resetFC(){ fcN=1; }
+async function execFormCreate(){
+  const ymVal=document.getElementById('fc-ym-sel')?.value||curY+'-'+curM;
+  const[fy,fm]=ymVal.split('-').map(Number);
+  const pos=sheetListData.findIndex(o=>o.isNew)+1;
+  const nx=document.getElementById('fc-nx'),bk=document.getElementById('fc-bk');
+  if(nx) nx.disabled=true;
+  if(bk) bk.style.display='none';
+  document.getElementById('fc-st').classList.add('show');
+  try{
+    await gasGet('createForm',{mapping:mappingResult,sheetPosition:pos,year:fy,month:fm});
+    document.getElementById('fc-st').classList.remove('show');
+    document.getElementById('fc-done').style.display='block';
+    document.getElementById('fc-done-sub').textContent=fy+'年'+fm+'月のフォームを作成しました。';
+    document.getElementById('m-form-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-form');loadAdminData()">閉じて更新</button>`;
+    toast('フォームを作成しました','s');
+  }catch(e){
+    document.getElementById('fc-st').classList.remove('show');
+    if(nx){nx.disabled=false;}
+    if(bk) bk.style.display='inline-flex';
+    toast('作成に失敗しました: '+e.message,'e');
+  }
+}
+
+// ============================================================
+// シフト公開（ボタン押下時にシート取得）
+// ============================================================
+async function openShiftPubModal(){
+  openM('m-shift-pub');
+  document.getElementById('m-sp-body').innerHTML='<div class="loading-row"><div class="spin"></div>シート一覧を取得中...</div>';
+  document.getElementById('m-sp-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-shift-pub\')">閉じる</button>';
+  try{
+    const d=await gasGet('adminData');
+    const sheets=d.shiftSheetNames||d.sheetNames||[];
+    if(sheets.length===0){
+      document.getElementById('m-sp-body').innerHTML='<div style="color:var(--ink2);font-size:12px;">シフト作成シートが見つかりません。</div>';
+      return;
+    }
+    document.getElementById('m-sp-body').innerHTML=`
+      <div class="fg"><label class="fl">コピーするシートを選択</label>
+        <div class="sheet-list">${sheets.map((n,i)=>`<label class="sheet-opt"><input type="radio" name="sht" value="${n}"${i===0?' checked':''}><span style="font-family:var(--mono);font-size:11px;">${n}</span></label>`).join('')}</div>
+      </div>
+      <div class="exec-st" id="sp-st"><div class="spin"></div>シフト公開中...</div>
+      <div class="done-box" id="sp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div><div class="done-sub" id="sp-done-sub"></div></div>`;
+    document.getElementById('m-sp-ft').innerHTML=`
+      <button class="btn btn-g" onclick="closeM('m-shift-pub')">キャンセル</button>
+      <button class="btn btn-s" id="sp-exec-btn" onclick="execShiftPub()">公開する</button>`;
+  }catch(e){
+    document.getElementById('m-sp-body').innerHTML='<div style="color:var(--red);font-size:12px;">取得に失敗しました: '+e.message+'</div>';
+  }
+}
+async function execShiftPub(){
+  const sel=document.querySelector('input[name="sht"]:checked');
+  if(!sel){toast('シートを選択してください','e');return;}
+  document.getElementById('sp-exec-btn').disabled=true;
+  document.getElementById('sp-st').classList.add('show');
+  try{
+    const res=await gasGet('publishShift',{sheetName:sel.value});
+    document.getElementById('sp-st').classList.remove('show');
+    document.getElementById('sp-done').style.display='block';
+    if(document.getElementById('sp-done-sub')) document.getElementById('sp-done-sub').textContent=(res.destName||'')+' として公開しました。';
+    document.getElementById('m-sp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-shift-pub')">閉じる</button>`;
+    toast('シフトを公開しました','s');
+  }catch(e){
+    document.getElementById('sp-st').classList.remove('show');
+    document.getElementById('sp-exec-btn').disabled=false;
+    toast('公開に失敗しました: '+e.message,'e');
+  }
+}
+
+// ============================================================
+// 予定表公開
+// ============================================================
+async function openCalPubModal(){
+  openM('m-cal-pub');
+  document.getElementById('m-cp-body').innerHTML='<div class="loading-row"><div class="spin"></div>情報を取得中...</div>';
+  document.getElementById('m-cp-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-cal-pub\')">閉じる</button>';
+  try{
+    const d=await gasGet('adminData');
+    const fmt=obj=>{if(!obj)return '<span style="color:var(--ink3)">未設定</span>';const dt=new Date(obj.y,obj.m-1,obj.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];return obj.m+'/'+obj.d+'（'+dow+'）';};
+    // 実施日をスロットから収集
+    const slotGroups={};
+    slots.forEach(s=>{const k=s.m+'/'+s.d;if(!slotGroups[k])slotGroups[k]=[];slotGroups[k].push(s.time);});
+    const slotKeys=Object.keys(slotGroups).sort((a,b)=>{const[am,ad]=a.split('/').map(Number),[bm,bd]=b.split('/').map(Number);return am!==bm?am-bm:ad-bd;});
+    const slotHtml=slotKeys.length>0
+      ? slotKeys.map(k=>`<div class="sumrow"><span class="sumk" style="color:var(--purple);">実施日</span><span class="sumv" style="color:var(--purple);">${k}（${slotGroups[k].length}枠）</span></div>`).join('')
+      : '<div class="sumrow"><span class="sumk" style="color:var(--ink3);">実施日</span><span class="sumv" style="color:var(--ink3);">未設定</span></div>';
+    let yrOpts='',moOpts='';
+    for(let y=curY-1;y<=curY+2;y++) yrOpts+=`<option value="${y}"${y===curY?' selected':''}>${y}年</option>`;
+    for(let m=1;m<=12;m++) moOpts+=`<option value="${m}"${m===curM?' selected':''}>${m}月</option>`;
+    document.getElementById('m-cp-body').innerHTML=`
+      <div class="fg"><label class="fl">対象年月</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <select class="fsel" id="cp-year">${yrOpts}</select>
+          <select class="fsel" id="cp-month">${moOpts}</select>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">受付日程・実施日</label>
+        <div class="sumbox">
+          <div class="sumrow"><span class="sumk">申込開始</span><span class="sumv" style="color:var(--green);">${fmt(dates.apply)}</span></div>
+          <div class="sumrow"><span class="sumk" style="color:var(--red);">締切</span><span class="sumv" style="color:var(--red);">${fmt(dates.deadline)}</span></div>
+          <div class="sumrow"><span class="sumk">シフト公開</span><span class="sumv" style="color:var(--blue);">${fmt(dates.open)}</span></div>
+          ${slotHtml}
+        </div>
+      </div>
+      <div class="exec-st" id="cp-st"><div class="spin"></div>予定表公開中...</div>
+      <div class="done-box" id="cp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div></div>`;
+    document.getElementById('m-cp-ft').innerHTML=`
+      <button class="btn btn-g" onclick="closeM('m-cal-pub')">キャンセル</button>
+      <button class="btn btn-s" id="cp-exec-btn" onclick="execCalPub()">公開する</button>`;
+  }catch(e){
+    document.getElementById('m-cp-body').innerHTML='<div style="color:var(--red);font-size:12px;">取得に失敗しました: '+e.message+'</div>';
+  }
+}
+async function execCalPub(){
+  const y=parseInt(document.getElementById('cp-year').value);
+  const m=parseInt(document.getElementById('cp-month').value);
+  document.getElementById('cp-exec-btn').disabled=true;
+  document.getElementById('cp-st').classList.add('show');
+  try{
+    await gasGet('publishCalendar',{year:y,month:m});
+    document.getElementById('cp-st').classList.remove('show');
+    document.getElementById('cp-done').style.display='block';
+    document.getElementById('m-cp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-cal-pub')">閉じる</button>`;
+    toast('予定表を公開しました','s');
+  }catch(e){
+    document.getElementById('cp-st').classList.remove('show');
+    document.getElementById('cp-exec-btn').disabled=false;
+    toast('公開に失敗しました: '+e.message,'e');
+  }
+}
+
+// ============================================================
+// 予定表自動作成
+// ============================================================
+async function openAutoModal(){
+  openM('m-auto');
+  document.getElementById('m-auto-body').innerHTML='<div class="loading-row"><div class="spin"></div>情報を取得中...</div>';
+  document.getElementById('m-auto-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-auto\')">閉じる</button>';
+  const slotSummary=slots.length>0
+    ? slots.map(s=>`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="font-family:var(--mono);">${s.m}/${s.d} ${s.time}</span><span style="color:var(--ink3);">${parseInt(s.interval)||15}分刻み</span></div>`).join('')
+    : '<div style="color:var(--ink3);font-size:11px;">実施日が設定されていません</div>';
+  document.getElementById('m-auto-body').innerHTML=`
+    <p style="font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:12px;">カレンダーのスロット情報をもとにシフト作成シートを自動生成します。</p>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 11px;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:6px;">使用スロット（刻み分数含む）</div>
+      ${slotSummary}
+    </div>
+    <div style="font-size:11px;color:var(--ink3);">刻み分数を変更する場合は「設定」タブの実施日設定から変更してください。</div>
+    <div class="exec-st" id="auto-st" style="margin-top:10px;"><div class="spin"></div>シート生成中...</div>
+    <div class="done-box" id="auto-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">生成完了</div></div>`;
+  document.getElementById('m-auto-ft').innerHTML=`
+    <button class="btn btn-g" onclick="closeM('m-auto')">キャンセル</button>
+    <button class="btn btn-p" id="auto-exec-btn" onclick="execAuto()">生成する</button>`;
+}
+async function execAuto(){
+  document.getElementById('auto-exec-btn').disabled=true;
+  document.getElementById('auto-st').classList.add('show');
+  // 刻み分数をスロットから収集
+  const slotsWithIntv = slots.map((s,i)=>{
+    const sel=document.getElementById('auto-intv-'+i);
+    return {...s, interval: sel ? parseInt(sel.value)||15 : parseInt(s.interval)||15};
+  });
+  const ymVal=document.getElementById('auto-ym-sel')?.value||curY+'-'+curM;
+  const[ay,am]=ymVal.split('-').map(Number);
+  try{
+    await gasGet('createScheduleSheet',{year:ay,month:am,slots:slotsWithIntv});
+    document.getElementById('auto-st').classList.remove('show');
+    document.getElementById('auto-done').style.display='block';
+    document.getElementById('m-auto-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-auto')">閉じる</button>`;
+    toast('シフト作成シートを生成しました','s');
+  }catch(e){
+    document.getElementById('auto-st').classList.remove('show');
+    document.getElementById('auto-exec-btn').disabled=false;
+    toast('生成に失敗しました: '+e.message,'e');
+  }
+}
+
+// ============================================================
+// モーダル制御
+// ============================================================
+function openM(id){ document.getElementById(id).classList.add('open'); }
+function closeM(id){ document.getElementById(id).classList.remove('open'); }
+function closeMReset(id, resetFn){ closeM(id); if(resetFn==='resetFC') resetFC(); }
+// オーバーレイクリックで閉じる
+document.addEventListener('click', e => {
+  if(e.target.classList.contains('ov')) closeM(e.target.id);
+});
+
+// ============================================================
+// ユーティリティ
+// ============================================================
+function getWeekNum(y,m,d){
+  const date=new Date(y,m-1,d),dow=date.getDay(),monDow=dow===0?6:dow-1;
+  const mon=new Date(date); mon.setDate(d-monDow);
+  const ms=new Date(y,m-1,1),msDow=ms.getDay(),msMon=msDow===0?6:msDow-1;
+  const fm=new Date(ms); fm.setDate(1-msMon);
+  return Math.floor((mon-fm)/(7*86400000))+1;
+}
+function copyUrl(){
+  navigator.clipboard.writeText('https://jw-utazu.github.io/shift-form/').then(()=>toast('URLをコピーしました','s'));
+}
+function toast(msg,type){
+  const a=document.getElementById('ta');
+  const el=document.createElement('div');
+  el.className='toast'+(type?' '+type:'');
+  el.textContent=(type==='s'?'✓ ':type==='e'?'⚠ ':'')+msg;
+  a.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);
+}
+(function(){
+  if(window.matchMedia('(display-mode: standalone)').matches) return;
+  let deferredPrompt=null;
+  window.addEventListener('beforeinstallprompt', e=>{
+    e.preventDefault(); deferredPrompt=e;
+    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display='block';
+  });
+  window.addEventListener('appinstalled', ()=>{ deferredPrompt=null; toast('インストールしました!','s'); closeM('m-pwa'); });
+  window.openPwaModal=function(){
+    if(window.matchMedia('(display-mode: standalone)').matches){ toast('すでにインストール済みです','s'); return; }
+    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display=deferredPrompt?'block':'none';
+    openM('m-pwa');
+  };
+  window.pwaTriggerInstall=async function(){
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const{outcome}=await deferredPrompt.userChoice; deferredPrompt=null;
+  };
+})();
+</script>
+</body>
+</html>
