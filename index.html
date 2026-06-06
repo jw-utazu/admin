@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>管理アプリ</title>
 <link rel="icon" type="image/png" href="https://jw-utazu.github.io/admin/logo.png">
-<link rel="apple-touch-icon" href="logo.png">
+<link rel="apple-touch-icon" href="https://jw-utazu.github.io/admin/logo.png">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="シフト管理">
@@ -337,6 +337,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 
 /* 時間選択用selectの見た目 */
 .time-sel option{font-family:var(--mono);}
+
+/* 日程一覧カード（3列グリッド） */
+.date-grid-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px;}
+.dgc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1.5px solid var(--border);border-radius:var(--r-lg);padding:10px 6px;background:var(--surface);text-align:center;min-height:72px;}
+.dgc-label{font-size:10px;font-weight:700;color:var(--ink2);}
+.dgc.g{border-color:var(--green);background:var(--green-l);}
+.dgc.g .dgc-label{color:var(--green);}
+.dgc.a{border-color:var(--red);background:var(--red-l);}
+.dgc.a .dgc-label{color:var(--red);}
+.dgc.b{border-color:var(--blue);background:var(--blue-l);}
+.dgc.b .dgc-label{color:var(--blue);}
+.dgc-val{font-size:11px;font-weight:700;color:var(--ink);line-height:1.4;}
+.dgc-val.unset{color:var(--ink3);font-weight:400;font-size:10px;}
 </style>
 </head>
 <body>
@@ -407,15 +420,26 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             </div>
             <div class="sdc-body" id="sdc-body"></div>
           </div>
-          <!-- 受付日程表示カード（カレンダータブ内） -->
+          <!-- 日程一覧カード（カレンダータブ内） -->
           <div class="dsp-card" style="margin-top:10px;">
             <div class="dsp-hd">
-              <span class="dsp-title">受付日程</span>
+              <span class="dsp-title">日程一覧</span>
             </div>
-            <div class="date-rows" id="date-view">
-              <div class="date-row selected-g"><span class="dr-icon">&#128203;</span><span class="dr-label g">申込開始</span><span class="dr-val" id="dv-apply">未設定</span></div>
-              <div class="date-row selected-a"><span class="dr-icon">&#9203;</span><span class="dr-label a" style="color:var(--red);">締切</span><span class="dr-val" id="dv-deadline" style="color:var(--red);">未設定</span></div>
-              <div class="date-row selected-b"><span class="dr-icon">&#128226;</span><span class="dr-label b">シフト公開</span><span class="dr-val" id="dv-open">未設定</span></div>
+            <div id="date-view">
+              <div class="date-grid-cards">
+                <div class="dgc g">
+                  <span class="dgc-label">申込開始</span>
+                  <span class="dgc-val" id="dv-apply"><span class="dgc-val unset">未設定</span></span>
+                </div>
+                <div class="dgc a">
+                  <span class="dgc-label">締切日</span>
+                  <span class="dgc-val" id="dv-deadline"><span class="dgc-val unset">未設定</span></span>
+                </div>
+                <div class="dgc b">
+                  <span class="dgc-label">シフト公開</span>
+                  <span class="dgc-val" id="dv-open"><span class="dgc-val unset">未設定</span></span>
+                </div>
+              </div>
             </div>
           </div>
           <!-- 実施日設定エリア（カレンダータブ内） -->
@@ -1132,10 +1156,11 @@ function updDateViews() {
     const dt=new Date(obj.y,obj.m-1,obj.d);
     return obj.m+'/'+obj.d+'（'+DOW7[dt.getDay()===0?6:dt.getDay()-1]+'）';
   };
-  // 通常表示
-  document.getElementById('dv-apply').textContent    = fmt(dates.apply);
-  document.getElementById('dv-deadline').textContent = fmt(dates.deadline);
-  document.getElementById('dv-open').textContent     = fmt(dates.open);
+  // 通常表示（日程一覧カード）
+  const fmtCard = (obj) => obj ? `<span>${fmt(obj)}</span>` : '<span class="dgc-val unset">未設定</span>';
+  document.getElementById('dv-apply').innerHTML    = fmtCard(dates.apply);
+  document.getElementById('dv-deadline').innerHTML = fmtCard(dates.deadline);
+  document.getElementById('dv-open').innerHTML     = fmtCard(dates.open);
   // 編集表示
   const fmtE = (obj, id) => {
     const el=document.getElementById(id);
