@@ -480,6 +480,26 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">シフト公開</span><span class="ab-d">シートを公開用ファイルへコピー</span></div>
             <span class="ab-ar">›</span>
           </button>
+          <button class="abtn" onclick="openNoticeModal()">
+            <div class="ab-ic" style="background:var(--teal-l);">📢</div>
+            <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openProxyModal()">
+            <div class="ab-ic" style="background:var(--purple-l);">🔄</div>
+            <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openRequestModal()">
+            <div class="ab-ic" style="background:var(--amber-l);">💬</div>
+            <div class="ab-tx"><span class="ab-n">要望確認</span><span class="ab-d">未対応の要望を確認・対応</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="execSyncAccess()">
+            <div class="ab-ic" style="background:var(--green-l);">🔗</div>
+            <div class="ab-tx"><span class="ab-n">権限リストを同期</span><span class="ab-d">公開ファイルの編集者をインポート</span></div>
+            <span class="ab-ar">›</span>
+          </button>
         </div>
       </div>
       <div>
@@ -544,6 +564,39 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     </div>
     <div class="mft" id="m-sp-ft">
       <button class="btn btn-g" onclick="closeM('m-shift-pub')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- お知らせ管理モーダル -->
+<div class="ov" id="m-notice">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">📢 お知らせ管理</span><button class="mx" onclick="closeM('m-notice')">&#10005;</button></div>
+    <div class="mbd" id="m-notice-body"><div class="loading-row"><div class="spin"></div>読み込み中...</div></div>
+    <div class="mft" id="m-notice-ft">
+      <button class="btn btn-g" onclick="closeM('m-notice')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 代理送信設定モーダル -->
+<div class="ov" id="m-proxy">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">🔄 代理送信設定</span><button class="mx" onclick="closeM('m-proxy')">&#10005;</button></div>
+    <div class="mbd" id="m-proxy-body"><div class="loading-row"><div class="spin"></div>読み込み中...</div></div>
+    <div class="mft" id="m-proxy-ft">
+      <button class="btn btn-g" onclick="closeM('m-proxy')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 要望確認モーダル -->
+<div class="ov" id="m-request">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">💬 要望確認</span><button class="mx" onclick="closeM('m-request')">&#10005;</button></div>
+    <div class="mbd" id="m-request-body"><div class="loading-row"><div class="spin"></div>読み込み中...</div></div>
+    <div class="mft" id="m-request-ft">
+      <button class="btn btn-g" onclick="closeM('m-request')">閉じる</button>
     </div>
   </div>
 </div>
@@ -614,7 +667,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 // ============================================================
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycbx1SnmwmKJrrzcVyuJIFiZrCwmRErBKxgxKpmvPrLuKLIvTGVp9aa4p4hrrgknjpPgetw/exec';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
-const ALLOWED   = ['simamodehu@gmail.com','hiroshirie1994@gmail.com','r.trk11021022@gmail.com','maitaki.teppei@gmail.com','jw.utazu@gmail.com'];
+// ALLOWED リストはGAS側で管理（authアクションで判定）
 const DOW7      = ['月','火','水','木','金','土','日'];
 // 時間の選択肢 0〜23
 const HOURS_LIST = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
@@ -692,24 +745,32 @@ function fetchUser(token) {
     .catch(() => showAuthErr('ユーザー情報の取得に失敗しました。'));
 }
 function processUser(u, save = true) {
-  if (!ALLOWED.includes(u.email)) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
-  // ログイン情報をlocalStorageに保存（次回自動ログイン用）
-  if (save) {
-    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture })); } catch(e) {}
-  }
-  document.getElementById('auth').style.display = 'none';
-  document.getElementById('app').style.display  = 'flex';
-  const av = document.getElementById('av');
-  if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
-  else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
-  // デフォルトを翌月に設定
-  const now = new Date();
-  const nextM = now.getMonth() + 2; // 翌月（1ベース）
-  curY = nextM > 12 ? now.getFullYear() + 1 : now.getFullYear();
-  curM = nextM > 12 ? 1 : nextM;
-  scY = curY; scM = curM;
-  slotY = curY; slotM = curM;
-  loadAdminData();
+  // GAS側でisAdminチェック
+  gasPost({ action: 'auth', email: u.email })
+    .then(res => {
+      if (!res || !res.ok || !res.isAdmin) {
+        showAuthErr('このアカウントはアクセスが許可されていません。');
+        return;
+      }
+      // ログイン情報をlocalStorageに保存（次回自動ログイン用）
+      if (save) {
+        try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture })); } catch(e) {}
+      }
+      document.getElementById('auth').style.display = 'none';
+      document.getElementById('app').style.display  = 'flex';
+      const av = document.getElementById('av');
+      if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
+      else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
+      // デフォルトを翌月に設定
+      const now = new Date();
+      const nextM = now.getMonth() + 2;
+      curY = nextM > 12 ? now.getFullYear() + 1 : now.getFullYear();
+      curM = nextM > 12 ? 1 : nextM;
+      scY = curY; scM = curM;
+      slotY = curY; slotM = curM;
+      loadAdminData();
+    })
+    .catch(() => showAuthErr('認証の確認に失敗しました。'));
 }
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch(e) {}
@@ -1547,47 +1608,39 @@ async function execFormCreate(){
 }
 
 // ============================================================
-// シフト公開（ボタン押下時にシート取得）
+// シフト公開（フラグセット版）
 // ============================================================
 async function openShiftPubModal(){
   openM('m-shift-pub');
-  document.getElementById('m-sp-body').innerHTML='<div class="loading-row"><div class="spin"></div>シート一覧を取得中...</div>';
-  document.getElementById('m-sp-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-shift-pub\')">閉じる</button>';
-  try{
-    const d=await gasGet('adminData');
-    const sheets=d.shiftSheetNames||d.sheetNames||[];
-    if(sheets.length===0){
-      document.getElementById('m-sp-body').innerHTML='<div style="color:var(--ink2);font-size:12px;">シフト作成シートが見つかりません。</div>';
-      return;
-    }
-    document.getElementById('m-sp-body').innerHTML=`
-      <div class="fg"><label class="fl">コピーするシートを選択</label>
-        <div class="sheet-list">${sheets.map((n,i)=>`<label class="sheet-opt"><input type="radio" name="sht" value="${n}"${i===0?' checked':''}><span style="font-family:var(--mono);font-size:11px;">${n}</span></label>`).join('')}</div>
-      </div>
-      <div class="exec-st" id="sp-st"><div class="spin"></div>シフト公開中...</div>
-      <div class="done-box" id="sp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div><div class="done-sub" id="sp-done-sub"></div></div>`;
-    document.getElementById('m-sp-ft').innerHTML=`
-      <button class="btn btn-g" onclick="closeM('m-shift-pub')">キャンセル</button>
-      <button class="btn btn-s" id="sp-exec-btn" onclick="execShiftPub()">公開する</button>`;
-  }catch(e){
-    document.getElementById('m-sp-body').innerHTML='<div style="color:var(--red);font-size:12px;">取得に失敗しました: '+e.message+'</div>';
-  }
+  document.getElementById('m-sp-body').innerHTML = `
+    <p style="font-size:13px;color:var(--ink2);line-height:1.8;">
+      シフト公開フラグ（<code>SHIFT_PUBLISHED=true</code>）をセットします。<br>
+      フォームアプリからシフト表が閲覧可能になります。
+    </p>
+    <div class="exec-st" id="sp-st"><div class="spin"></div>公開中...</div>
+    <div class="done-box" id="sp-done" style="display:none;">
+      <div class="done-icon">&#10003;</div>
+      <div class="done-title">公開完了</div>
+      <div class="done-sub" id="sp-done-sub"></div>
+    </div>`;
+  document.getElementById('m-sp-ft').innerHTML = `
+    <button class="btn btn-g" onclick="closeM('m-shift-pub')">キャンセル</button>
+    <button class="btn btn-s" id="sp-exec-btn" onclick="execShiftPub()">公開する</button>`;
 }
 async function execShiftPub(){
-  const sel=document.querySelector('input[name="sht"]:checked');
-  if(!sel){toast('シートを選択してください','e');return;}
-  document.getElementById('sp-exec-btn').disabled=true;
+  document.getElementById('sp-exec-btn').disabled = true;
   document.getElementById('sp-st').classList.add('show');
   try{
-    const res=await gasGet('publishShift',{sheetName:sel.value});
+    await gasGet('publishShift', {});
     document.getElementById('sp-st').classList.remove('show');
-    document.getElementById('sp-done').style.display='block';
-    if(document.getElementById('sp-done-sub')) document.getElementById('sp-done-sub').textContent=(res.destName||'')+' として公開しました。';
-    document.getElementById('m-sp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-shift-pub')">閉じる</button>`;
+    document.getElementById('sp-done').style.display = 'block';
+    if(document.getElementById('sp-done-sub'))
+      document.getElementById('sp-done-sub').textContent = 'シフト公開フラグをセットしました。';
+    document.getElementById('m-sp-ft').innerHTML = `<button class="btn btn-p" onclick="closeM('m-shift-pub')">閉じる</button>`;
     toast('シフトを公開しました','s');
   }catch(e){
     document.getElementById('sp-st').classList.remove('show');
-    document.getElementById('sp-exec-btn').disabled=false;
+    document.getElementById('sp-exec-btn').disabled = false;
     toast('公開に失敗しました: '+e.message,'e');
   }
 }
@@ -1733,8 +1786,234 @@ function toast(msg,type){
   a.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);
 }
-(function(){
-  if(window.matchMedia('(display-mode: standalone)').matches) return;
+// ============================================================
+// gasPost ヘルパー（POSTリクエスト）
+// ============================================================
+function gasPost(payload) {
+  return fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(r => r.json());
+}
+
+// ============================================================
+// エスケープユーティリティ
+// ============================================================
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// お知らせ管理
+// ============================================================
+let noticeEditId = null;
+async function openNoticeModal() {
+  openM('m-notice');
+  await refreshNoticeModal();
+}
+async function refreshNoticeModal() {
+  document.getElementById('m-notice-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
+  try {
+    const d = await gasGet('getNotices');
+    const notices = d.notices || [];
+    let html = `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">新規追加</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <input type="text" id="notice-title-in" placeholder="タイトル" class="fsel" style="font-size:13px;">
+          <textarea id="notice-body-in" placeholder="内容" class="fsel" style="min-height:80px;resize:vertical;font-size:13px;font-family:inherit;"></textarea>
+          <div style="display:flex;gap:8px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+              <input type="checkbox" id="notice-display-in" checked> 表示ON
+            </label>
+            <button class="btn btn-p" onclick="saveNotice()" style="font-size:11px;padding:5px 12px;">保存</button>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">お知らせ一覧（${notices.length}件）</div>`;
+    if (notices.length === 0) {
+      html += '<div style="color:var(--ink3);font-size:12px;text-align:center;padding:16px;">お知らせはありません</div>';
+    } else {
+      html += notices.map(n => `
+        <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:700;margin-bottom:3px;">${esc(n.title)}</div>
+              <div style="font-size:11px;color:var(--ink2);white-space:pre-wrap;">${esc(n.body)}</div>
+              <div style="font-size:10px;color:var(--ink3);margin-top:4px;">${n.date}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+              <button class="btn btn-p" onclick="editNotice(${n.id},'${esc(n.title)}',\`${esc(n.body)}\`)" style="font-size:10px;padding:3px 8px;">編集</button>
+              <button class="btn btn-d" onclick="deleteNotice(${n.id})" style="font-size:10px;padding:3px 8px;">削除</button>
+            </div>
+          </div>
+        </div>`).join('');
+    }
+    document.getElementById('m-notice-body').innerHTML = html;
+    document.getElementById('m-notice-ft').innerHTML = `<button class="btn btn-g" onclick="closeM('m-notice')">閉じる</button>`;
+  } catch (e) {
+    document.getElementById('m-notice-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
+  }
+}
+async function saveNotice() {
+  const title   = document.getElementById('notice-title-in').value.trim();
+  const body    = document.getElementById('notice-body-in').value.trim();
+  const display = document.getElementById('notice-display-in').checked;
+  if (!title) { toast('タイトルを入力してください','e'); return; }
+  try {
+    const payload = { action:'saveNotice', title, body, display };
+    if (noticeEditId) payload.id = noticeEditId;
+    const res = await gasPost(payload);
+    if (!res.ok) throw new Error(res.error || '保存失敗');
+    noticeEditId = null;
+    toast('お知らせを保存しました','s');
+    await refreshNoticeModal();
+  } catch (e) { toast('保存失敗: '+e.message,'e'); }
+}
+function editNotice(id, title, body) {
+  noticeEditId = id;
+  document.getElementById('notice-title-in').value = title;
+  document.getElementById('notice-body-in').value  = body;
+  document.getElementById('notice-display-in').checked = true;
+}
+async function deleteNotice(id) {
+  if (!confirm('このお知らせを削除しますか？')) return;
+  try {
+    const res = await gasPost({ action:'deleteNotice', id });
+    if (!res.ok) throw new Error(res.error || '削除失敗');
+    toast('削除しました','s');
+    await refreshNoticeModal();
+  } catch (e) { toast('削除失敗: '+e.message,'e'); }
+}
+
+// ============================================================
+// 代理送信設定
+// ============================================================
+let _members = [];
+async function openProxyModal() {
+  openM('m-proxy');
+  await refreshProxyModal();
+}
+async function refreshProxyModal() {
+  document.getElementById('m-proxy-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
+  try {
+    const [proxyRes, memberRes] = await Promise.all([
+      gasGet('getProxySettings'),
+      gasGet('getMemberList')
+    ]);
+    _members = (memberRes.members || []).filter(m => m.uid);
+    const settings = proxyRes.settings || [];
+    const memberOpts = _members.map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+    let html = `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">代理設定を追加</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理元（送ってもらう人）</div>
+            <select id="proxy-from-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理先（代わりに送る人）</div>
+            <select id="proxy-to-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select>
+          </div>
+        </div>
+        <button class="btn btn-p" onclick="addProxy()" style="font-size:11px;padding:5px 12px;">追加</button>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">設定一覧（${settings.length}件）</div>`;
+    if (settings.length === 0) {
+      html += '<div style="color:var(--ink3);font-size:12px;text-align:center;padding:16px;">設定がありません</div>';
+    } else {
+      html += settings.map(s => {
+        const fromM = _members.find(m => m.uid === s.fromUid);
+        const toM   = _members.find(m => m.uid === s.toUid);
+        const fromN = fromM ? fromM.name : s.fromUid;
+        const toN   = toM   ? toM.name   : s.toUid;
+        return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:12px;">${esc(fromN)} → ${esc(toN)}</span>
+          <button class="btn btn-d" onclick="deleteProxy(${s.rowIndex})" style="font-size:10px;padding:3px 8px;">解除</button>
+        </div>`;
+      }).join('');
+    }
+    document.getElementById('m-proxy-body').innerHTML = html;
+  } catch (e) {
+    document.getElementById('m-proxy-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
+  }
+}
+async function addProxy() {
+  const fromUid = document.getElementById('proxy-from-sel').value;
+  const toUid   = document.getElementById('proxy-to-sel').value;
+  if (!fromUid || !toUid) { toast('両方選択してください','e'); return; }
+  if (fromUid === toUid)  { toast('同じ人は設定できません','e'); return; }
+  try {
+    const res = await gasPost({ action:'saveProxySetting', fromUid, toUid });
+    if (!res.ok) throw new Error(res.error || '追加失敗');
+    toast('代理設定を追加しました','s');
+    await refreshProxyModal();
+  } catch (e) { toast('追加失敗: '+e.message,'e'); }
+}
+async function deleteProxy(rowIndex) {
+  if (!confirm('この代理設定を解除しますか？')) return;
+  try {
+    const res = await gasPost({ action:'deleteProxySetting', rowIndex });
+    if (!res.ok) throw new Error(res.error || '削除失敗');
+    toast('解除しました','s');
+    await refreshProxyModal();
+  } catch (e) { toast('解除失敗: '+e.message,'e'); }
+}
+
+// ============================================================
+// 要望確認
+// ============================================================
+async function openRequestModal() {
+  openM('m-request');
+  await refreshRequestModal();
+}
+async function refreshRequestModal() {
+  document.getElementById('m-request-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
+  try {
+    const d = await gasGet('getRequests');
+    const requests = (d.requests || []).filter(r => r.status === '未対応');
+    let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">未対応: ${requests.length}件</div>`;
+    if (requests.length === 0) {
+      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">未対応の要望はありません 🎉</div>';
+    } else {
+      html += requests.map(r => `
+        <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:12px;font-weight:700;">${esc(r.name)}</span>
+            <span style="font-size:10px;color:var(--ink3);">${r.sentAt}</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink);white-space:pre-wrap;margin-bottom:8px;">${esc(r.body)}</div>
+          <button class="btn btn-g" onclick="resolveRequest(${r.rowIndex})" style="font-size:11px;padding:4px 10px;">対応済みにする</button>
+        </div>`).join('');
+    }
+    document.getElementById('m-request-body').innerHTML = html;
+  } catch (e) {
+    document.getElementById('m-request-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
+  }
+}
+async function resolveRequest(rowIndex) {
+  try {
+    const res = await gasPost({ action:'resolveRequest', rowIndex });
+    if (!res.ok) throw new Error(res.error || '更新失敗');
+    toast('対応済みにしました','s');
+    await refreshRequestModal();
+  } catch (e) { toast('更新失敗: '+e.message,'e'); }
+}
+
+// ============================================================
+// 権限リスト同期
+// ============================================================
+async function execSyncAccess() {
+  if (!confirm('公開ファイルの編集者・閲覧者をアクセス許可リストに同期しますか？')) return;
+  try {
+    const res = await gasGet('syncAccessList');
+    if (!res.ok) throw new Error(res.error || '同期失敗');
+    toast(`同期完了（${res.added}件追加）`,'s');
+  } catch (e) { toast('同期失敗: '+e.message,'e'); }
+}
+
   let deferredPrompt=null;
   window.addEventListener('beforeinstallprompt', e=>{
     e.preventDefault(); deferredPrompt=e;
