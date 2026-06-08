@@ -480,26 +480,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">シフト公開</span><span class="ab-d">シートを公開用ファイルへコピー</span></div>
             <span class="ab-ar">›</span>
           </button>
-          <button class="abtn" onclick="openNoticeModal()">
-            <div class="ab-ic" style="background:var(--teal-l);">📢</div>
-            <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" onclick="openProxyModal()">
-            <div class="ab-ic" style="background:var(--purple-l);">🔄</div>
-            <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" onclick="openRequestModal()">
-            <div class="ab-ic" style="background:var(--amber-l);">💬</div>
-            <div class="ab-tx"><span class="ab-n">要望確認</span><span class="ab-d">未対応の要望を確認・対応</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" onclick="execSyncAccess()">
-            <div class="ab-ic" style="background:var(--green-l);">🔗</div>
-            <div class="ab-tx"><span class="ab-n">権限リストを同期</span><span class="ab-d">公開ファイルの編集者をインポート</span></div>
-            <span class="ab-ar">›</span>
-          </button>
         </div>
       </div>
       <div>
@@ -513,11 +493,59 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
         <div class="plbl">アプリ</div>
         <button onclick="openPwaModal()" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--blue-l);border:1.5px solid var(--blue);border-radius:var(--r);cursor:pointer;font-family:var(--sans);color:var(--blue);font-size:12px;font-weight:700;"><span style="font-size:15px;">📲</span><span>ホーム画面に追加</span></button>
       </div>
+      <!-- 新機能ボタン -->
+      <div class="sec">
+        <div class="slab">追加機能</div>
+        <button class="abtn" onclick="openNoticeModal()">
+          <div class="ab-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</div>
+          <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
+          <span class="ab-ar">›</span>
+        </button>
+        <button class="abtn" onclick="openProxyModal()">
+          <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔄</div>
+          <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
+          <span class="ab-ar">›</span>
+        </button>
+        <button class="abtn" onclick="openRequestModal()">
+          <div class="ab-ic" style="background:#fef3c7;color:#d97706;">💬</div>
+          <div class="ab-tx"><span class="ab-n">要望確認</span><span class="ab-d">未対応の要望を確認・対応</span></div>
+          <span class="ab-ar">›</span>
+        </button>
+        <button class="abtn" onclick="execSyncAccess()">
+          <div class="ab-ic" style="background:var(--green-l);color:var(--green);">🔗</div>
+          <div class="ab-tx"><span class="ab-n">権限リストを同期</span><span class="ab-d">公開ファイルの編集者をインポート</span></div>
+          <span class="ab-ar">›</span>
+        </button>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- MODALS -->
+<!-- お知らせ管理モーダル -->
+<div class="ov" id="m-notice">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">📢 お知らせ管理</span><button class="mx" onclick="closeM('m-notice')">&#10005;</button></div>
+    <div class="mbd" id="m-notice-body">読み込み中...</div>
+    <div class="mft" id="m-notice-ft"><button class="btn btn-g" onclick="closeM('m-notice')">閉じる</button></div>
+  </div>
+</div>
+<!-- 代理送信設定モーダル -->
+<div class="ov" id="m-proxy">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">🔄 代理送信設定</span><button class="mx" onclick="closeM('m-proxy')">&#10005;</button></div>
+    <div class="mbd" id="m-proxy-body">読み込み中...</div>
+    <div class="mft" id="m-proxy-ft"><button class="btn btn-g" onclick="closeM('m-proxy')">閉じる</button></div>
+  </div>
+</div>
+<!-- 要望確認モーダル -->
+<div class="ov" id="m-request">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">💬 要望確認</span><button class="mx" onclick="closeM('m-request')">&#10005;</button></div>
+    <div class="mbd" id="m-request-body">読み込み中...</div>
+    <div class="mft" id="m-request-ft"><button class="btn btn-g" onclick="closeM('m-request')">閉じる</button></div>
+  </div>
+</div>
 <div class="ov" id="m-pwa">
   <div class="modal sm">
     <div class="mhd"><span class="mt">📲 ホーム画面に追加</span><button class="mx" onclick="closeM('m-pwa')">&#10005;</button></div>
@@ -564,39 +592,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     </div>
     <div class="mft" id="m-sp-ft">
       <button class="btn btn-g" onclick="closeM('m-shift-pub')">閉じる</button>
-    </div>
-  </div>
-</div>
-
-<!-- お知らせ管理モーダル -->
-<div class="ov" id="m-notice">
-  <div class="modal" style="max-width:520px;">
-    <div class="mhd"><span class="mt">📢 お知らせ管理</span><button class="mx" onclick="closeM('m-notice')">&#10005;</button></div>
-    <div class="mbd" id="m-notice-body"><div class="loading-row"><div class="spin"></div>読み込み中...</div></div>
-    <div class="mft" id="m-notice-ft">
-      <button class="btn btn-g" onclick="closeM('m-notice')">閉じる</button>
-    </div>
-  </div>
-</div>
-
-<!-- 代理送信設定モーダル -->
-<div class="ov" id="m-proxy">
-  <div class="modal" style="max-width:520px;">
-    <div class="mhd"><span class="mt">🔄 代理送信設定</span><button class="mx" onclick="closeM('m-proxy')">&#10005;</button></div>
-    <div class="mbd" id="m-proxy-body"><div class="loading-row"><div class="spin"></div>読み込み中...</div></div>
-    <div class="mft" id="m-proxy-ft">
-      <button class="btn btn-g" onclick="closeM('m-proxy')">閉じる</button>
-    </div>
-  </div>
-</div>
-
-<!-- 要望確認モーダル -->
-<div class="ov" id="m-request">
-  <div class="modal" style="max-width:520px;">
-    <div class="mhd"><span class="mt">💬 要望確認</span><button class="mx" onclick="closeM('m-request')">&#10005;</button></div>
-    <div class="mbd" id="m-request-body"><div class="loading-row"><div class="spin"></div>読み込み中...</div></div>
-    <div class="mft" id="m-request-ft">
-      <button class="btn btn-g" onclick="closeM('m-request')">閉じる</button>
     </div>
   </div>
 </div>
@@ -667,7 +662,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 // ============================================================
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycbx1SnmwmKJrrzcVyuJIFiZrCwmRErBKxgxKpmvPrLuKLIvTGVp9aa4p4hrrgknjpPgetw/exec';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
-// ALLOWED リストはGAS側で管理（authアクションで判定）
+// ALLOWED配列は廃止（GASの管理者一覧シートで判定）
 const DOW7      = ['月','火','水','木','金','土','日'];
 // 時間の選択肢 0〜23
 const HOURS_LIST = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
@@ -716,7 +711,7 @@ function tryAutoLogin() {
     const saved = localStorage.getItem('adminUser');
     if (saved) {
       const u = JSON.parse(saved);
-      if (u && u.email && ALLOWED.includes(u.email)) {
+      if (u && u.email) {
         processUser(u, false); // 保存しなおさない
         return;
       }
@@ -745,32 +740,31 @@ function fetchUser(token) {
     .catch(() => showAuthErr('ユーザー情報の取得に失敗しました。'));
 }
 function processUser(u, save = true) {
-  // GAS側でisAdminチェック
-  gasPost({ action: 'auth', email: u.email })
-    .then(res => {
-      if (!res || !res.ok || !res.isAdmin) {
-        showAuthErr('このアカウントはアクセスが許可されていません。');
-        return;
-      }
-      // ログイン情報をlocalStorageに保存（次回自動ログイン用）
-      if (save) {
-        try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture })); } catch(e) {}
-      }
-      document.getElementById('auth').style.display = 'none';
-      document.getElementById('app').style.display  = 'flex';
-      const av = document.getElementById('av');
-      if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
-      else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
-      // デフォルトを翌月に設定
-      const now = new Date();
-      const nextM = now.getMonth() + 2;
-      curY = nextM > 12 ? now.getFullYear() + 1 : now.getFullYear();
-      curM = nextM > 12 ? 1 : nextM;
-      scY = curY; scM = curM;
-      slotY = curY; slotM = curM;
-      loadAdminData();
-    })
-    .catch(() => showAuthErr('認証の確認に失敗しました。'));
+  _processUserWithGasAuth(u, save);
+}
+async function _processUserWithGasAuth(u, save) {
+  try {
+    const res = await fetch(GAS_URL + '?action=auth&email=' + encodeURIComponent(u.email)).then(r => r.json());
+    if (!res.ok) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
+    if (!res.isAdmin) { showAuthErr('このアカウントには管理者権限がありません。'); return; }
+  } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
+  // ログイン情報をlocalStorageに保存（次回自動ログイン用）
+  if (save) {
+    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture })); } catch(e) {}
+  }
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('app').style.display  = 'flex';
+  const av = document.getElementById('av');
+  if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
+  else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
+  // デフォルトを翌月に設定
+  const now = new Date();
+  const nextM = now.getMonth() + 2; // 翌月（1ベース）
+  curY = nextM > 12 ? now.getFullYear() + 1 : now.getFullYear();
+  curM = nextM > 12 ? 1 : nextM;
+  scY = curY; scM = curM;
+  slotY = curY; slotM = curM;
+  loadAdminData();
 }
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch(e) {}
@@ -1608,39 +1602,33 @@ async function execFormCreate(){
 }
 
 // ============================================================
-// シフト公開（フラグセット版）
+// シフト公開（SHIFT_PUBLISHED フラグセットのみ）
 // ============================================================
 async function openShiftPubModal(){
   openM('m-shift-pub');
-  document.getElementById('m-sp-body').innerHTML = `
+  document.getElementById('m-sp-body').innerHTML=`
     <p style="font-size:13px;color:var(--ink2);line-height:1.8;">
       シフト公開フラグ（<code>SHIFT_PUBLISHED=true</code>）をセットします。<br>
       フォームアプリからシフト表が閲覧可能になります。
     </p>
     <div class="exec-st" id="sp-st"><div class="spin"></div>公開中...</div>
-    <div class="done-box" id="sp-done" style="display:none;">
-      <div class="done-icon">&#10003;</div>
-      <div class="done-title">公開完了</div>
-      <div class="done-sub" id="sp-done-sub"></div>
-    </div>`;
-  document.getElementById('m-sp-ft').innerHTML = `
+    <div class="done-box" id="sp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div><div class="done-sub" id="sp-done-sub">シフト公開フラグをセットしました。</div></div>`;
+  document.getElementById('m-sp-ft').innerHTML=`
     <button class="btn btn-g" onclick="closeM('m-shift-pub')">キャンセル</button>
     <button class="btn btn-s" id="sp-exec-btn" onclick="execShiftPub()">公開する</button>`;
 }
 async function execShiftPub(){
-  document.getElementById('sp-exec-btn').disabled = true;
+  document.getElementById('sp-exec-btn').disabled=true;
   document.getElementById('sp-st').classList.add('show');
   try{
-    await gasGet('publishShift', {});
+    await gasGet('publishShift',{});
     document.getElementById('sp-st').classList.remove('show');
-    document.getElementById('sp-done').style.display = 'block';
-    if(document.getElementById('sp-done-sub'))
-      document.getElementById('sp-done-sub').textContent = 'シフト公開フラグをセットしました。';
-    document.getElementById('m-sp-ft').innerHTML = `<button class="btn btn-p" onclick="closeM('m-shift-pub')">閉じる</button>`;
+    document.getElementById('sp-done').style.display='block';
+    document.getElementById('m-sp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-shift-pub')">閉じる</button>`;
     toast('シフトを公開しました','s');
   }catch(e){
     document.getElementById('sp-st').classList.remove('show');
-    document.getElementById('sp-exec-btn').disabled = false;
+    document.getElementById('sp-exec-btn').disabled=false;
     toast('公開に失敗しました: '+e.message,'e');
   }
 }
@@ -1696,6 +1684,7 @@ async function execCalPub(){
   document.getElementById('cp-exec-btn').disabled=true;
   document.getElementById('cp-st').classList.add('show');
   try{
+    // スプレッドシートコピー廃止→スクリプトプロパティへの書き込みのみ
     await gasGet('publishCalendar',{year:y,month:m});
     document.getElementById('cp-st').classList.remove('show');
     document.getElementById('cp-done').style.display='block';
@@ -1786,6 +1775,26 @@ function toast(msg,type){
   a.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);
 }
+(function(){
+  if(window.matchMedia('(display-mode: standalone)').matches) return;
+  let deferredPrompt=null;
+  window.addEventListener('beforeinstallprompt', e=>{
+    e.preventDefault(); deferredPrompt=e;
+    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display='block';
+  });
+  window.addEventListener('appinstalled', ()=>{ deferredPrompt=null; toast('インストールしました!','s'); closeM('m-pwa'); });
+  window.openPwaModal=function(){
+    if(window.matchMedia('(display-mode: standalone)').matches){ toast('すでにインストール済みです','s'); return; }
+    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display=deferredPrompt?'block':'none';
+    openM('m-pwa');
+  };
+  window.pwaTriggerInstall=async function(){
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const{outcome}=await deferredPrompt.userChoice; deferredPrompt=null;
+  };
+})();
+
 // ============================================================
 // gasPost ヘルパー（POSTリクエスト）
 // ============================================================
@@ -1798,16 +1807,9 @@ function gasPost(payload) {
 }
 
 // ============================================================
-// エスケープユーティリティ
-// ============================================================
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ============================================================
 // お知らせ管理
 // ============================================================
-let noticeEditId = null;
+let _noticeEditId = null;
 async function openNoticeModal() {
   openM('m-notice');
   await refreshNoticeModal();
@@ -1819,15 +1821,14 @@ async function refreshNoticeModal() {
     const notices = d.notices || [];
     let html = `
       <div style="margin-bottom:14px;">
-        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">新規追加</div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">${_noticeEditId ? '編集中 (ID:'+_noticeEditId+')' : '新規追加'}</div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <input type="text" id="notice-title-in" placeholder="タイトル" class="fsel" style="font-size:13px;">
           <textarea id="notice-body-in" placeholder="内容" class="fsel" style="min-height:80px;resize:vertical;font-size:13px;font-family:inherit;"></textarea>
-          <div style="display:flex;gap:8px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
-              <input type="checkbox" id="notice-display-in" checked> 表示ON
-            </label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" id="notice-display-in" checked> 表示ON</label>
             <button class="btn btn-p" onclick="saveNotice()" style="font-size:11px;padding:5px 12px;">保存</button>
+            ${_noticeEditId ? '<button class="btn btn-g" onclick="_noticeEditId=null;refreshNoticeModal()" style="font-size:11px;padding:5px 10px;">キャンセル</button>' : ''}
           </div>
         </div>
       </div>
@@ -1839,12 +1840,12 @@ async function refreshNoticeModal() {
         <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
             <div style="flex:1;">
-              <div style="font-size:12px;font-weight:700;margin-bottom:3px;">${esc(n.title)}</div>
-              <div style="font-size:11px;color:var(--ink2);white-space:pre-wrap;">${esc(n.body)}</div>
-              <div style="font-size:10px;color:var(--ink3);margin-top:4px;">${n.date}</div>
+              <div style="font-size:13px;font-weight:700;">${esc(n.title)}</div>
+              <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc(n.body||'').slice(0,60)}${(n.body||'').length>60?'…':''}</div>
+              <div style="font-size:10px;color:var(--ink3);">表示: ${n.display?'<span style="color:var(--green);">ON</span>':'<span style="color:var(--red);">OFF</span>'}</div>
             </div>
-            <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
-              <button class="btn btn-p" onclick="editNotice(${n.id},'${esc(n.title)}',\`${esc(n.body)}\`)" style="font-size:10px;padding:3px 8px;">編集</button>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button class="btn btn-g" onclick="editNotice(${n.id},'${esc(n.title).replace(/'/g,"\\'")}','${esc(n.body||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:3px 8px;">編集</button>
               <button class="btn btn-d" onclick="deleteNotice(${n.id})" style="font-size:10px;padding:3px 8px;">削除</button>
             </div>
           </div>
@@ -1860,37 +1861,37 @@ async function saveNotice() {
   const title   = document.getElementById('notice-title-in').value.trim();
   const body    = document.getElementById('notice-body-in').value.trim();
   const display = document.getElementById('notice-display-in').checked;
-  if (!title) { toast('タイトルを入力してください','e'); return; }
+  if (!title) { toast('タイトルを入力してください', 'e'); return; }
   try {
-    const payload = { action:'saveNotice', title, body, display };
-    if (noticeEditId) payload.id = noticeEditId;
+    const payload = { action: 'saveNotice', title, body, display };
+    if (_noticeEditId) payload.id = _noticeEditId;
     const res = await gasPost(payload);
     if (!res.ok) throw new Error(res.error || '保存失敗');
-    noticeEditId = null;
-    toast('お知らせを保存しました','s');
+    _noticeEditId = null;
+    toast('お知らせを保存しました', 's');
     await refreshNoticeModal();
-  } catch (e) { toast('保存失敗: '+e.message,'e'); }
+  } catch (e) { toast('保存失敗: ' + e.message, 'e'); }
 }
 function editNotice(id, title, body) {
-  noticeEditId = id;
-  document.getElementById('notice-title-in').value = title;
-  document.getElementById('notice-body-in').value  = body;
-  document.getElementById('notice-display-in').checked = true;
+  _noticeEditId = id;
+  document.getElementById('notice-title-in') && (document.getElementById('notice-title-in').value = title);
+  document.getElementById('notice-body-in')  && (document.getElementById('notice-body-in').value  = body);
+  document.getElementById('notice-display-in') && (document.getElementById('notice-display-in').checked = true);
 }
 async function deleteNotice(id) {
   if (!confirm('このお知らせを削除しますか？')) return;
   try {
-    const res = await gasPost({ action:'deleteNotice', id });
+    const res = await gasPost({ action: 'deleteNotice', id });
     if (!res.ok) throw new Error(res.error || '削除失敗');
-    toast('削除しました','s');
+    toast('削除しました', 's');
     await refreshNoticeModal();
-  } catch (e) { toast('削除失敗: '+e.message,'e'); }
+  } catch (e) { toast('削除失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
 // 代理送信設定
 // ============================================================
-let _members = [];
+let _proxyMembers = [];
 async function openProxyModal() {
   openM('m-proxy');
   await refreshProxyModal();
@@ -1898,25 +1899,18 @@ async function openProxyModal() {
 async function refreshProxyModal() {
   document.getElementById('m-proxy-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const [proxyRes, memberRes] = await Promise.all([
-      gasGet('getProxySettings'),
-      gasGet('getMemberList')
-    ]);
-    _members = (memberRes.members || []).filter(m => m.uid);
+    const [proxyRes, memberRes] = await Promise.all([gasGet('getProxySettings'), gasGet('getMemberList')]);
+    _proxyMembers = (memberRes.members || []).filter(m => m.uid);
     const settings = proxyRes.settings || [];
-    const memberOpts = _members.map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+    const memberOpts = _proxyMembers.map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
     let html = `
       <div style="margin-bottom:14px;">
         <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">代理設定を追加</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-          <div>
-            <div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理元（送ってもらう人）</div>
-            <select id="proxy-from-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select>
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理先（代わりに送る人）</div>
-            <select id="proxy-to-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select>
-          </div>
+          <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理元（送ってもらう人）</div>
+            <select id="proxy-from-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select></div>
+          <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理先（代わりに送る人）</div>
+            <select id="proxy-to-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select></div>
         </div>
         <button class="btn btn-p" onclick="addProxy()" style="font-size:11px;padding:5px 12px;">追加</button>
       </div>
@@ -1925,12 +1919,10 @@ async function refreshProxyModal() {
       html += '<div style="color:var(--ink3);font-size:12px;text-align:center;padding:16px;">設定がありません</div>';
     } else {
       html += settings.map(s => {
-        const fromM = _members.find(m => m.uid === s.fromUid);
-        const toM   = _members.find(m => m.uid === s.toUid);
-        const fromN = fromM ? fromM.name : s.fromUid;
-        const toN   = toM   ? toM.name   : s.toUid;
+        const fromM = _proxyMembers.find(m => m.uid === s.fromUid);
+        const toM   = _proxyMembers.find(m => m.uid === s.toUid);
         return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:12px;">${esc(fromN)} → ${esc(toN)}</span>
+          <span style="font-size:12px;">${esc(fromM?fromM.name:s.fromUid)} → ${esc(toM?toM.name:s.toUid)}</span>
           <button class="btn btn-d" onclick="deleteProxy(${s.rowIndex})" style="font-size:10px;padding:3px 8px;">解除</button>
         </div>`;
       }).join('');
@@ -1943,23 +1935,23 @@ async function refreshProxyModal() {
 async function addProxy() {
   const fromUid = document.getElementById('proxy-from-sel').value;
   const toUid   = document.getElementById('proxy-to-sel').value;
-  if (!fromUid || !toUid) { toast('両方選択してください','e'); return; }
-  if (fromUid === toUid)  { toast('同じ人は設定できません','e'); return; }
+  if (!fromUid || !toUid) { toast('両方選択してください', 'e'); return; }
+  if (fromUid === toUid)  { toast('同じ人は設定できません', 'e'); return; }
   try {
-    const res = await gasPost({ action:'saveProxySetting', fromUid, toUid });
+    const res = await gasPost({ action: 'saveProxySetting', fromUid, toUid });
     if (!res.ok) throw new Error(res.error || '追加失敗');
-    toast('代理設定を追加しました','s');
+    toast('代理設定を追加しました', 's');
     await refreshProxyModal();
-  } catch (e) { toast('追加失敗: '+e.message,'e'); }
+  } catch (e) { toast('追加失敗: ' + e.message, 'e'); }
 }
 async function deleteProxy(rowIndex) {
   if (!confirm('この代理設定を解除しますか？')) return;
   try {
-    const res = await gasPost({ action:'deleteProxySetting', rowIndex });
+    const res = await gasPost({ action: 'deleteProxySetting', rowIndex });
     if (!res.ok) throw new Error(res.error || '削除失敗');
-    toast('解除しました','s');
+    toast('解除しました', 's');
     await refreshProxyModal();
-  } catch (e) { toast('解除失敗: '+e.message,'e'); }
+  } catch (e) { toast('解除失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
@@ -1982,9 +1974,9 @@ async function refreshRequestModal() {
         <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);">
           <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
             <span style="font-size:12px;font-weight:700;">${esc(r.name)}</span>
-            <span style="font-size:10px;color:var(--ink3);">${r.sentAt}</span>
+            <span style="font-size:10px;color:var(--ink3);">${esc(r.sentAt||'')}</span>
           </div>
-          <div style="font-size:13px;color:var(--ink);white-space:pre-wrap;margin-bottom:8px;">${esc(r.body)}</div>
+          <div style="font-size:13px;color:var(--ink);white-space:pre-wrap;margin-bottom:8px;">${esc(r.body||'')}</div>
           <button class="btn btn-g" onclick="resolveRequest(${r.rowIndex})" style="font-size:11px;padding:4px 10px;">対応済みにする</button>
         </div>`).join('');
     }
@@ -1995,11 +1987,11 @@ async function refreshRequestModal() {
 }
 async function resolveRequest(rowIndex) {
   try {
-    const res = await gasPost({ action:'resolveRequest', rowIndex });
+    const res = await gasPost({ action: 'resolveRequest', rowIndex });
     if (!res.ok) throw new Error(res.error || '更新失敗');
-    toast('対応済みにしました','s');
+    toast('対応済みにしました', 's');
     await refreshRequestModal();
-  } catch (e) { toast('更新失敗: '+e.message,'e'); }
+  } catch (e) { toast('更新失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
@@ -2010,27 +2002,18 @@ async function execSyncAccess() {
   try {
     const res = await gasGet('syncAccessList');
     if (!res.ok) throw new Error(res.error || '同期失敗');
-    toast(`同期完了（${res.added}件追加）`,'s');
-  } catch (e) { toast('同期失敗: '+e.message,'e'); }
+    toast(`同期完了（${res.added}件追加）`, 's');
+  } catch (e) { toast('同期失敗: ' + e.message, 'e'); }
 }
 
-  let deferredPrompt=null;
-  window.addEventListener('beforeinstallprompt', e=>{
-    e.preventDefault(); deferredPrompt=e;
-    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display='block';
-  });
-  window.addEventListener('appinstalled', ()=>{ deferredPrompt=null; toast('インストールしました!','s'); closeM('m-pwa'); });
-  window.openPwaModal=function(){
-    if(window.matchMedia('(display-mode: standalone)').matches){ toast('すでにインストール済みです','s'); return; }
-    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display=deferredPrompt?'block':'none';
-    openM('m-pwa');
-  };
-  window.pwaTriggerInstall=async function(){
-    if(!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const{outcome}=await deferredPrompt.userChoice; deferredPrompt=null;
-  };
-};
+// ============================================================
+// エスケープユーティリティ（既存にない場合）
+// ============================================================
+if (typeof esc === 'undefined') {
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+}
 </script>
 </body>
 </html>
