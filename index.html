@@ -744,7 +744,33 @@ function processUser(u, save = true) {
 }
 async function _processUserWithGasAuth(u, save) {
   try {
-    const res = await fetch(GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email)).then(r => r.json());
+    // JSONP方式でCORSを回避（fetchは使わない）
+    const res = await new Promise((resolve, reject) => {
+      const cbName = '_authcb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const url = GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email) + '&callback=' + cbName;
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return; done = true;
+        delete window[cbName];
+        reject(new Error('タイムアウト'));
+      }, 30000);
+      window[cbName] = d => {
+        if (done) return; done = true;
+        clearTimeout(timer);
+        delete window[cbName];
+        if (sc.parentNode) sc.parentNode.removeChild(sc);
+        resolve(d);
+      };
+      const sc = document.createElement('script');
+      sc.onerror = () => {
+        if (done) return; done = true;
+        clearTimeout(timer);
+        delete window[cbName];
+        reject(new Error('通信エラー'));
+      };
+      sc.src = url;
+      document.head.appendChild(sc);
+    });
     if (!res.ok) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
     if (!res.isAdmin) { showAuthErr('このアカウントには管理者権限がありません。'); return; }
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
@@ -814,13 +840,7 @@ function gasGet(action, params) {
         if(done) return; done=true;
         clearTimeout(timer);
         delete window[cbName];
-        // fetchフォールバック
-        fetch(url+'&callback=noop', {mode:'no-cors'}).catch(()=>{});
-        // no-corsでは結果が取れないのでfetch+json試行
-        fetch(url).then(r=>r.json()).then(d=>{
-          if (d && d.error && !d.ok) return reject(new Error(d.error));
-          resolve(d);
-        }).catch(()=>reject(new Error('通信エラー（GASへの接続に失敗）')));
+        reject(new Error('通信エラー（GASへの接続に失敗）'));
       };
       sc.src = fetchUrl;
       document.head.appendChild(sc);
@@ -1796,14 +1816,13 @@ function toast(msg,type){
 })();
 
 // ============================================================
-// gasPost ヘルパー（POSTリクエスト）
+// gasPost ヘルパー（JSONP GET方式でCORSを回避）
 // ============================================================
 function gasPost(payload) {
-  return fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  }).then(r => r.json());
+  const action = payload.action;
+  const params = Object.assign({}, payload);
+  delete params.action;
+  return gasGet(action, Object.keys(params).length ? params : null);
 }
 
 // ============================================================
