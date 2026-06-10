@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>PW管理アプリ</title>
-<link rel="icon" type="image/png" href="./logo.png">
-<link rel="apple-touch-icon" href="./logo.png">
+<link rel="icon" type="image/png" href="https://jw-utazu.github.io/admin/logo.png">
+<link rel="apple-touch-icon" href="https://jw-utazu.github.io/admin/logo.png">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="シフト管理">
@@ -744,7 +744,7 @@ function processUser(u, save = true) {
 }
 async function _processUserWithGasAuth(u, save) {
   try {
-    const res = await fetch(GAS_URL + '?action=auth&email=' + encodeURIComponent(u.email)).then(r => r.json());
+    const res = await fetch(GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email)).then(r => r.json());
     if (!res.ok) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
     if (!res.isAdmin) { showAuthErr('このアカウントには管理者権限がありません。'); return; }
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
