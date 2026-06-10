@@ -744,33 +744,25 @@ function processUser(u, save = true) {
 }
 async function _processUserWithGasAuth(u, save) {
   try {
-    // JSONP方式でCORSを回避（fetchは使わない）
-    const res = await new Promise((resolve, reject) => {
-      const cbName = '_authcb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-      const url = GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email) + '&callback=' + cbName;
-      let done = false;
-      const timer = setTimeout(() => {
-        if (done) return; done = true;
-        delete window[cbName];
-        reject(new Error('タイムアウト'));
-      }, 30000);
-      window[cbName] = d => {
-        if (done) return; done = true;
+    // fetch方式（リダイレクト追従対応・Android Chrome対応）
+    const cbName = '_authcb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const url = GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email) + '&callback=' + cbName;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    const res = await fetch(url, { redirect: 'follow', signal: controller.signal })
+      .then(r => r.text())
+      .then(text => {
         clearTimeout(timer);
-        delete window[cbName];
-        if (sc.parentNode) sc.parentNode.removeChild(sc);
-        resolve(d);
-      };
-      const sc = document.createElement('script');
-      sc.onerror = () => {
-        if (done) return; done = true;
+        const start = text.indexOf('(');
+        const end   = text.lastIndexOf(')');
+        if (start === -1 || end === -1) throw new Error('レスポンス形式エラー');
+        return JSON.parse(text.slice(start + 1, end));
+      })
+      .catch(err => {
         clearTimeout(timer);
-        delete window[cbName];
-        reject(new Error('通信エラー'));
-      };
-      sc.src = url;
-      document.head.appendChild(sc);
-    });
+        if (err.name === 'AbortError') throw new Error('タイムアウト');
+        throw new Error('通信エラー');
+      });
     if (!res.ok) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
     if (!res.isAdmin) { showAuthErr('このアカウントには管理者権限がありません。'); return; }
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
@@ -801,78 +793,30 @@ function signOut() {
 function showAuthErr(msg) { const el=document.getElementById('auth-err'); el.textContent=msg; el.classList.add('show'); }
 
 // ============================================================
-// JSONP通信
+// GAS通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
 // ============================================================
-function jsonp(url, cb) {
-  const n = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-  window[n] = d => { delete window[n]; document.head.removeChild(sc); cb(null,d); };
-  const sc = document.createElement('script');
-  sc.onerror = () => { delete window[n]; cb(new Error('通信エラー')); };
-  sc.src = url+'&callback='+n; document.head.appendChild(sc);
-}
 function gasGet(action, params) {
-  return new Promise((resolve,reject) => {
-    let url = GAS_URL+'?action='+action;
-    if (params) url += '&params='+encodeURIComponent(JSON.stringify(params));
-
-    // fetch API を優先（スマホ対応）
-    if (window.fetch) {
-      const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const fetchUrl = url + '&callback='+cbName;
-      let done = false;
-      const timer = setTimeout(() => {
-        if(done) return; done=true;
-        delete window[cbName];
-        reject(new Error('通信タイムアウト（GASが応答しませんでした）'));
-      }, 180000);
-
-      // まずJSONPスクリプト方式で試み、失敗時はfetchで再試行
-      const sc = document.createElement('script');
-      window[cbName] = d => {
-        if(done) return; done=true;
-        clearTimeout(timer);
-        delete window[cbName];
-        if(sc.parentNode) sc.parentNode.removeChild(sc);
-        if (d && d.error && !d.ok) return reject(new Error(d.error));
-        resolve(d);
-      };
-      sc.onerror = () => {
-        if(done) return; done=true;
-        clearTimeout(timer);
-        delete window[cbName];
-        reject(new Error('通信エラー（GASへの接続に失敗）'));
-      };
-      sc.src = fetchUrl;
-      document.head.appendChild(sc);
-      return;
-    }
-
-    // fetch未対応環境は従来のJSONP
-    const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-    let done = false;
-    const timer = setTimeout(() => {
-      if(done) return; done=true;
-      delete window[cbName];
-      reject(new Error('通信タイムアウト（GASが応答しませんでした）'));
-    }, 180000);
-    window[cbName] = d => {
-      if(done) return; done=true;
+  const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  let url = GAS_URL+'?action='+action+'&callback='+cbName;
+  if (params) url += '&params='+encodeURIComponent(JSON.stringify(params));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180000);
+  return fetch(url, { redirect: 'follow', signal: controller.signal })
+    .then(r => r.text())
+    .then(text => {
       clearTimeout(timer);
-      delete window[cbName];
-      if(sc.parentNode) sc.parentNode.removeChild(sc);
-      if (d && d.error && !d.ok) return reject(new Error(d.error));
-      resolve(d);
-    };
-    const sc = document.createElement('script');
-    sc.onerror = () => {
-      if(done) return; done=true;
+      const start = text.indexOf('(');
+      const end   = text.lastIndexOf(')');
+      if (start === -1 || end === -1) throw new Error('レスポンス形式エラー');
+      const d = JSON.parse(text.slice(start + 1, end));
+      if (d && d.error && !d.ok) throw new Error(d.error);
+      return d;
+    })
+    .catch(err => {
       clearTimeout(timer);
-      delete window[cbName];
-      reject(new Error('通信エラー（GASへの接続に失敗）'));
-    };
-    sc.src = url+'&callback='+cbName;
-    document.head.appendChild(sc);
-  });
+      if (err.name === 'AbortError') throw new Error('通信タイムアウト（GASが応答しませんでした）');
+      throw new Error(err.message || '通信エラー（GASへの接続に失敗）');
+    });
 }
 
 // ============================================================
