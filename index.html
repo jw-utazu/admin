@@ -350,6 +350,36 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .dgc.b .dgc-label{color:var(--blue);}
 .dgc-val{font-size:11px;font-weight:700;color:var(--ink);line-height:1.4;}
 .dgc-val.unset{color:var(--ink3);font-weight:400;font-size:10px;}
+/* 日程保存ボタン */
+.save-dates-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);background:var(--surface2);color:var(--ink3);}
+.save-dates-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
+.save-dates-btn:disabled{opacity:.5;cursor:default;}
+/* 月次一括処理モーダル */
+.monthly-step{display:none;}.monthly-step.on{display:block;}
+.ms-title{font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:10px;}
+.ms-check-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);}
+.ms-check-row:last-child{border-bottom:none;}
+.ms-check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--purple);}
+.ms-check-row label{font-size:13px;font-weight:500;cursor:pointer;}
+.ms-info-row{display:flex;gap:8px;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border);}
+.ms-info-row:last-child{border-bottom:none;}
+.ms-info-k{color:var(--ink3);width:100px;flex-shrink:0;}
+.ms-info-v{font-weight:700;color:var(--ink);}
+.ms-step-nav{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+.ms-btn{padding:7px 18px;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);}
+.ms-btn.primary{background:var(--purple);color:#fff;border-color:var(--purple);}
+.ms-btn.sec{background:var(--surface2);color:var(--ink2);}
+.ms-prog-row{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border);}
+.ms-prog-row:last-child{border-bottom:none;}
+.ms-prog-ic{width:20px;text-align:center;}
+.ms-prog-label{flex:1;}
+.ms-prog-st{font-size:11px;font-weight:700;color:var(--ink3);}
+.ms-prog-st.running{color:var(--amber);}
+.ms-prog-st.done{color:var(--green);}
+.ms-prog-st.err{color:var(--red);}
+.step-indicator{display:flex;gap:6px;margin-bottom:14px;}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);}
+.step-dot.on{background:var(--purple);}
 </style>
 </head>
 <body>
@@ -422,8 +452,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           </div>
           <!-- 日程一覧カード（カレンダータブ内） -->
           <div class="dsp-card" style="margin-top:10px;">
-            <div class="dsp-hd">
+            <div class="dsp-hd" style="display:flex;align-items:center;justify-content:space-between;">
               <span class="dsp-title">日程一覧</span>
+              <button id="save-dates-btn" class="save-dates-btn" onclick="saveDates()" disabled>💾 日程を保存</button>
             </div>
             <div id="date-view">
               <div class="date-grid-cards">
@@ -460,26 +491,26 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
       <div>
         <div class="plbl">処理メニュー</div>
         <div class="ag">
-          <button class="abtn" onclick="openCalPubModal()">
+          <button class="abtn" onclick="openMonthlyModal()">
             <div class="ab-ic ic-a">&#128197;</div>
-            <div class="ab-tx"><span class="ab-n">予定表公開</span><span class="ab-d">予定表を外部ファイルへコピー</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" onclick="openFormModal()">
-            <div class="ab-ic ic-p">&#128221;</div>
-            <div class="ab-tx"><span class="ab-n">シフトフォーム作成</span><span class="ab-d">スロット紐付け・シート配置</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" onclick="openAutoModal()">
-            <div class="ab-ic ic-t">&#9881;</div>
-            <div class="ab-tx"><span class="ab-n">シフト作成枠作成</span><span class="ab-d">シフト作成シートを生成</span></div>
+            <div class="ab-tx"><span class="ab-n">🗓 月次一括処理</span><span class="ab-d">予定表公開・フォーム作成・シート作成</span></div>
             <span class="ab-ar">›</span>
           </button>
           <button class="abtn" onclick="openShiftPubModal()">
             <div class="ab-ic ic-g">&#128228;</div>
-            <div class="ab-tx"><span class="ab-n">シフト公開</span><span class="ab-d">シートを公開用ファイルへコピー</span></div>
+            <div class="ab-tx"><span class="ab-n">シフト公開</span><span class="ab-d">シフト公開フラグをセット</span></div>
             <span class="ab-ar">›</span>
           </button>
+          <a class="abtn" href="./shift-create.html" target="_blank">
+            <div class="ab-ic ic-p">&#9999;</div>
+            <div class="ab-tx"><span class="ab-n">✏️ シフト作成</span><span class="ab-d">シフト割り当て画面を開く</span></div>
+            <span class="ab-ar">›</span>
+          </a>
+          <a class="abtn" href="./shift-wish.html" target="_blank">
+            <div class="ab-ic ic-t">&#128203;</div>
+            <div class="ab-tx"><span class="ab-n">📋 希望確認</span><span class="ab-d">シフト希望一覧を表示</span></div>
+            <span class="ab-ar">›</span>
+          </a>
         </div>
       </div>
       <div>
@@ -570,6 +601,96 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     <div class="mft"><button class="btn btn-g" onclick="closeM('m-pwa')">閉じる</button></div>
   </div>
 </div>
+<!-- 月次一括処理 -->
+<div class="ov" id="m-monthly">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">🗓 月次一括処理</span><button class="mx" onclick="closeM('m-monthly')">&#10005;</button></div>
+    <div class="mbd" id="m-monthly-body">
+      <!-- Step 1: 処理選択 -->
+      <div class="monthly-step on" id="mstep-1">
+        <div class="step-indicator">
+          <div class="step-dot on" id="sdot-1"></div>
+          <div class="step-dot" id="sdot-2"></div>
+          <div class="step-dot" id="sdot-3"></div>
+          <div class="step-dot" id="sdot-4"></div>
+        </div>
+        <div class="ms-title">実行する処理を選択してください</div>
+        <div class="ms-check-row">
+          <input type="checkbox" id="mc-calpub" checked>
+          <label for="mc-calpub">📅 予定表公開</label>
+        </div>
+        <div class="ms-check-row">
+          <input type="checkbox" id="mc-form" checked>
+          <label for="mc-form">📝 シフトフォーム作成</label>
+        </div>
+        <div class="ms-check-row">
+          <input type="checkbox" id="mc-sheet" checked>
+          <label for="mc-sheet">⚙️ シフト作成枠作成</label>
+        </div>
+        <div class="ms-step-nav">
+          <button class="ms-btn sec" onclick="closeM('m-monthly')">キャンセル</button>
+          <button class="ms-btn primary" onclick="monthlyStep(2)">次へ →</button>
+        </div>
+      </div>
+      <!-- Step 2: 内容確認 -->
+      <div class="monthly-step" id="mstep-2">
+        <div class="step-indicator">
+          <div class="step-dot" id="sdot2-1"></div>
+          <div class="step-dot on" id="sdot2-2"></div>
+          <div class="step-dot" id="sdot2-3"></div>
+          <div class="step-dot" id="sdot2-4"></div>
+        </div>
+        <div class="ms-title">設定内容の確認</div>
+        <div id="mstep2-dates"></div>
+        <div class="ms-step-nav">
+          <button class="ms-btn sec" onclick="monthlyStep(1)">← 戻る</button>
+          <button class="ms-btn primary" onclick="monthlyGoStep3or4()">次へ →</button>
+        </div>
+      </div>
+      <!-- Step 3: フォーム作成設定 -->
+      <div class="monthly-step" id="mstep-3">
+        <div class="step-indicator">
+          <div class="step-dot" id="sdot3-1"></div>
+          <div class="step-dot" id="sdot3-2"></div>
+          <div class="step-dot on" id="sdot3-3"></div>
+          <div class="step-dot" id="sdot3-4"></div>
+        </div>
+        <div class="ms-title">フォーム作成設定</div>
+        <div id="mstep3-body">
+          <p style="font-size:12px;color:var(--ink2);">スロット紐付け・シート配置を設定します（省略可）</p>
+          <div style="margin-top:8px;font-size:12px;">
+            <label>シート配置位置：
+              <input type="number" id="ms-sheet-pos" value="3" min="1" max="20" style="width:60px;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;">
+            </label>
+          </div>
+        </div>
+        <div class="ms-step-nav">
+          <button class="ms-btn sec" onclick="monthlyStep(2)">← 戻る</button>
+          <button class="ms-btn primary" onclick="monthlyStep(4)">次へ →</button>
+        </div>
+      </div>
+      <!-- Step 4: 実行 -->
+      <div class="monthly-step" id="mstep-4">
+        <div class="step-indicator">
+          <div class="step-dot" id="sdot4-1"></div>
+          <div class="step-dot" id="sdot4-2"></div>
+          <div class="step-dot" id="sdot4-3"></div>
+          <div class="step-dot on" id="sdot4-4"></div>
+        </div>
+        <div class="ms-title">処理を実行します</div>
+        <div id="mstep4-list"></div>
+        <div id="mstep4-done" style="display:none;margin-top:10px;">
+          <div class="done-box"><div class="done-icon">&#10003;</div><div class="done-title">すべて完了しました</div></div>
+        </div>
+        <div class="ms-step-nav" id="mstep4-nav">
+          <button class="ms-btn sec" onclick="monthlyStep(3)" id="mstep4-back">← 戻る</button>
+          <button class="ms-btn primary" onclick="execMonthly()" id="mstep4-exec">実行</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- シフトフォーム作成 -->
 <div class="ov" id="m-form">
   <div class="modal">
@@ -1084,10 +1205,9 @@ function setDayAs(kind) {
   updDateViews();
   buildCalScroll();
   buildInfoArea();
-  // GASに即時保存
-  gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
-    .then(()=>toast((kind==='apply'?'申込開始日':kind==='deadline'?'締切日':'シフト公開日')+'を保存しました','s'))
-    .catch(e=>toast('保存に失敗しました: '+e.message,'e'));
+  // 変更フラグを立てて保存ボタンを活性化
+  datesChanged = true;
+  updSaveDatesBtn();
 }
 
 function setDayAsSlot() {
@@ -1233,11 +1353,19 @@ function chScM(dir){
   document.getElementById('sc-lbl').textContent=scY+'年'+scM+'月';
   buildCalGrid('cg-sched',scY,scM,'sched');
 }
+let datesChanged = false;
+function updSaveDatesBtn() {
+  const btn = document.getElementById('save-dates-btn');
+  if (!btn) return;
+  btn.disabled = !datesChanged;
+  btn.className = 'save-dates-btn' + (datesChanged ? ' active' : '');
+}
 async function saveDates() {
   try {
-    await gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open});
+    await gasGet('saveDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open});
     toast('日程を保存しました','s');
-    cancelDateEdit();
+    datesChanged = false;
+    updSaveDatesBtn();
     buildInfoArea();
     buildCalScroll();
     updStatus();
@@ -1977,6 +2105,147 @@ if (typeof esc === 'undefined') {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 }
+// ============================================================
+// 月次一括処理
+// ============================================================
+let monthlyChecks = { calpub: true, form: true, sheet: true };
+
+function openMonthlyModal() {
+  // チェック状態リセット
+  document.getElementById('mc-calpub').checked = true;
+  document.getElementById('mc-form').checked = true;
+  document.getElementById('mc-sheet').checked = true;
+  monthlyStep(1);
+  openM('m-monthly');
+}
+
+function monthlyStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('mstep-' + i);
+    if (el) el.className = 'monthly-step' + (i === n ? ' on' : '');
+  }
+  if (n === 2) buildMstep2();
+  if (n === 4) buildMstep4();
+}
+
+function monthlyGoStep3or4() {
+  monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
+  monthlyChecks.form   = document.getElementById('mc-form').checked;
+  monthlyChecks.sheet  = document.getElementById('mc-sheet').checked;
+  if (!monthlyChecks.calpub && !monthlyChecks.form && !monthlyChecks.sheet) {
+    toast('処理を1つ以上選択してください', 'e'); return;
+  }
+  // フォーム作成がONならStep3へ、OFFならStep4へ
+  if (monthlyChecks.form) {
+    monthlyStep(3);
+  } else {
+    monthlyStep(4);
+  }
+}
+
+function buildMstep2() {
+  const fmt = obj => {
+    if (!obj) return '<span style="color:var(--ink3)">未設定</span>';
+    const dt = new Date(obj.y, obj.m - 1, obj.d);
+    const dow = ['日','月','火','水','木','金','土'][dt.getDay()];
+    return obj.m + '/' + obj.d + '（' + dow + '）';
+  };
+  const slotGroups = {};
+  slots.forEach(s => {
+    const k = s.m + '/' + s.d;
+    if (!slotGroups[k]) slotGroups[k] = [];
+    slotGroups[k].push(s.time);
+  });
+  const slotKeys = Object.keys(slotGroups).sort((a,b) => {
+    const [am,ad]=a.split('/').map(Number), [bm,bd]=b.split('/').map(Number);
+    return am!==bm ? am-bm : ad-bd;
+  });
+  let html = '<div style="font-size:12px;color:var(--ink2);margin-bottom:6px;">以下の設定で処理を実行します</div>';
+  html += '<div class="ms-info-row"><span class="ms-info-k">申込開始</span><span class="ms-info-v" style="color:var(--green);">' + fmt(dates.apply) + '</span></div>';
+  html += '<div class="ms-info-row"><span class="ms-info-k">締切日</span><span class="ms-info-v" style="color:var(--red);">' + fmt(dates.deadline) + '</span></div>';
+  html += '<div class="ms-info-row"><span class="ms-info-k">シフト公開</span><span class="ms-info-v" style="color:var(--blue);">' + fmt(dates.open) + '</span></div>';
+  if (slotKeys.length > 0) {
+    slotKeys.forEach(k => {
+      html += '<div class="ms-info-row"><span class="ms-info-k" style="color:var(--purple);">実施日</span><span class="ms-info-v" style="color:var(--purple);">' + k + '（' + slotGroups[k].length + '枠）</span></div>';
+    });
+  } else {
+    html += '<div class="ms-info-row"><span class="ms-info-k">実施日</span><span class="ms-info-v" style="color:var(--ink3);">未設定</span></div>';
+  }
+  document.getElementById('mstep2-dates').innerHTML = html;
+}
+
+function buildMstep4() {
+  monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
+  monthlyChecks.form   = document.getElementById('mc-form').checked;
+  monthlyChecks.sheet  = document.getElementById('mc-sheet').checked;
+  const tasks = [];
+  if (monthlyChecks.calpub) tasks.push({ id: 'calpub', label: '予定表公開' });
+  if (monthlyChecks.form)   tasks.push({ id: 'form',   label: 'シフトフォーム作成' });
+  if (monthlyChecks.sheet)  tasks.push({ id: 'sheet',  label: 'シフト作成枠作成' });
+  document.getElementById('mstep4-list').innerHTML = tasks.map(t =>
+    `<div class="ms-prog-row" id="mpr-${t.id}">
+      <span class="ms-prog-ic" id="mpic-${t.id}">⏳</span>
+      <span class="ms-prog-label">${t.label}</span>
+      <span class="ms-prog-st" id="mpst-${t.id}">待機中</span>
+    </div>`
+  ).join('');
+  document.getElementById('mstep4-done').style.display = 'none';
+  document.getElementById('mstep4-back').style.display = '';
+  document.getElementById('mstep4-exec').style.display = '';
+}
+
+async function execMonthly() {
+  document.getElementById('mstep4-back').style.display = 'none';
+  document.getElementById('mstep4-exec').style.display = 'none';
+
+  const sheetPos = parseInt(document.getElementById('ms-sheet-pos')?.value || '3');
+
+  async function runTask(id, label, fn) {
+    document.getElementById('mpic-' + id).textContent = '⏳';
+    document.getElementById('mpst-' + id).textContent = '実行中...';
+    document.getElementById('mpst-' + id).className = 'ms-prog-st running';
+    try {
+      await fn();
+      document.getElementById('mpic-' + id).textContent = '✅';
+      document.getElementById('mpst-' + id).textContent = '完了';
+      document.getElementById('mpst-' + id).className = 'ms-prog-st done';
+    } catch (e) {
+      document.getElementById('mpic-' + id).textContent = '❌';
+      document.getElementById('mpst-' + id).textContent = 'エラー: ' + e.message;
+      document.getElementById('mpst-' + id).className = 'ms-prog-st err';
+      throw e;
+    }
+  }
+
+  try {
+    if (monthlyChecks.calpub) {
+      await runTask('calpub', '予定表公開', () =>
+        gasGet('publishCalendar', { year: curY, month: curM })
+      );
+    }
+    if (monthlyChecks.form) {
+      await runTask('form', 'シフトフォーム作成', () =>
+        gasGet('createFormSheet', { year: curY, month: curM, sheetPosition: sheetPos })
+      );
+    }
+    if (monthlyChecks.sheet) {
+      await runTask('sheet', 'シフト作成枠作成', () =>
+        gasGet('createShiftSheet', { year: curY, month: curM })
+      );
+    }
+    document.getElementById('mstep4-done').style.display = 'block';
+    // 閉じるボタン表示
+    document.getElementById('mstep4-nav').innerHTML = '<button class="ms-btn primary" onclick="closeM('m-monthly')">閉じる</button>';
+    toast('月次一括処理が完了しました', 's');
+  } catch (e) {
+    // エラー時は戻るボタンを再表示
+    document.getElementById('mstep4-nav').innerHTML =
+      '<button class="ms-btn sec" onclick="monthlyStep(monthlyChecks.form ? 3 : 2)">← 戻る</button>' +
+      '<button class="ms-btn primary" onclick="execMonthly()">再実行</button>';
+    toast('処理中にエラーが発生しました', 'e');
+  }
+}
+
 </script>
 </body>
 </html>
