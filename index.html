@@ -2235,7 +2235,7 @@ async function execMonthly() {
     }
     document.getElementById('mstep4-done').style.display = 'block';
     // 閉じるボタン表示
-    document.getElementById('mstep4-nav').innerHTML = '<button class="ms-btn primary" onclick="closeM('m-monthly')">閉じる</button>';
+    document.getElementById('mstep4-nav').innerHTML = '<button class="ms-btn primary" onclick="closeM(&quot;m-monthly&quot;)">閉じる</button>';
     toast('月次一括処理が完了しました', 's');
   } catch (e) {
     // エラー時は戻るボタンを再表示
