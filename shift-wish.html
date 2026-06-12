@@ -290,15 +290,13 @@ async function loadData() {
   document.getElementById('loading-overlay').style.display = 'flex';
   document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">読み込み中...</div>';
   try {
-    const params = new URLSearchParams(location.search);
-    const now = new Date();
-    const year  = parseInt(params.get('year'))  || now.getFullYear();
-    const month = parseInt(params.get('month')) || now.getMonth() + 1;
+    // 年月はGASのカレンダーシート（D3・F3）から取得（パラメータ省略）
+    const res = await gasGet('getWishData', {});
+    const year  = res.year  || new Date().getFullYear();
+    const month = res.month || new Date().getMonth() + 1;
 
     document.getElementById('hdr-title').textContent = 'シフト希望確認 — ' + year + '年' + month + '月';
     document.getElementById('sb-ym').textContent = year + '年' + month + '月';
-
-    const res = await gasGet('getWishData', { year, month });
     if (!res.ok) throw new Error(res.error || '取得失敗');
     wishData = res;
 
