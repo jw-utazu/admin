@@ -83,7 +83,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .lo-msg{font-size:13px;color:var(--ink2);}
 
 /* トースト */
-.ta{position:fixed;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:5px;}
+.ta{position:fixed;bottom:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:5px;}
 .toast{background:var(--ink);color:#fff;border-radius:var(--r);padding:8px 13px;font-size:12px;animation:t-up .18s ease;box-shadow:0 4px 12px rgba(0,0,0,.2);}
 .toast.s{background:var(--green);}
 .toast.e{background:var(--red);}
@@ -110,7 +110,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 </div>
 
 <!-- Google Sign-In -->
-<script src="https://accounts.google.com/gsi/client"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="renderGsiButton()"></script>
 
 <!-- アプリ本体 -->
 <div id="app-screen" style="display:none;flex-direction:column;height:100%;">
@@ -239,10 +239,13 @@ function showApp() {
 
 async function onGoogleLogin(resp) {
   try {
+    toast('認証中...', '');
     const payload = JSON.parse(atob(resp.credential.split('.')[1]));
     const email   = payload.email;
+    toast('GAS通信中: ' + email, '');
     const d = await gasGet('auth', { email, source: 'admin' });
-    if (!d.ok || !d.isAdmin) { toast('管理者権限がありません', 'e'); return; }
+    toast('GAS応答: ok=' + d.ok + ' isAdmin=' + d.isAdmin + ' reason=' + (d.reason||''), '');
+    if (!d.ok || !d.isAdmin) { toast('管理者権限がありません (reason:' + (d.reason||'none') + ')', 'e'); return; }
     adminUser = { email, name: d.name || email, uid: d.uid || '', isAdmin: true };
     localStorage.setItem('adminUser', JSON.stringify(adminUser));
     showApp();
