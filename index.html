@@ -505,13 +505,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <span class="ab-ar">›</span>
           </button>
           <a class="abtn" href="./shift-create.html" target="_blank">
-            <div class="ab-ic ic-p">&#9999;</div>
-            <div class="ab-tx"><span class="ab-n">✏️ シフト作成</span><span class="ab-d">シフト割り当て画面を開く</span></div>
-            <span class="ab-ar">›</span>
-          </a>
-          <a class="abtn" href="./shift-wish.html" target="_blank">
-            <div class="ab-ic ic-t">&#128203;</div>
-            <div class="ab-tx"><span class="ab-n">📋 希望確認</span><span class="ab-d">シフト希望一覧を表示</span></div>
+            <div class="ab-ic ic-p">&#128202;</div>
+            <div class="ab-tx"><span class="ab-n">🗂 シフト管理アプリ</span><span class="ab-d">シフト作成・希望確認・設定</span></div>
             <span class="ab-ar">›</span>
           </a>
         </div>
@@ -638,10 +633,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <input type="checkbox" id="mc-form" checked>
           <label for="mc-form">📝 シフトフォーム作成</label>
         </div>
-        <div class="ms-check-row">
-          <input type="checkbox" id="mc-sheet" checked>
-          <label for="mc-sheet">⚙️ シフト作成枠作成</label>
-        </div>
         <div class="ms-step-nav">
           <button class="ms-btn sec" onclick="closeM('m-monthly')">キャンセル</button>
           <button class="ms-btn primary" onclick="monthlyStep(2)">次へ →</button>
@@ -745,18 +736,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   </div>
 </div>
 
-<!-- 予定表自動作成 -->
-<div class="ov" id="m-auto">
-  <div class="modal sm">
-    <div class="mhd"><span class="mt">&#9881; 予定表自動作成</span><button class="mx" onclick="closeM('m-auto')">&#10005;</button></div>
-    <div class="mbd" id="m-auto-body">
-      <div class="loading-row"><div class="spin"></div>情報を取得中...</div>
-    </div>
-    <div class="mft" id="m-auto-ft">
-      <button class="btn btn-g" onclick="closeM('m-auto')">閉じる</button>
-    </div>
-  </div>
-</div>
 
 <!-- スロット保存確認 -->
 <div class="ov" id="m-slot-confirm">
@@ -1805,52 +1784,6 @@ async function execCalPub(){
 }
 
 // ============================================================
-// 予定表自動作成
-// ============================================================
-async function openAutoModal(){
-  openM('m-auto');
-  document.getElementById('m-auto-body').innerHTML='<div class="loading-row"><div class="spin"></div>情報を取得中...</div>';
-  document.getElementById('m-auto-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-auto\')">閉じる</button>';
-  const slotSummary=slots.length>0
-    ? slots.map(s=>`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="font-family:var(--mono);">${s.m}/${s.d} ${s.time}</span><span style="color:var(--ink3);">${parseInt(s.interval)||15}分刻み</span></div>`).join('')
-    : '<div style="color:var(--ink3);font-size:11px;">実施日が設定されていません</div>';
-  document.getElementById('m-auto-body').innerHTML=`
-    <p style="font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:12px;">カレンダーのスロット情報をもとにシフト作成シートを自動生成します。</p>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 11px;margin-bottom:10px;">
-      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:6px;">使用スロット（刻み分数含む）</div>
-      ${slotSummary}
-    </div>
-    <div style="font-size:11px;color:var(--ink3);">刻み分数を変更する場合は「設定」タブの実施日設定から変更してください。</div>
-    <div class="exec-st" id="auto-st" style="margin-top:10px;"><div class="spin"></div>シート生成中...</div>
-    <div class="done-box" id="auto-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">生成完了</div></div>`;
-  document.getElementById('m-auto-ft').innerHTML=`
-    <button class="btn btn-g" onclick="closeM('m-auto')">キャンセル</button>
-    <button class="btn btn-p" id="auto-exec-btn" onclick="execAuto()">生成する</button>`;
-}
-async function execAuto(){
-  document.getElementById('auto-exec-btn').disabled=true;
-  document.getElementById('auto-st').classList.add('show');
-  // 刻み分数をスロットから収集
-  const slotsWithIntv = slots.map((s,i)=>{
-    const sel=document.getElementById('auto-intv-'+i);
-    return {...s, interval: sel ? parseInt(sel.value)||15 : parseInt(s.interval)||15};
-  });
-  const ymVal=document.getElementById('auto-ym-sel')?.value||curY+'-'+curM;
-  const[ay,am]=ymVal.split('-').map(Number);
-  try{
-    await gasGet('createScheduleSheet',{year:ay,month:am,slots:slotsWithIntv});
-    document.getElementById('auto-st').classList.remove('show');
-    document.getElementById('auto-done').style.display='block';
-    document.getElementById('m-auto-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-auto')">閉じる</button>`;
-    toast('シフト作成シートを生成しました','s');
-  }catch(e){
-    document.getElementById('auto-st').classList.remove('show');
-    document.getElementById('auto-exec-btn').disabled=false;
-    toast('生成に失敗しました: '+e.message,'e');
-  }
-}
-
-// ============================================================
 // モーダル制御
 // ============================================================
 function openM(id){ document.getElementById(id).classList.add('open'); }
@@ -2123,13 +2056,11 @@ if (typeof esc === 'undefined') {
 // ============================================================
 // 月次一括処理
 // ============================================================
-let monthlyChecks = { calpub: true, form: true, sheet: true };
+let monthlyChecks = { calpub: true, form: true };
 
 function openMonthlyModal() {
-  // チェック状態リセット
   document.getElementById('mc-calpub').checked = true;
   document.getElementById('mc-form').checked = true;
-  document.getElementById('mc-sheet').checked = true;
   monthlyStep(1);
   openM('m-monthly');
 }
@@ -2146,11 +2077,9 @@ function monthlyStep(n) {
 function monthlyGoStep3or4() {
   monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
   monthlyChecks.form   = document.getElementById('mc-form').checked;
-  monthlyChecks.sheet  = document.getElementById('mc-sheet').checked;
-  if (!monthlyChecks.calpub && !monthlyChecks.form && !monthlyChecks.sheet) {
+  if (!monthlyChecks.calpub && !monthlyChecks.form) {
     toast('処理を1つ以上選択してください', 'e'); return;
   }
-  // フォーム作成がONならStep3へ、OFFならStep4へ
   if (monthlyChecks.form) {
     monthlyStep(3);
   } else {
@@ -2192,15 +2121,12 @@ function buildMstep2() {
 function buildMstep4() {
   monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
   monthlyChecks.form   = document.getElementById('mc-form').checked;
-  monthlyChecks.sheet  = document.getElementById('mc-sheet').checked;
-  // デフォルト処理を先頭に固定追加
   const tasks = [
     { id: 'savedates', label: '💾 日程を保存' },
     { id: 'calregen',  label: '🔄 実施日保存・カレンダー再生成' }
   ];
   if (monthlyChecks.calpub) tasks.push({ id: 'calpub', label: '📅 予定表公開' });
   if (monthlyChecks.form)   tasks.push({ id: 'form',   label: '📝 シフトフォーム作成' });
-  if (monthlyChecks.sheet)  tasks.push({ id: 'sheet',  label: '⚙️ シフト作成枠作成' });
   document.getElementById('mstep4-list').innerHTML = tasks.map(t =>
     `<div class="ms-prog-row" id="mpr-${t.id}">
       <span class="ms-prog-ic" id="mpic-${t.id}">⏳</span>
@@ -2261,11 +2187,6 @@ async function execMonthly() {
     if (monthlyChecks.form) {
       await runTask('form', () =>
         gasGet('createFormSheet', { year: curY, month: curM, sheetPosition: sheetPos })
-      );
-    }
-    if (monthlyChecks.sheet) {
-      await runTask('sheet', () =>
-        gasGet('createShiftSheet', { year: curY, month: curM })
       );
     }
 
