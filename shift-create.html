@@ -164,7 +164,7 @@ select.cs.wOn{background:#fff9c4;color:#b45309;font-weight:700;border-color:#fbb
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 <!-- Google Sign-In -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client"></script>
 
 <!-- アプリ本体 -->
 <div id="app-screen" style="display:none;flex-direction:column;height:100%;">
@@ -277,9 +277,19 @@ function initAuth() {
 function showLogin() {
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app-screen').style.display   = 'none';
-  if (typeof google !== 'undefined') {
+  renderGsiButton();
+}
+
+function renderGsiButton() {
+  if (typeof google !== 'undefined' && google.accounts) {
     google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onGoogleLogin });
-    google.accounts.id.renderButton(document.getElementById('gsi-btn'), { theme:'outline', size:'large', text:'signin_with', locale:'ja' });
+    google.accounts.id.renderButton(
+      document.getElementById('gsi-btn'),
+      { theme: 'outline', size: 'large', text: 'signin_with', locale: 'ja' }
+    );
+  } else {
+    // GSIがまだロード中なら100ms後にリトライ
+    setTimeout(renderGsiButton, 100);
   }
 }
 
