@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/png" href="https://jw-utazu.github.io/admin/logo.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト作成</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
@@ -929,67 +930,6 @@ window.addEventListener('resize', checkAutoHide);
 // 起動
 // ============================================================
 initAuth();
-
-
-// ===== 左パネル リサイズ・折りたたみ =====
-const LP_MIN=140, LP_MAX=360, LP_AUTO_HIDE=900;
-const lpWrap=document.getElementById('lpWrap');
-const lpToggle=document.getElementById('lpToggle');
-const lpResize=document.getElementById('lpResize');
-let lpCollapsed=false;
-let lpWidth=196;
-
-function toggleLp(){
-  lpCollapsed=!lpCollapsed;
-  if(lpCollapsed){
-    lpWrap.classList.add('collapsed');
-    lpToggle.textContent='▶';
-    lpToggle.title='表示';
-    lpToggle.style.right='-14px';
-  } else {
-    lpWrap.classList.remove('collapsed');
-    lpWrap.style.width=lpWidth+'px';
-    lpToggle.textContent='◀';
-    lpToggle.title='非表示';
-  }
-}
-
-// ドラッグリサイズ
-lpResize.addEventListener('mousedown',e=>{
-  e.preventDefault();
-  lpResize.classList.add('dragging');
-  const startX=e.clientX, startW=lpWrap.offsetWidth;
-  function onMove(e){
-    const w=Math.min(LP_MAX,Math.max(LP_MIN,startW+(e.clientX-startX)));
-    lpWidth=w;
-    lpWrap.style.width=w+'px';
-  }
-  function onUp(){
-    lpResize.classList.remove('dragging');
-    document.removeEventListener('mousemove',onMove);
-    document.removeEventListener('mouseup',onUp);
-  }
-  document.addEventListener('mousemove',onMove);
-  document.addEventListener('mouseup',onUp);
-});
-
-// 画面幅で自動非表示
-function checkAutoHide(){
-  if(window.innerWidth<=LP_AUTO_HIDE && !lpCollapsed){
-    lpCollapsed=true;
-    lpWrap.classList.add('collapsed');
-    lpToggle.textContent='▶';
-    lpToggle.title='表示';
-  } else if(window.innerWidth>LP_AUTO_HIDE && lpCollapsed){
-    lpCollapsed=false;
-    lpWrap.classList.remove('collapsed');
-    lpWrap.style.width=lpWidth+'px';
-    lpToggle.textContent='◀';
-    lpToggle.title='非表示';
-  }
-}
-checkAutoHide();
-window.addEventListener('resize',checkAutoHide);
 </script>
 </body>
 </html>
