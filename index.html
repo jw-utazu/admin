@@ -889,7 +889,7 @@ async function _processUserWithGasAuth(u, save) {
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
   // ログイン情報をlocalStorageに保存（次回自動ログイン用）
   if (save) {
-    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture })); } catch(e) {}
+    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, isAdmin: true })); } catch(e) {}
   }
   document.getElementById('auth').style.display = 'none';
   document.getElementById('app').style.display  = 'flex';
