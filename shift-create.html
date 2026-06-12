@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>シフト作成</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#18181b;--ink2:#52525b;--ink3:#71717a;
+  --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
+  --border:#e4e4e7;--border2:#d4d4d8;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --amber:#d97706;
+  --purple:#7c3aed;--purple-l:#f5f3ff;
+  --nh:#b3e5fc;--nf:#0277bd;--nc:#e1f5fe;
+  --sh:#fff9c4;--sf:#f57f17;--sc2:#fffde7;
+  --nch:#81d4fa;--sch:#ffe082;
+  --sans:'Noto Sans JP',sans-serif;
+  --r:8px;--r-lg:12px;
+}
+html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5;}
+body{display:flex;flex-direction:column;overflow:hidden;}
+
+.hdr{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.1);z-index:100;}
+.hdr-logo{width:28px;height:28px;border-radius:7px;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;}
+.hdr-title{font-size:14px;font-weight:700;flex:1;}
+.save-st{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--amber);}
+.save-st.saved{color:var(--green);}
+.save-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+.hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+.hbtn.pub{background:var(--green);color:#fff;border-color:var(--green);}
+.hbtn.sav{background:var(--purple);color:#fff;border-color:var(--purple);}
+
+.dtabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;overflow-x:auto;flex-shrink:0;}
+.dtab{padding:10px 16px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+.dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
+
+.body{display:flex;flex:1;overflow:hidden;}
+
+/* LEFT PANEL */
+.lp-wrap{position:relative;display:flex;flex-shrink:0;transition:width .2s ease;}
+.lp{border-right:1px solid var(--border);background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;width:100%;min-width:0;}
+.lp-wrap.collapsed{width:0!important;overflow:visible;}
+.lp-wrap.collapsed .lp{display:none;}
+.lp-resize{position:absolute;right:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent;}
+.lp-resize:hover,.lp-resize.dragging{background:var(--purple);opacity:.3;border-radius:4px;}
+.lp-toggle{position:absolute;right:-14px;top:50%;transform:translateY(-50%);z-index:20;width:14px;height:40px;background:var(--surface);border:1px solid var(--border);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:10px;box-shadow:2px 0 4px rgba(0,0,0,.08);}
+.lp-toggle:hover{background:var(--purple-l);color:var(--purple);}
+.lp-hd{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;}
+.lp-date{font-size:12px;font-weight:700;}
+.lp-cnt{margin-top:6px;padding:5px 8px;background:var(--purple-l);border-radius:var(--r);display:flex;align-items:baseline;gap:5px;}
+.lp-n{font-size:18px;font-weight:700;color:var(--purple);}
+.lp-u{font-size:10px;color:var(--purple);}
+.lp-sec{font-size:10px;font-weight:700;color:var(--ink3);padding:6px 12px 3px;background:var(--surface2);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.06em;}
+.mr{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);}
+.m-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.d-on{background:var(--green);}
+.d-off{background:var(--border2);}
+.m-name{font-size:12px;font-weight:500;flex:1;}
+.m-name.off{color:var(--ink3);}
+.sts{display:flex;gap:3px;flex-wrap:wrap;}
+.sc{font-size:10px;padding:2px 5px;border-radius:3px;font-weight:700;}
+.sc-a{background:#fef3c7;color:#92400e;}
+.sc-s{background:var(--blue-l);color:var(--blue);}
+.sc-r{background:var(--green-l);color:var(--green);}
+.sc-k{background:var(--purple-l);color:var(--purple);}
+
+/* RIGHT MAIN */
+.rm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.rm{overflow-y:auto;padding:14px;background:var(--bg);flex:1;}
+
+.tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
+.tb-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.tb-time{font-size:14px;font-weight:700;color:var(--purple);}
+.tb-acts{display:flex;align-items:center;gap:8px;}
+.tb-st{font-size:11px;font-weight:700;color:var(--amber);}
+.tb-st.saved{color:var(--green);}
+.tb-btn{padding:4px 10px;border:1px solid var(--purple);border-radius:6px;background:none;color:var(--purple);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+.tb-btn:hover{background:var(--purple-l);}
+
+/* 責任者 */
+.resp-area{padding:8px 12px;border-bottom:1px solid var(--border);background:#fff7ed;}
+.area-title{font-size:10px;font-weight:700;margin-bottom:6px;color:#c2410c;}
+.ra-row{display:flex;align-items:center;gap:10px;}
+.ra-item{display:flex;align-items:center;gap:6px;flex:1;}
+.ra-label{font-size:11px;font-weight:700;color:#c2410c;white-space:nowrap;}
+.ra-sel{flex:1;border:1px solid #fed7aa;border-radius:var(--r);padding:5px 7px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+
+/* カート担当 */
+.cart-area{padding:8px 12px;border-bottom:1px solid var(--border);background:#f0fdf4;}
+.cart-title{color:#15803d;}
+.cart-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.cart-tbl th,.cart-tbl td{border:1px solid #86efac;padding:6px 8px;text-align:center;vertical-align:middle;}
+.cart-tbl thead th{background:#dcfce7;color:#15803d;font-weight:700;}
+.cart-tbl .row-lbl{background:#f0fdf4;font-weight:700;color:#15803d;text-align:left;font-size:11px;white-space:nowrap;width:90px;}
+.cart-sel{width:100%;border:1px solid #86efac;border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+.cart-num{width:100%;border:1px solid #86efac;border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+.cart-num:disabled{background:#f0fdf4;color:var(--ink3);}
+
+/* ===== 奉仕者テーブル ===== */
+.tbl-wrap{overflow-x:auto;}
+.shift-tbl{border-collapse:collapse;font-size:13px;width:100%;table-layout:fixed;}
+.shift-tbl th,.shift-tbl td{border:2px solid #ccc;text-align:center;vertical-align:middle;}
+
+/* 時間列 */
+.th-time{background:var(--surface);padding:12px 14px;width:120px;font-weight:700;color:var(--ink2);}
+.td-time{background:var(--surface);padding:18px 14px;width:120px;font-size:13px;font-weight:700;color:var(--ink2);white-space:nowrap;text-align:center;}
+
+/* 北口・南口タイトル */
+.th-n-title{background:var(--nh);color:var(--nf);font-weight:700;font-size:18px;padding:16px 10px;}
+.th-s-title{background:var(--sh);color:var(--sf);font-weight:700;font-size:18px;padding:16px 10px;}
+
+/* 使用カートヘッダー */
+.th-cart-n{background:var(--nh);color:var(--nf);font-weight:700;font-size:13px;padding:0;vertical-align:middle;}
+.th-cart-s{background:var(--sh);color:var(--sf);font-weight:700;font-size:13px;padding:0;vertical-align:middle;}
+.cart-th-inner{display:flex;align-items:center;justify-content:center;padding:6px 8px;height:100%;}
+.cart-th-label{font-weight:700;font-size:13px;}
+.cart-th-sel-row{padding:4px 6px;}
+.cart-th-sel-row select{width:100%;border:1px solid rgba(0,0,0,.2);border-radius:5px;padding:4px 5px;font-size:12px;font-family:var(--sans);background:var(--surface);outline:none;}
+
+/* データセル */
+.td-n{background:var(--nc);padding:14px 8px;}
+.td-s{background:var(--sc2);padding:14px 8px;}
+.td-e{background:var(--surface);padding:14px 8px;}
+.td-cart-n{background:var(--nc);width:100px;}
+.td-cart-s{background:var(--sc2);width:100px;}
+
+/* セル内コンテンツ */
+.cell-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:2px 4px;}
+select.cs{width:100%;border:1px solid var(--border2);border-radius:5px;padding:5px 4px;font-size:13px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);text-align:center;}
+select.cs:focus{border-color:var(--blue);background:var(--blue-l);}
+select.cs.wOn{background:#fff9c4;color:#b45309;font-weight:700;border-color:#fbbf24;}
+
+.watch-row{display:flex;align-items:center;gap:5px;}
+.watch-chk{width:14px;height:14px;cursor:pointer;accent-color:var(--amber);}
+.watch-lbl{font-size:11px;color:var(--ink3);cursor:pointer;user-select:none;}
+.watch-lbl.on{color:#b45309;font-weight:700;}
+
+/* TOAST */
+.ta{position:fixed;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:5px;}
+.toast{background:var(--ink);color:#fff;border-radius:var(--r);padding:8px 13px;font-size:12px;animation:t-up .18s ease;box-shadow:0 4px 12px rgba(0,0,0,.2);}
+.toast.s{background:var(--green);}
+@keyframes t-up{from{opacity:0;transform:translateY(8px);}}
+</style>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:#f4f4f5;z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div style="background:#fff;padding:32px 40px;border-radius:12px;border:1px solid #e4e4e7;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.08);">
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px;">シフト作成</div>
+    <div style="font-size:12px;color:#71717a;margin-bottom:20px;">管理者アカウントでログインしてください</div>
+    <div id="gsi-btn"></div>
+  </div>
+</div>
+<!-- ローディングオーバーレイ -->
+<div id="loading-overlay" style="display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+  <div class="save-dot" style="width:32px;height:32px;border-radius:50%;background:var(--purple);animation:spin 1s linear infinite;"></div>
+  <div class="lo-msg" style="font-size:13px;color:var(--ink2);">読み込み中...</div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<!-- Google Sign-In -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- アプリ本体 -->
+<div id="app-screen" style="display:none;flex-direction:column;height:100%;">
+
+<div class="hdr">
+  <div class="hdr-logo">SC</div>
+  <span class="hdr-title">シフト作成 — 2026年7月</span>
+  <div class="save-st" id="gst"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div>
+  <button class="hbtn" onclick="signOut()">ログアウト</button>
+  <button class="hbtn pub" onclick="publishShift()">シフト公開</button>
+  <button class="hbtn sav" onclick="saveAll()">全て保存</button>
+</div>
+
+<div class="dtabs">
+  <button class="dtab on">7/5（日）</button>
+  <button class="dtab">7/12（日）</button>
+  <button class="dtab">7/19（日）</button>
+  <button class="dtab">7/26（日）</button>
+</div>
+
+<div class="body">
+  <div class="lp-wrap" id="lpWrap" style="width:196px;">
+    <div class="lp-resize" id="lpResize"></div>
+    <button class="lp-toggle" id="lpToggle" onclick="toggleLp()" title="非表示">◀</button>
+    <div class="lp" id="lp">
+    <div class="lp-hd">
+      <div class="lp-date" id="lp-date-label">読み込み中...</div>
+      <div class="lp-cnt"><div class="lp-n" id="lp-count">-</div><div class="lp-u" id="lp-total">名申込</div></div>
+    </div>
+    <div id="lp-members"></div>
+        </div>
+  </div>
+
+  <div class="rm-wrap">
+  <div class="rm" id="main-content">
+    <div style="padding:24px;color:var(--ink3);text-align:center;">読み込み中...</div>
+  </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="ta" id="ta"></div>
+
+<script>
+// ============================================================
+// 設定
+// ============================================================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzbPBxl6S3VdSVF9RqXSI1VQkZNGJXwU_zePBM8e3UYed-RyxxA_PRom_Xw9v5rvUwScQ/exec';
+const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
+
+// ============================================================
+// 状態
+// ============================================================
+let adminUser   = null;   // { email, name, uid, isAdmin }
+let memberFlags = {};     // { uid: { name, respFlag, cartFlag } }
+let applicants  = [];     // [{ name, appliedCount, appliedSlots, respFlag, cartFlag }]
+let shiftDates  = [];     // parseShiftSheet戻り値 dates配列
+let activeDateIdx = 0;    // 現在表示中の日付インデックス
+let curYM       = null;   // { year, month }
+
+// ブロックごとの保存状態 { blockKey: bool }
+const bs = {};
+
+// LocalStorageドラフトキー
+const draftKey = () => curYM ? 'shift_draft_' + curYM.year + '.' + curYM.month : 'shift_draft';
+
+// ============================================================
+// JSONP通信
+// ============================================================
+function gasGet(action, params) {
+  const cbName = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  let url = GAS_URL + '?action=' + action + '&callback=' + cbName;
+  if (params) url += '&params=' + encodeURIComponent(JSON.stringify(params));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180000);
+  return fetch(url, { redirect: 'follow', signal: controller.signal })
+    .then(r => r.text())
+    .then(text => {
+      clearTimeout(timer);
+      const start = text.indexOf('(');
+      const end   = text.lastIndexOf(')');
+      if (start === -1 || end === -1) throw new Error('レスポンス形式エラー');
+      const d = JSON.parse(text.slice(start + 1, end));
+      if (d && d.error && !d.ok) throw new Error(d.error);
+      return d;
+    })
+    .catch(err => {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('通信タイムアウト');
+      throw new Error(err.message || '通信エラー');
+    });
+}
+
+// ============================================================
+// 認証
+// ============================================================
+function initAuth() {
+  try {
+    const u = JSON.parse(localStorage.getItem('adminUser') || 'null');
+    if (u && u.isAdmin) {
+      adminUser = u;
+      showApp();
+      return;
+    }
+  } catch (_) {}
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display   = 'none';
+  if (typeof google !== 'undefined') {
+    google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onGoogleLogin });
+    google.accounts.id.renderButton(document.getElementById('gsi-btn'), { theme:'outline', size:'large', text:'signin_with', locale:'ja' });
+  }
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display   = 'flex';
+  loadData();
+}
+
+async function onGoogleLogin(resp) {
+  try {
+    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
+    const email   = payload.email;
+    const d = await gasGet('auth', { email, source: 'admin' });
+    // 未紐づけの場合でも管理アプリはisAdminチェック
+    if (!d.ok || !d.isAdmin) {
+      toast('管理者権限がありません', 'e'); return;
+    }
+    adminUser = { email, name: d.name || email, uid: d.uid || '', isAdmin: true };
+    localStorage.setItem('adminUser', JSON.stringify(adminUser));
+    showApp();
+  } catch (e) {
+    toast('ログインエラー: ' + e.message, 'e');
+  }
+}
+
+function signOut() {
+  try { localStorage.removeItem('adminUser'); } catch (_) {}
+  toast('ログアウトしました', 's');
+  setTimeout(() => location.reload(), 800);
+}
+
+// ============================================================
+// データ読み込み
+// ============================================================
+async function loadData() {
+  setLoading(true, 'データを読み込み中...');
+  try {
+    // URLパラメータからyear/month取得、なければ現在月
+    const params = new URLSearchParams(location.search);
+    const now = new Date();
+    const year  = parseInt(params.get('year'))  || now.getFullYear();
+    const month = parseInt(params.get('month')) || now.getMonth() + 1;
+    curYM = { year, month };
+
+    // ヘッダー更新
+    document.querySelector('.hdr-title').textContent = 'シフト作成 — ' + year + '年' + month + '月';
+
+    // 3並列取得
+    const [flagsRes, appRes, shiftRes] = await Promise.all([
+      gasGet('getMemberFlags'),
+      gasGet('getApplicants', { year, month }),
+      gasGet('getShiftCreateData', { year, month })
+    ]);
+
+    memberFlags = flagsRes.ok ? flagsRes.flags : {};
+    applicants  = appRes.ok  ? appRes.applicants : [];
+    shiftDates  = shiftRes.ok ? shiftRes.dates : [];
+
+    // ドラフト復元確認
+    const draft = loadDraft();
+    if (draft && draft.blocks && Object.keys(draft.blocks).length > 0) {
+      if (confirm('前回の未保存データがあります。復元しますか？')) {
+        applyDraft(draft);
+      } else {
+        clearDraft();
+      }
+    }
+
+    buildTabs();
+    buildLeftPanel();
+    if (shiftDates.length > 0) {
+      activeDateIdx = 0;
+      renderDate(0);
+    } else {
+      setLoading(false);
+      document.getElementById('main-content').innerHTML =
+        '<div style="padding:24px;color:var(--ink3);text-align:center;">シフト作成シートが見つかりません。<br>管理アプリで「シフト作成枠作成」を実行してください。</div>';
+    }
+    setLoading(false);
+  } catch (e) {
+    setLoading(false);
+    toast('読み込みエラー: ' + e.message, 'e');
+  }
+}
+
+function setLoading(on, msg) {
+  const el = document.getElementById('loading-overlay');
+  if (!el) return;
+  el.style.display = on ? 'flex' : 'none';
+  if (msg) el.querySelector('.lo-msg').textContent = msg;
+}
+
+// ============================================================
+// タブ（日付）構築
+// ============================================================
+function buildTabs() {
+  // 日付ユニーク一覧
+  const dateTabs = [];
+  const seen = new Set();
+  shiftDates.forEach(d => {
+    const k = d.date + '(' + d.weekday + ')';
+    if (!seen.has(k)) { seen.add(k); dateTabs.push({ date: d.date, weekday: d.weekday }); }
+  });
+  const el = document.querySelector('.dtabs');
+  el.innerHTML = dateTabs.map((t, i) =>
+    `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchTab(${i})">${t.date}（${t.weekday}）</button>`
+  ).join('');
+  window._dateTabs = dateTabs;
+}
+
+function switchTab(i) {
+  document.querySelectorAll('.dtab').forEach((b, idx) => b.className = 'dtab' + (idx === i ? ' on' : ''));
+  activeDateIdx = i;
+  const tab = (window._dateTabs || [])[i];
+  if (tab) {
+    // その日の最初のshiftDatesインデックスを探す
+    const si = shiftDates.findIndex(d => d.date === tab.date);
+    if (si >= 0) renderDate(si);
+  }
+  buildLeftPanel();
+}
+
+// ============================================================
+// 左パネル構築
+// ============================================================
+function buildLeftPanel() {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+
+  // その日の申込者を特定
+  const dayDates = shiftDates.filter(d => d.date === tab.date);
+  const allSlotKeys = new Set();
+  dayDates.forEach(d => d.slots && d.slots.forEach(s => allSlotKeys.add(tab.date + ' ' + s.time)));
+
+  // 申込者（その日に1スロット以上）
+  const applied = applicants.filter(a =>
+    a.appliedSlots && a.appliedSlots.some(sk => Array.from(allSlotKeys).some(k => sk.includes(tab.date)))
+  );
+  const notApplied = applicants.filter(a => !applied.find(b => b.name === a.name));
+
+  // 日付ヘッダー
+  document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）';
+  document.getElementById('lp-count').textContent = applied.length;
+  document.getElementById('lp-total').textContent = '名申込 / 全' + applicants.length + '名';
+
+  const lp = document.getElementById('lp-members');
+  let html = '<div class="lp-sec">申込者</div>';
+  html += applied.map(a => {
+    const tags = [
+      `<span class="sc sc-a">申${a.appliedCount}</span>`,
+      a.respFlag ? '<span class="sc sc-r">責</span>' : '',
+      a.cartFlag ? '<span class="sc sc-k">カ</span>' : ''
+    ].filter(Boolean).join('');
+    return `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${a.name}</div><div class="sts">${tags}</div></div>`;
+  }).join('');
+  if (notApplied.length > 0) {
+    html += '<div class="lp-sec">未申込</div>';
+    html += notApplied.map(a =>
+      `<div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${a.name}</div></div>`
+    ).join('');
+  }
+  lp.innerHTML = html;
+}
+
+// ============================================================
+// 日付の全時間帯を描画
+// ============================================================
+function renderDate(startIdx) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  // その日のshiftDates（時間帯ブロック）を全取得
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+
+  const container = document.getElementById('main-content');
+  container.innerHTML = dayBlocks.map((block, bi) => buildBlock(block, bi)).join('');
+  // 保存状態を反映
+  dayBlocks.forEach((block, bi) => {
+    const key = blockKey(block);
+    if (bs[key]) markSaved(bi);
+  });
+}
+
+function blockKey(block) {
+  return block.date + '_' + block.time;
+}
+
+// ============================================================
+// ブロック（時間帯）HTML生成
+// ============================================================
+function buildBlock(block, bi) {
+  const key = blockKey(block);
+  const tab = (window._dateTabs || [])[activeDateIdx];
+
+  // その日の申込者
+  const applied = applicants.filter(a =>
+    a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date))
+  );
+  const respMembers = applied.filter(a => a.respFlag).map(a => a.name);
+  const cartMembers = applied.filter(a => a.cartFlag).map(a => a.name);
+
+  // ドラフトから既存データを取得
+  const draft = loadDraft();
+  const draftBlock = (draft && draft.blocks && draft.blocks[key]) || null;
+  const savedBlock = block; // GASからのデータ
+
+  return `
+  <div class="tb" id="tb-${bi}">
+    <div class="tb-hd">
+      <span class="tb-time">${block.time}</span>
+      <div class="tb-acts">
+        <span class="tb-st" id="st-${bi}">● 未保存</span>
+        <button class="tb-btn" onclick="saveBlock(${bi})">この時間帯を保存</button>
+      </div>
+    </div>
+    ${buildRespArea(bi, block, respMembers, draftBlock)}
+    ${buildCartArea(bi, block, cartMembers, draftBlock)}
+    <div class="tbl-wrap">
+      <table class="shift-tbl">
+        <thead>
+          <tr>
+            <th class="th-time" rowspan="2"></th>
+            <th class="th-n-title" colspan="3">北口</th>
+            <th class="th-s-title" colspan="3">南口</th>
+          </tr>
+          <tr>
+            <th class="th-cart-n" colspan="2">
+              <div class="cart-th-inner"><div class="cart-th-label">使用カート</div></div>
+            </th>
+            <th class="th-cart-n">
+              <div class="cart-th-sel-row">
+                ${buildCartSel('nc-' + bi, block.slots && block.slots[0] ? block.slots[0].northCart : '', bi)}
+              </div>
+            </th>
+            <th class="th-cart-s" colspan="2">
+              <div class="cart-th-inner"><div class="cart-th-label">使用カート</div></div>
+            </th>
+            <th class="th-cart-s">
+              <div class="cart-th-sel-row">
+                ${buildCartSel('sc-' + bi, block.slots && block.slots[0] ? block.slots[0].southCart : '', bi)}
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="sbody-${bi}">
+          ${buildSlotRows(block, bi, applied, draftBlock)}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function buildCartSel(id, val, bi) {
+  const opts = ['','①②','③④','①②③④'].map(o => `<option${o===val?' selected':''}>${o || '—'}</option>`).join('');
+  return `<select id="${id}" onchange="mu(${bi})">${opts}</select>`;
+}
+
+// ============================================================
+// 責任者エリア
+// ============================================================
+function buildRespArea(bi, block, respMembers, draftBlock) {
+  const r1 = (draftBlock && draftBlock.responsible && draftBlock.responsible[0]) ||
+             (block.responsible && block.responsible[0]) || '';
+  const r2 = (draftBlock && draftBlock.responsible && draftBlock.responsible[1]) ||
+             (block.responsible && block.responsible[1]) || '';
+  const opts = '<option value="">—</option>' + respMembers.map(n =>
+    `<option${n===r1||n===r2?'':''} value="${n}">${n}</option>`).join('');
+  function sel(id, val) {
+    return `<select class="ra-sel" id="${id}" onchange="mu(${bi})">
+      <option value="">—</option>
+      ${respMembers.map(n => `<option value="${n}"${n===val?' selected':''}>${n}</option>`).join('')}
+    </select>`;
+  }
+  return `
+  <div class="resp-area">
+    <div class="area-title">責任者（申込者中・責任者フラグのある方）</div>
+    <div class="ra-row">
+      <div class="ra-item"><span class="ra-label">担当①</span>${sel('resp1-' + bi, r1)}</div>
+      <div class="ra-item"><span class="ra-label">担当②</span>${sel('resp2-' + bi, r2)}</div>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// カート担当エリア
+// ============================================================
+function buildCartArea(bi, block, cartMembers, draftBlock) {
+  const cart = (draftBlock && draftBlock.cart) || block.cart || { bring: [], take: [] };
+  const brings = cart.bring || [];
+  const takes  = cart.take  || [];
+  function cartSel(id, val, numId) {
+    const s = `<select class="cart-sel" id="${id}" onchange="ucn('${id}','${numId}');mu(${bi})">
+      <option value="">—</option>
+      ${cartMembers.map(n => `<option value="${n}"${n===val?' selected':''}>${n}</option>`).join('')}
+    </select>`;
+    return s;
+  }
+  function numSel(id, val, disabled) {
+    return `<select class="cart-num" id="${id}"${disabled?' disabled':''}>
+      <option value="">—</option>
+      ${['①②③④','①②','③④'].map(o => `<option${o===val?' selected':''}>${o}</option>`).join('')}
+    </select>`;
+  }
+  const ki1v = brings[0] ? brings[0].name : '', ki1n = brings[0] ? brings[0].cartNo : '';
+  const ki2v = brings[1] ? brings[1].name : '', ki2n = brings[1] ? brings[1].cartNo : '';
+  const ko1v = takes[0]  ? takes[0].name  : '', ko1n = takes[0]  ? takes[0].cartNo  : '';
+  const ko2v = takes[1]  ? takes[1].name  : '', ko2n = takes[1]  ? takes[1].cartNo  : '';
+  return `
+  <div class="cart-area">
+    <div class="area-title cart-title">カート担当者（申込者中・カートフラグのある方）</div>
+    <table class="cart-tbl">
+      <thead><tr><th style="width:90px;"></th><th colspan="2">持ち込み</th><th colspan="2">持ち帰り</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="row-lbl">カート担当者</td>
+          <td>${cartSel('ki1-'+bi, ki1v, 'kn1-'+bi)}</td>
+          <td>${cartSel('ki2-'+bi, ki2v, 'kn2-'+bi)}</td>
+          <td>${cartSel('ko1-'+bi, ko1v, 'kon1-'+bi)}</td>
+          <td>${cartSel('ko2-'+bi, ko2v, 'kon2-'+bi)}</td>
+        </tr>
+        <tr>
+          <td class="row-lbl">カート番号</td>
+          <td>${numSel('kn1-'+bi, ki1n, !ki1v)}</td>
+          <td>${numSel('kn2-'+bi, ki2n, !ki2v)}</td>
+          <td>${numSel('kon1-'+bi, ko1n, !ko1v)}</td>
+          <td>${numSel('kon2-'+bi, ko2n, !ko2v)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// ============================================================
+// 奉仕者スロット行
+// ============================================================
+function buildSlotRows(block, bi, applied, draftBlock) {
+  const slots = block.slots || [];
+  return slots.map((slot, ri) => {
+    const draftSlot = draftBlock && draftBlock.slots && draftBlock.slots[ri];
+    const src = draftSlot || slot;
+    const north = src.north || [];
+    const south = src.south || [];
+    // その時間帯の申込者
+    const slotApplied = applied.filter(a =>
+      a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date + ' ' + slot.time) || sk.includes(slot.time))
+    ).map(a => a.name);
+    return `<tr>
+      <td class="td-time">${slot.time}</td>
+      ${watchCell(north[0]||{name:'',watch:false}, 'n', bi, ri, slotApplied, slot.northCart)}
+      ${memberCell(north[1]||{name:'',watch:false}, 'n', bi, ri, 1, slotApplied)}
+      ${memberCell(north[2]||{name:'',watch:false}, 'n', bi, ri, 2, slotApplied)}
+      ${watchCell(south[0]||{name:'',watch:false}, 's', bi, ri, slotApplied, slot.southCart)}
+      ${memberCell(south[1]||{name:'',watch:false}, 's', bi, ri, 1, slotApplied)}
+      ${memberCell(south[2]||{name:'',watch:false}, 's', bi, ri, 2, slotApplied)}
+    </tr>`;
+  }).join('');
+}
+
+function slotOpts(val, members) {
+  return '<option value="">—</option>' +
+    members.map(n => `<option value="${n}"${n===val?' selected':''}>${n}</option>`).join('');
+}
+
+function watchCell(entry, pfx, bi, ri, members, cartVal) {
+  const val  = entry ? entry.name  : '';
+  const isW  = entry ? entry.watch : false;
+  const sid  = `${pfx}w_${bi}_${ri}`;
+  const cid  = `${pfx}wc_${bi}_${ri}`;
+  const lid  = `${pfx}wl_${bi}_${ri}`;
+  const bg   = pfx === 'n' ? 'td-n' : 'td-s';
+  return `<td class="${bg}">
+    <div class="cell-wrap">
+      <select class="cs${isW?' wOn':''}" id="${sid}" onchange="mu(${bi})">${slotOpts(val, members)}</select>
+      <div class="watch-row">
+        <input type="checkbox" class="watch-chk" id="${cid}" ${isW?'checked':''} onchange="tw('${sid}','${cid}','${lid}',${bi})">
+        <label class="watch-lbl${isW?' on':''}" id="${lid}" for="${cid}">見守り</label>
+      </div>
+    </div>
+  </td>`;
+}
+
+function memberCell(entry, pfx, bi, ri, ci, members) {
+  const val = entry ? entry.name : '';
+  const sid = `${pfx}m_${bi}_${ri}_${ci}`;
+  const bg  = pfx === 'n' ? (val ? 'td-n' : 'td-e') : (val ? 'td-s' : 'td-e');
+  return `<td class="${bg}">
+    <div class="cell-wrap">
+      <select class="cs" id="${sid}" onchange="mu(${bi})">${slotOpts(val, members)}</select>
+    </div>
+  </td>`;
+}
+
+// ============================================================
+// 変更フラグ
+// ============================================================
+function tw(sid, cid, lid, bi) {
+  const s = document.getElementById(sid), c = document.getElementById(cid), l = document.getElementById(lid);
+  if (!s || !c || !l) return;
+  if (c.checked) { s.classList.add('wOn'); l.classList.add('on'); }
+  else           { s.classList.remove('wOn'); l.classList.remove('on'); }
+  mu(bi);
+}
+function mu(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  const block = dayBlocks[bi];
+  if (!block) return;
+  const key = blockKey(block);
+  bs[key] = false;
+  const st = document.getElementById('st-' + bi);
+  if (st) { st.textContent = '● 未保存'; st.className = 'tb-st'; }
+  ug();
+  saveDraftBlock(bi, block);
+}
+function ug() {
+  const u = Object.values(bs).some(v => !v);
+  document.getElementById('gst').className = u ? 'save-st' : 'save-st saved';
+  document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み';
+}
+function ucn(si, ni) {
+  const s = document.getElementById(si), n = document.getElementById(ni);
+  if (!s || !n) return;
+  n.disabled = !s.value;
+  if (!s.value) n.value = '';
+}
+function markSaved(bi) {
+  const st = document.getElementById('st-' + bi);
+  if (st) { st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; }
+}
+
+// ============================================================
+// ドラフト収集（ブロックiのUI状態を読む）
+// ============================================================
+function collectBlock(bi, block) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  if (!block) block = dayBlocks[bi];
+  if (!block) return null;
+
+  const resp = [
+    (document.getElementById('resp1-' + bi) || {}).value || '',
+    (document.getElementById('resp2-' + bi) || {}).value || ''
+  ].filter(Boolean);
+
+  const cart = {
+    bring: [
+      { name: (document.getElementById('ki1-'+bi)||{}).value||'', cartNo: (document.getElementById('kn1-'+bi)||{}).value||'' },
+      { name: (document.getElementById('ki2-'+bi)||{}).value||'', cartNo: (document.getElementById('kn2-'+bi)||{}).value||'' }
+    ].filter(e => e.name),
+    take: [
+      { name: (document.getElementById('ko1-'+bi)||{}).value||'', cartNo: (document.getElementById('kon1-'+bi)||{}).value||'' },
+      { name: (document.getElementById('ko2-'+bi)||{}).value||'', cartNo: (document.getElementById('kon2-'+bi)||{}).value||'' }
+    ].filter(e => e.name)
+  };
+
+  const slots = (block.slots || []).map((slot, ri) => {
+    function getEntry(pfx, ci) {
+      const isWatch = pfx + 'w';
+      if (ci === 0) {
+        const sid = `${pfx}w_${bi}_${ri}`;
+        const cid = `${pfx}wc_${bi}_${ri}`;
+        return {
+          name:  (document.getElementById(sid)||{}).value || '',
+          watch: (document.getElementById(cid)||{}).checked || false
+        };
+      } else {
+        const sid = `${pfx}m_${bi}_${ri}_${ci}`;
+        return { name: (document.getElementById(sid)||{}).value || '', watch: false };
+      }
+    }
+    const northCart = (document.getElementById('nc-' + bi) || {}).value || '';
+    const southCart = (document.getElementById('sc-' + bi) || {}).value || '';
+    return {
+      time: slot.time,
+      north: [getEntry('n',0), getEntry('n',1), getEntry('n',2)],
+      northCart,
+      south: [getEntry('s',0), getEntry('s',1), getEntry('s',2)],
+      southCart
+    };
+  });
+
+  return { responsible: resp, cart, slots };
+}
+
+// ============================================================
+// LocalStorageドラフト
+// ============================================================
+function loadDraft() {
+  try { return JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch (_) { return null; }
+}
+function saveDraftBlock(bi, block) {
+  try {
+    const data = loadDraft() || { blocks: {} };
+    const key  = blockKey(block);
+    data.blocks[key] = collectBlock(bi, block);
+    localStorage.setItem(draftKey(), JSON.stringify(data));
+  } catch (_) {}
+}
+function applyDraft(draft) {
+  // ドラフトはrenderDate後に適用 → mu()経由でUI更新
+  // ここでは単にdraftをshiftDatesにマージ
+  if (!draft || !draft.blocks) return;
+  shiftDates.forEach(block => {
+    const key = blockKey(block);
+    if (draft.blocks[key]) {
+      const d = draft.blocks[key];
+      if (d.responsible) block.responsible = d.responsible;
+      if (d.cart) block.cart = d.cart;
+      if (d.slots) d.slots.forEach((ds, si) => { if (block.slots && block.slots[si]) Object.assign(block.slots[si], ds); });
+    }
+  });
+}
+function clearDraft() {
+  try { localStorage.removeItem(draftKey()); } catch (_) {}
+}
+
+// ============================================================
+// 保存処理
+// ============================================================
+async function saveBlock(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  const block = dayBlocks[bi];
+  if (!block) return;
+
+  const st  = document.getElementById('st-' + bi);
+  const btn = document.querySelector('#tb-' + bi + ' .tb-btn');
+  if (btn) btn.disabled = true;
+  if (st)  st.textContent = '保存中...';
+
+  try {
+    const data = collectBlock(bi, block);
+    await gasGet('saveShiftBlock', {
+      year:        curYM.year,
+      month:       curYM.month,
+      date:        block.date,
+      time:        block.time,
+      responsible: data.responsible,
+      cart:        data.cart,
+      slots:       data.slots
+    });
+    const key = blockKey(block);
+    bs[key] = true;
+    markSaved(bi);
+    ug();
+    // ドラフトから該当ブロック削除
+    try {
+      const draft = loadDraft() || { blocks: {} };
+      delete draft.blocks[key];
+      localStorage.setItem(draftKey(), JSON.stringify(draft));
+    } catch (_) {}
+    toast('時間帯を保存しました', 's');
+  } catch (e) {
+    if (st)  st.textContent = '● 未保存';
+    toast('保存に失敗しました: ' + e.message, 'e');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function saveAll() {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  for (let i = 0; i < dayBlocks.length; i++) {
+    await saveBlock(i);
+  }
+}
+
+async function publishShift() {
+  if (!confirm('シフトを公開しますか？\n公開後は全メンバーがシフトを確認できます。')) return;
+  try {
+    await gasGet('publishShift', {});
+    toast('シフトを公開しました', 's');
+  } catch (e) {
+    toast('公開に失敗しました: ' + e.message, 'e');
+  }
+}
+
+// ============================================================
+// トースト
+// ============================================================
+function toast(msg, type) {
+  const ta = document.getElementById('ta');
+  const t  = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  ta.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ============================================================
+// 左パネル リサイズ・折りたたみ
+// ============================================================
+const LP_MIN = 140, LP_MAX = 360, LP_AUTO_HIDE = 900;
+const lpWrap   = document.getElementById('lpWrap');
+const lpToggle = document.getElementById('lpToggle');
+const lpResize = document.getElementById('lpResize');
+let lpCollapsed = false;
+let lpWidth = 196;
+
+function toggleLp() {
+  lpCollapsed = !lpCollapsed;
+  if (lpCollapsed) {
+    lpWrap.classList.add('collapsed');
+    lpToggle.textContent = '▶';
+    lpToggle.title = '表示';
+    lpToggle.style.right = '-14px';
+  } else {
+    lpWrap.classList.remove('collapsed');
+    lpWrap.style.width = lpWidth + 'px';
+    lpToggle.textContent = '◀';
+    lpToggle.title = '非表示';
+  }
+}
+lpResize.addEventListener('mousedown', e => {
+  e.preventDefault();
+  lpResize.classList.add('dragging');
+  const startX = e.clientX, startW = lpWrap.offsetWidth;
+  function onMove(e) {
+    const w = Math.min(LP_MAX, Math.max(LP_MIN, startW + (e.clientX - startX)));
+    lpWidth = w; lpWrap.style.width = w + 'px';
+  }
+  function onUp() {
+    lpResize.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
+function checkAutoHide() {
+  if (window.innerWidth <= LP_AUTO_HIDE && !lpCollapsed) {
+    lpCollapsed = true; lpWrap.classList.add('collapsed');
+    lpToggle.textContent = '▶'; lpToggle.title = '表示';
+  } else if (window.innerWidth > LP_AUTO_HIDE && lpCollapsed) {
+    lpCollapsed = false; lpWrap.classList.remove('collapsed');
+    lpWrap.style.width = lpWidth + 'px';
+    lpToggle.textContent = '◀'; lpToggle.title = '非表示';
+  }
+}
+checkAutoHide();
+window.addEventListener('resize', checkAutoHide);
+
+// ============================================================
+// 起動
+// ============================================================
+initAuth();
+
+
+// ===== 左パネル リサイズ・折りたたみ =====
+const LP_MIN=140, LP_MAX=360, LP_AUTO_HIDE=900;
+const lpWrap=document.getElementById('lpWrap');
+const lpToggle=document.getElementById('lpToggle');
+const lpResize=document.getElementById('lpResize');
+let lpCollapsed=false;
+let lpWidth=196;
+
+function toggleLp(){
+  lpCollapsed=!lpCollapsed;
+  if(lpCollapsed){
+    lpWrap.classList.add('collapsed');
+    lpToggle.textContent='▶';
+    lpToggle.title='表示';
+    lpToggle.style.right='-14px';
+  } else {
+    lpWrap.classList.remove('collapsed');
+    lpWrap.style.width=lpWidth+'px';
+    lpToggle.textContent='◀';
+    lpToggle.title='非表示';
+  }
+}
+
+// ドラッグリサイズ
+lpResize.addEventListener('mousedown',e=>{
+  e.preventDefault();
+  lpResize.classList.add('dragging');
+  const startX=e.clientX, startW=lpWrap.offsetWidth;
+  function onMove(e){
+    const w=Math.min(LP_MAX,Math.max(LP_MIN,startW+(e.clientX-startX)));
+    lpWidth=w;
+    lpWrap.style.width=w+'px';
+  }
+  function onUp(){
+    lpResize.classList.remove('dragging');
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+  }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+});
+
+// 画面幅で自動非表示
+function checkAutoHide(){
+  if(window.innerWidth<=LP_AUTO_HIDE && !lpCollapsed){
+    lpCollapsed=true;
+    lpWrap.classList.add('collapsed');
+    lpToggle.textContent='▶';
+    lpToggle.title='表示';
+  } else if(window.innerWidth>LP_AUTO_HIDE && lpCollapsed){
+    lpCollapsed=false;
+    lpWrap.classList.remove('collapsed');
+    lpWrap.style.width=lpWidth+'px';
+    lpToggle.textContent='◀';
+    lpToggle.title='非表示';
+  }
+}
+checkAutoHide();
+window.addEventListener('resize',checkAutoHide);
+</script>
+</body>
+</html>
