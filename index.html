@@ -380,6 +380,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .step-indicator{display:flex;gap:6px;margin-bottom:14px;}
 .step-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);}
 .step-dot.on{background:var(--purple);}
+.ms-check-row.ms-fixed{background:var(--surface2);opacity:.75;cursor:default;}
+.ms-fixed-ic{font-size:11px;color:var(--ink3);width:20px;flex-shrink:0;}
+.ms-fixed-label{font-size:13px;font-weight:500;color:var(--ink2);}
 </style>
 </head>
 <body>
@@ -615,6 +618,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <div class="step-dot" id="sdot-4"></div>
         </div>
         <div class="ms-title">実行する処理を選択してください</div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">— 必須処理（常に実行）—</div>
+          <div class="ms-check-row ms-fixed">
+            <span class="ms-fixed-ic">🔒</span>
+            <span class="ms-fixed-label">💾 日程を保存</span>
+          </div>
+          <div class="ms-check-row ms-fixed">
+            <span class="ms-fixed-ic">🔒</span>
+            <span class="ms-fixed-label">🔄 実施日保存・カレンダー再生成</span>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">— 追加処理（選択）—</div>
         <div class="ms-check-row">
           <input type="checkbox" id="mc-calpub" checked>
           <label for="mc-calpub">📅 予定表公開</label>
@@ -2178,10 +2193,14 @@ function buildMstep4() {
   monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
   monthlyChecks.form   = document.getElementById('mc-form').checked;
   monthlyChecks.sheet  = document.getElementById('mc-sheet').checked;
-  const tasks = [];
-  if (monthlyChecks.calpub) tasks.push({ id: 'calpub', label: '予定表公開' });
-  if (monthlyChecks.form)   tasks.push({ id: 'form',   label: 'シフトフォーム作成' });
-  if (monthlyChecks.sheet)  tasks.push({ id: 'sheet',  label: 'シフト作成枠作成' });
+  // デフォルト処理を先頭に固定追加
+  const tasks = [
+    { id: 'savedates', label: '💾 日程を保存' },
+    { id: 'calregen',  label: '🔄 実施日保存・カレンダー再生成' }
+  ];
+  if (monthlyChecks.calpub) tasks.push({ id: 'calpub', label: '📅 予定表公開' });
+  if (monthlyChecks.form)   tasks.push({ id: 'form',   label: '📝 シフトフォーム作成' });
+  if (monthlyChecks.sheet)  tasks.push({ id: 'sheet',  label: '⚙️ シフト作成枠作成' });
   document.getElementById('mstep4-list').innerHTML = tasks.map(t =>
     `<div class="ms-prog-row" id="mpr-${t.id}">
       <span class="ms-prog-ic" id="mpic-${t.id}">⏳</span>
@@ -2200,7 +2219,7 @@ async function execMonthly() {
 
   const sheetPos = parseInt(document.getElementById('ms-sheet-pos')?.value || '3');
 
-  async function runTask(id, label, fn) {
+  async function runTask(id, fn) {
     document.getElementById('mpic-' + id).textContent = '⏳';
     document.getElementById('mpst-' + id).textContent = '実行中...';
     document.getElementById('mpst-' + id).className = 'ms-prog-st running';
@@ -2218,27 +2237,46 @@ async function execMonthly() {
   }
 
   try {
+    // ① 必須：日程を保存
+    await runTask('savedates', () =>
+      gasGet('saveDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open })
+    );
+
+    // ② 必須：実施日保存・カレンダー再生成（①保存後のデータを使用）
+    const cleanSlots = slots.map(s => ({
+      ...s,
+      interval: parseInt(s.interval) || 15,
+      y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d)
+    }));
+    await runTask('calregen', () =>
+      gasGet('updateCalendarSlots', { slots: cleanSlots, year: curY, month: curM })
+    );
+
+    // ③ 以降の選択処理は①②完了後に実行（最新データを参照）
     if (monthlyChecks.calpub) {
-      await runTask('calpub', '予定表公開', () =>
+      await runTask('calpub', () =>
         gasGet('publishCalendar', { year: curY, month: curM })
       );
     }
     if (monthlyChecks.form) {
-      await runTask('form', 'シフトフォーム作成', () =>
+      await runTask('form', () =>
         gasGet('createFormSheet', { year: curY, month: curM, sheetPosition: sheetPos })
       );
     }
     if (monthlyChecks.sheet) {
-      await runTask('sheet', 'シフト作成枠作成', () =>
+      await runTask('sheet', () =>
         gasGet('createShiftSheet', { year: curY, month: curM })
       );
     }
+
     document.getElementById('mstep4-done').style.display = 'block';
-    // 閉じるボタン表示
-    document.getElementById('mstep4-nav').innerHTML = '<button class="ms-btn primary" onclick="closeM(&quot;m-monthly&quot;)">閉じる</button>';
+    document.getElementById('mstep4-nav').innerHTML =
+      '<button class="ms-btn primary" onclick="closeM(&quot;m-monthly&quot;)">閉じる</button>';
+    // 日程変更フラグをリセット
+    datesChanged = false;
+    updSaveDatesBtn();
     toast('月次一括処理が完了しました', 's');
   } catch (e) {
-    // エラー時は戻るボタンを再表示
     document.getElementById('mstep4-nav').innerHTML =
       '<button class="ms-btn sec" onclick="monthlyStep(monthlyChecks.form ? 3 : 2)">← 戻る</button>' +
       '<button class="ms-btn primary" onclick="execMonthly()">再実行</button>';
