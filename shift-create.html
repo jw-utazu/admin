@@ -353,22 +353,20 @@ function signOut() {
 async function loadData() {
   setLoading(true, 'データを読み込み中...');
   try {
-    // URLパラメータからyear/month取得、なければ現在月
-    const params = new URLSearchParams(location.search);
-    const now = new Date();
-    const year  = parseInt(params.get('year'))  || now.getFullYear();
-    const month = parseInt(params.get('month')) || now.getMonth() + 1;
+    // 年月はGASのカレンダーシート（D3・F3）から取得
+    // 3並列取得（year/month省略でGASがカレンダーシートを参照）
+    const [flagsRes, appRes, shiftRes] = await Promise.all([
+      gasGet('getMemberFlags'),
+      gasGet('getApplicants', {}),
+      gasGet('getShiftCreateData', {})
+    ]);
+
+    const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
+    const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
     curYM = { year, month };
 
     // ヘッダー更新
     document.querySelector('.hdr-title').textContent = 'シフト作成 — ' + year + '年' + month + '月';
-
-    // 3並列取得
-    const [flagsRes, appRes, shiftRes] = await Promise.all([
-      gasGet('getMemberFlags'),
-      gasGet('getApplicants', { year, month }),
-      gasGet('getShiftCreateData', { year, month })
-    ]);
 
     memberFlags = flagsRes.ok ? flagsRes.flags : {};
     applicants  = appRes.ok  ? appRes.applicants : [];
