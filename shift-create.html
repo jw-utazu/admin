@@ -2,230 +2,196 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>シフト管理アプリ</title>
 <link rel="icon" type="image/png" href="https://jw-utazu.github.io/admin/logo.png">
-<link rel="apple-touch-icon" href="https://jw-utazu.github.io/admin/logo.png">
-<link rel="manifest" href="manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="シフト管理">
-<meta name="mobile-web-app-capable" content="yes">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>シフト管理アプリ</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer onload="renderGsiButton()"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --ink:#18181b;--ink2:#52525b;--ink3:#a1a1aa;
+  --ink:#18181b;--ink2:#52525b;--ink3:#71717a;
   --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
   --border:#e4e4e7;--border2:#d4d4d8;
-  --blue:#2563eb;--blue-l:#eff6ff;--blue-d:#1d4ed8;
-  --green:#16a34a;--green-l:#f0fdf4;
-  --amber:#d97706;--amber-l:#fffbeb;
-  --red:#dc2626;--red-l:#fef2f2;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --green:#16a34a;--green-l:#f0fdf4;--green-d:#14532d;
+  --green3:#bbf7d0;--green4:#dcfce7;
+  --amber:#d97706;--red:#dc2626;--red-l:#fef2f2;
   --purple:#7c3aed;--purple-l:#f5f3ff;
-  --teal:#0d9488;--teal-l:#f0fdfa;
-  --r:8px;--r-lg:12px;
-  --mono:'JetBrains Mono',monospace;
   --sans:'Noto Sans JP',sans-serif;
-  --sh:0 1px 2px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.1);
-  --sh-lg:0 4px 6px rgba(0,0,0,.07),0 10px 15px rgba(0,0,0,.1);
+  --r:8px;--r-lg:12px;
+  --sh:0 1px 3px rgba(0,0,0,.1);
 }
-body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.6;min-height:100vh;}
+html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5;}
+body{display:flex;flex-direction:column;overflow:hidden;}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes t-up{from{opacity:0;transform:translateY(8px)}}
+@keyframes t-up{from{opacity:0;transform:translateY(8px);}}
 
-/* ===== ログイン ===== */
+/* LOGIN */
 #login-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;flex-direction:column;align-items:center;justify-content:center;}
-.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:44px 36px;width:100%;max-width:340px;text-align:center;box-shadow:var(--sh-lg);}
-.login-logo{width:48px;height:48px;background:var(--purple);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;color:#fff;}
+.login-card{background:var(--surface);padding:36px 44px;border-radius:var(--r-lg);border:1px solid var(--border);text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.login-logo{width:48px;height:48px;background:var(--purple);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:22px;color:#fff;}
 .login-title{font-size:17px;font-weight:700;margin-bottom:6px;}
-.login-sub{font-size:12px;color:var(--ink2);margin-bottom:24px;line-height:1.8;}
+.login-sub{font-size:12px;color:var(--ink2);margin-bottom:22px;}
 
-/* ===== ローディング ===== */
-#loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9998;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
-.spin-circle{width:32px;height:32px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--purple);animation:spin 1s linear infinite;}
+/* LOADING */
+#loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9000;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+.spin{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin 1s linear infinite;}
 .lo-msg{font-size:13px;color:var(--ink2);}
 
-/* ===== アプリ全体 ===== */
-#app-screen{display:none;flex-direction:column;height:100vh;}
-
-/* ===== ヘッダー ===== */
-.hdr{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;position:sticky;top:0;z-index:100;flex-shrink:0;}
-.hdr-logo{width:28px;height:28px;border-radius:7px;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;}
+/* HEADER */
+.hdr{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;box-shadow:var(--sh);z-index:100;}
+.hdr-logo{width:28px;height:28px;border-radius:7px;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;}
 .hdr-title{font-size:14px;font-weight:700;flex:1;}
 .hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+.hbtn:hover{background:var(--bg);}
 .hbtn.pub{background:var(--green);color:#fff;border-color:var(--green);}
-.hbtn.sav{background:var(--purple);color:#fff;border-color:var(--purple);}
+.hbtn.pub:hover{opacity:.9;}
 .save-st{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--amber);}
 .save-st.saved{color:var(--green);}
 .save-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
 
-/* ===== メインタブ（希望確認/シフト作成/設定） ===== */
-.main-tabs{display:flex;background:var(--surface);border-bottom:2px solid var(--border);flex-shrink:0;}
-.main-tab{flex:1;padding:11px 4px;border:none;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;}
-.main-tab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
+/* MAIN TABS */
+.main-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;flex-shrink:0;}
+.mtab{padding:10px 16px;border:none;border-bottom:3px solid transparent;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);transition:all .15s;white-space:nowrap;}
+.mtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
+.mtab:hover:not(.on){color:var(--ink);background:var(--bg);}
 
-/* ===== タブコンテンツ共通 ===== */
+/* TAB CONTENT */
 .tab-content{display:none;flex:1;overflow:hidden;flex-direction:column;}
 .tab-content.on{display:flex;}
 
-/* ===== トースト ===== */
+/* TOAST */
 .ta{position:fixed;bottom:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:5px;}
 .toast{background:var(--ink);color:#fff;border-radius:var(--r);padding:8px 13px;font-size:12px;animation:t-up .18s ease;box-shadow:0 4px 12px rgba(0,0,0,.2);}
-.toast.s{background:var(--green);}
-.toast.e{background:var(--red);}
+.toast.s{background:var(--green);}.toast.e{background:var(--red);}
 
-/* ===================================================
-   タブ①：希望確認
-=================================================== */
-.wish-toolbar{padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.wish-summary{font-size:12px;color:var(--ink2);}
-.wish-summary strong{color:var(--purple);font-size:15px;}
-.wish-scroll{flex:1;overflow:auto;padding:14px;}
-.wish-table-wrap{overflow-x:auto;}
-.wish-tbl{border-collapse:collapse;font-size:11px;white-space:nowrap;}
-.wish-tbl th,.wish-tbl td{border:1px solid var(--border);padding:5px 8px;text-align:center;}
-.wish-tbl .w-name{text-align:left;font-weight:700;background:var(--surface2);position:sticky;left:0;z-index:1;min-width:80px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.wish-tbl .w-slot-hd{background:var(--surface2);font-size:10px;color:var(--ink2);min-width:80px;}
-.wish-tbl .w-check{background:#d1fae5;color:var(--green);font-size:15px;cursor:pointer;}
-.wish-tbl .w-check.has-comment{background:#fef9c3;}
-.wish-empty{padding:40px;text-align:center;color:var(--ink3);}
+/* ===== TAB1: 希望確認 ===== */
+.wish-summary{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:14px;flex-shrink:0;font-size:12px;flex-wrap:wrap;}
+.ws-item{display:flex;align-items:center;gap:5px;}
+.ws-val{font-size:18px;font-weight:700;color:var(--green);}
+.ws-lbl{color:var(--ink3);}
+.ws-div{width:1px;height:22px;background:var(--border2);}
+.ws-ym{font-size:13px;font-weight:700;color:var(--ink2);}
+.wish-reload-btn{margin-left:auto;padding:4px 10px;border:1px solid var(--green);border-radius:var(--r);background:none;color:var(--green);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+.wish-reload-btn:hover{background:var(--green-l);}
+.tbl-outer{flex:1;overflow:auto;padding:10px;}
+.tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+table.wish-tbl{border-collapse:collapse;font-size:12px;white-space:nowrap;}
+table.wish-tbl th,table.wish-tbl td{border:1px solid var(--border);text-align:center;vertical-align:middle;}
+.col-name{position:sticky;left:0;z-index:5;background:var(--surface);min-width:110px;max-width:140px;text-align:left!important;padding:0 8px;font-weight:700;}
+th.col-name{background:var(--green4);color:var(--green-d);font-size:11px;border-right:2px solid var(--border2)!important;z-index:10;}
+td.col-name{border-right:2px solid var(--border2)!important;}
+.th-date{background:var(--green4);color:var(--green-d);font-weight:700;font-size:11px;padding:6px 10px;position:sticky;top:0;z-index:3;}
+.th-time{background:var(--green3);color:var(--green-d);font-weight:700;font-size:10px;padding:4px 8px;min-width:80px;position:sticky;top:28px;z-index:3;}
+.th-top{position:sticky;top:0;z-index:6;}
+td.cell-on{background:#dcfce7;cursor:pointer;position:relative;}
+td.cell-on:hover{background:#bbf7d0;}
+td.cell-off{background:var(--surface);}
+.check-mark{font-size:16px;color:var(--green);line-height:1;}
+.note-mark{font-size:10px;position:absolute;top:2px;right:3px;color:var(--amber);}
+td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
+.empty-msg{padding:40px;text-align:center;color:var(--ink3);}
+.popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:5000;align-items:center;justify-content:center;}
+.popup-overlay.on{display:flex;}
+.popup-box{background:var(--surface);border-radius:var(--r-lg);padding:20px;max-width:320px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.15);}
+.popup-title{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--green-d);}
+.popup-body{font-size:12px;color:var(--ink2);white-space:pre-wrap;margin-bottom:14px;line-height:1.7;}
+.popup-close-btn{width:100%;padding:8px;border-radius:var(--r);background:var(--green);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);}
 
-/* コメントポップアップ */
-.comment-popup{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;box-shadow:var(--sh-lg);z-index:500;max-width:200px;font-size:12px;display:none;}
-.comment-popup.show{display:block;}
-
-/* ===================================================
-   タブ②：シフト作成
-=================================================== */
-/* 日付タブ */
-.dtabs{background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;flex-shrink:0;scrollbar-width:none;}
-.dtabs::-webkit-scrollbar{display:none;}
-.dtab{padding:9px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;flex-shrink:0;}
+/* ===== TAB2: シフト作成 ===== */
+.dtabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;overflow-x:auto;flex-shrink:0;}
+.dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
-
-/* 作成コンテンツ */
-.shift-body{display:flex;flex:1;overflow:hidden;}
-/* 左パネル */
-.lp-wrap{width:180px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);overflow-y:auto;transition:width .2s;}
-.lp-wrap.collapsed{width:0;overflow:hidden;}
-.lp-toggle{position:absolute;left:180px;top:50%;transform:translateY(-50%);z-index:10;width:14px;height:40px;background:var(--surface);border:1px solid var(--border);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink3);box-shadow:2px 0 4px rgba(0,0,0,.08);}
+.sc-body{display:flex;flex:1;overflow:hidden;}
+.lp-wrap{position:relative;display:flex;flex-shrink:0;transition:width .2s ease;width:196px;}
+.lp{border-right:1px solid var(--border);background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;width:100%;min-width:0;}
+.lp-wrap.collapsed{width:0!important;overflow:visible;}
+.lp-wrap.collapsed .lp{display:none;}
+.lp-resize{position:absolute;right:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent;}
+.lp-resize:hover,.lp-resize.dragging{background:var(--purple);opacity:.3;border-radius:4px;}
+.lp-toggle{position:absolute;right:-14px;top:50%;transform:translateY(-50%);z-index:20;width:14px;height:40px;background:var(--surface);border:1px solid var(--border);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:10px;box-shadow:2px 0 4px rgba(0,0,0,.08);}
 .lp-toggle:hover{background:var(--purple-l);color:var(--purple);}
-.lp-pos{position:relative;display:flex;flex:1;overflow:hidden;}
-.lp-hd{padding:8px 10px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;}
-.lp-date{font-size:11px;font-weight:700;}
-.lp-cnt{margin-top:4px;padding:4px 7px;background:var(--purple-l);border-radius:var(--r);display:flex;align-items:baseline;gap:4px;}
-.lp-n{font-size:16px;font-weight:700;color:var(--purple);}
+.lp-hd{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;}
+.lp-date{font-size:12px;font-weight:700;}
+.lp-cnt{margin-top:6px;padding:5px 8px;background:var(--purple-l);border-radius:var(--r);display:flex;align-items:baseline;gap:5px;}
+.lp-n{font-size:18px;font-weight:700;color:var(--purple);}
 .lp-u{font-size:10px;color:var(--purple);}
-.lp-sec{font-size:10px;font-weight:700;color:var(--ink3);padding:5px 10px 2px;background:var(--surface2);border-bottom:1px solid var(--border);}
-.mr{display:flex;align-items:center;gap:5px;padding:6px 10px;border-bottom:1px solid var(--border);}
-.m-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.lp-sec{font-size:10px;font-weight:700;color:var(--ink3);padding:6px 12px 3px;background:var(--surface2);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.06em;}
+.mr{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);}
+.m-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .d-on{background:var(--green);}.d-off{background:var(--border2);}
-.m-name{font-size:11px;font-weight:500;flex:1;}
-.m-name.off{color:var(--ink3);}
-.sc{font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700;}
-.sc-r{background:var(--green-l);color:var(--green);}
-.sc-k{background:var(--purple-l);color:var(--purple);}
-.sc-a{background:var(--amber-l);color:var(--amber);}
-
-/* 右メイン */
-.rm-wrap{flex:1;overflow-y:auto;padding:14px;background:var(--bg);}
-
-/* 時間帯ブロック */
+.m-name{font-size:12px;font-weight:500;flex:1;}.m-name.off{color:var(--ink3);}
+.sts{display:flex;gap:3px;flex-wrap:wrap;}
+.sc-badge{font-size:10px;padding:2px 5px;border-radius:3px;font-weight:700;}
+.sc-a{background:#fef3c7;color:#92400e;}.sc-r{background:var(--green-l);color:var(--green);}.sc-k{background:var(--purple-l);color:var(--purple);}
+.rm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.rm{overflow-y:auto;padding:14px;background:var(--bg);flex:1;}
 .tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
 .tb-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface2);}
 .tb-time{font-size:14px;font-weight:700;color:var(--purple);}
 .tb-acts{display:flex;align-items:center;gap:8px;}
-.tb-st{font-size:11px;font-weight:700;color:var(--amber);}
-.tb-st.saved{color:var(--green);}
+.tb-st{font-size:11px;font-weight:700;color:var(--amber);}.tb-st.saved{color:var(--green);}
 .tb-btn{padding:4px 10px;border:1px solid var(--purple);border-radius:6px;background:none;color:var(--purple);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);}
 .tb-btn:hover{background:var(--purple-l);}
-
-/* 責任者エリア */
 .resp-area{padding:8px 12px;border-bottom:1px solid var(--border);background:#fff7ed;}
-.area-title{font-size:10px;font-weight:700;margin-bottom:5px;color:#c2410c;}
-.ra-row{display:flex;gap:8px;}
-.ra-item{display:flex;align-items:center;gap:5px;flex:1;}
+.area-title{font-size:10px;font-weight:700;margin-bottom:6px;color:#c2410c;}
+.ra-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.ra-item{display:flex;align-items:center;gap:6px;flex:1;min-width:140px;}
 .ra-label{font-size:11px;font-weight:700;color:#c2410c;white-space:nowrap;}
-.ra-sel{flex:1;border:1px solid #fed7aa;border-radius:var(--r);padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
-
-/* カート担当エリア */
-.cart-area{padding:8px 12px;border-bottom:1px solid var(--border);background:#f0fdf4;}
-.cart-title{color:#15803d;}
+.ra-sel{flex:1;border:1px solid #fed7aa;border-radius:var(--r);padding:5px 7px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+.cart-area{padding:8px 12px;border-bottom:1px solid var(--border);background:var(--green-l);}
+.cart-title{color:var(--green-d);}
 .cart-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.cart-tbl th,.cart-tbl td{border:1px solid #86efac;padding:5px 7px;text-align:center;vertical-align:middle;}
-.cart-tbl thead th{background:#dcfce7;color:#15803d;font-weight:700;}
-.cart-tbl .row-lbl{background:#f0fdf4;font-weight:700;color:#15803d;text-align:left;font-size:11px;white-space:nowrap;}
-.cart-sel{width:100%;border:1px solid #86efac;border-radius:5px;padding:3px 5px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
-.cart-num{width:100%;border:1px solid #86efac;border-radius:5px;padding:3px 5px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
-.cart-num:disabled{background:#f0fdf4;color:var(--ink3);}
-
-/* 奉仕者テーブル */
-.tbl-outer{overflow-x:auto;}
+.cart-tbl th,.cart-tbl td{border:1px solid var(--green3);padding:5px 7px;text-align:center;vertical-align:middle;}
+.cart-tbl thead th{background:var(--green4);color:var(--green-d);font-weight:700;}
+.cart-tbl .row-lbl{background:var(--green-l);font-weight:700;color:var(--green-d);text-align:left;font-size:11px;white-space:nowrap;width:90px;}
+.cart-sel{width:100%;border:1px solid var(--green3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+.cart-num{width:100%;border:1px solid var(--green3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+.cart-num:disabled{background:var(--green-l);color:var(--ink3);}
+.tbl-wrap{overflow-x:auto;}
 .shift-tbl{border-collapse:collapse;font-size:12px;width:100%;}
-.shift-tbl th,.shift-tbl td{border:1px solid #ccc;text-align:center;vertical-align:middle;}
-.th-time{background:var(--surface2);padding:8px 10px;font-weight:700;color:var(--ink2);white-space:nowrap;font-size:11px;}
-.td-time{background:var(--surface2);padding:10px 10px;font-size:12px;font-weight:700;color:var(--ink2);white-space:nowrap;}
-.th-place{font-weight:700;font-size:13px;padding:8px 10px;}
-.td-cell{padding:8px 6px;}
-.cell-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
-select.cs{width:100%;min-width:90px;border:1px solid var(--border2);border-radius:5px;padding:4px 4px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;background:var(--surface);}
-select.cs:focus{border-color:var(--blue);background:var(--blue-l);}
-.watch-row{display:flex;align-items:center;gap:4px;}
-.watch-chk{width:13px;height:13px;cursor:pointer;accent-color:var(--amber);}
-.watch-lbl{font-size:10px;color:var(--ink3);cursor:pointer;}
-.watch-lbl.on{color:#b45309;font-weight:700;}
+.shift-tbl th,.shift-tbl td{border:1px solid var(--border2);text-align:center;vertical-align:middle;}
+.th-slot-time{background:var(--surface2);padding:8px 10px;font-weight:700;color:var(--ink2);font-size:11px;min-width:90px;}
+.td-slot-time{background:var(--surface2);padding:10px 8px;font-size:12px;font-weight:700;color:var(--ink2);white-space:nowrap;text-align:center;min-width:90px;}
+.th-place{font-weight:700;font-size:12px;padding:8px 12px;}
+.cell-w{padding:6px 8px;min-width:120px;}
+.cell-wrap{display:flex;flex-direction:column;gap:4px;}
+select.cs{width:100%;border:1px solid var(--border2);border-radius:5px;padding:4px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);}
+select.cs:focus{border-color:var(--blue);}
+select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 
-/* 空表示 */
-.shift-empty{padding:40px;text-align:center;color:var(--ink3);}
-
-/* ===================================================
-   タブ③：設定
-=================================================== */
+/* ===== TAB3: 設定 ===== */
 .settings-scroll{flex:1;overflow-y:auto;padding:14px;}
-.settings-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
-.settings-hd{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:13px;font-weight:700;}
-.settings-bd{padding:12px;}
-.settings-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);}
-.settings-row:last-child{border-bottom:none;}
-.settings-label{font-size:12px;font-weight:500;}
-.settings-sub{font-size:10px;color:var(--ink3);margin-top:2px;}
-.s-actions{display:flex;gap:6px;}
-.s-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);background:var(--surface2);color:var(--ink2);}
-.s-btn.danger{border-color:var(--red);color:var(--red);background:var(--red-l);}
-.s-btn.primary{border-color:var(--purple);color:var(--purple);background:var(--purple-l);}
-.s-btn.green{border-color:var(--green);color:var(--green);background:var(--green-l);}
-.s-add-row{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;}
-.s-input{border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-size:12px;font-family:var(--sans);color:var(--ink);outline:none;background:var(--surface);}
-.s-input:focus{border-color:var(--purple);}
-.period-inputs{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink2);}
-.period-inputs input{width:72px;}
-.big-btn{width:100%;padding:12px;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);border:none;display:flex;align-items:center;justify-content:center;gap:8px;}
-.big-btn.purple{background:var(--purple);color:#fff;}
-.big-btn.purple:hover{background:#6d28d9;}
-.big-btn.green{background:var(--green);color:#fff;}
-.big-btn.green:hover{background:#15803d;}
-.big-btn:disabled{opacity:.5;cursor:not-allowed;}
-
-/* モーダル */
-.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:16px;}
-.ov.open{display:flex;}
-.modal{background:var(--surface);border-radius:var(--r-lg);width:100%;max-width:420px;max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--sh-lg);}
-.mhd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);}
-.mt{font-size:14px;font-weight:700;}
-.mx{background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink3);padding:2px 6px;}
-.mbd{padding:16px;overflow-y:auto;flex:1;}
-.mft{padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
-.btn{padding:7px 16px;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);border:none;}
-.btn-g{background:var(--surface2);color:var(--ink2);border:1px solid var(--border);}
-.btn-p{background:var(--purple);color:#fff;}
-.btn-d{background:var(--red);color:#fff;}
-
-/* done-box */
-.done-box{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;}
-.done-icon{width:40px;height:40px;border-radius:50%;background:var(--green-l);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;}
-.done-title{font-size:14px;font-weight:700;color:var(--green);}
-.exec-st{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);padding:12px 0;}
+.sec-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
+.sec-hd{padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:13px;font-weight:700;}
+.sec-body{padding:12px 14px;}
+.setting-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
+.setting-row:last-child{border-bottom:none;}
+.setting-name{flex:1;font-size:13px;}
+.setting-detail{font-size:11px;color:var(--ink3);}
+.setting-actions{display:flex;gap:6px;flex-shrink:0;}
+.s-btn{padding:4px 10px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);background:var(--surface2);color:var(--ink2);}
+.s-btn:hover{background:var(--bg);}
+.s-btn.del{color:var(--red);border-color:#fca5a5;background:var(--red-l);}
+.s-btn.del:hover{background:#fecaca;}
+.s-btn.primary{background:var(--purple);color:#fff;border-color:var(--purple);}
+.s-btn.primary:hover{opacity:.9;}
+.s-btn.green{background:var(--green);color:#fff;border-color:var(--green);}
+.s-btn.green:hover{opacity:.9;}
+.add-form{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-top:8px;}
+.add-form label{font-size:11px;font-weight:700;color:var(--ink2);display:block;margin-bottom:4px;}
+.add-form input,.add-form select{width:100%;border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--surface);}
+.add-form input:focus{border-color:var(--purple);}
+.form-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.form-col{flex:1;min-width:100px;}
+.add-form-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:8px;}
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.tag{display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--purple-l);border:1px solid #ddd6fe;border-radius:20px;font-size:12px;color:var(--purple);}
+.tag .del-t{background:none;border:none;color:var(--ink3);cursor:pointer;padding:0;font-size:14px;line-height:1;}
+.tag .del-t:hover{color:var(--red);}
+.exec-btn{width:100%;padding:12px;border-radius:var(--r);border:1px solid #fca5a5;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;background:var(--red-l);color:var(--red);}
+.exec-btn:hover{background:#fecaca;}
 </style>
 </head>
 <body>
@@ -242,1079 +208,693 @@ select.cs:focus{border-color:var(--blue);background:var(--blue-l);}
 
 <!-- ローディング -->
 <div id="loading-overlay">
-  <div class="spin-circle"></div>
-  <div class="lo-msg">読み込み中...</div>
+  <div class="spin"></div>
+  <div class="lo-msg" id="lo-msg">読み込み中...</div>
 </div>
 
 <!-- アプリ本体 -->
-<div id="app-screen">
-
-  <!-- ヘッダー -->
+<div id="app-screen" style="display:none;flex-direction:column;height:100%;">
   <div class="hdr">
     <div class="hdr-logo">🗂</div>
     <span class="hdr-title" id="hdr-title">シフト管理アプリ</span>
-    <div class="save-st" id="gst" style="display:none;">
-      <div class="save-dot"></div><span id="gst-txt">未保存あり</span>
-    </div>
-    <button class="hbtn sav" id="btn-save-all" style="display:none;" onclick="saveAll()">全て保存</button>
-    <button class="hbtn pub" id="btn-pub" style="display:none;" onclick="confirmPublish()">シフト公開</button>
+    <div class="save-st" id="gst" style="display:none;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div>
+    <button class="hbtn pub" onclick="publishShift()">📣 シフト公開</button>
     <button class="hbtn" onclick="signOut()">ログアウト</button>
   </div>
 
-  <!-- メインタブ -->
   <div class="main-tabs">
-    <button class="main-tab on" id="mtab-wish" onclick="switchMainTab('wish')">📋 希望確認</button>
-    <button class="main-tab"    id="mtab-shift" onclick="switchMainTab('shift')">✏️ シフト作成</button>
-    <button class="main-tab"    id="mtab-settings" onclick="switchMainTab('settings')">⚙️ 設定</button>
+    <button class="mtab on"  id="mtab-wish"     onclick="switchMainTab('wish',this)">📋 希望確認</button>
+    <button class="mtab"     id="mtab-create"   onclick="switchMainTab('create',this)">✏️ シフト作成</button>
+    <button class="mtab"     id="mtab-settings" onclick="switchMainTab('settings',this)">⚙️ 設定</button>
   </div>
 
-  <!-- ① 希望確認タブ -->
+  <!-- TAB1: 希望確認 -->
   <div class="tab-content on" id="tab-wish">
-    <div class="wish-toolbar">
-      <div class="wish-summary" id="wish-summary">読み込み中...</div>
-      <button class="hbtn" onclick="loadWishData()" style="margin-left:auto;">🔄 更新</button>
+    <div class="wish-summary">
+      <div class="ws-item"><span class="ws-val" id="ws-applied">-</span><span class="ws-lbl">名申込</span></div>
+      <div class="ws-div"></div>
+      <div class="ws-item"><span class="ws-val" id="ws-total" style="color:var(--ink2);font-size:15px;">-</span><span class="ws-lbl">名中</span></div>
+      <div class="ws-div"></div>
+      <span class="ws-ym" id="ws-ym">読み込み中...</span>
+      <button class="wish-reload-btn" onclick="loadWishData()">🔄 再読み込み</button>
     </div>
-    <div class="wish-scroll">
-      <div id="wish-body"><div class="wish-empty">データを読み込み中...</div></div>
+    <div class="tbl-outer">
+      <div class="tbl-card">
+        <div id="wish-table-wrap"><div class="empty-msg">読み込み中...</div></div>
+      </div>
     </div>
-    <div class="comment-popup" id="comment-popup"></div>
   </div>
 
-  <!-- ② シフト作成タブ -->
-  <div class="tab-content" id="tab-shift">
-    <div class="dtabs" id="dtabs"></div>
-    <div class="lp-pos">
+  <!-- TAB2: シフト作成 -->
+  <div class="tab-content" id="tab-create">
+    <div class="dtabs" id="dtabs"><div style="padding:10px 14px;font-size:12px;color:var(--ink3);">読み込み中...</div></div>
+    <div class="sc-body">
       <div class="lp-wrap" id="lpWrap">
-        <div class="lp-hd">
-          <div class="lp-date" id="lp-date-label">—</div>
-          <div class="lp-cnt">
-            <div class="lp-n" id="lp-count">0</div>
-            <div class="lp-u" id="lp-total">名申込</div>
+        <div class="lp-resize" id="lpResize"></div>
+        <button class="lp-toggle" id="lpToggle" onclick="toggleLp()">◀</button>
+        <div class="lp" id="lp">
+          <div class="lp-hd">
+            <div class="lp-date" id="lp-date-label">-</div>
+            <div class="lp-cnt"><div class="lp-n" id="lp-count">-</div><div class="lp-u" id="lp-total">名申込</div></div>
           </div>
+          <div id="lp-members"></div>
         </div>
-        <div id="lp-members"></div>
       </div>
-      <button class="lp-toggle" id="lpToggle" onclick="toggleLp()">◀</button>
-      <div class="rm-wrap" id="shift-main">
-        <div class="shift-empty">シフト作成タブを開いてください</div>
+      <div class="rm-wrap">
+        <div style="display:flex;align-items:center;justify-content:flex-end;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);gap:8px;flex-shrink:0;">
+          <button class="tb-btn" style="border-color:var(--green);color:var(--green);" onclick="saveAll()">💾 全て保存</button>
+        </div>
+        <div class="rm" id="main-content">
+          <div style="padding:24px;color:var(--ink3);text-align:center;">「シフト作成」タブを選択すると読み込みます</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ③ 設定タブ -->
+  <!-- TAB3: 設定 -->
   <div class="tab-content" id="tab-settings">
     <div class="settings-scroll">
 
-      <!-- 場所管理 -->
-      <div class="settings-card">
-        <div class="settings-hd">📍 場所管理</div>
-        <div class="settings-bd">
-          <div id="locations-list"></div>
-          <div class="s-add-row" style="margin-top:10px;">
-            <input class="s-input" id="new-loc-name" placeholder="場所名" style="flex:1;min-width:80px;">
-            <div class="period-inputs">
-              <input class="s-input" id="new-loc-start" placeholder="2026.07" style="width:72px;">
-              <span>〜</span>
-              <input class="s-input" id="new-loc-end" placeholder="2026.09" style="width:72px;">
+      <div class="sec-card">
+        <div class="sec-hd">📍 場所管理</div>
+        <div class="sec-body">
+          <div id="location-list"></div>
+          <button class="s-btn primary" onclick="showAddLocationForm()" style="margin-top:8px;">＋ 場所を追加</button>
+          <div class="add-form" id="add-location-form" style="display:none;">
+            <div class="form-row">
+              <div class="form-col">
+                <label>場所名</label>
+                <input type="text" id="new-loc-name" placeholder="例：北口">
+              </div>
             </div>
-            <button class="s-btn primary" onclick="addLocation()">追加</button>
+            <div class="form-row">
+              <div class="form-col">
+                <label>開始年月（空白=常時） 例：2026.08</label>
+                <input type="text" id="new-loc-start" placeholder="2026.08">
+              </div>
+              <div class="form-col">
+                <label>終了年月（空白=無期限） 例：2026.10</label>
+                <input type="text" id="new-loc-end" placeholder="2026.10">
+              </div>
+            </div>
+            <div class="add-form-actions">
+              <button class="s-btn" onclick="hideAddLocationForm()">キャンセル</button>
+              <button class="s-btn primary" onclick="addLocation()">追加</button>
+            </div>
           </div>
-          <div style="font-size:10px;color:var(--ink3);margin-top:4px;">開始・終了年月は空白で常時有効。形式：2026.07</div>
+          <div style="text-align:right;margin-top:10px;">
+            <button class="s-btn green" onclick="saveLocations()">💾 場所設定を保存</button>
+          </div>
         </div>
       </div>
 
-      <!-- カート番号管理 -->
-      <div class="settings-card">
-        <div class="settings-hd">🛒 カート番号管理</div>
-        <div class="settings-bd">
-          <div id="cart-numbers-list"></div>
-          <div class="s-add-row" style="margin-top:10px;">
-            <input class="s-input" id="new-cart-num" placeholder="例：5" style="width:80px;">
-            <button class="s-btn primary" onclick="addCartNumber()">追加</button>
+      <div class="sec-card">
+        <div class="sec-hd">🛒 カート番号管理</div>
+        <div class="sec-body">
+          <div id="cart-tag-list" class="tag-list"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="new-cart-num" placeholder="例：5" style="width:80px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-size:12px;font-family:var(--sans);outline:none;">
+            <button class="s-btn primary" onclick="addCartNum()">＋ 追加</button>
+            <button class="s-btn green" onclick="saveCartNumbers()" style="margin-left:auto;">💾 保存</button>
           </div>
         </div>
       </div>
 
-      <!-- デフォルトスロット分数 -->
-      <div class="settings-card">
-        <div class="settings-hd">⏱ デフォルトスロット分数</div>
-        <div class="settings-bd">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <select class="s-input" id="default-slot-sel" style="width:100px;">
-              <option value="15">15分</option>
+      <div class="sec-card">
+        <div class="sec-hd">⏱ デフォルトスロット分数</div>
+        <div class="sec-body">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <select id="default-slot-sel" style="border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:13px;font-family:var(--sans);outline:none;">
+              <option value="10">10分</option>
+              <option value="15" selected>15分</option>
               <option value="20">20分</option>
               <option value="30">30分</option>
               <option value="60">60分</option>
             </select>
-            <button class="s-btn primary" onclick="saveDefaultSlot()">保存</button>
+            <button class="s-btn green" onclick="saveDefaultSlot()">💾 保存</button>
           </div>
+          <p style="font-size:11px;color:var(--ink3);margin-top:8px;">カレンダーシートで実施日スロット分数を個別指定できます</p>
         </div>
       </div>
 
-      <!-- シフト作成枠作成 -->
-      <div class="settings-card">
-        <div class="settings-hd">⚙️ シフト作成枠作成</div>
-        <div class="settings-bd">
-          <p style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.7;">現在のシフトデータをバックアップした後、新しい月のデータ入力準備をします。</p>
-          <button class="big-btn purple" onclick="confirmCreateSheet()">⚙️ シフト作成枠を作成する</button>
-        </div>
-      </div>
-
-      <!-- シフト公開 -->
-      <div class="settings-card">
-        <div class="settings-hd">📢 シフト公開</div>
-        <div class="settings-bd">
-          <p style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.7;">シフトを公開します。公開後はフォームアプリで全メンバーがシフトを確認できます。</p>
-          <button class="big-btn green" onclick="confirmPublish()">📢 シフトを公開する</button>
+      <div class="sec-card">
+        <div class="sec-hd">🔄 シフト作成枠作成</div>
+        <div class="sec-body">
+          <p style="font-size:12px;color:var(--ink2);margin-bottom:12px;line-height:1.7;">
+            現在のシフトデータをバックアップしてから3シートをクリアし、新月のシフト作成を開始します。<br>
+            <strong style="color:var(--red);">注意：実行するとシフトデータがクリアされます。</strong>
+          </p>
+          <button class="exec-btn" onclick="execCreateShiftSheet()">⚙️ シフト作成枠を作成する</button>
         </div>
       </div>
 
     </div>
   </div>
+</div>
 
-</div><!-- /#app-screen -->
+<!-- コメントポップアップ -->
+<div class="popup-overlay" id="popup-overlay" onclick="closePopup()">
+  <div class="popup-box" onclick="event.stopPropagation()">
+    <div class="popup-title" id="popup-title"></div>
+    <div class="popup-body" id="popup-body"></div>
+    <button class="popup-close-btn" onclick="closePopup()">閉じる</button>
+  </div>
+</div>
+
+<!-- 場所編集モーダル -->
+<div class="popup-overlay" id="edit-loc-modal" onclick="closeEditLocModal()">
+  <div class="popup-box" onclick="event.stopPropagation()">
+    <div class="popup-title">場所を編集</div>
+    <input type="hidden" id="edit-loc-idx">
+    <div class="add-form" style="background:none;border:none;padding:0;">
+      <div class="form-row">
+        <div class="form-col"><label>場所名</label><input type="text" id="edit-loc-name"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-col"><label>開始年月（空白=常時）</label><input type="text" id="edit-loc-start" placeholder="2026.08"></div>
+        <div class="form-col"><label>終了年月（空白=無期限）</label><input type="text" id="edit-loc-end" placeholder="2026.10"></div>
+      </div>
+    </div>
+    <div class="add-form-actions" style="margin-top:14px;">
+      <button class="s-btn" onclick="closeEditLocModal()">キャンセル</button>
+      <button class="popup-close-btn" style="width:auto;padding:8px 20px;" onclick="saveEditLocation()">保存</button>
+    </div>
+  </div>
+</div>
 
 <div class="ta" id="ta"></div>
 
-<!-- シフト作成枠作成確認モーダル -->
-<div class="ov" id="m-create-sheet">
-  <div class="modal">
-    <div class="mhd"><span class="mt">⚙️ シフト作成枠作成</span><button class="mx" onclick="closeModal('m-create-sheet')">✕</button></div>
-    <div class="mbd">
-      <p style="font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:10px;">現在のシフトデータをバックアップして3シートをクリアします。この操作は元に戻せません。</p>
-      <div class="exec-st" id="cs-exec-st" style="display:none;"><div class="spin-circle" style="width:18px;height:18px;"></div>処理中...</div>
-      <div class="done-box" id="cs-done" style="display:none;"><div class="done-icon">✓</div><div class="done-title">完了しました</div></div>
-    </div>
-    <div class="mft" id="cs-ft">
-      <button class="btn btn-g" onclick="closeModal('m-create-sheet')">キャンセル</button>
-      <button class="btn btn-d" id="cs-exec-btn" onclick="execCreateSheet()">実行</button>
-    </div>
-  </div>
-</div>
-
-<!-- シフト公開確認モーダル -->
-<div class="ov" id="m-publish">
-  <div class="modal">
-    <div class="mhd"><span class="mt">📢 シフト公開</span><button class="mx" onclick="closeModal('m-publish')">✕</button></div>
-    <div class="mbd">
-      <p style="font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:10px;">シフトを公開します。公開後は全メンバーがシフトを確認できます。よろしいですか？</p>
-      <div class="exec-st" id="pub-exec-st" style="display:none;"><div class="spin-circle" style="width:18px;height:18px;"></div>公開中...</div>
-      <div class="done-box" id="pub-done" style="display:none;"><div class="done-icon">✓</div><div class="done-title">シフトを公開しました</div></div>
-    </div>
-    <div class="mft" id="pub-ft">
-      <button class="btn btn-g" onclick="closeModal('m-publish')">キャンセル</button>
-      <button class="btn btn-p" id="pub-exec-btn" onclick="execPublish()">公開する</button>
-    </div>
-  </div>
-</div>
-
 <script>
-// ============================================================
-// 設定
-// ============================================================
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbzbPBxl6S3VdSVF9RqXSI1VQkZNGJXwU_zePBM8e3UYed-RyxxA_PRom_Xw9v5rvUwScQ/exec';
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbx1SnmwmKJrrzcVyuJIFiZrCwmRErBKxgxKpmvPrLuKLIvTGVp9aa4p4hrrgknjpPgetw/exec';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
 
-// ============================================================
-// 状態
-// ============================================================
-let adminUser    = null;
-let memberFlags  = {};   // { uid: { name, furigana, gender, respFlag, cartFlag } }
-let applicants   = [];   // [{ uid, name, appliedCount, appliedSlots, respFlag, cartFlag }]
-let shiftDates   = [];   // GAS getShiftCreateData の dates 配列
-let locations    = [];   // [{ name, startYM, endYM }]
-let cartNumbers  = [];   // ['1','2','3','4']
-let curYM        = null; // { year, month }
-let activeMainTab = 'wish';
+let adminUser     = null;
+let memberFlags   = {};
+let applicants    = [];
+let shiftDates    = [];
+let locations     = [];
+let cartNumbers   = [];
+let defaultSlot   = 15;
 let activeDateIdx = 0;
-let lpCollapsed   = false;
-const bs = {}; // ブロック保存状態
-
-const draftKey = () => curYM ? 'shift_draft_' + curYM.year + '.' + curYM.month : 'shift_draft';
+let curYM         = null;
+let createLoaded  = false;
+let settingsLoaded = false;
+const bs = {};
 
 // ============================================================
 // GAS通信
 // ============================================================
-function gasGet(action, params, timeout) {
-  const cbName = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-  let url = GAS_URL + '?action=' + action + '&callback=' + cbName;
+function gasGet(action, params) {
+  const cb = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  let url  = GAS_URL + '?action=' + action + '&callback=' + cb;
   if (params) url += '&params=' + encodeURIComponent(JSON.stringify(params));
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout || 180000);
-  return fetch(url, { redirect: 'follow', signal: controller.signal })
+  const ctrl  = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 180000);
+  return fetch(url, { redirect: 'follow', signal: ctrl.signal })
     .then(r => r.text())
-    .then(text => {
+    .then(t => {
       clearTimeout(timer);
-      const s = text.indexOf('('), e = text.lastIndexOf(')');
-      if (s === -1 || e === -1) throw new Error('レスポンス形式エラー');
-      const d = JSON.parse(text.slice(s + 1, e));
+      const s = t.indexOf('('), e = t.lastIndexOf(')');
+      if (s < 0 || e < 0) throw new Error('レスポンス形式エラー');
+      const d = JSON.parse(t.slice(s + 1, e));
       if (d && d.error && !d.ok) throw new Error(d.error);
       return d;
     })
-    .catch(err => {
-      clearTimeout(timer);
-      if (err.name === 'AbortError') throw new Error('通信タイムアウト');
-      throw new Error(err.message || '通信エラー');
-    });
+    .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
 }
-
 function gasAuthGet(email, source) {
-  const cbName = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-  const url = GAS_URL + '?action=auth&source=' + encodeURIComponent(source) +
-              '&email=' + encodeURIComponent(email) + '&callback=' + cbName;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
-  return fetch(url, { redirect: 'follow', signal: controller.signal })
+  const cb = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const url = GAS_URL + '?action=auth&source=' + encodeURIComponent(source) + '&email=' + encodeURIComponent(email) + '&callback=' + cb;
+  const ctrl  = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  return fetch(url, { redirect: 'follow', signal: ctrl.signal })
     .then(r => r.text())
-    .then(text => {
-      clearTimeout(timer);
-      const s = text.indexOf('('), e = text.lastIndexOf(')');
-      if (s === -1 || e === -1) throw new Error('レスポンス形式エラー');
-      return JSON.parse(text.slice(s + 1, e));
-    })
-    .catch(err => {
-      clearTimeout(timer);
-      if (err.name === 'AbortError') throw new Error('通信タイムアウト');
-      throw new Error(err.message || '通信エラー');
-    });
+    .then(t => { clearTimeout(timer); const s = t.indexOf('('), e = t.lastIndexOf(')'); return JSON.parse(t.slice(s + 1, e)); })
+    .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
 }
 
 // ============================================================
 // 認証
 // ============================================================
 function initAuth() {
-  try {
-    const u = JSON.parse(localStorage.getItem('adminUser') || 'null');
-    if (u && u.isAdmin) { adminUser = u; showApp(); return; }
-  } catch (_) {}
+  try { const u = JSON.parse(localStorage.getItem('adminUser') || 'null'); if (u && u.isAdmin) { adminUser = u; showApp(); return; } } catch (_) {}
   showLogin();
 }
-
-function showLogin() {
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app-screen').style.display   = 'none';
-  renderGsiButton();
-}
-
+function showLogin() { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').style.display = 'none'; renderGsiButton(); }
 function renderGsiButton() {
   if (typeof google !== 'undefined' && google.accounts) {
     google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onGoogleLogin });
     google.accounts.id.renderButton(document.getElementById('gsi-btn'), { theme: 'outline', size: 'large', text: 'signin_with', locale: 'ja' });
-  } else {
-    setTimeout(renderGsiButton, 100);
-  }
+  } else { setTimeout(renderGsiButton, 100); }
 }
-
 async function onGoogleLogin(resp) {
   try {
+    setLoading(true, '認証中...');
     const payload = JSON.parse(atob(resp.credential.split('.')[1]));
-    const email   = payload.email;
-    const d = await gasAuthGet(email, 'admin');
-    if (!d.ok || !d.isAdmin) { toast('管理者権限がありません', 'e'); return; }
-    adminUser = { email, name: d.name || email, uid: d.uid || '', isAdmin: true };
+    const d = await gasAuthGet(payload.email, 'admin');
+    if (!d.ok || !d.isAdmin) { setLoading(false); toast('管理者権限がありません', 'e'); return; }
+    adminUser = { email: payload.email, name: d.name || payload.email, uid: d.uid || '', isAdmin: true };
     localStorage.setItem('adminUser', JSON.stringify(adminUser));
-    showApp();
-  } catch (e) {
-    toast('ログインエラー: ' + e.message, 'e');
-  }
+    setLoading(false); showApp();
+  } catch (e) { setLoading(false); toast('ログインエラー: ' + e.message, 'e'); }
 }
-
-function signOut() {
-  try { localStorage.removeItem('adminUser'); } catch (_) {}
-  toast('ログアウトしました', 's');
-  setTimeout(() => location.reload(), 800);
-}
-
-function showApp() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display   = 'flex';
-  loadInitialData();
-}
+function signOut() { try { localStorage.removeItem('adminUser'); } catch (_) {} toast('ログアウトしました', 's'); setTimeout(() => location.reload(), 800); }
+function showApp() { document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-screen').style.display = 'flex'; loadInitData(); }
 
 // ============================================================
-// 初期データ読み込み
+// 初期読み込み
 // ============================================================
-async function loadInitialData() {
+async function loadInitData() {
   setLoading(true, 'データを読み込み中...');
-  try {
-    const [flagsRes, appRes, shiftRes, locRes, cartRes, slotRes] = await Promise.all([
-      gasGet('getMemberFlags'),
-      gasGet('getApplicants', {}),
-      gasGet('getShiftCreateData', {}),
-      gasGet('getLocations', {}),
-      gasGet('getCartNumbers'),
-      gasGet('getDefaultSlot')
-    ]);
+  try { await loadWishDataInternal(); setLoading(false); }
+  catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
+}
 
+// ============================================================
+// タブ切り替え
+// ============================================================
+function switchMainTab(name, btn) {
+  document.querySelectorAll('.main-tabs .mtab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('on'));
+  document.getElementById('tab-' + name).classList.add('on');
+  const gst = document.getElementById('gst');
+  if (name === 'create') { gst.style.display = ''; if (!createLoaded) loadCreateData(); }
+  else { gst.style.display = 'none'; }
+  if (name === 'settings' && !settingsLoaded) loadSettingsData();
+}
+
+// ============================================================
+// TAB1: 希望確認
+// ============================================================
+async function loadWishData() {
+  document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">読み込み中...</div>';
+  setLoading(true, 'シフト希望を取得中...');
+  try { await loadWishDataInternal(); } catch (e) { toast('読み込みエラー: ' + e.message, 'e'); } finally { setLoading(false); }
+}
+async function loadWishDataInternal() {
+  const res   = await gasGet('getWishData', {});
+  const year  = res.year  || new Date().getFullYear();
+  const month = res.month || new Date().getMonth() + 1;
+  if (!curYM) curYM = { year, month };
+  document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
+  document.getElementById('ws-ym').textContent     = year + '年' + month + '月';
+  if (!res.ok) throw new Error(res.error || '取得失敗');
+  document.getElementById('ws-applied').textContent = res.appliedCount || 0;
+  document.getElementById('ws-total').textContent   = res.totalMembers || 0;
+  if (!res.members || res.members.length === 0 || !res.slots || res.slots.length === 0) {
+    document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">データがありません。<br>シフト希望シートが作成されているか確認してください。</div>';
+  } else { buildWishTable(res); }
+}
+function buildWishTable(data) {
+  const { members, slots, matrix } = data;
+  const dg = []; const seen = new Set();
+  slots.forEach(slot => { const si = slot.indexOf(' '), dk = si >= 0 ? slot.slice(0, si) : slot; if (!seen.has(dk)) { seen.add(dk); dg.push({ date: dk, times: [] }); } dg.find(g => g.date === dk).times.push(slot); });
+  let html = '<table class="wish-tbl"><thead><tr class="th-top"><th class="col-name th-date" rowspan="2">氏名</th>';
+  dg.forEach(g => { html += `<th class="th-date" colspan="${g.times.length}">${esc(g.date)}</th>`; });
+  html += '</tr><tr>';
+  slots.forEach(slot => { const si = slot.indexOf(' '); html += `<th class="th-time">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
+  html += '</tr></thead><tbody>';
+  members.forEach(m => {
+    const row = matrix[m.uid] || {};
+    html += '<tr><td class="col-name">' + esc(m.name) + '</td>';
+    slots.forEach(slot => {
+      const val = row[slot];
+      if (val) {
+        const hc = typeof val === 'object' && val.comment;
+        html += `<td class="cell-data cell-on" onclick="showNote('${esc(m.name)}','${esc(slot)}','${hc ? esc(val.comment) : ''}')"><span class="check-mark">✅</span>${hc ? '<span class="note-mark">📝</span>' : ''}</td>`;
+      } else { html += '<td class="cell-data cell-off"></td>'; }
+    });
+    html += '</tr>';
+  });
+  html += '<tr style="background:var(--green4);"><td class="col-name" style="font-weight:700;color:var(--green-d);">申込数</td>';
+  slots.forEach(slot => { let c = 0; members.forEach(m => { if (matrix[m.uid] && matrix[m.uid][slot]) c++; }); html += `<td class="cell-data" style="font-weight:700;color:var(--green);">${c}</td>`; });
+  html += '</tr></tbody></table>';
+  document.getElementById('wish-table-wrap').innerHTML = html;
+}
+function showNote(name, slot, comment) { if (!comment) return; document.getElementById('popup-title').textContent = name + '｜' + slot; document.getElementById('popup-body').textContent = comment; document.getElementById('popup-overlay').classList.add('on'); }
+function closePopup() { document.getElementById('popup-overlay').classList.remove('on'); }
+
+// ============================================================
+// TAB2: シフト作成
+// ============================================================
+async function loadCreateData() {
+  setLoading(true, 'シフトデータを読み込み中...');
+  try {
+    const [flagsRes, appRes, shiftRes] = await Promise.all([
+      gasGet('getMemberFlags'), gasGet('getApplicants', {}), gasGet('getShiftCreateData', {})
+    ]);
     const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
     const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
     curYM = { year, month };
-
     document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
-
-    memberFlags = flagsRes.ok ? flagsRes.flags : {};
+    memberFlags = flagsRes.ok ? flagsRes.flags   : {};
     applicants  = appRes.ok  ? appRes.applicants : [];
-    shiftDates  = shiftRes.ok ? shiftRes.dates : [];
-    locations   = locRes.ok  ? locRes.locations : [];
-    cartNumbers = cartRes.ok ? cartRes.cartNumbers : [];
-
-    if (slotRes.ok) {
-      const sel = document.getElementById('default-slot-sel');
-      if (sel) sel.value = String(slotRes.defaultSlot || 15);
-    }
-
-    // ドラフト確認
-    const draft = loadDraft();
-    if (draft && draft.blocks && Object.keys(draft.blocks).length > 0) {
-      if (confirm('前回の未保存データがあります。復元しますか？')) applyDraft(draft);
-      else clearDraft();
-    }
-
-    renderSettings();
-    buildDateTabs();
-    loadWishData();
+    shiftDates  = shiftRes.ok ? shiftRes.dates   : [];
+    locations   = shiftRes.locations   || [];
+    cartNumbers = shiftRes.cartNumbers || [];
+    defaultSlot = shiftRes.defaultSlot || 15;
+    buildCreateTabs();
+    buildLeftPanel();
+    if (shiftDates.length > 0) { activeDateIdx = 0; renderDate(); }
+    else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>「設定」タブからシフト作成枠を作成してください。</div>'; }
+    createLoaded = true;
     setLoading(false);
-  } catch (e) {
-    setLoading(false);
-    toast('読み込みエラー: ' + e.message, 'e');
-  }
+  } catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
 }
 
-function setLoading(on, msg) {
-  const el = document.getElementById('loading-overlay');
-  if (!el) return;
-  el.style.display = on ? 'flex' : 'none';
-  if (msg) el.querySelector('.lo-msg').textContent = msg;
-}
-
-// ============================================================
-// メインタブ切り替え
-// ============================================================
-function switchMainTab(tab) {
-  activeMainTab = tab;
-  ['wish','shift','settings'].forEach(t => {
-    document.getElementById('mtab-' + t).classList.toggle('on', t === tab);
-    document.getElementById('tab-'  + t).classList.toggle('on', t === tab);
-  });
-  // シフト作成タブに切り替えたとき
-  if (tab === 'shift') {
-    document.getElementById('gst').style.display = '';
-    document.getElementById('btn-save-all').style.display = '';
-    document.getElementById('btn-pub').style.display = '';
-    if (shiftDates.length > 0 && !window._tabsBuilt) {
-      window._tabsBuilt = true;
-      buildDateTabs();
-      if (shiftDates.length > 0) renderDate(0);
-    }
-  } else {
-    document.getElementById('gst').style.display = 'none';
-    document.getElementById('btn-save-all').style.display = 'none';
-    document.getElementById('btn-pub').style.display = 'none';
-  }
-}
-
-// ============================================================
-// ① 希望確認タブ
-// ============================================================
-let wishData = null;
-
-async function loadWishData() {
-  document.getElementById('wish-body').innerHTML = '<div class="wish-empty">読み込み中...</div>';
-  document.getElementById('wish-summary').textContent = '読み込み中...';
-  try {
-    const res = await gasGet('getWishData', {});
-    if (!res.ok) throw new Error(res.error || '取得失敗');
-    wishData = res;
-    renderWishTable(res);
-  } catch (e) {
-    document.getElementById('wish-body').innerHTML = '<div class="wish-empty">取得エラー: ' + esc(e.message) + '</div>';
-  }
-}
-
-function renderWishTable(data) {
-  const { members, slots, matrix, totalMembers, appliedCount } = data;
-  document.getElementById('wish-summary').innerHTML =
-    '申込 <strong>' + appliedCount + '</strong> 名 / 全 <strong>' + totalMembers + '</strong> 名';
-
-  if (!members || members.length === 0 || !slots || slots.length === 0) {
-    document.getElementById('wish-body').innerHTML = '<div class="wish-empty">申込データがありません</div>';
-    return;
-  }
-
-  let html = '<div class="wish-table-wrap"><table class="wish-tbl"><thead><tr>';
-  html += '<th class="w-name">名前</th>';
-  slots.forEach(s => { html += '<th class="w-slot-hd">' + esc(s) + '</th>'; });
-  html += '</tr></thead><tbody>';
-
-  members.forEach(m => {
-    html += '<tr><td class="w-name" title="' + esc(m.name) + '">' + esc(m.name) + '</td>';
-    slots.forEach(s => {
-      const cell = matrix[m.uid] && matrix[m.uid][s];
-      if (cell) {
-        const hasComment = typeof cell === 'object' && cell.comment;
-        const comment = hasComment ? cell.comment : '';
-        html += '<td class="w-check' + (hasComment ? ' has-comment' : '') + '"'
-          + (hasComment ? ' onclick="showComment(event,' + JSON.stringify(comment) + ')" title="' + esc(comment) + '"' : '')
-          + '>✅' + (hasComment ? '📝' : '') + '</td>';
-      } else {
-        html += '<td></td>';
-      }
-    });
-    html += '</tr>';
-  });
-
-  html += '</tbody></table></div>';
-  document.getElementById('wish-body').innerHTML = html;
-}
-
-function showComment(e, comment) {
-  e.stopPropagation();
-  const popup = document.getElementById('comment-popup');
-  popup.textContent = comment;
-  popup.style.left = Math.min(e.clientX, window.innerWidth - 220) + 'px';
-  popup.style.top  = (e.clientY + 10) + 'px';
-  popup.classList.add('show');
-}
-document.addEventListener('click', () => {
-  document.getElementById('comment-popup').classList.remove('show');
-});
-
-// ============================================================
-// ② シフト作成タブ — 日付タブ
-// ============================================================
-function buildDateTabs() {
-  const seen = new Set();
-  const dateTabs = [];
-  shiftDates.forEach(d => {
-    const k = d.date + '_' + d.weekday;
-    if (!seen.has(k)) { seen.add(k); dateTabs.push({ date: d.date, weekday: d.weekday }); }
-  });
-  window._dateTabs = dateTabs;
-  const el = document.getElementById('dtabs');
-  el.innerHTML = dateTabs.map((t, i) =>
-    `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${t.date}（${t.weekday}）</button>`
+function buildCreateTabs() {
+  const dt = []; const seen = new Set();
+  shiftDates.forEach(d => { const k = d.date + '(' + d.weekday + ')'; if (!seen.has(k)) { seen.add(k); dt.push({ date: d.date, weekday: d.weekday }); } });
+  window._dateTabs = dt;
+  document.getElementById('dtabs').innerHTML = dt.map((t, i) =>
+    `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
 }
-
 function switchDateTab(i) {
   document.querySelectorAll('.dtab').forEach((b, idx) => b.className = 'dtab' + (idx === i ? ' on' : ''));
   activeDateIdx = i;
+  renderDate();
   buildLeftPanel();
-  renderDate(i);
 }
 
-// ============================================================
-// ② シフト作成タブ — 左パネル
-// ============================================================
 function buildLeftPanel() {
   const tab = (window._dateTabs || [])[activeDateIdx];
   if (!tab) return;
-  const dayDates = shiftDates.filter(d => d.date === tab.date);
-  const allSlotTimes = new Set();
-  dayDates.forEach(d => (d.slots || []).forEach(s => allSlotTimes.add(tab.date + ' ' + s.time)));
-
-  const applied = applicants.filter(a =>
-    a.appliedSlots && a.appliedSlots.some(sk => sk.startsWith(tab.date + ' ') || sk.startsWith(tab.date + '('))
-  );
+  const applied    = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(tab.date)));
   const notApplied = applicants.filter(a => !applied.find(b => b.uid === a.uid));
-
   document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）';
-  document.getElementById('lp-count').textContent = applied.length;
-  document.getElementById('lp-total').textContent = '名申込 / 全' + applicants.length + '名';
-
-  const lp = document.getElementById('lp-members');
+  document.getElementById('lp-count').textContent  = applied.length;
+  document.getElementById('lp-total').textContent  = '名申込 / 全' + applicants.length + '名';
   let html = '<div class="lp-sec">申込者</div>';
-  html += applied.map(a => {
-    const tags = [
-      `<span class="sc sc-a">申${a.appliedCount}</span>`,
-      a.respFlag ? '<span class="sc sc-r">責</span>' : '',
-      a.cartFlag ? '<span class="sc sc-k">カ</span>' : ''
-    ].filter(Boolean).join('');
-    return `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div>${tags}</div></div>`;
-  }).join('');
-  if (notApplied.length > 0) {
-    html += '<div class="lp-sec">未申込</div>';
-    html += notApplied.map(a =>
-      `<div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div>`
-    ).join('');
-  }
-  lp.innerHTML = html;
+  html += applied.map(a => `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="sts"><span class="sc-badge sc-a">申${a.appliedCount}</span>${a.respFlag ? '<span class="sc-badge sc-r">責</span>' : ''}${a.cartFlag ? '<span class="sc-badge sc-k">カ</span>' : ''}</div></div>`).join('');
+  if (notApplied.length > 0) { html += '<div class="lp-sec">未申込</div>'; html += notApplied.map(a => `<div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div>`).join(''); }
+  document.getElementById('lp-members').innerHTML = html;
 }
 
-function toggleLp() {
-  lpCollapsed = !lpCollapsed;
-  document.getElementById('lpWrap').classList.toggle('collapsed', lpCollapsed);
-  document.getElementById('lpToggle').textContent = lpCollapsed ? '▶' : '◀';
-  document.getElementById('lpToggle').style.left = lpCollapsed ? '0' : '180px';
-}
-
-// ============================================================
-// ② シフト作成タブ — ブロック描画
-// ============================================================
-function renderDate(tabIdx) {
-  const tab = (window._dateTabs || [])[tabIdx];
-  if (!tab) { document.getElementById('shift-main').innerHTML = '<div class="shift-empty">日付を選択してください</div>'; return; }
+function renderDate() {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
   const dayBlocks = shiftDates.filter(d => d.date === tab.date);
-  if (dayBlocks.length === 0) {
-    document.getElementById('shift-main').innerHTML = '<div class="shift-empty">この日のシフトデータがありません。<br>設定タブから「シフト作成枠作成」を実行してください。</div>';
-    return;
-  }
-  document.getElementById('shift-main').innerHTML = dayBlocks.map((block, bi) => buildBlock(block, bi)).join('');
-  dayBlocks.forEach((block, bi) => { if (bs[blockKey(block)]) markSaved(bi); });
-  buildLeftPanel();
+  document.getElementById('main-content').innerHTML = dayBlocks.map((block, bi) => buildBlock(block, bi)).join('');
+  dayBlocks.forEach((block, bi) => { if (bs[bKey(block)]) markSaved(bi); });
+  ug();
 }
-
-function blockKey(block) { return block.date + '_' + block.time; }
+function bKey(b) { return b.date + '_' + b.time; }
 
 function buildBlock(block, bi) {
-  const draft = (loadDraft() || {}).blocks || {};
-  const db    = draft[blockKey(block)] || null;
-
-  // 責任者候補（メンバーフラグのrespFlag）
-  const respCandidates = applicants.filter(a => a.respFlag);
-  // カート候補（メンバーフラグのcartFlag）
-  const cartCandidates = applicants.filter(a => a.cartFlag);
-
-  return `
-<div class="tb" id="tb-${bi}">
-  <div class="tb-hd">
-    <span class="tb-time">${esc(block.time)}</span>
-    <div class="tb-acts">
-      <span class="tb-st" id="st-${bi}">● 未保存</span>
-      <button class="tb-btn" onclick="saveBlock(${bi})">この時間帯を保存</button>
+  const applied     = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date)));
+  const respMembers = applied.filter(a => a.respFlag);
+  const cartMembers = applied.filter(a => a.cartFlag);
+  return `<div class="tb" id="tb-${bi}">
+    <div class="tb-hd">
+      <span class="tb-time">${esc(block.time)}</span>
+      <div class="tb-acts">
+        <span class="tb-st" id="st-${bi}">● 未保存</span>
+        <button class="tb-btn" onclick="saveBlock(${bi})">この時間帯を保存</button>
+      </div>
     </div>
-  </div>
-  ${buildRespArea(bi, block, db, respCandidates)}
-  ${buildCartArea(bi, block, db, cartCandidates)}
-  ${buildSlotTable(bi, block, db)}
-</div>`;
+    ${buildRespArea(bi, block.responsible || {}, respMembers)}
+    ${buildCartArea(bi, block.cart || {}, cartMembers)}
+    ${buildSlotTable(bi, block)}
+  </div>`;
 }
 
-// 責任者エリア
-function buildRespArea(bi, block, db, respCandidates) {
-  const resp = (db && db.responsible) || block.responsible || {};
-  const r1   = resp.r1 || '';
-  const r2   = resp.r2 || '';
-  const uid2name = uid => {
-    const f = memberFlags[uid];
-    return f ? f.name : uid;
-  };
-  function respSel(id, val) {
-    return `<select class="ra-sel" id="${id}" onchange="mu(${bi})">
-      <option value="">—</option>
-      ${respCandidates.map(a => `<option value="${a.uid}"${a.uid===val?' selected':''}>${esc(a.name)}</option>`).join('')}
-    </select>`;
-  }
-  return `
-<div class="resp-area">
-  <div class="area-title">責任者（最大2名）</div>
-  <div class="ra-row">
-    <div class="ra-item"><span class="ra-label">担当①</span>${respSel('resp1-'+bi, r1)}</div>
-    <div class="ra-item"><span class="ra-label">担当②</span>${respSel('resp2-'+bi, r2)}</div>
-  </div>
-</div>`;
+function buildNameMap() {
+  const m = {};
+  Object.entries(memberFlags).forEach(([uid, f]) => { m[uid] = f.name; });
+  applicants.forEach(a => { m[a.uid] = a.name; });
+  return m;
 }
 
-// カート担当エリア
-function buildCartArea(bi, block, db, cartCandidates) {
-  const cart = (db && db.cart) || block.cart || {};
-  const ki1 = cart.ki1||'', kc1 = cart.kc1||'';
-  const ki2 = cart.ki2||'', kc2 = cart.kc2||'';
-  const ko1 = cart.ko1||'', oc1 = cart.oc1||'';
-  const ko2 = cart.ko2||'', oc2 = cart.oc2||'';
-
-  // カート番号の選択肢（設定から取得、未設定時はデフォルト）
-  const cnOpts = cartNumbers.length > 0 ? cartNumbers : ['1','2','3','4'];
-  const cartNumGroups = [
-    cnOpts.join(','),
-    cnOpts.slice(0, Math.ceil(cnOpts.length/2)).join(','),
-    cnOpts.slice(Math.ceil(cnOpts.length/2)).join(',')
-  ];
-  // 重複除去
-  const uniqueGroups = [...new Set(cartNumGroups)];
-
-  function cSel(id, val, numId) {
-    return `<select class="cart-sel" id="${id}" onchange="ucn('${id}','${numId}');mu(${bi})">
-      <option value="">—</option>
-      ${cartCandidates.map(a => `<option value="${a.uid}"${a.uid===val?' selected':''}>${esc(a.name)}</option>`).join('')}
-    </select>`;
+function buildRespArea(bi, resp, respMembers) {
+  const nm = buildNameMap();
+  function sel(id, val) {
+    let o = '<option value="">—</option>';
+    respMembers.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
+    if (val && !respMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
+    return `<select class="ra-sel" id="${id}" onchange="mu(${bi})">${o}</select>`;
   }
-  function nSel(id, val, disabled) {
-    return `<select class="cart-num" id="${id}"${disabled?' disabled':''}>
-      <option value="">—</option>
-      ${uniqueGroups.map(g => `<option value="${g}"${g===val?' selected':''}>${g}</option>`).join('')}
-    </select>`;
-  }
-  return `
-<div class="cart-area">
-  <div class="area-title cart-title">カート担当者</div>
-  <table class="cart-tbl">
-    <thead><tr><th style="width:80px;"></th><th colspan="2">持ち込み</th><th colspan="2">持ち帰り</th></tr></thead>
-    <tbody>
-      <tr>
-        <td class="row-lbl">担当者</td>
-        <td>${cSel('ki1-'+bi,ki1,'kn1-'+bi)}</td>
-        <td>${cSel('ki2-'+bi,ki2,'kn2-'+bi)}</td>
-        <td>${cSel('ko1-'+bi,ko1,'kn3-'+bi)}</td>
-        <td>${cSel('ko2-'+bi,ko2,'kn4-'+bi)}</td>
-      </tr>
-      <tr>
-        <td class="row-lbl">カート番号</td>
-        <td>${nSel('kn1-'+bi,kc1,!ki1)}</td>
-        <td>${nSel('kn2-'+bi,kc2,!ki2)}</td>
-        <td>${nSel('kn3-'+bi,oc1,!ko1)}</td>
-        <td>${nSel('kn4-'+bi,oc2,!ko2)}</td>
-      </tr>
-    </tbody>
-  </table>
-</div>`;
+  return `<div class="resp-area"><div class="area-title">責任者（最大2名）</div><div class="ra-row">
+    <div class="ra-item"><span class="ra-label">担当①</span>${sel('resp1-'+bi, resp.r1||'')}</div>
+    <div class="ra-item"><span class="ra-label">担当②</span>${sel('resp2-'+bi, resp.r2||'')}</div>
+  </div></div>`;
 }
 
-// 奉仕者テーブル
-function buildSlotTable(bi, block, db) {
-  const slots = block.slots || [];
-  if (slots.length === 0) return '<div style="padding:10px 12px;font-size:12px;color:var(--ink3);">スロットデータがありません</div>';
+function buildCartArea(bi, cart, cartMembers) {
+  const nm = buildNameMap();
+  const nums = cartNumbers.length > 0 ? cartNumbers : ['1','2','3','4'];
+  const h1 = nums.slice(0, Math.ceil(nums.length / 2)).join(',');
+  const h2 = nums.slice(Math.ceil(nums.length / 2)).join(',');
+  const al = nums.join(',');
+  const numOpts = [['—',''],['①②', h1],['③④', h2],['①②③④', al]].map(([l, v]) => `<option value="${esc(v)}">${l}</option>`).join('');
 
-  // その日の申込者（スロット時間帯に申し込んでいる人）
-  const tab = (window._dateTabs||[])[activeDateIdx];
-  const appliedBySlot = {};  // slotTime -> [uid, ...]
-  slots.forEach(slot => {
-    appliedBySlot[slot.time] = applicants
-      .filter(a => a.appliedSlots && a.appliedSlots.some(sk => {
-        const skDate = sk.split(' ')[0];
-        const skTime = sk.split(' ')[1];
-        return skDate === tab.date && skTime === block.time;
-      }))
-      .map(a => a.uid);
-  });
-
-  // 場所一覧（全スロットで共通）
-  const placesSet = new Set();
-  slots.forEach(s => Object.keys(s.places || {}).forEach(p => placesSet.add(p)));
-  // locationsの順序に合わせる、なければplacesSetの順序
-  const orderedPlaces = locations.length > 0
-    ? locations.map(l => l.name).filter(n => placesSet.has(n))
-    : [...placesSet];
-
-  if (orderedPlaces.length === 0) {
-    return '<div style="padding:10px 12px;font-size:12px;color:var(--ink3);">場所が設定されていません。設定タブから場所を追加してください。</div>';
+  function cSel(id, val) {
+    let o = '<option value="">—</option>';
+    cartMembers.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
+    if (val && !cartMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
+    const nid = id.replace('ci', 'cn').replace('co', 'con');
+    return `<select class="cart-sel" id="${id}" onchange="ucn('${id}','${nid}');mu(${bi})">${o}</select>`;
   }
+  function nSel(id, val, dis) {
+    const opts = numOpts.replace(`value="${esc(val)}"`, `value="${esc(val)}" selected`);
+    return `<select class="cart-num" id="${id}"${dis ? ' disabled' : ''}>${opts}</select>`;
+  }
+  const { ki1='', kc1='', ki2='', kc2='', ko1='', oc1='', ko2='', oc2='' } = cart;
+  return `<div class="cart-area"><div class="area-title cart-title">カート担当者（最大各2名・空白可）</div>
+    <table class="cart-tbl">
+      <thead><tr><th style="width:90px;"></th><th colspan="2">持ち込み</th><th colspan="2">持ち帰り</th></tr></thead>
+      <tbody>
+        <tr><td class="row-lbl">担当者</td><td>${cSel('ci1-'+bi,ki1)}</td><td>${cSel('ci2-'+bi,ki2)}</td><td>${cSel('co1-'+bi,ko1)}</td><td>${cSel('co2-'+bi,ko2)}</td></tr>
+        <tr><td class="row-lbl">カート番号</td><td>${nSel('cn1-'+bi,kc1,!ki1)}</td><td>${nSel('cn2-'+bi,kc2,!ki2)}</td><td>${nSel('con1-'+bi,oc1,!ko1)}</td><td>${nSel('con2-'+bi,oc2,!ko2)}</td></tr>
+      </tbody>
+    </table>
+  </div>`;
+}
 
-  // ヘッダー行
-  let html = '<div class="tbl-outer"><table class="shift-tbl"><thead><tr>';
-  html += '<th class="th-time"></th>';
-  orderedPlaces.forEach(p => {
-    html += `<th class="th-place" style="background:var(--purple-l);color:var(--purple);" colspan="3">${esc(p)}</th>`;
-  });
+function buildSlotTable(bi, block) {
+  const slots   = block.slots || [];
+  const locNames = locations.length > 0 ? locations.map(l => l.name) : ['北口', '南口'];
+  const nm      = buildNameMap();
+  const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date)));
+  if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
+  const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
+  let html = '<div class="tbl-wrap"><table class="shift-tbl"><thead><tr><th class="th-slot-time">時間</th>';
+  locNames.forEach((loc, li) => { html += `<th class="th-place" style="background:${pc[li % pc.length]};">${esc(loc)}</th>`; });
   html += '</tr></thead><tbody>';
-
-  // スロット行
   slots.forEach((slot, ri) => {
-    const draftSlot = db && db.slots && db.slots[ri];
-    const slotData  = draftSlot || slot;
-    const allApplicants = applicants; // 全申込者（時間帯ベースで表示）
-
-    html += `<tr><td class="td-time">${esc(slot.time)}</td>`;
-    orderedPlaces.forEach(place => {
-      const placeData = (slotData.places && slotData.places[place]) || [];
-      // 3列固定（col0, col1, col2）
-      for (let ci = 0; ci < 3; ci++) {
-        const uid = placeData[ci] || '';
-        const cellId = `cell_${bi}_${ri}_${encodeURIComponent(place)}_${ci}`;
-        const bgStyle = ci === 0 ? 'background:#eff6ff;' : '';
-        html += `<td class="td-cell" style="${bgStyle}">
-          <div class="cell-wrap">
-            <select class="cs" id="${cellId}" onchange="mu(${bi})">${staffOpts(uid, allApplicants)}</select>
-            ${ci === 0 ? `<div class="watch-row">
-              <input type="checkbox" class="watch-chk" id="${cellId}_w" ${''} onchange="mu(${bi})">
-              <label class="watch-lbl" id="${cellId}_wl" for="${cellId}_w">見守り</label>
-            </div>` : ''}
-          </div>
-        </td>`;
-      }
+    const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date + ' ' + slot.time.split('~')[0]) || sk.includes(block.date)));
+    html += '<tr><td class="td-slot-time">' + esc(slot.time) + '</td>';
+    locNames.forEach((loc, li) => {
+      const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
+      html += `<td class="cell-w" style="background:${pc[li % pc.length]}20;"><div class="cell-wrap" id="cw-${bi}-${ri}-${li}">`;
+      uids.forEach((uid, pi) => { html += buildPS(bi, ri, li, pi, uid, sa, nm, false); });
+      html += buildPS(bi, ri, li, uids.length, '', sa, nm, true);
+      html += '</div></td>';
     });
     html += '</tr>';
   });
-
   html += '</tbody></table></div>';
   return html;
 }
 
-function staffOpts(selectedUid, allApplicants) {
-  return '<option value="">—</option>' +
-    allApplicants.map(a =>
-      `<option value="${a.uid}"${a.uid === selectedUid ? ' selected' : ''}>${esc(a.name)}</option>`
-    ).join('');
+function buildPS(bi, ri, li, pi, val, sa, nm, isNew) {
+  const id = `ps-${bi}-${ri}-${li}-${pi}`;
+  let o = '<option value="">—</option>';
+  sa.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
+  if (val && !sa.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
+  return `<select class="cs${isNew ? ' new-sel' : ''}" id="${id}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}" onchange="onPS(this)">${o}</select>`;
 }
 
-// ============================================================
-// 変更フラグ・UI
-// ============================================================
-function mu(bi) {
-  const tab = (window._dateTabs||[])[activeDateIdx];
-  if (!tab) return;
+function onPS(sel) {
+  const bi = +sel.dataset.bi, ri = +sel.dataset.ri, li = +sel.dataset.li;
+  const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
+  if (!cw) return;
+  const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
-  bs[blockKey(block)] = false;
+  const slot = (block.slots || [])[ri];
+  const locNames = locations.length > 0 ? locations.map(l => l.name) : ['北口', '南口'];
+  const nm = buildNameMap();
+  const sa = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date + ' ' + (slot ? slot.time.split('~')[0] : '')) || sk.includes(block.date)));
+  const uids = [];
+  cw.querySelectorAll('select.cs').forEach(s => { if (s.value) uids.push(s.value); });
+  let html = '';
+  uids.forEach((uid, p) => { html += buildPS(bi, ri, li, p, uid, sa, nm, false); });
+  html += buildPS(bi, ri, li, uids.length, '', sa, nm, true);
+  cw.innerHTML = html;
+  cw.querySelectorAll('select.cs').forEach(s => { s.onchange = function() { onPS(this); }; });
+  mu(bi);
+}
+
+function mu(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
+  if (!block) return;
+  bs[bKey(block)] = false;
   const st = document.getElementById('st-' + bi);
   if (st) { st.textContent = '● 未保存'; st.className = 'tb-st'; }
-  ugSaveStatus();
-  saveDraftBlock(bi, block);
+  ug();
 }
+function ucn(si, ni) { const s = document.getElementById(si), n = document.getElementById(ni); if (!s || !n) return; n.disabled = !s.value; if (!s.value) n.value = ''; }
+function markSaved(bi) { const st = document.getElementById('st-' + bi); if (st) { st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; } }
+function ug() { const u = Object.values(bs).some(v => !v); document.getElementById('gst').className = u ? 'save-st' : 'save-st saved'; document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み'; }
 
-function ugSaveStatus() {
-  const u = Object.values(bs).some(v => !v);
-  document.getElementById('gst').className = u ? 'save-st' : 'save-st saved';
-  document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み';
-}
-
-function markSaved(bi) {
-  const st = document.getElementById('st-' + bi);
-  if (st) { st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; }
-}
-
-function ucn(selId, numId) {
-  const s = document.getElementById(selId), n = document.getElementById(numId);
-  if (!s || !n) return;
-  n.disabled = !s.value;
-  if (!s.value) n.value = '';
-}
-
-// ============================================================
-// ドラフト収集
-// ============================================================
-function collectBlock(bi, block) {
-  const tab = (window._dateTabs||[])[activeDateIdx];
-  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
-  if (!block) block = dayBlocks[bi];
+function collectBlock(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return null;
-
-  const responsible = {
-    r1: (document.getElementById('resp1-'+bi)||{}).value || '',
-    r2: (document.getElementById('resp2-'+bi)||{}).value || ''
-  };
-
-  const cart = {
-    ki1: (document.getElementById('ki1-'+bi)||{}).value || '',
-    kc1: (document.getElementById('kn1-'+bi)||{}).value || '',
-    ki2: (document.getElementById('ki2-'+bi)||{}).value || '',
-    kc2: (document.getElementById('kn2-'+bi)||{}).value || '',
-    ko1: (document.getElementById('ko1-'+bi)||{}).value || '',
-    oc1: (document.getElementById('kn3-'+bi)||{}).value || '',
-    ko2: (document.getElementById('ko2-'+bi)||{}).value || '',
-    oc2: (document.getElementById('kn4-'+bi)||{}).value || ''
-  };
-
+  const responsible = { r1: (document.getElementById('resp1-'+bi)||{}).value||'', r2: (document.getElementById('resp2-'+bi)||{}).value||'' };
+  const cart = { ki1:(document.getElementById('ci1-'+bi)||{}).value||'', kc1:(document.getElementById('cn1-'+bi)||{}).value||'', ki2:(document.getElementById('ci2-'+bi)||{}).value||'', kc2:(document.getElementById('cn2-'+bi)||{}).value||'', ko1:(document.getElementById('co1-'+bi)||{}).value||'', oc1:(document.getElementById('con1-'+bi)||{}).value||'', ko2:(document.getElementById('co2-'+bi)||{}).value||'', oc2:(document.getElementById('con2-'+bi)||{}).value||'' };
+  const locNames = locations.length > 0 ? locations.map(l => l.name) : ['北口', '南口'];
   const slots = (block.slots || []).map((slot, ri) => {
-    const placesData = {};
-    locations.forEach(loc => {
-      const place = loc.name;
+    const places = {};
+    locNames.forEach((loc, li) => {
+      const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
       const uids = [];
-      for (let ci = 0; ci < 3; ci++) {
-        const cellId = `cell_${bi}_${ri}_${encodeURIComponent(place)}_${ci}`;
-        const sel = document.getElementById(cellId);
-        if (sel) uids.push(sel.value || '');
-      }
-      // 末尾の空を除去
-      while (uids.length > 0 && !uids[uids.length - 1]) uids.pop();
-      placesData[place] = uids;
+      if (cw) cw.querySelectorAll('select.cs').forEach(s => { if (s.value) uids.push(s.value); });
+      places[loc] = uids;
     });
-    return { time: slot.time, places: placesData };
+    return { time: slot.time, places };
   });
-
   return { responsible, cart, slots };
 }
 
-// ============================================================
-// LocalStorageドラフト
-// ============================================================
-function loadDraft() {
-  try { return JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch (_) { return null; }
-}
-function saveDraftBlock(bi, block) {
-  try {
-    const data = loadDraft() || { blocks: {} };
-    data.blocks[blockKey(block)] = collectBlock(bi, block);
-    localStorage.setItem(draftKey(), JSON.stringify(data));
-  } catch (_) {}
-}
-function applyDraft(draft) {
-  if (!draft || !draft.blocks) return;
-  shiftDates.forEach(block => {
-    const k = blockKey(block);
-    if (!draft.blocks[k]) return;
-    const d = draft.blocks[k];
-    if (d.responsible) block.responsible = d.responsible;
-    if (d.cart) block.cart = d.cart;
-    if (d.slots) d.slots.forEach((ds, si) => { if (block.slots && block.slots[si]) Object.assign(block.slots[si], ds); });
-  });
-}
-function clearDraft() {
-  try { localStorage.removeItem(draftKey()); } catch (_) {}
-}
-
-// ============================================================
-// 保存処理
-// ============================================================
 async function saveBlock(bi) {
-  const tab = (window._dateTabs||[])[activeDateIdx];
-  if (!tab) return;
-  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
-  const block = dayBlocks[bi];
+  const tab   = (window._dateTabs || [])[activeDateIdx];
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
-
-  const st  = document.getElementById('st-' + bi);
-  const btn = document.querySelector('#tb-' + bi + ' .tb-btn');
+  const st = document.getElementById('st-' + bi);
+  const btn = document.querySelector(`#tb-${bi} .tb-btn`);
   if (btn) btn.disabled = true;
-  if (st)  st.textContent = '保存中...';
-
+  if (st) st.textContent = '保存中...';
   try {
-    const data = collectBlock(bi, block);
-    await gasGet('saveShiftBlock', {
-      date:        block.date,
-      time:        block.time,
-      responsible: data.responsible,
-      cart:        data.cart,
-      slots:       data.slots
-    });
-    bs[blockKey(block)] = true;
-    markSaved(bi);
-    ugSaveStatus();
-    try {
-      const draft = loadDraft() || { blocks: {} };
-      delete draft.blocks[blockKey(block)];
-      localStorage.setItem(draftKey(), JSON.stringify(draft));
-    } catch (_) {}
-    toast('保存しました', 's');
-  } catch (e) {
-    if (st) st.textContent = '● 未保存';
-    toast('保存に失敗しました: ' + e.message, 'e');
-  } finally {
-    if (btn) btn.disabled = false;
-  }
+    const data = collectBlock(bi);
+    await gasGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, slots: data.slots });
+    bs[bKey(block)] = true; markSaved(bi); ug(); toast('保存しました', 's');
+  } catch (e) { if (st) st.textContent = '● 未保存'; toast('保存に失敗しました: ' + e.message, 'e'); }
+  finally { if (btn) btn.disabled = false; }
 }
 
 async function saveAll() {
-  const tab = (window._dateTabs||[])[activeDateIdx];
+  const tab = (window._dateTabs || [])[activeDateIdx];
   if (!tab) return;
   const dayBlocks = shiftDates.filter(d => d.date === tab.date);
   for (let i = 0; i < dayBlocks.length; i++) await saveBlock(i);
 }
 
-// ============================================================
-// ③ 設定タブ — 描画
-// ============================================================
-function renderSettings() {
-  renderLocationsList();
-  renderCartNumbersList();
+async function publishShift() {
+  if (!confirm('シフトを公開しますか？\n公開後は全メンバーがシフトを確認できます。')) return;
+  try { await gasGet('publishShift', {}); toast('シフトを公開しました', 's'); }
+  catch (e) { toast('公開に失敗しました: ' + e.message, 'e'); }
 }
 
-// 場所一覧描画
-function renderLocationsList() {
-  const el = document.getElementById('locations-list');
-  if (!el) return;
-  if (locations.length === 0) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--ink3);padding:4px 0;">場所が登録されていません</div>';
-    return;
-  }
-  el.innerHTML = locations.map((loc, i) => `
-    <div class="settings-row">
-      <div>
-        <div class="settings-label">${esc(loc.name)}</div>
-        <div class="settings-sub">${loc.startYM||'—'} 〜 ${loc.endYM||'—'}</div>
-      </div>
-      <div class="s-actions">
-        <button class="s-btn" onclick="editLocation(${i})">編集</button>
-        <button class="s-btn danger" onclick="deleteLocation(${i})">削除</button>
-      </div>
-    </div>`
-  ).join('');
+// 左パネルリサイズ
+const LP_MIN = 140, LP_MAX = 360;
+let lpCollapsed = false, lpWidth = 196;
+function toggleLp() {
+  lpCollapsed = !lpCollapsed;
+  const w = document.getElementById('lpWrap'), t = document.getElementById('lpToggle');
+  if (lpCollapsed) { w.classList.add('collapsed'); t.textContent = '▶'; }
+  else { w.classList.remove('collapsed'); w.style.width = lpWidth + 'px'; t.textContent = '◀'; }
+}
+document.getElementById('lpResize').addEventListener('mousedown', e => {
+  e.preventDefault(); document.getElementById('lpResize').classList.add('dragging');
+  const sx = e.clientX, sw = document.getElementById('lpWrap').offsetWidth;
+  const mv = e => { const w = Math.min(LP_MAX, Math.max(LP_MIN, sw + (e.clientX - sx))); lpWidth = w; document.getElementById('lpWrap').style.width = w + 'px'; };
+  const up = () => { document.getElementById('lpResize').classList.remove('dragging'); document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+  document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+});
+
+// ============================================================
+// TAB3: 設定
+// ============================================================
+async function loadSettingsData() {
+  setLoading(true, '設定を読み込み中...');
+  try {
+    const [lr, cr, sr] = await Promise.all([gasGet('getLocations', {}), gasGet('getCartNumbers'), gasGet('getDefaultSlot')]);
+    locations   = lr.ok ? lr.locations   : [];
+    cartNumbers = cr.ok ? cr.cartNumbers : [];
+    defaultSlot = sr.ok ? sr.defaultSlot  : 15;
+    renderLocationList(); renderCartTags();
+    const sel = document.getElementById('default-slot-sel'); if (sel) sel.value = String(defaultSlot);
+    settingsLoaded = true; setLoading(false);
+  } catch (e) { setLoading(false); toast('設定読み込みエラー: ' + e.message, 'e'); }
 }
 
+function renderLocationList() {
+  const list = document.getElementById('location-list');
+  if (!list) return;
+  if (locations.length === 0) { list.innerHTML = '<div style="font-size:12px;color:var(--ink3);padding:8px 0;">場所が登録されていません</div>'; return; }
+  list.innerHTML = locations.map((loc, i) => `
+    <div class="setting-row">
+      <div><div class="setting-name">${esc(loc.name)}</div>
+      <div class="setting-detail">${loc.startYM || loc.endYM ? `期間: ${loc.startYM || '〜'} 〜 ${loc.endYM || '〜'}` : '常時有効'}</div></div>
+      <div class="setting-actions">
+        <button class="s-btn" onclick="openEditLocModal(${i})">編集</button>
+        <button class="s-btn del" onclick="deleteLocation(${i})">削除</button>
+      </div>
+    </div>`).join('');
+}
+function showAddLocationForm() { document.getElementById('new-loc-name').value = ''; document.getElementById('new-loc-start').value = ''; document.getElementById('new-loc-end').value = ''; document.getElementById('add-location-form').style.display = ''; }
+function hideAddLocationForm() { document.getElementById('add-location-form').style.display = 'none'; }
 function addLocation() {
-  const name  = (document.getElementById('new-loc-name').value || '').trim();
-  const start = (document.getElementById('new-loc-start').value || '').trim();
-  const end   = (document.getElementById('new-loc-end').value || '').trim();
+  const name = document.getElementById('new-loc-name').value.trim();
   if (!name) { toast('場所名を入力してください', 'e'); return; }
-  locations.push({ name, startYM: start, endYM: end });
-  saveLocations();
-  document.getElementById('new-loc-name').value  = '';
-  document.getElementById('new-loc-start').value = '';
-  document.getElementById('new-loc-end').value   = '';
+  locations.push({ name, startYM: document.getElementById('new-loc-start').value.trim(), endYM: document.getElementById('new-loc-end').value.trim() });
+  renderLocationList(); hideAddLocationForm();
 }
-
-function editLocation(i) {
-  const loc   = locations[i];
-  const name  = prompt('場所名', loc.name);
-  if (name === null) return;
-  const start = prompt('開始年月（例：2026.07、空白=常時）', loc.startYM || '');
-  if (start === null) return;
-  const end   = prompt('終了年月（例：2026.09、空白=常時）', loc.endYM || '');
-  if (end === null) return;
-  locations[i] = { name: name.trim(), startYM: start.trim(), endYM: end.trim() };
-  saveLocations();
+function deleteLocation(i) { if (!confirm(`「${locations[i].name}」を削除しますか？`)) return; locations.splice(i, 1); renderLocationList(); }
+function openEditLocModal(i) { document.getElementById('edit-loc-idx').value = i; document.getElementById('edit-loc-name').value = locations[i].name; document.getElementById('edit-loc-start').value = locations[i].startYM||''; document.getElementById('edit-loc-end').value = locations[i].endYM||''; document.getElementById('edit-loc-modal').classList.add('on'); }
+function closeEditLocModal() { document.getElementById('edit-loc-modal').classList.remove('on'); }
+function saveEditLocation() {
+  const i = parseInt(document.getElementById('edit-loc-idx').value);
+  const name = document.getElementById('edit-loc-name').value.trim();
+  if (!name) { toast('場所名を入力してください', 'e'); return; }
+  locations[i] = { name, startYM: document.getElementById('edit-loc-start').value.trim(), endYM: document.getElementById('edit-loc-end').value.trim() };
+  renderLocationList(); closeEditLocModal();
 }
-
-function deleteLocation(i) {
-  if (!confirm('「' + locations[i].name + '」を削除しますか？')) return;
-  locations.splice(i, 1);
-  saveLocations();
-}
-
 async function saveLocations() {
-  try {
-    await gasGet('saveLocations', { locations });
-    renderLocationsList();
-    toast('場所を保存しました', 's');
-  } catch (e) {
-    toast('保存に失敗しました: ' + e.message, 'e');
-  }
+  try { await gasGet('saveLocations', { locations }); toast('場所設定を保存しました', 's'); createLoaded = false; }
+  catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
-// カート番号一覧描画
-function renderCartNumbersList() {
-  const el = document.getElementById('cart-numbers-list');
-  if (!el) return;
-  if (cartNumbers.length === 0) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--ink3);padding:4px 0;">カート番号が登録されていません</div>';
-    return;
-  }
-  el.innerHTML = cartNumbers.map((n, i) => `
-    <div class="settings-row">
-      <div class="settings-label">カート ${esc(String(n))}</div>
-      <button class="s-btn danger" onclick="deleteCartNumber(${i})">削除</button>
-    </div>`
-  ).join('');
+function renderCartTags() {
+  document.getElementById('cart-tag-list').innerHTML = cartNumbers.map((n, i) =>
+    `<span class="tag">${esc(n)}<button class="del-t" onclick="deleteCartNum(${i})">×</button></span>`).join('');
 }
-
-function addCartNumber() {
-  const v = (document.getElementById('new-cart-num').value || '').trim();
-  if (!v) { toast('番号を入力してください', 'e'); return; }
-  if (cartNumbers.includes(v)) { toast('既に登録されています', 'e'); return; }
-  cartNumbers.push(v);
-  saveCartNumbers();
-  document.getElementById('new-cart-num').value = '';
-}
-
-function deleteCartNumber(i) {
-  if (!confirm('カート番号「' + cartNumbers[i] + '」を削除しますか？')) return;
-  cartNumbers.splice(i, 1);
-  saveCartNumbers();
-}
-
+function addCartNum() { const v = document.getElementById('new-cart-num').value.trim(); if (!v) return; if (cartNumbers.includes(v)) { toast('すでに追加されています', 'e'); return; } cartNumbers.push(v); renderCartTags(); document.getElementById('new-cart-num').value = ''; }
+function deleteCartNum(i) { cartNumbers.splice(i, 1); renderCartTags(); }
 async function saveCartNumbers() {
-  try {
-    await gasGet('saveCartNumbers', { cartNumbers });
-    renderCartNumbersList();
-    toast('カート番号を保存しました', 's');
-  } catch (e) {
-    toast('保存に失敗しました: ' + e.message, 'e');
-  }
+  try { await gasGet('saveCartNumbers', { cartNumbers }); toast('カート番号を保存しました', 's'); createLoaded = false; }
+  catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
 async function saveDefaultSlot() {
-  const val = parseInt(document.getElementById('default-slot-sel').value) || 15;
+  const v = parseInt(document.getElementById('default-slot-sel').value);
+  try { await gasGet('saveDefaultSlot', { defaultSlot: v }); defaultSlot = v; toast('デフォルトスロット分数を保存しました', 's'); }
+  catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
+}
+
+async function execCreateShiftSheet() {
+  if (!confirm('現在のシフトデータをバックアップし、3シートをクリアします。\n実行してもよいですか？')) return;
+  setLoading(true, 'シフト作成枠を作成中...');
   try {
-    await gasGet('saveDefaultSlot', { defaultSlot: val });
-    toast('デフォルトスロット分数を保存しました', 's');
-  } catch (e) {
-    toast('保存に失敗しました: ' + e.message, 'e');
-  }
-}
-
-// ============================================================
-// シフト作成枠作成
-// ============================================================
-function confirmCreateSheet() {
-  document.getElementById('cs-exec-st').style.display = 'none';
-  document.getElementById('cs-done').style.display    = 'none';
-  document.getElementById('cs-ft').innerHTML =
-    '<button class="btn btn-g" onclick="closeModal(\'m-create-sheet\')">キャンセル</button>' +
-    '<button class="btn btn-d" id="cs-exec-btn" onclick="execCreateSheet()">実行</button>';
-  document.getElementById('m-create-sheet').classList.add('open');
-}
-
-async function execCreateSheet() {
-  document.getElementById('cs-exec-btn').disabled = true;
-  document.getElementById('cs-exec-st').style.display = 'flex';
-  document.getElementById('cs-ft').innerHTML = '';
-  try {
-    await gasGet('createShiftSheet', { year: curYM && curYM.year, month: curYM && curYM.month }, 300000);
-    document.getElementById('cs-exec-st').style.display = 'none';
-    document.getElementById('cs-done').style.display    = 'block';
-    document.getElementById('cs-ft').innerHTML = '<button class="btn btn-p" onclick="closeModal(\'m-create-sheet\')">閉じる</button>';
-    toast('シフト作成枠を作成しました', 's');
-    // シフトデータをリロード
-    shiftDates = [];
-    window._tabsBuilt = false;
-  } catch (e) {
-    document.getElementById('cs-exec-st').style.display = 'none';
-    document.getElementById('cs-ft').innerHTML =
-      '<button class="btn btn-g" onclick="closeModal(\'m-create-sheet\')">閉じる</button>' +
-      '<button class="btn btn-d" onclick="execCreateSheet()">再実行</button>';
-    toast('エラー: ' + e.message, 'e');
-  }
-}
-
-// ============================================================
-// シフト公開
-// ============================================================
-function confirmPublish() {
-  document.getElementById('pub-exec-st').style.display = 'none';
-  document.getElementById('pub-done').style.display    = 'none';
-  document.getElementById('pub-ft').innerHTML =
-    '<button class="btn btn-g" onclick="closeModal(\'m-publish\')">キャンセル</button>' +
-    '<button class="btn btn-p" id="pub-exec-btn" onclick="execPublish()">公開する</button>';
-  document.getElementById('m-publish').classList.add('open');
-}
-
-async function execPublish() {
-  document.getElementById('pub-exec-btn').disabled = true;
-  document.getElementById('pub-exec-st').style.display = 'flex';
-  document.getElementById('pub-ft').innerHTML = '';
-  try {
-    await gasGet('publishShift', {});
-    document.getElementById('pub-exec-st').style.display = 'none';
-    document.getElementById('pub-done').style.display    = 'block';
-    document.getElementById('pub-ft').innerHTML = '<button class="btn btn-p" onclick="closeModal(\'m-publish\')">閉じる</button>';
-    toast('シフトを公開しました', 's');
-  } catch (e) {
-    document.getElementById('pub-exec-st').style.display = 'none';
-    document.getElementById('pub-ft').innerHTML =
-      '<button class="btn btn-g" onclick="closeModal(\'m-publish\')">閉じる</button>' +
-      '<button class="btn btn-p" onclick="execPublish()">再実行</button>';
-    toast('エラー: ' + e.message, 'e');
-  }
-}
-
-// ============================================================
-// モーダル制御
-// ============================================================
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.addEventListener('click', e => { if (e.target.classList.contains('ov')) closeModal(e.target.id); });
-
-// ============================================================
-// トースト
-// ============================================================
-function toast(msg, type) {
-  const ta = document.getElementById('ta');
-  const t  = document.createElement('div');
-  t.className = 'toast' + (type ? ' ' + type : '');
-  t.textContent = msg;
-  ta.appendChild(t);
-  setTimeout(() => t.remove(), 2500);
+    const res = await gasGet('createShiftSheet', curYM ? { year: curYM.year, month: curYM.month } : {});
+    if (!res.ok) throw new Error(res.error || '失敗');
+    toast('シフト作成枠を作成しました（' + (res.yearMonth || '') + '）', 's');
+    createLoaded = false;
+  } catch (e) { toast('エラー: ' + e.message, 'e'); }
+  finally { setLoading(false); }
 }
 
 // ============================================================
 // ユーティリティ
 // ============================================================
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function setLoading(on, msg) { document.getElementById('loading-overlay').style.display = on ? 'flex' : 'none'; if (msg) document.getElementById('lo-msg').textContent = msg; }
+function toast(msg, type) { const ta = document.getElementById('ta'), t = document.createElement('div'); t.className = 'toast' + (type ? ' ' + type : ''); t.textContent = msg; ta.appendChild(t); setTimeout(() => t.remove(), 2800); }
+function esc(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
-// ============================================================
-// 起動
-// ============================================================
 initAuth();
 </script>
 </body>
