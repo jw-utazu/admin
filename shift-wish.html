@@ -197,6 +197,29 @@ function gasGet(action, params) {
     });
 }
 
+// auth専用（email/sourceを直接URLパラメータで渡す）
+function gasAuthGet(email, source) {
+  const cbName = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const url = GAS_URL + '?action=auth&source=' + encodeURIComponent(source) +
+              '&email=' + encodeURIComponent(email) + '&callback=' + cbName;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  return fetch(url, { redirect: 'follow', signal: controller.signal })
+    .then(r => r.text())
+    .then(text => {
+      clearTimeout(timer);
+      const start = text.indexOf('(');
+      const end   = text.lastIndexOf(')');
+      if (start === -1 || end === -1) throw new Error('レスポンス形式エラー');
+      return JSON.parse(text.slice(start + 1, end));
+    })
+    .catch(err => {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('通信タイムアウト');
+      throw new Error(err.message || '通信エラー');
+    });
+}
+
 // ============================================================
 // 認証
 // ============================================================
@@ -243,7 +266,7 @@ async function onGoogleLogin(resp) {
     const payload = JSON.parse(atob(resp.credential.split('.')[1]));
     const email   = payload.email;
     toast('GAS通信中: ' + email, '');
-    const d = await gasGet('auth', { email, source: 'admin' });
+    const d = await gasAuthGet(email, 'admin');
     toast('GAS応答: ok=' + d.ok + ' isAdmin=' + d.isAdmin + ' reason=' + (d.reason||''), '');
     if (!d.ok || !d.isAdmin) { toast('管理者権限がありません (reason:' + (d.reason||'none') + ')', 'e'); return; }
     adminUser = { email, name: d.name || email, uid: d.uid || '', isAdmin: true };
