@@ -2069,6 +2069,8 @@ async function buildMstep3() {
 }
 
 let monthlyMappingResult = {};
+
+function buildMstep2() {
   const fmt = obj => {
     if (!obj) return '<span style="color:var(--ink3)">未設定</span>';
     const dt = new Date(obj.y, obj.m - 1, obj.d);
