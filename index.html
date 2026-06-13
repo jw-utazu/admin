@@ -1615,7 +1615,9 @@ async function execFormCreate(){
     document.getElementById('fc-st').classList.remove('show');
     document.getElementById('fc-done').style.display='block';
     document.getElementById('fc-done-sub').textContent=fy+'年'+fm+'月のフォームを作成しました。';
-    document.getElementById('m-form-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-form');loadAdminData()">閉じて更新</button>`;
+    document.getElementById('m-form-ft').innerHTML=`
+      <button class="btn btn-g" onclick="closeMReset('m-form','resetFC')">閉じる</button>
+      <button class="btn btn-d" onclick="execFormCreate()">再作成</button>`;
     toast('フォームを作成しました','s');
   }catch(e){
     document.getElementById('fc-st').classList.remove('show');
