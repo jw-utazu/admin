@@ -627,6 +627,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <input type="checkbox" id="mc-form" checked>
           <label for="mc-form">📝 シフトフォーム作成</label>
         </div>
+        <div class="ms-check-row">
+          <input type="checkbox" id="mc-shift" checked>
+          <label for="mc-shift">🗂 シフト作成準備</label>
+        </div>
         <div class="ms-step-nav">
           <button class="ms-btn sec" onclick="closeM('m-monthly')">キャンセル</button>
           <button class="ms-btn primary" onclick="monthlyStep(2)">次へ →</button>
@@ -1996,11 +2000,12 @@ if (typeof esc === 'undefined') {
 // ============================================================
 // 月次一括処理
 // ============================================================
-let monthlyChecks = { calpub: true, form: true };
+let monthlyChecks = { calpub: true, form: true, shift: true };
 
 function openMonthlyModal() {
   document.getElementById('mc-calpub').checked = true;
   document.getElementById('mc-form').checked = true;
+  document.getElementById('mc-shift').checked = true;
   monthlyStep(1);
   openM('m-monthly');
 }
@@ -2018,6 +2023,7 @@ function monthlyStep(n) {
 function monthlyGoStep3or4() {
   monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
   monthlyChecks.form   = document.getElementById('mc-form').checked;
+  monthlyChecks.shift  = document.getElementById('mc-shift').checked;
   if (monthlyChecks.form) {
     monthlyStep(3);
   } else {
@@ -2106,11 +2112,13 @@ function buildMstep2() {
 function buildMstep4() {
   monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
   monthlyChecks.form   = document.getElementById('mc-form').checked;
+  monthlyChecks.shift  = document.getElementById('mc-shift').checked;
   const tasks = [
     { id: 'calregen', label: '🔄 日程・実施日を保存' }
   ];
   if (monthlyChecks.calpub) tasks.push({ id: 'calpub', label: '📅 予定表公開' });
   if (monthlyChecks.form)   tasks.push({ id: 'form',   label: '📝 シフトフォーム作成' });
+  if (monthlyChecks.shift)  tasks.push({ id: 'shift',  label: '🗂 シフト作成準備' });
   document.getElementById('mstep4-list').innerHTML = tasks.map(t =>
     `<div class="ms-prog-row" id="mpr-${t.id}">
       <span class="ms-prog-ic" id="mpic-${t.id}">⏳</span>
@@ -2168,6 +2176,12 @@ async function execMonthly() {
       document.querySelectorAll('.map-sel-m').forEach(s => { monthlyMappingResult[s.dataset.key] = s.value; });
       await runTask('form', () =>
         gasGet('createFormSheet', { year: curY, month: curM, mapping: monthlyMappingResult })
+      );
+    }
+
+    if (monthlyChecks.shift) {
+      await runTask('shift', () =>
+        gasGet('createShiftSheet', { year: curY, month: curM })
       );
     }
 
