@@ -1816,11 +1816,14 @@ function toast(msg,type){
 function gasPost(actionOrPayload, params) {
   let payload;
   if (typeof actionOrPayload === 'string') {
-    // gasPost('uploadPhoto', { ... }) 形式
     payload = Object.assign({ action: actionOrPayload }, params);
   } else {
-    // gasPost({ action: 'saveNotice', ... }) 形式（既存呼び出し互換）
     payload = actionOrPayload;
+  }
+  // 管理者UID・名前を自動付与
+  if (SESSION && SESSION.uid) {
+    payload.adminUid  = payload.adminUid  || SESSION.uid;
+    payload.adminName = payload.adminName || SESSION.name;
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
