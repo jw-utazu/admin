@@ -1811,13 +1811,36 @@ function toast(msg,type){
 })();
 
 // ============================================================
-// gasPost ヘルパー（JSONP GET方式でCORSを回避）
+// gasPost ヘルパー（POST方式・写真アップロード等の大容量データ用）
 // ============================================================
-function gasPost(payload) {
-  const action = payload.action;
-  const params = Object.assign({}, payload);
-  delete params.action;
-  return gasGet(action, Object.keys(params).length ? params : null);
+function gasPost(actionOrPayload, params) {
+  let payload;
+  if (typeof actionOrPayload === 'string') {
+    // gasPost('uploadPhoto', { ... }) 形式
+    payload = Object.assign({ action: actionOrPayload }, params);
+  } else {
+    // gasPost({ action: 'saveNotice', ... }) 形式（既存呼び出し互換）
+    payload = actionOrPayload;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180000);
+  return fetch(GAS_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    signal: controller.signal,
+    body: JSON.stringify(payload)
+  })
+    .then(r => r.json())
+    .then(d => {
+      clearTimeout(timer);
+      if (d && d.error && !d.ok) throw new Error(d.error);
+      return d;
+    })
+    .catch(err => {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('通信タイムアウト（GASが応答しませんでした）');
+      throw new Error(err.message || '通信エラー（GASへの接続に失敗）');
+    });
 }
 
 // ============================================================
@@ -2304,6 +2327,7 @@ async function onPhotoFilesSelected(event) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
   const body = document.getElementById('m-photo-mgmt-body');
+
   // 既存写真数を確認してindexを決める
   let startIndex = 1;
   try {
@@ -2311,24 +2335,50 @@ async function onPhotoFilesSelected(event) {
     startIndex = ((res && res.photos) || []).length + 1;
   } catch(_) {}
 
-  body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin"></div> アップロード中...</div>';
-  try {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const base64 = await fileToBase64(file);
-      await gasGet('uploadPhoto', {
+  const total = files.length;
+  let completed = 0;
+  let failed = 0;
+
+  const updateProgress = () => {
+    body.innerHTML = '<div style="text-align:center;padding:20px;">'
+      + '<div class="spin"></div>'
+      + '<div style="margin-top:10px;font-size:14px;color:var(--ink2);">'
+      + total + '枚中 ' + completed + '枚完了...'
+      + (failed > 0 ? '<span style="color:var(--red);"> (' + failed + '枚失敗)</span>' : '')
+      + '</div></div>';
+  };
+  updateProgress();
+
+  // base64変換を全ファイル並列で実行
+  const base64List = await Promise.all(files.map(f => fileToBase64(f)));
+
+  // アップロードを全ファイル並列で実行
+  await Promise.all(files.map(async (file, i) => {
+    try {
+      await gasPost('uploadPhoto', {
         category: _photoMgmtCategory,
         year:     _photoMgmtYear,
         month:    _photoMgmtMonth,
-        base64,
+        base64:   base64List[i],
         mimeType: file.type || 'image/jpeg',
         index:    startIndex + i
       });
+      completed++;
+    } catch(e) {
+      failed++;
+      console.error('アップロード失敗:', file.name, e.message);
     }
-    toast(files.length + '枚のアップロードが完了しました', 's');
-  } catch(e) {
-    toast('アップロードに失敗しました: ' + e.message, 'e');
+    updateProgress();
+  }));
+
+  if (failed === 0) {
+    toast(total + '枚のアップロードが完了しました', 's');
+  } else if (completed > 0) {
+    toast(completed + '枚完了、' + failed + '枚失敗しました', 'e');
+  } else {
+    toast('アップロードに失敗しました', 'e');
   }
+
   // リスト再読み込み
   const inp = document.getElementById('photo-upload-input');
   if (inp) inp.value = '';
