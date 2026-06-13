@@ -337,16 +337,6 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
         </div>
       </div>
 
-      <div class="sec-card">
-        <div class="sec-hd">🔄 シフト作成枠作成</div>
-        <div class="sec-body">
-          <p style="font-size:12px;color:var(--ink2);margin-bottom:12px;line-height:1.7;">
-            現在のシフトデータをバックアップしてから3シートをクリアし、新月のシフト作成を開始します。<br>
-            <strong style="color:var(--red);">注意：実行するとシフトデータがクリアされます。</strong>
-          </p>
-          <button class="exec-btn" onclick="execCreateShiftSheet()">⚙️ シフト作成枠を作成する</button>
-        </div>
-      </div>
 
     </div>
   </div>
@@ -557,7 +547,7 @@ async function loadCreateData() {
     buildCreateTabs();
     buildLeftPanel();
     if (shiftDates.length > 0) { activeDateIdx = 0; renderDate(); }
-    else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>「設定」タブからシフト作成枠を作成してください。</div>'; }
+    else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「🗂 シフト作成準備」を実行してください。</div>'; }
     createLoaded = true;
     setLoading(false);
   } catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
