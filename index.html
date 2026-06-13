@@ -2269,7 +2269,7 @@ async function openPhotoMgmtModal(category) {
   // ファイル入力リセット
   const inp = document.getElementById('photo-upload-input');
   if (inp) inp.value = '';
-  document.getElementById('m-photo-mgmt').style.display = 'flex';
+  openM('m-photo-mgmt');
   await loadPhotoMgmtList();
 }
 
