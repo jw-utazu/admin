@@ -456,6 +456,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <div class="dsp-card" style="margin-top:10px;">
             <div class="dsp-hd" style="display:flex;align-items:center;justify-content:space-between;">
               <span class="dsp-title">日程一覧</span>
+              <button onclick="resetDates()" style="padding:3px 9px;border:1px solid var(--red-l);border-radius:5px;background:var(--red-l);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">🗑 一括リセット</button>
             </div>
             <div id="date-view">
               <div class="date-grid-cards">
@@ -476,6 +477,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           </div>
           <!-- 実施日設定エリア（カレンダータブ内） -->
           <div style="margin-top:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:12px;font-weight:700;color:var(--ink2);">実施日一覧</span>
+              <button onclick="resetAllSlots()" style="padding:3px 9px;border:1px solid var(--red-l);border-radius:5px;background:var(--red-l);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">🗑 一括リセット</button>
+            </div>
             <div class="slot-set-card">
               <div id="popup-area"></div>
               <div class="slot-set-list" id="slot-set-list">
@@ -495,11 +500,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <button class="abtn" onclick="openMonthlyModal()">
             <div class="ab-ic ic-a">&#128640;</div>
             <div class="ab-tx"><span class="ab-n">🚀 募集開始処理</span><span class="ab-d">予定表公開・フォーム作成</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" onclick="openShiftPubModal()">
-            <div class="ab-ic ic-g">&#128228;</div>
-            <div class="ab-tx"><span class="ab-n">シフト公開</span><span class="ab-d">シフト公開フラグをセット</span></div>
             <span class="ab-ar">›</span>
           </button>
           <a class="abtn" href="./shift-create.html" target="_blank">
@@ -703,18 +703,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   </div>
 </div>
 
-<!-- シフト公開 -->
-<div class="ov" id="m-shift-pub">
-  <div class="modal">
-    <div class="mhd"><span class="mt">&#128228; シフト公開</span><button class="mx" onclick="closeM('m-shift-pub')">&#10005;</button></div>
-    <div class="mbd" id="m-sp-body">
-      <div class="loading-row"><div class="spin"></div>シート一覧を取得中...</div>
-    </div>
-    <div class="mft" id="m-sp-ft">
-      <button class="btn btn-g" onclick="closeM('m-shift-pub')">閉じる</button>
-    </div>
-  </div>
-</div>
 
 <!-- 予定表公開 -->
 <div class="ov" id="m-cal-pub">
@@ -1451,7 +1439,10 @@ function buildSlotSetList(){
     const dt=new Date(g.y,g.m-1,g.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(g.y,g.m,g.d);
     const k=g.y+'/'+g.m+'/'+g.d;
     return `<div class="sdg">
-      <div class="sdg-hd"><span class="sdg-date">${g.m}/${g.d}（${dow}）</span><span class="sdg-wk">第${wn}週</span></div>
+      <div class="sdg-hd" style="display:flex;align-items:center;justify-content:space-between;">
+        <span><span class="sdg-date">${g.m}/${g.d}（${dow}）</span><span class="sdg-wk">第${wn}週</span></span>
+        <button onclick="resetDaySlots('${k}')" style="padding:2px 7px;border:1px solid var(--red-l);border-radius:4px;background:var(--red-l);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);">🗑 この日をリセット</button>
+      </div>
       <div class="sdg-times">${g.times.map((t,i)=>`<span class="stime">${t.time}</span><span class="sintv">${t.interval}分</span><button class="sdel" onclick="delSlot('${k}',${i})">✕</button>`).join('')}</div>
     </div>`;
   }).join('');
@@ -1461,6 +1452,22 @@ function delSlot(key,idx){
   const ds=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
   slots=slots.filter(s=>s!==ds[idx]);
   buildSlotSetList(); buildCalScroll(); buildInfoArea();
+}
+function resetDaySlots(key){
+  const[y,m,d]=key.split('/').map(Number);
+  slots=slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+  buildSlotSetList(); buildCalScroll(); buildInfoArea();
+}
+function resetAllSlots(){
+  if(!confirm('実施日一覧を全てリセットしますか？')) return;
+  slots=[];
+  buildSlotSetList(); buildCalScroll(); buildInfoArea();
+}
+function resetDates(){
+  if(!confirm('日程一覧（申込開始・締切・シフト公開日）をリセットしますか？')) return;
+  dates={apply:null,deadline:null,open:null};
+  datesChanged=true;
+  buildInfoArea();
 }
 // ============================================================
 // シフトフォーム作成（ボタン押下時にデータ取得）
