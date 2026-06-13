@@ -2015,9 +2015,6 @@ function monthlyStep(n) {
 function monthlyGoStep3or4() {
   monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
   monthlyChecks.form   = document.getElementById('mc-form').checked;
-  if (!monthlyChecks.calpub && !monthlyChecks.form) {
-    toast('処理を1つ以上選択してください', 'e'); return;
-  }
   if (monthlyChecks.form) {
     monthlyStep(3);
   } else {
