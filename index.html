@@ -2009,6 +2009,7 @@ function monthlyStep(n) {
     if (el) el.className = 'monthly-step' + (i === n ? ' on' : '');
   }
   if (n === 2) buildMstep2();
+  if (n === 3) buildMstep3();
   if (n === 4) buildMstep4();
 }
 
@@ -2022,7 +2023,52 @@ function monthlyGoStep3or4() {
   }
 }
 
-function buildMstep2() {
+async function buildMstep3() {
+  const body = document.getElementById('mstep3-body');
+  body.innerHTML = '<div class="loading-row"><div class="spin"></div>前月データを読み込み中...</div>';
+  try {
+    const d = await gasGet('adminData');
+    const curSlots  = d.currentSlots  || [];
+    const prevSlots = d.prevSlots     || [];
+    const groups    = {}, prevGroups  = {};
+    curSlots.forEach(s  => { const k = s.dateLabel; if (!groups[k])     groups[k]     = { dl: s.dateLabel, wk: s.week, times: [] }; groups[k].times.push(s.time); });
+    prevSlots.forEach(s => { const k = s.dateLabel; if (!prevGroups[k]) prevGroups[k] = { dl: s.dateLabel, wk: s.week, times: [] }; prevGroups[k].times.push(s.time); });
+    monthlyMappingResult = {};
+    curSlots.forEach(cs => {
+      const key     = cs.week + ' ' + cs.dateLabel + ' ' + cs.time;
+      const matched = prevSlots.find(ps => ps.time === cs.time);
+      monthlyMappingResult[key] = matched ? matched.week + ' ' + matched.dateLabel + ' ' + matched.time : '';
+    });
+    let mapHtml = '';
+    if (prevSlots.length === 0) {
+      mapHtml = '<div style="color:var(--ink2);font-size:12px;padding:8px 10px;background:var(--amber-l);border:1px solid #fcd34d;border-radius:var(--r);">前月のデータが見つかりませんでした。紐付けは不要です。</div>';
+    } else {
+      Object.values(groups).forEach(g => {
+        mapHtml += `<div class="map-date-hd">📅 ${g.dl} <span style="font-size:10px;opacity:.7;">${g.wk}</span></div>`;
+        g.times.forEach(time => {
+          const key = g.wk + ' ' + g.dl + ' ' + time;
+          const def = monthlyMappingResult[key] || '';
+          let opts  = '<option value="">（なし）</option>';
+          Object.values(prevGroups).forEach(pg => {
+            opts += `<optgroup label="${pg.wk}　${pg.dl}">`;
+            pg.times.forEach(pt => {
+              const pk = pg.wk + ' ' + pg.dl + ' ' + pt;
+              opts += `<option value="${pk}"${pk === def ? ' selected' : ''}>${pg.dl}　${pt}</option>`;
+            });
+            opts += '</optgroup>';
+          });
+          mapHtml += `<div class="map-row"><div class="map-cur">${time}</div><div class="map-arr">&#8594;</div><select class="fsel map-sel-m" data-key="${key}" style="font-size:11px;padding:4px 7px;">${opts}</select></div>`;
+        });
+        mapHtml += '<div style="height:6px;"></div>';
+      });
+    }
+    body.innerHTML = '<p style="font-size:12px;color:var(--ink2);margin-bottom:9px;">各時間帯と前月の対応スロットを紐付けてください。</p>' + mapHtml;
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--red);font-size:12px;">読み込みに失敗しました: ' + e.message + '</div>';
+  }
+}
+
+let monthlyMappingResult = {};
   const fmt = obj => {
     if (!obj) return '<span style="color:var(--ink3)">未設定</span>';
     const dt = new Date(obj.y, obj.m - 1, obj.d);
@@ -2114,8 +2160,10 @@ async function execMonthly() {
       );
     }
     if (monthlyChecks.form) {
+      // Step3で選択した紐づけを収集
+      document.querySelectorAll('.map-sel-m').forEach(s => { monthlyMappingResult[s.dataset.key] = s.value; });
       await runTask('form', () =>
-        gasGet('createFormSheet', { year: curY, month: curM })
+        gasGet('createFormSheet', { year: curY, month: curM, mapping: monthlyMappingResult })
       );
     }
 
