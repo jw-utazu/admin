@@ -439,7 +439,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <span id="cal-ym-label">読み込み中...</span>
             <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
           </div>
-          <button class="save-slot-btn" onclick="confirmSlotSave()">保存・再生成</button>
         </div>
         <!-- スクロールエリア（2ヶ月） -->
         <div class="cal-scroll-area" id="cal-scroll-area"></div>
@@ -457,7 +456,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <div class="dsp-card" style="margin-top:10px;">
             <div class="dsp-hd" style="display:flex;align-items:center;justify-content:space-between;">
               <span class="dsp-title">日程一覧</span>
-              <button id="save-dates-btn" class="save-dates-btn" onclick="saveDates()" disabled>💾 日程を保存</button>
             </div>
             <div id="date-view">
               <div class="date-grid-cards">
@@ -495,8 +493,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
         <div class="plbl">処理メニュー</div>
         <div class="ag">
           <button class="abtn" onclick="openMonthlyModal()">
-            <div class="ab-ic ic-a">&#128197;</div>
-            <div class="ab-tx"><span class="ab-n">🗓 月次一括処理</span><span class="ab-d">予定表公開・フォーム作成・シート作成</span></div>
+            <div class="ab-ic ic-a">&#128640;</div>
+            <div class="ab-tx"><span class="ab-n">🚀 募集開始処理</span><span class="ab-d">予定表公開・フォーム作成</span></div>
             <span class="ab-ar">›</span>
           </button>
           <button class="abtn" onclick="openShiftPubModal()">
@@ -602,7 +600,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 <!-- 月次一括処理 -->
 <div class="ov" id="m-monthly">
   <div class="modal sm">
-    <div class="mhd"><span class="mt">🗓 月次一括処理</span><button class="mx" onclick="closeM('m-monthly')">&#10005;</button></div>
+    <div class="mhd"><span class="mt">🚀 募集開始処理</span><button class="mx" onclick="closeM('m-monthly')">&#10005;</button></div>
     <div class="mbd" id="m-monthly-body">
       <!-- Step 1: 処理選択 -->
       <div class="monthly-step on" id="mstep-1">
@@ -617,11 +615,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">— 必須処理（常に実行）—</div>
           <div class="ms-check-row ms-fixed">
             <span class="ms-fixed-ic">🔒</span>
-            <span class="ms-fixed-label">💾 日程を保存</span>
-          </div>
-          <div class="ms-check-row ms-fixed">
-            <span class="ms-fixed-ic">🔒</span>
-            <span class="ms-fixed-label">🔄 実施日保存・カレンダー再生成</span>
+            <span class="ms-fixed-label">💾 日程・実施日を保存</span>
           </div>
         </div>
         <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">— 追加処理（選択）—</div>
@@ -653,7 +647,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <button class="ms-btn primary" onclick="monthlyGoStep3or4()">次へ →</button>
         </div>
       </div>
-      <!-- Step 3: フォーム作成設定 -->
+      <!-- Step 3: フォーム作成設定（紐づけ） -->
       <div class="monthly-step" id="mstep-3">
         <div class="step-indicator">
           <div class="step-dot" id="sdot3-1"></div>
@@ -663,12 +657,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
         </div>
         <div class="ms-title">フォーム作成設定</div>
         <div id="mstep3-body">
-          <p style="font-size:12px;color:var(--ink2);">スロット紐付け・シート配置を設定します（省略可）</p>
-          <div style="margin-top:8px;font-size:12px;">
-            <label>シート配置位置：
-              <input type="number" id="ms-sheet-pos" value="3" min="1" max="20" style="width:60px;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:12px;">
-            </label>
-          </div>
+          <p style="font-size:12px;color:var(--ink2);">スロット紐付けを設定します（省略可）</p>
         </div>
         <div class="ms-step-nav">
           <button class="ms-btn sec" onclick="monthlyStep(2)">← 戻る</button>
@@ -738,21 +727,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 
 
 <!-- スロット保存確認 -->
-<div class="ov" id="m-slot-confirm">
-  <div class="modal sm">
-    <div class="mhd"><span class="mt">実施日設定の保存</span><button class="mx" onclick="closeM('m-slot-confirm')">&#10005;</button></div>
-    <div class="mbd">
-      <div class="warn">&#9888; スロットを保存するとカレンダーシートが更新され、カレンダーが再生成されます。</div>
-      <p style="font-size:13px;color:var(--ink2);">この操作は元に戻せません。よろしいですか？</p>
-      <div class="exec-st" id="sc-st"><div class="spin"></div>保存・再生成中...</div>
-      <div class="done-box" id="sc-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">保存完了</div></div>
-    </div>
-    <div class="mft" id="sc-ft">
-      <button class="btn btn-g" onclick="closeM('m-slot-confirm')">キャンセル</button>
-      <button class="btn btn-d" id="sc-exec-btn" onclick="execSlotSave()">保存してカレンダー再生成</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- 日付クリック: 設定種別選択モーダル -->
 <div class="ov" id="m-day-select">
@@ -1483,33 +1458,6 @@ function delSlot(key,idx){
   slots=slots.filter(s=>s!==ds[idx]);
   buildSlotSetList(); buildCalScroll(); buildInfoArea();
 }
-function confirmSlotSave(){
-  document.getElementById('sc-done').style.display='none';
-  document.getElementById('sc-st').classList.remove('show');
-  document.getElementById('sc-exec-btn').disabled=false;
-  document.getElementById('sc-ft').innerHTML=`
-    <button class="btn btn-g" onclick="closeM('m-slot-confirm')">キャンセル</button>
-    <button class="btn btn-d" id="sc-exec-btn" onclick="execSlotSave()">保存してカレンダー再生成</button>`;
-  openM('m-slot-confirm');
-}
-async function execSlotSave(){
-  document.getElementById('sc-exec-btn').disabled=true;
-  document.getElementById('sc-st').classList.add('show');
-  try {
-    // intervalを必ず整数として送信
-    const cleanSlots=slots.map(s=>({...s,interval:parseInt(s.interval)||15,y:parseInt(s.y),m:parseInt(s.m),d:parseInt(s.d)}));
-    await gasGet('updateCalendarSlots',{slots:cleanSlots,year:curY,month:curM});
-    document.getElementById('sc-st').classList.remove('show');
-    document.getElementById('sc-done').style.display='block';
-    document.getElementById('sc-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-slot-confirm');loadAdminData()">閉じて更新</button>`;
-    toast('スロットを保存しカレンダーを再生成しました','s');
-  } catch(e){
-    document.getElementById('sc-st').classList.remove('show');
-    document.getElementById('sc-exec-btn').disabled=false;
-    toast('保存に失敗しました: '+e.message,'e');
-  }
-}
-
 // ============================================================
 // シフトフォーム作成（ボタン押下時にデータ取得）
 // ============================================================
@@ -1580,9 +1528,7 @@ function renderFormModal(d){
       <div class="sln" id="ln1"></div>
       <div class="si"><div class="sc" id="s2">2</div><div class="sl" id="sl2">紐付け</div></div>
       <div class="sln" id="ln2"></div>
-      <div class="si"><div class="sc" id="s3">3</div><div class="sl" id="sl3">配置</div></div>
-      <div class="sln" id="ln3"></div>
-      <div class="si"><div class="sc" id="s4">4</div><div class="sl" id="sl4">確認</div></div>
+      <div class="si"><div class="sc" id="s3">3</div><div class="sl" id="sl3">確認</div></div>
     </div>
     <div id="p1">
       <div class="fg"><label class="fl">対象年月</label><select class="fsel" id="fc-ym-sel">${ymOpts}</select></div>
@@ -1592,14 +1538,9 @@ function renderFormModal(d){
       ${mapHtml}
     </div>
     <div id="p3" style="display:none;">
-      <p style="font-size:12px;color:var(--ink2);margin-bottom:9px;">&#9650;&#9660; で新規シートの配置順を変更してください。</p>
-      <div id="sheet-place-list" style="display:flex;flex-direction:column;gap:4px;"></div>
-    </div>
-    <div id="p4" style="display:none;">
       <div class="sumbox">
         <div class="sumrow"><span class="sumk">対象月</span><span class="sumv" id="fc-s-ym">--</span></div>
         <div class="sumrow"><span class="sumk">紐付け</span><span class="sumv" id="fc-s-map">--</span></div>
-        <div class="sumrow"><span class="sumk">シート位置</span><span class="sumv" id="fc-s-pos">--</span></div>
       </div>
       <div class="fg">
         <label class="fl">実施日一覧</label>
@@ -1637,43 +1578,40 @@ function moveSheet(dir){
   renderSheetPlace();
 }
 function fcStep(dir){
-  if(dir===1&&fcN===4){execFormCreate();return;}
-  if(dir===1&&fcN===2) document.querySelectorAll('.map-sel').forEach(s=>{mappingResult[s.dataset.key]=s.value;});
-  if(dir===1&&fcN===3){
-    const pos=sheetListData.findIndex(o=>o.isNew)+1;
+  if(dir===1&&fcN===3){execFormCreate();return;}
+  if(dir===1&&fcN===2){
+    document.querySelectorAll('.map-sel').forEach(s=>{mappingResult[s.dataset.key]=s.value;});
     const ymVal=document.getElementById('fc-ym-sel')?.value||curY+'-'+curM;
     const[fy,fm]=ymVal.split('-').map(Number);
     const cnt=Object.values(mappingResult).filter(v=>v).length;
     document.getElementById('fc-s-ym').textContent=fy+'年'+fm+'月';
     document.getElementById('fc-s-map').textContent=cnt+'件';
-    document.getElementById('fc-s-pos').textContent=pos+'番目';
   }
-  fcN=Math.min(4,Math.max(1,fcN+dir));
+  fcN=Math.min(3,Math.max(1,fcN+dir));
   updFcSteps();
 }
 function updFcSteps(){
-  for(let i=1;i<=4;i++){
+  for(let i=1;i<=3;i++){
     const p=document.getElementById('p'+i); if(p) p.style.display=i===fcN?'block':'none';
     const c=document.getElementById('s'+i),l=document.getElementById('sl'+i);
     if(c){c.className='sc'+(i<fcN?' dn':i===fcN?' on':'');c.innerHTML=i<fcN?'&#10003;':i;}
     if(l) l.className='sl'+(i===fcN?' on':'');
-    if(i<4){const ln=document.getElementById('ln'+i);if(ln)ln.className='sln'+(i<fcN?' dn':'');}
+    if(i<3){const ln=document.getElementById('ln'+i);if(ln)ln.className='sln'+(i<fcN?' dn':'');}
   }
   const nx=document.getElementById('fc-nx'),bk=document.getElementById('fc-bk');
-  if(nx){nx.textContent=fcN===4?'作成する':'次へ';nx.className='btn '+(fcN===4?'btn-d':'btn-p');}
+  if(nx){nx.textContent=fcN===3?'作成する':'次へ';nx.className='btn '+(fcN===3?'btn-d':'btn-p');}
   if(bk) bk.style.display=fcN>1?'inline-flex':'none';
 }
 function resetFC(){ fcN=1; }
 async function execFormCreate(){
   const ymVal=document.getElementById('fc-ym-sel')?.value||curY+'-'+curM;
   const[fy,fm]=ymVal.split('-').map(Number);
-  const pos=sheetListData.findIndex(o=>o.isNew)+1;
   const nx=document.getElementById('fc-nx'),bk=document.getElementById('fc-bk');
   if(nx) nx.disabled=true;
   if(bk) bk.style.display='none';
   document.getElementById('fc-st').classList.add('show');
   try{
-    await gasGet('createForm',{mapping:mappingResult,sheetPosition:pos,year:fy,month:fm});
+    await gasGet('createForm',{mapping:mappingResult,year:fy,month:fm});
     document.getElementById('fc-st').classList.remove('show');
     document.getElementById('fc-done').style.display='block';
     document.getElementById('fc-done-sub').textContent=fy+'年'+fm+'月のフォームを作成しました。';
@@ -2122,8 +2060,7 @@ function buildMstep4() {
   monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
   monthlyChecks.form   = document.getElementById('mc-form').checked;
   const tasks = [
-    { id: 'savedates', label: '💾 日程を保存' },
-    { id: 'calregen',  label: '🔄 実施日保存・カレンダー再生成' }
+    { id: 'calregen', label: '🔄 日程・実施日を保存' }
   ];
   if (monthlyChecks.calpub) tasks.push({ id: 'calpub', label: '📅 予定表公開' });
   if (monthlyChecks.form)   tasks.push({ id: 'form',   label: '📝 シフトフォーム作成' });
@@ -2143,8 +2080,6 @@ async function execMonthly() {
   document.getElementById('mstep4-back').style.display = 'none';
   document.getElementById('mstep4-exec').style.display = 'none';
 
-  const sheetPos = parseInt(document.getElementById('ms-sheet-pos')?.value || '3');
-
   async function runTask(id, fn) {
     document.getElementById('mpic-' + id).textContent = '⏳';
     document.getElementById('mpst-' + id).textContent = '実行中...';
@@ -2163,22 +2098,19 @@ async function execMonthly() {
   }
 
   try {
-    // ① 必須：日程を保存
-    await runTask('savedates', () =>
-      gasGet('saveDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open })
-    );
-
-    // ② 必須：実施日保存・カレンダー再生成（①保存後のデータを使用）
+    // ① 必須：日程・実施日を保存（カレンダー履歴への追記も含む）
     const cleanSlots = slots.map(s => ({
       ...s,
       interval: parseInt(s.interval) || 15,
       y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d)
     }));
     await runTask('calregen', () =>
-      gasGet('updateCalendarSlots', { slots: cleanSlots, year: curY, month: curM })
+      gasGet('updateCalendarSlots', {
+        slots: cleanSlots, year: curY, month: curM,
+        apply: dates.apply, deadline: dates.deadline, open: dates.open
+      })
     );
 
-    // ③ 以降の選択処理は①②完了後に実行（最新データを参照）
     if (monthlyChecks.calpub) {
       await runTask('calpub', () =>
         gasGet('publishCalendar', { year: curY, month: curM })
@@ -2186,17 +2118,16 @@ async function execMonthly() {
     }
     if (monthlyChecks.form) {
       await runTask('form', () =>
-        gasGet('createFormSheet', { year: curY, month: curM, sheetPosition: sheetPos })
+        gasGet('createFormSheet', { year: curY, month: curM })
       );
     }
 
     document.getElementById('mstep4-done').style.display = 'block';
     document.getElementById('mstep4-nav').innerHTML =
       '<button class="ms-btn primary" onclick="closeM(&quot;m-monthly&quot;)">閉じる</button>';
-    // 日程変更フラグをリセット
     datesChanged = false;
     updSaveDatesBtn();
-    toast('月次一括処理が完了しました', 's');
+    toast('募集開始処理が完了しました', 's');
   } catch (e) {
     document.getElementById('mstep4-nav').innerHTML =
       '<button class="ms-btn sec" onclick="monthlyStep(monthlyChecks.form ? 3 : 2)">← 戻る</button>' +
