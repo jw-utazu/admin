@@ -543,6 +543,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <div class="ab-tx"><span class="ab-n">権限リストを同期</span><span class="ab-d">公開ファイルの編集者をインポート</span></div>
           <span class="ab-ar">›</span>
         </button>
+        <button class="abtn" onclick="openPhotoMgmtModal('exhibit')">
+          <div class="ab-ic" style="background:#f0fdf4;color:#16a34a;">🖼</div>
+          <div class="ab-tx"><span class="ab-n">展示内容写真管理</span><span class="ab-d">カート展示写真のアップロード・削除</span></div>
+          <span class="ab-ar">›</span>
+        </button>
+        <button class="abtn" onclick="openPhotoMgmtModal('road')">
+          <div class="ab-ic" style="background:#eff6ff;color:#2563eb;">🗺</div>
+          <div class="ab-tx"><span class="ab-n">道路許可書写真管理</span><span class="ab-d">道路使用許可書写真のアップロード・削除</span></div>
+          <span class="ab-ar">›</span>
+        </button>
       </div>
     </div>
   </div>
@@ -557,6 +567,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     <div class="mft" id="m-notice-ft"><button class="btn btn-g" onclick="closeM('m-notice')">閉じる</button></div>
   </div>
 </div>
+<!-- 写真管理モーダル -->
+<div class="ov" id="m-photo-mgmt">
+  <div class="modal" style="max-width:540px;">
+    <div class="mhd"><span class="mt" id="m-photo-mgmt-title">🖼 写真管理</span><button class="mx" onclick="closeM('m-photo-mgmt')">&#10005;</button></div>
+    <div class="mbd" id="m-photo-mgmt-body">読み込み中...</div>
+    <div class="mft" id="m-photo-mgmt-ft">
+      <button class="btn btn-g" onclick="closeM('m-photo-mgmt')">閉じる</button>
+      <label class="btn btn-p" style="cursor:pointer;">📤 写真を追加
+        <input type="file" id="photo-upload-input" accept="image/*" multiple style="display:none;" onchange="onPhotoFilesSelected(event)">
+      </label>
+    </div>
+  </div>
+</div>
+
 <!-- 代理送信設定モーダル -->
 <div class="ov" id="m-proxy">
   <div class="modal" style="max-width:520px;">
@@ -2205,6 +2229,132 @@ async function execMonthly() {
     toast('処理中にエラーが発生しました', 'e');
   }
 }
+
+// ============================================================
+// 写真管理モーダル
+// ============================================================
+let _photoMgmtCategory = 'exhibit';
+let _photoMgmtYear = curY;
+let _photoMgmtMonth = curM;
+
+async function openPhotoMgmtModal(category) {
+  _photoMgmtCategory = category;
+  _photoMgmtYear  = curY;
+  _photoMgmtMonth = curM;
+  const titleEl = document.getElementById('m-photo-mgmt-title');
+  titleEl.textContent = category === 'road' ? '🗺 道路許可書写真管理' : '🖼 展示内容写真管理';
+  // ファイル入力リセット
+  const inp = document.getElementById('photo-upload-input');
+  if (inp) inp.value = '';
+  document.getElementById('m-photo-mgmt').style.display = 'flex';
+  await loadPhotoMgmtList();
+}
+
+async function loadPhotoMgmtList() {
+  const body = document.getElementById('m-photo-mgmt-body');
+  body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin"></div> 読み込み中...</div>';
+  try {
+    const res = await gasGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
+    const photos = (res && res.photos) || [];
+    // 年月セレクタ
+    const ymHtml = buildPhotoYmSelector();
+    if (!photos.length) {
+      body.innerHTML = ymHtml + '<div style="text-align:center;padding:20px;color:var(--ink3);font-size:13px;">写真が登録されていません</div>';
+      return;
+    }
+    let grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:10px;">';
+    photos.forEach(p => {
+      grid += '<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#f9fafb;">'
+        + '<img src="' + p.url + '" alt="' + p.fileName + '" style="width:100%;height:100px;object-fit:cover;display:block;" loading="lazy">'
+        + '<div style="padding:4px 6px;font-size:11px;color:var(--ink3);word-break:break-all;">' + p.fileName + '</div>'
+        + '<button onclick="deletePhoto('' + p.fileId + '')" style="position:absolute;top:4px;right:4px;background:rgba(239,68,68,0.85);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;">✕</button>'
+        + '</div>';
+    });
+    grid += '</div>';
+    body.innerHTML = ymHtml + grid;
+  } catch(e) {
+    body.innerHTML = '<div style="color:var(--red);padding:16px;">読み込みに失敗しました: ' + e.message + '</div>';
+  }
+}
+
+function buildPhotoYmSelector() {
+  // 年月セレクタ（前後6ヶ月）
+  let opts = '';
+  for (let delta = -3; delta <= 3; delta++) {
+    let y = curY, m = curM + delta;
+    while (m < 1)  { m += 12; y--; }
+    while (m > 12) { m -= 12; y++; }
+    const sel = (y === _photoMgmtYear && m === _photoMgmtMonth) ? ' selected' : '';
+    opts += '<option value="' + y + '_' + m + '"' + sel + '>' + y + '年' + m + '月</option>';
+  }
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+    + '<span style="font-size:12px;color:var(--ink2);font-weight:700;">対象月：</span>'
+    + '<select style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;" onchange="onPhotoYmChange(this.value)">' + opts + '</select>'
+    + '</div>';
+}
+
+async function onPhotoYmChange(val) {
+  const parts = val.split('_');
+  _photoMgmtYear  = parseInt(parts[0]);
+  _photoMgmtMonth = parseInt(parts[1]);
+  await loadPhotoMgmtList();
+}
+
+async function onPhotoFilesSelected(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  const body = document.getElementById('m-photo-mgmt-body');
+  // 既存写真数を確認してindexを決める
+  let startIndex = 1;
+  try {
+    const res = await gasGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
+    startIndex = ((res && res.photos) || []).length + 1;
+  } catch(_) {}
+
+  body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin"></div> アップロード中...</div>';
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const base64 = await fileToBase64(file);
+      await gasGet('uploadPhoto', {
+        category: _photoMgmtCategory,
+        year:     _photoMgmtYear,
+        month:    _photoMgmtMonth,
+        base64,
+        mimeType: file.type || 'image/jpeg',
+        index:    startIndex + i
+      });
+    }
+    toast(files.length + '枚のアップロードが完了しました', 's');
+  } catch(e) {
+    toast('アップロードに失敗しました: ' + e.message, 'e');
+  }
+  // リスト再読み込み
+  const inp = document.getElementById('photo-upload-input');
+  if (inp) inp.value = '';
+  await loadPhotoMgmtList();
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function deletePhoto(fileId) {
+  if (!confirm('この写真を削除しますか？')) return;
+  try {
+    await gasGet('deletePhoto', { fileId });
+    toast('削除しました', 's');
+    await loadPhotoMgmtList();
+  } catch(e) {
+    toast('削除に失敗しました: ' + e.message, 'e');
+  }
+}
+
 
 </script>
 </body>
