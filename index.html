@@ -242,7 +242,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .sb{border-left:1px solid var(--border);background:var(--surface);padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
 .plbl{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--ink3);text-transform:uppercase;margin-bottom:5px;}
 .ag{display:flex;flex-direction:column;gap:4px;}
-.abtn{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);cursor:pointer;text-align:left;width:100%;font-family:var(--sans);transition:all .12s;text-decoration:none;}
+.abtn{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);cursor:pointer;text-align:left;width:100%;font-family:var(--sans);transition:all .12s;}
 .abtn:hover{border-color:var(--border2);background:var(--surface);}
 .ab-ic{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
 .ic-g{background:var(--green-l);}.ic-a{background:var(--amber-l);}.ic-p{background:var(--purple-l);}.ic-t{background:var(--teal-l);}
@@ -1252,6 +1252,8 @@ function buildInfoArea() {
       <div class="info-row"><span class="info-label">申込開始</span><span class="info-val green">${fmt(dates.apply)}</span></div>
       <div class="info-row"><span class="info-label">締切</span><span class="info-val amber">${fmt(dates.deadline)}</span></div>
       <div class="info-row"><span class="info-label">シフト公開</span><span class="info-val blue">${fmt(dates.open)}</span></div>`;
+  } else if(datesCard) {
+    datesCard.style.display='none';
   }
   // 実施日一覧カード
   const slotsCard = document.getElementById('info-slots-card');
@@ -1491,7 +1493,10 @@ function resetDates(){
   if(!confirm('日程一覧（申込開始・締切・シフト公開日）をリセットしますか？')) return;
   dates={apply:null,deadline:null,open:null};
   datesChanged=true;
+  updDateViews();
+  updSaveDatesBtn();
   buildInfoArea();
+  buildCalScroll();
 }
 // ============================================================
 // シフトフォーム作成（ボタン押下時にデータ取得）
@@ -1903,9 +1908,9 @@ async function saveNotice() {
   const display = document.getElementById('notice-display-in').checked;
   if (!title) { toast('タイトルを入力してください', 'e'); return; }
   try {
-    const payload = { action: 'saveNotice', title, body, display };
-    if (_noticeEditId) payload.id = _noticeEditId;
-    const res = await gasPost(payload);
+    const params = { title, body, display };
+    if (_noticeEditId) params.id = _noticeEditId;
+    const res = await gasGet('saveNotice', params);
     if (!res.ok) throw new Error(res.error || '保存失敗');
     _noticeEditId = null;
     toast('お知らせを保存しました', 's');
@@ -1921,7 +1926,7 @@ function editNotice(id, title, body) {
 async function deleteNotice(id) {
   if (!confirm('このお知らせを削除しますか？')) return;
   try {
-    const res = await gasPost({ action: 'deleteNotice', id });
+    const res = await gasGet('deleteNotice', { id });
     if (!res.ok) throw new Error(res.error || '削除失敗');
     toast('削除しました', 's');
     await refreshNoticeModal();
