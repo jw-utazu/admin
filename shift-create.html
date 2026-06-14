@@ -157,6 +157,9 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .th-place{font-weight:700;font-size:12px;padding:8px 12px;}
 .cell-w{padding:6px 8px;min-width:120px;}
 .cell-wrap{display:flex;flex-direction:column;gap:4px;}
+.cart-cell{padding:4px 8px;min-width:120px;background:inherit;}
+.cart-sel-place{width:100%;border:1px solid var(--border2);border-radius:5px;padding:4px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);}
+.th-cart-row td{font-size:10px;font-weight:700;color:var(--ink3);padding:3px 8px;background:#f8fafc;border-bottom:2px solid var(--border2);}
 select.cs{width:100%;border:1px solid var(--border2);border-radius:5px;padding:4px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);}
 select.cs:focus{border-color:var(--blue);}
 select.cs.new-sel{border-style:dashed;color:var(--ink3);}
@@ -667,19 +670,39 @@ function buildSlotTable(bi, block) {
   const locNames = locations.length > 0 ? locations.map(l => l.name) : ['北口', '南口'];
   const nm      = buildNameMap();
   const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date)));
+  const placeCart = block.placeCart || {};
+  const nums = cartNumbers.length > 0 ? cartNumbers : ['1','2','3','4'];
   if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
   const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
-  let html = '<div class="tbl-wrap"><table class="shift-tbl"><thead><tr><th class="th-slot-time">時間</th>';
+
+  // ヘッダー行（場所名）
+  let html = '<div class="tbl-wrap"><table class="shift-tbl"><thead>';
+  html += '<tr><th class="th-slot-time">時間</th>';
   locNames.forEach((loc, li) => { html += `<th class="th-place" style="background:${pc[li % pc.length]};">${esc(loc)}</th>`; });
+  html += '</tr>';
+
+  // カート番号選択行
+  html += '<tr class="th-cart-row"><td class="td-slot-time" style="font-size:10px;color:var(--ink3);font-weight:700;padding:3px 8px;">カート番号</td>';
+  locNames.forEach((loc, li) => {
+    const cartVal = placeCart[loc] || '';
+    let opts = '<option value="">—</option>';
+    nums.forEach(n => { opts += `<option value="${esc(n)}"${n === cartVal ? ' selected' : ''}>${esc(n)}</option>`; });
+    html += `<td class="cart-cell" style="background:${pc[li % pc.length]}20;">
+      <select class="cart-sel-place" id="pc-${bi}-${li}" onchange="mu(${bi})">${opts}</select>
+    </td>`;
+  });
   html += '</tr></thead><tbody>';
+
+  // スロット行（奉仕者3固定）
   slots.forEach((slot, ri) => {
     const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date + ' ' + slot.time.split('~')[0]) || sk.includes(block.date)));
     html += '<tr><td class="td-slot-time">' + esc(slot.time) + '</td>';
     locNames.forEach((loc, li) => {
       const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
       html += `<td class="cell-w" style="background:${pc[li % pc.length]}20;"><div class="cell-wrap" id="cw-${bi}-${ri}-${li}">`;
-      uids.forEach((uid, pi) => { html += buildPS(bi, ri, li, pi, uid, sa, nm, false); });
-      html += buildPS(bi, ri, li, uids.length, '', sa, nm, true);
+      for (let pi = 0; pi < 3; pi++) {
+        html += buildPS(bi, ri, li, pi, uids[pi] || '', sa, nm);
+      }
       html += '</div></td>';
     });
     html += '</tr>';
@@ -688,33 +711,12 @@ function buildSlotTable(bi, block) {
   return html;
 }
 
-function buildPS(bi, ri, li, pi, val, sa, nm, isNew) {
+function buildPS(bi, ri, li, pi, val, sa, nm) {
   const id = `ps-${bi}-${ri}-${li}-${pi}`;
   let o = '<option value="">—</option>';
   sa.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
   if (val && !sa.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
-  return `<select class="cs${isNew ? ' new-sel' : ''}" id="${id}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}" onchange="onPS(this)">${o}</select>`;
-}
-
-function onPS(sel) {
-  const bi = +sel.dataset.bi, ri = +sel.dataset.ri, li = +sel.dataset.li;
-  const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
-  if (!cw) return;
-  const tab = (window._dateTabs || [])[activeDateIdx];
-  const block = shiftDates.filter(d => d.date === tab.date)[bi];
-  if (!block) return;
-  const slot = (block.slots || [])[ri];
-  const locNames = locations.length > 0 ? locations.map(l => l.name) : ['北口', '南口'];
-  const nm = buildNameMap();
-  const sa = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date + ' ' + (slot ? slot.time.split('~')[0] : '')) || sk.includes(block.date)));
-  const uids = [];
-  cw.querySelectorAll('select.cs').forEach(s => { if (s.value) uids.push(s.value); });
-  let html = '';
-  uids.forEach((uid, p) => { html += buildPS(bi, ri, li, p, uid, sa, nm, false); });
-  html += buildPS(bi, ri, li, uids.length, '', sa, nm, true);
-  cw.innerHTML = html;
-  cw.querySelectorAll('select.cs').forEach(s => { s.onchange = function() { onPS(this); }; });
-  mu(bi);
+  return `<select class="cs" id="${id}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}" onchange="mu(${bi})">${o}</select>`;
 }
 
 function mu(bi) {
@@ -737,6 +739,12 @@ function collectBlock(bi) {
   const responsible = { r1: (document.getElementById('resp1-'+bi)||{}).value||'', r2: (document.getElementById('resp2-'+bi)||{}).value||'' };
   const cart = { ki1:(document.getElementById('ci1-'+bi)||{}).value||'', kc1:(document.getElementById('cn1-'+bi)||{}).value||'', ki2:(document.getElementById('ci2-'+bi)||{}).value||'', kc2:(document.getElementById('cn2-'+bi)||{}).value||'', ko1:(document.getElementById('co1-'+bi)||{}).value||'', oc1:(document.getElementById('con1-'+bi)||{}).value||'', ko2:(document.getElementById('co2-'+bi)||{}).value||'', oc2:(document.getElementById('con2-'+bi)||{}).value||'' };
   const locNames = locations.length > 0 ? locations.map(l => l.name) : ['北口', '南口'];
+  // 場所ごとカート番号収集
+  const placeCart = {};
+  locNames.forEach((loc, li) => {
+    const sel = document.getElementById(`pc-${bi}-${li}`);
+    placeCart[loc] = sel ? sel.value : '';
+  });
   const slots = (block.slots || []).map((slot, ri) => {
     const places = {};
     locNames.forEach((loc, li) => {
@@ -747,7 +755,7 @@ function collectBlock(bi) {
     });
     return { time: slot.time, places };
   });
-  return { responsible, cart, slots };
+  return { responsible, cart, placeCart, slots };
 }
 
 async function saveBlock(bi) {
@@ -760,7 +768,7 @@ async function saveBlock(bi) {
   if (st) st.textContent = '保存中...';
   try {
     const data = collectBlock(bi);
-    await gasGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, slots: data.slots });
+    await gasGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, slots: data.slots });
     bs[bKey(block)] = true; markSaved(bi); ug(); toast('保存しました', 's');
   } catch (e) { if (st) st.textContent = '● 未保存'; toast('保存に失敗しました: ' + e.message, 'e'); }
   finally { if (btn) btn.disabled = false; }
