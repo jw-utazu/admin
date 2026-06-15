@@ -150,9 +150,15 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .lp-sec-toggle:hover{background:var(--border);}
 .lp-sec-arrow{font-size:9px;margin-right:4px;transition:transform .15s;}
 .lp-sec-toggle.open .lp-sec-arrow{transform:rotate(90deg);}
-/* 希望確認テーブルのスクロールスナップ */
-.wish-snap-outer{overflow:auto;flex:1;scroll-snap-type:y mandatory;scroll-padding-top:64px;}
-.wish-snap-outer table.wish-tbl tbody tr{scroll-snap-align:start;}
+/* 希望確認テーブル */
+.wish-snap-outer{overflow:auto;flex:1;}
+/* 未申込一覧（希望確認タブ） */
+.wish-not-applied-toggle{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);cursor:pointer;user-select:none;font-size:12px;font-weight:700;color:var(--ink2);}
+.wish-not-applied-toggle:hover{background:var(--bg);}
+.wish-not-applied-arrow{font-size:9px;transition:transform .15s;}
+.wish-not-applied-toggle.open .wish-not-applied-arrow{transform:rotate(90deg);}
+.wish-not-applied-body{display:none;padding:8px 14px;background:var(--surface);border-top:1px solid var(--border);}
+.wish-not-applied-body .wna-item{font-size:12px;color:var(--ink3);padding:3px 0;}
 .rm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
 .rm{overflow-y:auto;padding:14px;background:var(--bg);flex:1;}
 .tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
@@ -554,13 +560,19 @@ async function loadWishData() {
   try { await loadWishDataInternal(); } catch (e) { toast('読み込みエラー: ' + e.message, 'e'); } finally { setLoading(false); }
 }
 async function loadWishDataInternal() {
-  const res   = await gasGet('getWishData', {});
+  // getWishData と getMemberFlags を並行取得（memberFlagsが未取得の場合も対応）
+  const [res, flagsRes] = await Promise.all([
+    gasGet('getWishData', {}),
+    Object.keys(memberFlags).length > 0 ? Promise.resolve({ ok: true, flags: memberFlags }) : gasGet('getMemberFlags')
+  ]);
   const year  = res.year  || new Date().getFullYear();
   const month = res.month || new Date().getMonth() + 1;
   if (!curYM) curYM = { year, month };
   document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
   document.getElementById('ws-ym').textContent     = year + '年' + month + '月';
   if (!res.ok) throw new Error(res.error || '取得失敗');
+  // memberFlagsを更新（未取得だった場合）
+  if (flagsRes.ok && Object.keys(memberFlags).length === 0) memberFlags = flagsRes.flags || {};
   document.getElementById('ws-applied').textContent = res.appliedCount || 0;
   document.getElementById('ws-total').textContent   = res.totalMembers || 0;
   if (!res.members || res.members.length === 0 || !res.slots || res.slots.length === 0) {
@@ -585,11 +597,10 @@ function buildWishTable(data) {
     return taStr.localeCompare(tbStr);
   });
 
-  // 日付グループ構築（"7/10(金)"部分をキーにして曜日なし日付も抽出）
+  // 日付グループ構築
   const dg = []; const seen = new Set();
   sortedSlots.forEach(slot => {
     const si = slot.indexOf(' '), dk = si >= 0 ? slot.slice(0, si) : slot;
-    // 曜日なし日付（"7/10"）を dateNum として抽出
     const sl = dk.indexOf('/');
     const paren = dk.indexOf('(');
     const dateNum = sl >= 0 ? dk.slice(0, paren >= 0 ? paren : undefined) : dk;
@@ -603,13 +614,18 @@ function buildWishTable(data) {
     totalSlots[m.uid] = sortedSlots.filter(slot => matrix[m.uid] && matrix[m.uid][slot]).length;
   });
 
+  // 未申込者を抽出（memberFlagsの全メンバーのうち、matrixにいない人）
+  const appliedUids = new Set(members.map(m => m.uid));
+  const notAppliedMembers = Object.entries(memberFlags)
+    .filter(([uid]) => !appliedUids.has(uid))
+    .map(([uid, f]) => ({ uid, name: f.name, furigana: f.furigana || '' }))
+    .sort((a, b) => a.furigana.localeCompare(b.furigana) || a.name.localeCompare(b.name));
+
   let html = '<div class="wish-snap-outer"><table class="wish-tbl">';
   html += '<thead>';
-  // 1行目：氏名 + 日付 + 合計
   html += '<tr><th class="col-name th-date" rowspan="2" style="position:sticky;top:0;left:0;z-index:11;">氏名</th>';
   dg.forEach(g => { html += `<th class="th-date" colspan="${g.times.length}" style="position:sticky;top:0;z-index:3;">${esc(g.date)}</th>`; });
   html += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:0;z-index:11;min-width:50px;">合計</th></tr>';
-  // 2行目：時間帯
   html += '<tr>';
   sortedSlots.forEach(slot => { const si = slot.indexOf(' '); html += `<th class="th-time" style="position:sticky;top:28px;z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
   html += '</tr></thead><tbody>';
@@ -633,10 +649,27 @@ function buildWishTable(data) {
   sortedSlots.forEach(slot => { let c = 0; members.forEach(m => { if (matrix[m.uid] && matrix[m.uid][slot]) c++; }); html += `<td class="cell-data" style="font-weight:700;color:var(--green);">${c}</td>`; });
   html += '<td class="cell-data" style="position:sticky;right:0;background:var(--green4);z-index:2;"></td></tr>';
   html += '</tbody></table></div>';
+
+  // 未申込一覧（折りたたみ）
+  if (notAppliedMembers.length > 0) {
+    html += `<div class="wish-not-applied-toggle" onclick="toggleWishNotApplied(this)">
+      <span>未申込（${notAppliedMembers.length}名）</span>
+      <span class="wish-not-applied-arrow">▶</span>
+    </div>`;
+    html += `<div class="wish-not-applied-body">`;
+    html += notAppliedMembers.map(m => `<div class="wna-item">・${esc(m.name)}</div>`).join('');
+    html += `</div>`;
+  }
+
   document.getElementById('wish-table-wrap').innerHTML = html;
 }
 function showNote(name, slot, comment) { if (!comment) return; document.getElementById('popup-title').textContent = name + '｜' + slot; document.getElementById('popup-body').textContent = comment; document.getElementById('popup-overlay').classList.add('on'); }
 function closePopup() { document.getElementById('popup-overlay').classList.remove('on'); }
+function toggleWishNotApplied(el) {
+  el.classList.toggle('open');
+  const body = el.nextElementSibling;
+  if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
 
 // ============================================================
 // TAB2: シフト作成
@@ -930,9 +963,10 @@ function buildSlotTable(bi, block) {
     if (!container) return;
     container.querySelectorAll('.cell-wrap').forEach(el => {
       applyCellWrapLayout(el);
-      if (!el._ro) {
-        el._ro = new ResizeObserver(() => applyCellWrapLayout(el));
-        el._ro.observe(el);
+      const td = el.closest('td') || el;
+      if (!td._ro) {
+        td._ro = new ResizeObserver(() => applyCellWrapLayout(el));
+        td._ro.observe(td);
       }
     });
   }));
@@ -977,10 +1011,13 @@ function toggleNotApplied(el) {
 }
 
 function applyCellWrapLayout(el) {
-  if (el.offsetWidth < 300) {
-    el.classList.add("vertical");
-  } else {
-    el.classList.remove("vertical");
+  // cell-wrapの親td幅を基準に判定
+  const td = el.closest('td') || el;
+  const w = td.offsetWidth;
+  if (w > 0 && w < 300) {
+    el.classList.add('vertical');
+  } else if (w >= 300) {
+    el.classList.remove('vertical');
   }
 }
 
@@ -1203,4 +1240,3 @@ initAuth();
 </script>
 </body>
 </html>
-
