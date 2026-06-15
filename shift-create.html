@@ -151,8 +151,8 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .lp-sec-arrow{font-size:9px;margin-right:4px;transition:transform .15s;}
 .lp-sec-toggle.open .lp-sec-arrow{transform:rotate(90deg);}
 /* 希望確認テーブルのスクロールスナップ */
-#wish-table-wrap > div{scroll-snap-type:y mandatory;}
-#wish-table-wrap table.wish-tbl tbody tr{scroll-snap-align:start;}
+.wish-snap-outer{overflow:auto;flex:1;scroll-snap-type:y mandatory;scroll-padding-top:64px;}
+.wish-snap-outer table.wish-tbl tbody tr{scroll-snap-align:start;}
 .rm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
 .rm{overflow-y:auto;padding:14px;background:var(--bg);flex:1;}
 .tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
@@ -603,7 +603,7 @@ function buildWishTable(data) {
     totalSlots[m.uid] = sortedSlots.filter(slot => matrix[m.uid] && matrix[m.uid][slot]).length;
   });
 
-  let html = '<div style="overflow:auto;flex:1;"><table class="wish-tbl">';
+  let html = '<div class="wish-snap-outer"><table class="wish-tbl">';
   html += '<thead>';
   // 1行目：氏名 + 日付 + 合計
   html += '<tr><th class="col-name th-date" rowspan="2" style="position:sticky;top:0;left:0;z-index:11;">氏名</th>';
@@ -884,7 +884,7 @@ function buildSlotTable(bi, block) {
 
   // ヘッダー行（場所名ドロップダウン）
   let html = '<div class="tbl-wrap"><table class="shift-tbl"><thead>';
-  html += '<tr><th class="th-slot-time">時間</th>';
+  html += '<tr><th class="th-slot-time">場所</th>';
   if (locations.length >= 2) {
     html += `<th class="th-place" style="background:${pc[0]};">${makeLocSel(0, savedP1)}</th>`;
     html += `<th class="th-place" style="background:${pc[1]};">${makeLocSel(1, savedP2)}</th>`;
@@ -924,15 +924,18 @@ function buildSlotTable(bi, block) {
   html += '</tbody></table></div>';
 
   // ResizeObserver で cell-wrap の幅を監視して縦横切替
-  setTimeout(() => {
-    document.querySelectorAll(`#tb-${bi} .cell-wrap`).forEach(el => {
+  // DOMレンダリング＋レイアウト計算後に実行するため rAF を2段階使用
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const container = document.getElementById('main-content');
+    if (!container) return;
+    container.querySelectorAll('.cell-wrap').forEach(el => {
       applyCellWrapLayout(el);
       if (!el._ro) {
         el._ro = new ResizeObserver(() => applyCellWrapLayout(el));
         el._ro.observe(el);
       }
     });
-  }, 0);
+  }));
 
   return html;
 }
