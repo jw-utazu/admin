@@ -593,7 +593,8 @@ function buildWishTable(data) {
     const mb = parseInt(dpB.slice(0, slB)), ddb = parseInt(dpB.slice(slB + 1));
     if (ma !== mb) return ma - mb;
     if (dda !== ddb) return dda - ddb;
-    return taStr.localeCompare(tbStr);
+    const toMin = s => { const m = s.match(/^(\d+):(\d+)/); return m ? +m[1]*60 + +m[2] : 0; };
+    return toMin(taStr) - toMin(tbStr);
   });
 
   // 日付グループ構築
@@ -689,7 +690,8 @@ async function loadCreateData() {
     locations    = shiftRes.locations    || [];
     cartNumbers  = shiftRes.cartNumbers  || [];
     cartPresets  = shiftRes.cartPresets  || [];
-    memoMap      = shiftRes.memoMap      || {};
+    memoMap = {};
+    (shiftRes.dates || []).forEach(d => { if (d.memo) memoMap[d.date + '_' + d.time] = d.memo; });
     defaultSlot  = shiftRes.defaultSlot  || 15;
     buildCreateTabs();
     buildLeftPanel();
