@@ -761,7 +761,8 @@ function buildLeftPanel() {
   const blockTime = block ? block.time : '';
 
   // その時間帯に申込がある人のみ（appliedSlotsのdate部分がtab.dateと一致）
-  const applied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => {
+  const applied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => {
+    const sk = typeof s === 'object' ? s.slot : s;
     const dp = sk.indexOf('/'); const pp = sk.indexOf('(');
     const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk;
     if (dn !== tab.date) return false;
@@ -786,7 +787,18 @@ function buildLeftPanel() {
     const badgeA = `<span class="sc-badge sc-a">申${a.appliedCount}</span>`;
     const badgeR = a.respFlag ? `<span class="sc-badge sc-r">責</span>` : '';
     const badgeK = a.cartFlag ? `<span class="sc-badge sc-k">カ</span>` : '';
-    return `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>`;
+    // 選択中時間帯のコメント・カート不可を取得
+    const slotObj = blockTime ? (a.appliedSlots || []).find(s => {
+      const sk = typeof s === 'object' ? s.slot : s;
+      const startT = blockTime.split('~')[0];
+      return sk.includes(') ' + startT) || sk.includes(' ' + startT);
+    }) : null;
+    const cartNg = slotObj && typeof slotObj === 'object' ? slotObj.cartNg : false;
+    const note   = slotObj && typeof slotObj === 'object' ? slotObj.note   : '';
+    const cartNgHtml = cartNg ? `<span style="font-size:10px;color:var(--red);font-weight:700;">🚫カート不可</span>` : '';
+    const noteHtml   = note   ? `<span style="font-size:10px;color:var(--ink2);">📝${esc(note)}</span>` : '';
+    const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
+    return `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}`;
   }).join('');
   if (notApplied.length > 0) {
     html += `<div class="lp-sec lp-sec-toggle" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
@@ -800,7 +812,7 @@ function buildLeftPanel() {
 function bKey(b) { return b.date + '_' + b.time; }
 
 function buildBlock(block, bi) {
-  const applied     = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date)));
+  const applied     = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; return sk.includes(block.date); }));
   const respMembers = applied.filter(a => a.respFlag);
   const cartMembers = applied.filter(a => a.cartFlag);
   return `<div class="tb" id="tb-${bi}">
@@ -902,7 +914,7 @@ function buildSlotTable(bi, block) {
   const slots   = block.slots || [];
   const locNames = getBlockLocNames(bi, block);
   const nm      = buildNameMap();
-  const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => { const dp = sk.indexOf('/'); const pp = sk.indexOf('('); const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk; return dn === block.date; }));
+  const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; const dp = sk.indexOf('/'); const pp = sk.indexOf('('); const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk; return dn === block.date; }));
   const placeCart = block.placeCart || {};
   if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
   const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
@@ -945,7 +957,7 @@ function buildSlotTable(bi, block) {
 
   // スロット行（奉仕者3固定）
   slots.forEach((slot, ri) => {
-    const startT = slot.time.split('~')[0]; const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(') ' + startT) || sk.includes(' ' + startT)));
+    const startT = slot.time.split('~')[0]; const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; return sk.includes(') ' + startT) || sk.includes(' ' + startT); }));
     html += '<tr><td class="td-slot-time">' + esc(slot.time) + '</td>';
     locNames.forEach((loc, li) => {
       const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
