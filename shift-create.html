@@ -115,11 +115,10 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .ttab{padding:6px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .ttab.on{color:var(--green);border-bottom-color:var(--green);font-weight:700;}
 .ttab:hover:not(.on){color:var(--ink);background:var(--bg);}
-.cell-wrap{display:flex;flex-direction:row;gap:4px;flex-wrap:wrap;align-items:center;}
+.cell-wrap{display:flex;flex-direction:row;gap:4px;flex-wrap:nowrap;align-items:center;}
 .cell-wrap.vertical{flex-direction:column;}
 .cell-wrap select.cs{flex:1;min-width:100px;}
-.cell-wrap.vertical select.cs{min-width:100px;width:100%;max-width:100%;}
-@media(max-width:600px){.cell-wrap{flex-direction:column;} .cell-wrap select.cs{max-width:100%;width:100%;}}
+.cell-wrap.vertical select.cs{min-width:0;width:100%;max-width:100%;}
 .dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
 .sc-body{display:flex;flex:1;overflow:hidden;}
@@ -1011,12 +1010,14 @@ function toggleNotApplied(el) {
 }
 
 function applyCellWrapLayout(el) {
-  // cell-wrapの親td幅を基準に判定
-  const td = el.closest('td') || el;
-  const w = td.offsetWidth;
-  if (w > 0 && w < 300) {
+  // cell-wrap内の3つのドロップダウンが横並びで各100px以上を確保できるかで縦横を切替
+  // 横並び時: 各100px×3 + gap 4px×2(=8px) = 308px が境界（308px以上で横、未満で縦）
+  const THRESHOLD = 100 * 3 + 4 * 2; // 308px
+  const w = el.clientWidth; // cell-wrapの内容幅(paddingなし)
+  if (w <= 0) return; // 非表示タブ内などサイズ未確定時は判定しない
+  if (w < THRESHOLD) {
     el.classList.add('vertical');
-  } else if (w >= 300) {
+  } else {
     el.classList.remove('vertical');
   }
 }
