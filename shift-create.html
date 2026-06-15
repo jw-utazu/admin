@@ -179,8 +179,8 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cart-tbl th,.cart-tbl td{border:1px solid var(--green3);padding:5px 7px;text-align:center;vertical-align:middle;}
 .cart-tbl thead th{background:var(--green4);color:var(--green-d);font-weight:700;}
 .cart-tbl .row-lbl{background:var(--green-l);font-weight:700;color:var(--green-d);text-align:left;font-size:11px;white-space:nowrap;width:90px;}
-.cart-sel{width:100%;border:1px solid var(--green3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
-.cart-num{width:100%;border:1px solid var(--green3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+.cart-sel{width:100%;min-width:100px;border:1px solid var(--green3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
+.cart-num{width:100%;min-width:100px;border:1px solid var(--green3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
 .cart-num:disabled{background:var(--green-l);color:var(--ink3);}
 .tbl-wrap{overflow-x:auto;}
 .shift-tbl{border-collapse:collapse;font-size:12px;width:100%;}
@@ -858,6 +858,7 @@ function buildCartArea(bi, cart, cartMembers) {
   }
   const { ki1='', kc1='', ki2='', kc2='', ko1='', oc1='', ko2='', oc2='' } = cart;
   return `<div class="cart-area"><div class="area-title cart-title">カート担当者（最大各2名・空白可）</div>
+    <div class="tbl-wrap">
     <table class="cart-tbl">
       <thead><tr><th style="width:90px;"></th><th colspan="2">持ち込み</th><th colspan="2">持ち帰り</th></tr></thead>
       <tbody>
@@ -865,6 +866,7 @@ function buildCartArea(bi, cart, cartMembers) {
         <tr><td class="row-lbl">カート番号</td><td>${nSel('cn1-'+bi,kc1,!ki1)}</td><td>${nSel('cn2-'+bi,kc2,!ki2)}</td><td>${nSel('con1-'+bi,oc1,!ko1)}</td><td>${nSel('con2-'+bi,oc2,!ko2)}</td></tr>
       </tbody>
     </table>
+    </div>
   </div>`;
 }
 
