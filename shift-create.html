@@ -100,7 +100,12 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .popup-close-btn{width:100%;padding:8px;border-radius:var(--r);background:var(--green);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);}
 
 /* ===== TAB2: シフト作成 ===== */
-.dtabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;overflow-x:auto;flex-shrink:0;}
+.dtabs-time{display:flex;overflow-x:auto;gap:0;flex:1;}
+.ttab{padding:6px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+.ttab.on{color:var(--green);border-bottom-color:var(--green);font-weight:700;}
+.ttab:hover:not(.on){color:var(--ink);background:var(--bg);}
+.cell-wrap{display:flex;flex-direction:row;gap:4px;flex-wrap:wrap;}
+@media(max-width:600px){.cell-wrap{flex-direction:column;}}
 .dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
 .sc-body{display:flex;flex:1;overflow:hidden;}
@@ -264,8 +269,12 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
         </div>
       </div>
       <div class="rm-wrap">
-        <div style="display:flex;align-items:center;justify-content:flex-end;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);gap:8px;flex-shrink:0;">
-          <button class="tb-btn" style="border-color:var(--green);color:var(--green);" onclick="saveAll()">💾 全て保存</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);gap:8px;flex-shrink:0;">
+          <div class="dtabs-time" id="dtabs-time"></div>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button class="tb-btn" style="border-color:var(--green);color:var(--green);" onclick="saveDayAll()">💾 この日付をすべて保存</button>
+            <button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;" onclick="saveAll()">💾 すべて保存</button>
+          </div>
         </div>
         <div class="rm" id="main-content">
           <div style="padding:24px;color:var(--ink3);text-align:center;">「シフト作成」タブを選択すると読み込みます</div>
@@ -319,6 +328,19 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
             <input type="text" id="new-cart-num" placeholder="例：5" style="width:80px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-size:12px;font-family:var(--sans);outline:none;">
             <button class="s-btn primary" onclick="addCartNum()">＋ 追加</button>
             <button class="s-btn green" onclick="saveCartNumbers()" style="margin-left:auto;">💾 保存</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-card">
+        <div class="sec-hd">🔀 カートプリセット管理</div>
+        <div class="sec-body">
+          <p style="font-size:11px;color:var(--ink3);margin-bottom:8px;">シフト作成画面でカート番号の組み合わせとして選択できるプリセットを登録します。例：<code>1,3</code></p>
+          <div id="cart-preset-list" class="tag-list"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="new-cart-preset" placeholder="例：1,3" style="width:100px;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-size:12px;font-family:var(--sans);outline:none;">
+            <button class="s-btn primary" onclick="addCartPreset()">＋ 追加</button>
+            <button class="s-btn green" onclick="saveCartPresets()" style="margin-left:auto;">💾 保存</button>
           </div>
         </div>
       </div>
@@ -387,8 +409,11 @@ let applicants    = [];
 let shiftDates    = [];
 let locations     = [];
 let cartNumbers   = [];
+let cartPresets   = [];
+let memoMap       = {};
 let defaultSlot   = 15;
 let activeDateIdx = 0;
+let activeTimeIdx = 0;
 let curYM         = null;
 let createLoaded  = false;
 let settingsLoaded = false;
@@ -541,15 +566,17 @@ async function loadCreateData() {
     const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
     curYM = { year, month };
     document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
-    memberFlags = flagsRes.ok ? flagsRes.flags   : {};
-    applicants  = appRes.ok  ? appRes.applicants : [];
-    shiftDates  = shiftRes.ok ? shiftRes.dates   : [];
-    locations   = shiftRes.locations   || [];
-    cartNumbers = shiftRes.cartNumbers || [];
-    defaultSlot = shiftRes.defaultSlot || 15;
+    memberFlags  = flagsRes.ok ? flagsRes.flags    : {};
+    applicants   = appRes.ok  ? appRes.applicants  : [];
+    shiftDates   = shiftRes.ok ? shiftRes.dates    : [];
+    locations    = shiftRes.locations    || [];
+    cartNumbers  = shiftRes.cartNumbers  || [];
+    cartPresets  = shiftRes.cartPresets  || [];
+    memoMap      = shiftRes.memoMap      || {};
+    defaultSlot  = shiftRes.defaultSlot  || 15;
     buildCreateTabs();
     buildLeftPanel();
-    if (shiftDates.length > 0) { activeDateIdx = 0; renderDate(); }
+    if (shiftDates.length > 0) { activeDateIdx = 0; activeTimeIdx = 0; buildTimeTabs(); }
     else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「🗂 シフト作成準備」を実行してください。</div>'; }
     createLoaded = true;
     setLoading(false);
@@ -560,39 +587,77 @@ function buildCreateTabs() {
   const dt = []; const seen = new Set();
   shiftDates.forEach(d => { const k = d.date + '(' + d.weekday + ')'; if (!seen.has(k)) { seen.add(k); dt.push({ date: d.date, weekday: d.weekday }); } });
   window._dateTabs = dt;
+  // 日付タブ右端に「すべて保存」ボタンは別途HTML側に配置済み
   document.getElementById('dtabs').innerHTML = dt.map((t, i) =>
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
 }
+
 function switchDateTab(i) {
   document.querySelectorAll('.dtab').forEach((b, idx) => b.className = 'dtab' + (idx === i ? ' on' : ''));
   activeDateIdx = i;
-  renderDate();
+  activeTimeIdx = 0;
+  buildTimeTabs();
   buildLeftPanel();
+}
+
+function buildTimeTabs() {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  const ttabEl = document.getElementById('dtabs-time');
+  if (!ttabEl) return;
+  ttabEl.innerHTML = dayBlocks.map((block, bi) =>
+    `<button class="ttab${bi === activeTimeIdx ? ' on' : ''}" onclick="switchTimeTab(${bi})">${esc(block.time)}</button>`
+  ).join('');
+  renderBlock();
+}
+
+function switchTimeTab(bi) {
+  document.querySelectorAll('.ttab').forEach((b, idx) => b.className = 'ttab' + (idx === bi ? ' on' : ''));
+  activeTimeIdx = bi;
+  buildLeftPanel();
+  renderBlock();
+}
+
+function renderBlock() {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  const block = dayBlocks[activeTimeIdx];
+  if (!block) {
+    document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">データがありません</div>';
+    return;
+  }
+  document.getElementById('main-content').innerHTML = buildBlock(block, activeTimeIdx);
+  if (bs[bKey(block)]) markSaved(activeTimeIdx);
+  ug();
 }
 
 function buildLeftPanel() {
   const tab = (window._dateTabs || [])[activeDateIdx];
   if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  const block = dayBlocks[activeTimeIdx];
   const applied    = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(tab.date)));
   const notApplied = applicants.filter(a => !applied.find(b => b.uid === a.uid));
-  document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）';
+  document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）' + (block ? ' ' + block.time : '');
   document.getElementById('lp-count').textContent  = applied.length;
   document.getElementById('lp-total').textContent  = '名申込 / 全' + applicants.length + '名';
-  let html = '<div class="lp-sec">申込者</div>';
+
+  // メモ表示
+  const memoKey = block ? (tab.date + '_' + block.time) : '';
+  const memo = memoKey ? (memoMap[memoKey] || '') : '';
+  const memoHtml = memo
+    ? `<div style="margin:6px 12px;padding:6px 8px;background:#fef9c3;border:1px solid #fde68a;border-radius:var(--r);font-size:11px;color:#92400e;white-space:pre-wrap;">${esc(memo)}</div>`
+    : '';
+
+  let html = memoHtml + '<div class="lp-sec">申込者</div>';
   html += applied.map(a => `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="sts"><span class="sc-badge sc-a">申${a.appliedCount}</span>${a.respFlag ? '<span class="sc-badge sc-r">責</span>' : ''}${a.cartFlag ? '<span class="sc-badge sc-k">カ</span>' : ''}</div></div>`).join('');
   if (notApplied.length > 0) { html += '<div class="lp-sec">未申込</div>'; html += notApplied.map(a => `<div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div>`).join(''); }
   document.getElementById('lp-members').innerHTML = html;
 }
 
-function renderDate() {
-  const tab = (window._dateTabs || [])[activeDateIdx];
-  if (!tab) return;
-  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
-  document.getElementById('main-content').innerHTML = dayBlocks.map((block, bi) => buildBlock(block, bi)).join('');
-  dayBlocks.forEach((block, bi) => { if (bs[bKey(block)]) markSaved(bi); });
-  ug();
-}
 function bKey(b) { return b.date + '_' + b.time; }
 
 function buildBlock(block, bi) {
@@ -601,10 +666,10 @@ function buildBlock(block, bi) {
   const cartMembers = applied.filter(a => a.cartFlag);
   return `<div class="tb" id="tb-${bi}">
     <div class="tb-hd">
-      <span class="tb-time">${esc(block.time)}</span>
+      <span class="tb-time">${esc(block.date)}（${esc(block.weekday)}） ${esc(block.time)}</span>
       <div class="tb-acts">
-        <span class="tb-st" id="st-${bi}">● 未保存</span>
-        <button class="tb-btn" onclick="saveBlock(${bi})">この時間帯を保存</button>
+        <span class="tb-st" id="st-${bi}" style="display:none;">● 未保存</span>
+        <button class="tb-btn" id="save-btn-${bi}" onclick="saveBlock(${bi})">この時間帯を保存</button>
       </div>
     </div>
     ${buildRespArea(bi, block.responsible || {}, respMembers)}
@@ -671,7 +736,6 @@ function buildSlotTable(bi, block) {
   const nm      = buildNameMap();
   const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(sk => sk.includes(block.date)));
   const placeCart = block.placeCart || {};
-  const nums = cartNumbers.length > 0 ? cartNumbers : ['1','2','3','4'];
   if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
   const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
 
@@ -681,14 +745,22 @@ function buildSlotTable(bi, block) {
   locNames.forEach((loc, li) => { html += `<th class="th-place" style="background:${pc[li % pc.length]};">${esc(loc)}</th>`; });
   html += '</tr>';
 
-  // カート番号選択行
+  // カート番号選択行（プリセット2つ選択）
   html += '<tr class="th-cart-row"><td class="td-slot-time" style="font-size:10px;color:var(--ink3);font-weight:700;padding:3px 8px;">カート番号</td>';
   locNames.forEach((loc, li) => {
-    const cartVal = placeCart[loc] || '';
-    let opts = '<option value="">—</option>';
-    nums.forEach(n => { opts += `<option value="${esc(n)}"${n === cartVal ? ' selected' : ''}>${esc(n)}</option>`; });
+    const savedVal = placeCart[loc] || '';
+    const savedParts = savedVal ? savedVal.split(',') : ['', ''];
+    let opts0 = '<option value="">—</option>';
+    let opts1 = '<option value="">—</option>';
+    cartPresets.forEach(p => {
+      opts0 += `<option value="${esc(p)}"${p === savedParts[0] ? ' selected' : ''}>${esc(p)}</option>`;
+      opts1 += `<option value="${esc(p)}"${p === savedParts[1] ? ' selected' : ''}>${esc(p)}</option>`;
+    });
     html += `<td class="cart-cell" style="background:${pc[li % pc.length]}20;">
-      <select class="cart-sel-place" id="pc-${bi}-${li}" onchange="mu(${bi})">${opts}</select>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        <select class="cart-sel-place" id="pc-${bi}-${li}-0" onchange="mu(${bi})" style="flex:1;min-width:60px;">${opts0}</select>
+        <select class="cart-sel-place" id="pc-${bi}-${li}-1" onchange="mu(${bi})" style="flex:1;min-width:60px;">${opts1}</select>
+      </div>
     </td>`;
   });
   html += '</tr></thead><tbody>';
@@ -725,12 +797,21 @@ function mu(bi) {
   if (!block) return;
   bs[bKey(block)] = false;
   const st = document.getElementById('st-' + bi);
-  if (st) { st.textContent = '● 未保存'; st.className = 'tb-st'; }
+  if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; }
   ug();
 }
+function markSaved(bi) {
+  const st = document.getElementById('st-' + bi);
+  if (st) { st.style.display = ''; st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; }
+}
+function ug() {
+  const u = Object.values(bs).some(v => !v);
+  document.getElementById('gst').className = u ? 'save-st' : 'save-st saved';
+  document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み';
+  document.getElementById('gst').style.display = Object.keys(bs).length > 0 ? '' : 'none';
+}
+
 function ucn(si, ni) { const s = document.getElementById(si), n = document.getElementById(ni); if (!s || !n) return; n.disabled = !s.value; if (!s.value) n.value = ''; }
-function markSaved(bi) { const st = document.getElementById('st-' + bi); if (st) { st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; } }
-function ug() { const u = Object.values(bs).some(v => !v); document.getElementById('gst').className = u ? 'save-st' : 'save-st saved'; document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み'; }
 
 function collectBlock(bi) {
   const tab = (window._dateTabs || [])[activeDateIdx];
@@ -739,11 +820,12 @@ function collectBlock(bi) {
   const responsible = { r1: (document.getElementById('resp1-'+bi)||{}).value||'', r2: (document.getElementById('resp2-'+bi)||{}).value||'' };
   const cart = { ki1:(document.getElementById('ci1-'+bi)||{}).value||'', kc1:(document.getElementById('cn1-'+bi)||{}).value||'', ki2:(document.getElementById('ci2-'+bi)||{}).value||'', kc2:(document.getElementById('cn2-'+bi)||{}).value||'', ko1:(document.getElementById('co1-'+bi)||{}).value||'', oc1:(document.getElementById('con1-'+bi)||{}).value||'', ko2:(document.getElementById('co2-'+bi)||{}).value||'', oc2:(document.getElementById('con2-'+bi)||{}).value||'' };
   const locNames = locations.length > 0 ? locations.map(l => l.name) : ['北口', '南口'];
-  // 場所ごとカート番号収集
   const placeCart = {};
   locNames.forEach((loc, li) => {
-    const sel = document.getElementById(`pc-${bi}-${li}`);
-    placeCart[loc] = sel ? sel.value : '';
+    const s1 = document.getElementById(`pc-${bi}-${li}-0`);
+    const s2 = document.getElementById(`pc-${bi}-${li}-1`);
+    const vals = [s1 ? s1.value : '', s2 ? s2.value : ''].filter(v => v);
+    placeCart[loc] = vals.join(',');
   });
   const slots = (block.slots || []).map((slot, ri) => {
     const places = {};
@@ -762,10 +844,10 @@ async function saveBlock(bi) {
   const tab   = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
-  const st = document.getElementById('st-' + bi);
-  const btn = document.querySelector(`#tb-${bi} .tb-btn`);
+  const st  = document.getElementById('st-' + bi);
+  const btn = document.getElementById('save-btn-' + bi);
   if (btn) btn.disabled = true;
-  if (st) st.textContent = '保存中...';
+  if (st) { st.style.display = ''; st.textContent = '保存中...'; }
   try {
     const data = collectBlock(bi);
     await gasGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, slots: data.slots });
@@ -774,11 +856,38 @@ async function saveBlock(bi) {
   finally { if (btn) btn.disabled = false; }
 }
 
-async function saveAll() {
+async function saveDayAll() {
   const tab = (window._dateTabs || [])[activeDateIdx];
   if (!tab) return;
   const dayBlocks = shiftDates.filter(d => d.date === tab.date);
-  for (let i = 0; i < dayBlocks.length; i++) await saveBlock(i);
+  const curIdx = activeTimeIdx;
+  for (let i = 0; i < dayBlocks.length; i++) {
+    // 各時間帯タブを順番にレンダリングして保存
+    activeTimeIdx = i;
+    buildTimeTabs();
+    await saveBlock(i);
+  }
+  // 元のタブに戻す
+  activeTimeIdx = curIdx;
+  buildTimeTabs();
+}
+
+async function saveAll() {
+  const tabs = window._dateTabs || [];
+  const curDateIdx = activeDateIdx;
+  const curTimeIdx = activeTimeIdx;
+  for (let di = 0; di < tabs.length; di++) {
+    activeDateIdx = di;
+    const dayBlocks = shiftDates.filter(d => d.date === tabs[di].date);
+    for (let bi = 0; bi < dayBlocks.length; bi++) {
+      activeTimeIdx = bi;
+      buildTimeTabs();
+      await saveBlock(bi);
+    }
+  }
+  activeDateIdx = curDateIdx;
+  activeTimeIdx = curTimeIdx;
+  buildTimeTabs();
 }
 
 async function publishShift() {
@@ -810,11 +919,12 @@ document.getElementById('lpResize').addEventListener('mousedown', e => {
 async function loadSettingsData() {
   setLoading(true, '設定を読み込み中...');
   try {
-    const [lr, cr, sr] = await Promise.all([gasGet('getLocations', {}), gasGet('getCartNumbers'), gasGet('getDefaultSlot')]);
-    locations   = lr.ok ? lr.locations   : [];
-    cartNumbers = cr.ok ? cr.cartNumbers : [];
-    defaultSlot = sr.ok ? sr.defaultSlot  : 15;
-    renderLocationList(); renderCartTags();
+    const [lr, cr, pr, sr] = await Promise.all([gasGet('getLocations', {}), gasGet('getCartNumbers'), gasGet('getCartPresets'), gasGet('getDefaultSlot')]);
+    locations    = lr.ok ? lr.locations    : [];
+    cartNumbers  = cr.ok ? cr.cartNumbers  : [];
+    cartPresets  = pr.ok ? pr.cartPresets  : [];
+    defaultSlot  = sr.ok ? sr.defaultSlot  : 15;
+    renderLocationList(); renderCartTags(); renderCartPresets();
     const sel = document.getElementById('default-slot-sel'); if (sel) sel.value = String(defaultSlot);
     settingsLoaded = true; setLoading(false);
   } catch (e) { setLoading(false); toast('設定読み込みエラー: ' + e.message, 'e'); }
@@ -865,6 +975,25 @@ function addCartNum() { const v = document.getElementById('new-cart-num').value.
 function deleteCartNum(i) { cartNumbers.splice(i, 1); renderCartTags(); }
 async function saveCartNumbers() {
   try { await gasGet('saveCartNumbers', { cartNumbers }); toast('カート番号を保存しました', 's'); createLoaded = false; }
+  catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
+}
+
+function renderCartPresets() {
+  const el = document.getElementById('cart-preset-list');
+  if (!el) return;
+  el.innerHTML = cartPresets.map((p, i) =>
+    `<span class="tag">${esc(p)}<button class="del-t" onclick="deleteCartPreset(${i})">×</button></span>`).join('');
+}
+function addCartPreset() {
+  const v = document.getElementById('new-cart-preset').value.trim();
+  if (!v) return;
+  if (cartPresets.includes(v)) { toast('すでに追加されています', 'e'); return; }
+  cartPresets.push(v); renderCartPresets();
+  document.getElementById('new-cart-preset').value = '';
+}
+function deleteCartPreset(i) { cartPresets.splice(i, 1); renderCartPresets(); }
+async function saveCartPresets() {
+  try { await gasGet('saveCartPresets', { cartPresets }); toast('カートプリセットを保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
