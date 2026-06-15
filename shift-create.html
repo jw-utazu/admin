@@ -9,6 +9,8 @@
 <script src="https://accounts.google.com/gsi/client" async defer onload="renderGsiButton()"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+*{scrollbar-width:none;}
+*::-webkit-scrollbar{display:none;}
 :root{
   --ink:#18181b;--ink2:#52525b;--ink3:#71717a;
   --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
@@ -86,15 +88,14 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .wish-reload-btn:hover{background:var(--green-l);}
 .tbl-outer{flex:1;overflow:hidden;padding:10px;display:flex;flex-direction:column;}
 .tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;flex:1;display:flex;flex-direction:column;}
-#wish-table-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+#wish-table-wrap{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
 #wish-table-wrap > div[style]{flex:1;}
 table.wish-tbl{border-collapse:collapse;font-size:12px;white-space:nowrap;}
 table.wish-tbl th,table.wish-tbl td{border:1px solid var(--border);text-align:center;vertical-align:middle;}
 .col-name{position:sticky;left:0;z-index:5;background:var(--surface);min-width:110px;max-width:140px;text-align:left!important;padding:0 8px;font-weight:700;}
 th.col-name{background:var(--green4);color:var(--green-d);font-size:11px;border-right:2px solid var(--border2)!important;z-index:10;}
 td.col-name{border-right:2px solid var(--border2)!important;}
-.th-date{background:var(--green4);color:var(--green-d);font-weight:700;font-size:11px;padding:6px 10px;position:sticky;top:0;z-index:3;}
-.th-time{background:var(--green3);color:var(--green-d);font-weight:700;font-size:10px;padding:4px 8px;min-width:80px;position:sticky;top:28px;z-index:3;}
+
 .th-top{position:sticky;top:0;z-index:6;}
 td.cell-on{background:#dcfce7;cursor:pointer;position:relative;}
 td.cell-on:hover{background:#bbf7d0;}
@@ -151,7 +152,9 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .lp-sec-arrow{font-size:9px;margin-right:4px;transition:transform .15s;}
 .lp-sec-toggle.open .lp-sec-arrow{transform:rotate(90deg);}
 /* 希望確認テーブル */
-.wish-snap-outer{overflow:auto;flex:1;}
+.wish-snap-outer{overflow:auto;min-height:412px;}
+.th-date{background:var(--green4);color:var(--green-d);font-weight:700;font-size:11px;padding:6px 10px;position:sticky;top:0;z-index:3;box-shadow:0 1px 0 var(--border);}
+.th-time{background:var(--green3);color:var(--green-d);font-weight:700;font-size:10px;padding:4px 8px;min-width:80px;position:sticky;top:28px;z-index:3;box-shadow:0 2px 0 var(--border);}
 /* 未申込一覧（希望確認タブ） */
 .wish-not-applied-toggle{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);cursor:pointer;user-select:none;font-size:12px;font-weight:700;color:var(--ink2);}
 .wish-not-applied-toggle:hover{background:var(--bg);}
