@@ -136,7 +136,8 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .lp-n{font-size:18px;font-weight:700;color:var(--purple);}
 .lp-u{font-size:10px;color:var(--purple);}
 .lp-sec{font-size:10px;font-weight:700;color:var(--ink3);padding:6px 12px 3px;background:var(--surface2);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.06em;}
-.mr{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);}
+.mr{display:flex;align-items:center;gap:6px;padding:8px 12px;}
+.mr-wrap{border-bottom:1px solid var(--border);}
 .m-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .d-on{background:var(--green);}.d-off{background:var(--border2);}
 .m-name{font-size:12px;font-weight:500;flex:1;}.m-name.off{color:var(--ink3);}
@@ -798,12 +799,12 @@ function buildLeftPanel() {
     const cartNgHtml = cartNg ? `<span style="font-size:10px;color:var(--red);font-weight:700;">🚫カート不可</span>` : '';
     const noteHtml   = note   ? `<span style="font-size:10px;color:var(--ink2);">📝${esc(note)}</span>` : '';
     const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
-    return `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}`;
+    return `<div class="mr-wrap"><div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}</div>`;
   }).join('');
   if (notApplied.length > 0) {
     html += `<div class="lp-sec lp-sec-toggle" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
     html += `<div class="lp-not-applied" style="display:none;">`;
-    html += notApplied.map(a => `<div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div>`).join('');
+    html += notApplied.map(a => `<div class="mr-wrap"><div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div></div>`).join('');
     html += `</div>`;
   }
   document.getElementById('lp-members').innerHTML = html;
