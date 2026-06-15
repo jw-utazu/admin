@@ -116,7 +116,9 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .ttab.on{color:var(--green);border-bottom-color:var(--green);font-weight:700;}
 .ttab:hover:not(.on){color:var(--ink);background:var(--bg);}
 .cell-wrap{display:flex;flex-direction:row;gap:4px;flex-wrap:wrap;align-items:center;}
-.cell-wrap select.cs{flex:1;min-width:80px;max-width:150px;}
+.cell-wrap.vertical{flex-direction:column;}
+.cell-wrap select.cs{flex:1;min-width:100px;}
+.cell-wrap.vertical select.cs{min-width:100px;width:100%;max-width:100%;}
 @media(max-width:600px){.cell-wrap{flex-direction:column;} .cell-wrap select.cs{max-width:100%;width:100%;}}
 .dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
@@ -139,9 +141,18 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .m-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .d-on{background:var(--green);}.d-off{background:var(--border2);}
 .m-name{font-size:12px;font-weight:500;flex:1;}.m-name.off{color:var(--ink3);}
+.lp-badges{display:flex;gap:2px;flex-shrink:0;}
+.lp-badge-col{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:20px;}
 .sts{display:flex;gap:3px;flex-wrap:wrap;}
 .sc-badge{font-size:10px;padding:2px 5px;border-radius:3px;font-weight:700;}
 .sc-a{background:#fef3c7;color:#92400e;}.sc-r{background:var(--green-l);color:var(--green);}.sc-k{background:var(--purple-l);color:var(--purple);}
+.lp-sec-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
+.lp-sec-toggle:hover{background:var(--border);}
+.lp-sec-arrow{font-size:9px;margin-right:4px;transition:transform .15s;}
+.lp-sec-toggle.open .lp-sec-arrow{transform:rotate(90deg);}
+/* 希望確認テーブルのスクロールスナップ */
+#wish-table-wrap > div{scroll-snap-type:y mandatory;}
+#wish-table-wrap table.wish-tbl tbody tr{scroll-snap-align:start;}
 .rm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
 .rm{overflow-y:auto;padding:14px;background:var(--bg);flex:1;}
 .tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
@@ -237,7 +248,6 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
     <div class="hdr-row1">
       <div class="hdr-logo">🗂</div>
       <span class="hdr-title" id="hdr-title">シフト管理アプリ</span>
-      <button class="hbtn pub" onclick="publishShift()">📣 シフト公開</button>
       <div class="acc-wrap">
         <div class="acc-icon" id="acc-icon" onclick="toggleAccMenu()">👤</div>
         <div class="acc-menu" id="acc-menu">
@@ -245,7 +255,10 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
         </div>
       </div>
     </div>
-
+    <div class="hdr-row2">
+      <div style="flex:1;"></div>
+      <button class="hbtn pub" onclick="publishShift()">📣 シフト公開</button>
+    </div>
   </div>
 
   <div class="main-tabs">
@@ -736,12 +749,16 @@ function buildLeftPanel() {
 
   let html = memoHtml + '<div class="lp-sec">申込者</div>';
   html += applied.map(a => {
-    const badges = `<span class="sc-badge sc-a">申${a.appliedCount}</span>${a.respFlag ? '<span class="sc-badge sc-r">責</span>' : ''}${a.cartFlag ? '<span class="sc-badge sc-k">カ</span>' : ''}`;
-    return `<div class="mr"><div class="m-dot d-on"></div><div class="sts" style="flex-shrink:0;">${badges}</div><div class="m-name">${esc(a.name)}</div></div>`;
+    const badgeA = `<span class="sc-badge sc-a">申${a.appliedCount}</span>`;
+    const badgeR = a.respFlag ? `<span class="sc-badge sc-r">責</span>` : '';
+    const badgeK = a.cartFlag ? `<span class="sc-badge sc-k">カ</span>` : '';
+    return `<div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>`;
   }).join('');
   if (notApplied.length > 0) {
-    html += '<div class="lp-sec">未申込</div>';
+    html += `<div class="lp-sec lp-sec-toggle" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
+    html += `<div class="lp-not-applied" style="display:none;">`;
     html += notApplied.map(a => `<div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div>`).join('');
+    html += `</div>`;
   }
   document.getElementById('lp-members').innerHTML = html;
 }
@@ -837,23 +854,7 @@ function getBlockLocNames(bi, block) {
 }
 
 function buildPlaceSelectUI(bi, block) {
-  const permanentLocs = locations.filter(l => !l.startYM && !l.endYM);
-  if (locations.length < 2) return ''; // 場所が1つ以下なら選択UI不要
-
-  const savedP1 = block.place ? block.place.p1 : (permanentLocs[0] ? permanentLocs[0].name : '');
-  const savedP2 = block.place ? block.place.p2 : (permanentLocs[1] ? permanentLocs[1].name : '');
-
-  const allLocs = locations.map(l => l.name);
-  function makeSel(idx, val) {
-    let o = '<option value="">—</option>';
-    allLocs.forEach(n => { o += `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`; });
-    return `<select id="place-sel-${bi}-${idx}" class="cart-sel-place" onchange="onPlaceChange(${bi})" style="flex:1;">${o}</select>`;
-  }
-  return `<div style="padding:6px 12px;border-bottom:1px solid var(--border);background:#f0f9ff;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <span style="font-size:10px;font-weight:700;color:#0369a1;white-space:nowrap;">使用場所</span>
-    <span style="font-size:10px;color:#0369a1;">①</span>${makeSel(0, savedP1)}
-    <span style="font-size:10px;color:#0369a1;">②</span>${makeSel(1, savedP2)}
-  </div>`;
+  return ''; // ヘッダーセル内に統合
 }
 
 function onPlaceChange(bi) {
@@ -870,10 +871,26 @@ function buildSlotTable(bi, block) {
   if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
   const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
 
-  // ヘッダー行（場所名）
+  const permanentLocs = locations.filter(l => !l.startYM && !l.endYM);
+  const allLocs = locations.map(l => l.name);
+  const savedP1 = block.place ? block.place.p1 : (permanentLocs[0] ? permanentLocs[0].name : '');
+  const savedP2 = block.place ? block.place.p2 : (permanentLocs[1] ? permanentLocs[1].name : '');
+
+  function makeLocSel(idx, val) {
+    let o = '<option value="">—</option>';
+    allLocs.forEach(n => { o += `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`; });
+    return `<select id="place-sel-${bi}-${idx}" class="cart-sel-place" onchange="onPlaceChange(${bi})" style="width:100%;font-weight:700;font-size:12px;">${o}</select>`;
+  }
+
+  // ヘッダー行（場所名ドロップダウン）
   let html = '<div class="tbl-wrap"><table class="shift-tbl"><thead>';
   html += '<tr><th class="th-slot-time">時間</th>';
-  locNames.forEach((loc, li) => { html += `<th class="th-place" style="background:${pc[li % pc.length]};">${esc(loc)}</th>`; });
+  if (locations.length >= 2) {
+    html += `<th class="th-place" style="background:${pc[0]};">${makeLocSel(0, savedP1)}</th>`;
+    html += `<th class="th-place" style="background:${pc[1]};">${makeLocSel(1, savedP2)}</th>`;
+  } else {
+    locNames.forEach((loc, li) => { html += `<th class="th-place" style="background:${pc[li % pc.length]};">${esc(loc)}</th>`; });
+  }
   html += '</tr>';
 
   // カート番号選択行（プリセット2つ選択）
@@ -905,6 +922,18 @@ function buildSlotTable(bi, block) {
     html += '</tr>';
   });
   html += '</tbody></table></div>';
+
+  // ResizeObserver で cell-wrap の幅を監視して縦横切替
+  setTimeout(() => {
+    document.querySelectorAll(`#tb-${bi} .cell-wrap`).forEach(el => {
+      applyCellWrapLayout(el);
+      if (!el._ro) {
+        el._ro = new ResizeObserver(() => applyCellWrapLayout(el));
+        el._ro.observe(el);
+      }
+    });
+  }, 0);
+
   return html;
 }
 
@@ -934,6 +963,22 @@ function ug() {
   document.getElementById('gst').className = u ? 'save-st' : 'save-st saved';
   document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み';
   document.getElementById('gst').style.display = Object.keys(bs).length > 0 ? '' : 'none';
+}
+
+function toggleNotApplied(el) {
+  el.classList.toggle("open");
+  const next = el.nextElementSibling;
+  if (next && next.classList.contains("lp-not-applied")) {
+    next.style.display = next.style.display === "none" ? "" : "none";
+  }
+}
+
+function applyCellWrapLayout(el) {
+  if (el.offsetWidth < 300) {
+    el.classList.add("vertical");
+  } else {
+    el.classList.remove("vertical");
+  }
 }
 
 function ucn(si, ni) { const s = document.getElementById(si), n = document.getElementById(ni); if (!s || !n) return; n.disabled = !s.value; if (!s.value) n.value = ''; }
