@@ -335,6 +335,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .toast.s{background:var(--green);}.toast.e{background:var(--red);}
 @keyframes t-up{from{opacity:0;transform:translateY(8px);}}
 
+/* GAS実行中スピナーオーバーレイ */
+#gas-spinner{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.35);align-items:center;justify-content:center;}
+#gas-spinner.show{display:flex;}
+.gas-spin-box{background:var(--surface);border-radius:var(--r-lg);padding:24px 32px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:var(--sh-lg);}
+.gas-spin-box .spin{width:28px;height:28px;border-width:3px;}
+.gas-spin-label{font-size:13px;font-weight:700;color:var(--ink2);}
+
+/* auth-card内ローディング状態 */
+#auth-loading{display:none;flex-direction:column;align-items:center;gap:12px;margin-bottom:4px;}
+#auth-loading.show{display:flex;}
+#auth-loading .spin{width:28px;height:28px;border-width:3px;}
+#auth-loading-text{font-size:13px;font-weight:700;color:var(--ink2);}
+#auth-login-area{transition:opacity .15s;}
+#auth-login-area.hide{display:none;}
+
 /* 時間選択用selectの見た目 */
 .time-sel option{font-family:var(--mono);}
 
@@ -383,25 +398,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .ms-check-row.ms-fixed{background:var(--surface2);opacity:.75;cursor:default;}
 .ms-fixed-ic{font-size:11px;color:var(--ink3);width:20px;flex-shrink:0;}
 .ms-fixed-label{font-size:13px;font-weight:500;color:var(--ink2);}
-/* メンバー管理 */
-.member-row{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);gap:8px;}
-.member-row:last-child{border-bottom:none;}
-.member-info{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0;}
-.member-name{font-size:13px;font-weight:700;color:var(--ink);}
-.member-kana{font-size:11px;color:var(--ink3);}
-.member-gender-badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;}
-.mgb-m{background:#eff6ff;color:#2563eb;}
-.mgb-f{background:#fdf2f8;color:#be185d;}
-.role-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;}
-.rb-resp{background:#fef9c3;color:#713f12;}
-.rb-cart{background:#f0fdf4;color:#15803d;}
-.btn-edit-member{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);flex-shrink:0;}
-.btn-edit-member:hover{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
-.mf-row{display:flex;flex-direction:column;gap:4px;}
-.mf-lbl{font-size:11px;font-weight:700;color:var(--ink2);}
-.mf-inp{border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--sans);font-size:13px;color:var(--ink);outline:none;width:100%;}
-.mf-inp:focus{border-color:var(--blue);}
-.req{color:var(--red);}
 </style>
 </head>
 <body>
@@ -411,11 +407,17 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   <div class="auth-card">
     <div class="auth-logo" style="background:none;padding:0;overflow:hidden;"><img src="logo.png" alt="PW" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.parentNode.style.background='var(--blue)';this.parentNode.textContent='PW'"></div>
     <div class="auth-title">PW管理</div>
-    <div class="auth-sub">管理者アカウントでログインしてください。<br>許可されたアカウントのみアクセスできます。</div>
-    <button class="g-btn" onclick="signIn()">
-      <svg width="16" height="16" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.075 17.64 11.767 17.64 9.2z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
-      Googleでログイン
-    </button>
+    <div id="auth-loading">
+      <div class="spin"></div>
+      <div id="auth-loading-text">認証中…</div>
+    </div>
+    <div id="auth-login-area">
+      <div class="auth-sub">管理者アカウントでログインしてください。<br>許可されたアカウントのみアクセスできます。</div>
+      <button class="g-btn" onclick="signIn()">
+        <svg width="16" height="16" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.075 17.64 11.767 17.64 9.2z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+        Googleでログイン
+      </button>
+    </div>
     <div class="auth-err" id="auth-err"></div>
   </div>
 </div>
@@ -542,11 +544,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
       <!-- 新機能ボタン -->
       <div class="sec">
         <div class="slab">追加機能</div>
-        <button class="abtn" onclick="openMemberModal()">
-          <div class="ab-ic" style="background:#f0f9ff;color:#0369a1;">👥</div>
-          <div class="ab-tx"><span class="ab-n">メンバー管理</span><span class="ab-d">メンバーの追加・編集・有効無効</span></div>
-          <span class="ab-ar">›</span>
-        </button>
         <button class="abtn" onclick="openNoticeModal()">
           <div class="ab-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</div>
           <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
@@ -583,17 +580,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 </div>
 
 <!-- MODALS -->
-<!-- メンバー管理モーダル -->
-<div class="ov" id="m-member">
-  <div class="modal" style="max-width:560px;">
-    <div class="mhd"><span class="mt">👥 メンバー管理</span><button class="mx" onclick="closeM('m-member')">&#10005;</button></div>
-    <div class="mbd" id="m-member-body" style="padding:0;">読み込み中...</div>
-    <div class="mft" id="m-member-ft">
-      <button class="btn btn-g" onclick="closeMemberForm()">閉じる</button>
-      <button class="btn btn-p" id="m-member-add-btn" onclick="openMemberAddForm()">＋ メンバー追加</button>
-    </div>
-  </div>
-</div>
 <!-- お知らせ管理モーダル -->
 <div class="ov" id="m-notice">
   <div class="modal" style="max-width:520px;">
@@ -795,6 +781,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   </div>
 </div>
 
+<!-- GAS実行中スピナーオーバーレイ -->
+<div id="gas-spinner">
+  <div class="gas-spin-box">
+    <div class="spin"></div>
+    <div class="gas-spin-label">処理中…</div>
+  </div>
+</div>
+
 <div class="ta" id="ta"></div>
 
 <script>
@@ -815,7 +809,6 @@ const INTV_LIST  = [5,10,15,20,30];
 // ============================================================
 let curY=2026, curM=7;   // 対象月（当月をデフォルト）
 let scY=2026, scM=7;     // 日程設定カレンダー月
-let _currentUser = null; // ログイン中の管理者情報
 let slotY=2026, slotM=7; // 実施日カレンダー月
 let adminData   = null;
 let activeKind  = null;  // 'apply'|'deadline'|'open'|null
@@ -885,6 +878,14 @@ function processUser(u, save = true) {
   _processUserWithGasAuth(u, save);
 }
 async function _processUserWithGasAuth(u, save) {
+  // auth-cardをローディング状態に切り替え
+  document.getElementById('auth-login-area').classList.add('hide');
+  document.getElementById('auth-err').classList.remove('show');
+  const loadingEl = document.getElementById('auth-loading');
+  const loadingText = document.getElementById('auth-loading-text');
+  loadingEl.classList.add('show');
+  loadingText.textContent = '認証中…';
+
   try {
     // fetch方式（リダイレクト追従対応・Android Chrome対応）
     const cbName = '_authcb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -907,18 +908,18 @@ async function _processUserWithGasAuth(u, save) {
       });
     if (!res.ok) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
     if (!res.isAdmin) { showAuthErr('このアカウントには管理者権限がありません。'); return; }
-    // ログインユーザー情報を保持（uid空＝オーナーアカウント）
-    _currentUser = { uid: res.uid || '', name: u.name, email: u.email };
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
+
   // ログイン情報をlocalStorageに保存（次回自動ログイン用）
   if (save) {
     try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, isAdmin: true })); } catch(e) {}
   }
-  document.getElementById('auth').style.display = 'none';
-  document.getElementById('app').style.display  = 'flex';
+
+  // アバター設定
   const av = document.getElementById('av');
   if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
   else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
+
   // デフォルトを翌月に設定
   const now = new Date();
   const nextM = now.getMonth() + 2; // 翌月（1ベース）
@@ -926,7 +927,16 @@ async function _processUserWithGasAuth(u, save) {
   curM = nextM > 12 ? 1 : nextM;
   scY = curY; scM = curM;
   slotY = curY; slotM = curM;
-  loadAdminData();
+
+  // データ読み込み中に切り替えてからデータ取得
+  loadingText.textContent = 'データを読み込み中…';
+  try {
+    await loadAdminData();
+  } catch(e) {}
+
+  // データ取得完了後に#appを表示
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('app').style.display  = 'flex';
 }
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch(e) {}
@@ -934,17 +944,34 @@ function signOut() {
   document.getElementById('app').style.display  = 'none';
   document.getElementById('auth').style.display = 'flex';
 }
-function showAuthErr(msg) { const el=document.getElementById('auth-err'); el.textContent=msg; el.classList.add('show'); }
+function showAuthErr(msg) {
+  document.getElementById('auth-loading').classList.remove('show');
+  document.getElementById('auth-login-area').classList.remove('hide');
+  const el=document.getElementById('auth-err'); el.textContent=msg; el.classList.add('show');
+}
 
 // ============================================================
 // GAS通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
 // ============================================================
+let _gasCount = 0;
+function _gasSpinShow() {
+  _gasCount++;
+  if (_gasCount === 1 && document.getElementById('app').style.display === 'flex') {
+    document.getElementById('gas-spinner').classList.add('show');
+  }
+}
+function _gasSpinHide() {
+  _gasCount = Math.max(0, _gasCount - 1);
+  if (_gasCount === 0) document.getElementById('gas-spinner').classList.remove('show');
+}
+
 function gasGet(action, params) {
   const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   let url = GAS_URL+'?action='+action+'&callback='+cbName;
   if (params) url += '&params='+encodeURIComponent(JSON.stringify(params));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
+  _gasSpinShow();
   return fetch(url, { redirect: 'follow', signal: controller.signal })
     .then(r => r.text())
     .then(text => {
@@ -954,10 +981,12 @@ function gasGet(action, params) {
       if (start === -1 || end === -1) throw new Error('レスポンス形式エラー');
       const d = JSON.parse(text.slice(start + 1, end));
       if (d && d.error && !d.ok) throw new Error(d.error);
+      _gasSpinHide();
       return d;
     })
     .catch(err => {
       clearTimeout(timer);
+      _gasSpinHide();
       if (err.name === 'AbortError') throw new Error('通信タイムアウト（GASが応答しませんでした）');
       throw new Error(err.message || '通信エラー（GASへの接続に失敗）');
     });
@@ -1865,6 +1894,7 @@ function gasPost(actionOrPayload, params) {
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
+  _gasSpinShow();
   return fetch(GAS_URL, {
     method: 'POST',
     redirect: 'follow',
@@ -1875,10 +1905,12 @@ function gasPost(actionOrPayload, params) {
     .then(d => {
       clearTimeout(timer);
       if (d && d.error && !d.ok) throw new Error(d.error);
+      _gasSpinHide();
       return d;
     })
     .catch(err => {
       clearTimeout(timer);
+      _gasSpinHide();
       if (err.name === 'AbortError') throw new Error('通信タイムアウト（GASが応答しませんでした）');
       throw new Error(err.message || '通信エラー（GASへの接続に失敗）');
     });
@@ -2446,201 +2478,6 @@ async function deletePhoto(fileId) {
   }
 }
 
-
-// ============================================================
-// メンバー管理モーダル
-// ============================================================
-let _memberList = [];
-let _memberEditRowIndex = null; // 編集中のrowIndex
-
-async function openMemberModal() {
-  openM('m-member');
-  document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
-  document.getElementById('m-member-add-btn').style.display = '';
-  try {
-    const res = await gasGet('getMemberListAll');
-    if (!res.ok) throw new Error(res.error || '取得失敗');
-    _memberList = res.members || [];
-    renderMemberList();
-  } catch(e) {
-    document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;color:var(--red);">エラー: ' + esc(e.message) + '</div>';
-  }
-}
-
-function renderMemberList() {
-  _memberEditRowIndex = null;
-  document.getElementById('m-member-add-btn').style.display = '';
-  const valid   = _memberList.filter(m => m.valid);
-  const invalid = _memberList.filter(m => !m.valid);
-
-  let html = '<div style="padding:12px 14px 0;font-size:11px;color:var(--ink3);">計 ' + _memberList.length + ' 名（有効 ' + valid.length + ' 名 / 無効 ' + invalid.length + ' 名）</div>';
-
-  const renderSection = (list, label, labelColor) => {
-    if (!list.length) return '';
-    let s = '<div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:' + labelColor + ';">' + label + '</div>';
-    list.forEach(m => {
-      s += `
-      <div class="member-row" data-row="${m.rowIndex}">
-        <div class="member-info">
-          <span class="member-name">${esc(m.name)}</span>
-          <span class="member-kana">${esc(m.furigana)}</span>
-          <span class="member-gender-badge ${m.gender === 'M' ? 'mgb-m' : 'mgb-f'}">${m.gender === 'M' ? '男' : '女'}</span>
-          ${m.isResponsible ? '<span class="role-badge rb-resp">責任者</span>' : ''}
-          ${m.isCart        ? '<span class="role-badge rb-cart">カート</span>' : ''}
-        </div>
-        <button class="btn-edit-member" onclick="openMemberEditForm(${m.rowIndex})">編集</button>
-      </div>`;
-    });
-    return s;
-  };
-
-  html += renderSection(valid, '✅ 有効メンバー', 'var(--green)');
-  html += renderSection(invalid, '⛔ 無効メンバー', 'var(--ink3)');
-  document.getElementById('m-member-body').innerHTML = html;
-}
-
-function openMemberAddForm() {
-  _memberEditRowIndex = null;
-  document.getElementById('m-member-add-btn').style.display = 'none';
-  const isOwner = !_currentUser?.uid; // uidが空＝オーナーアカウント
-  document.getElementById('m-member-body').innerHTML = buildMemberForm(null, isOwner);
-}
-
-function openMemberEditForm(rowIndex) {
-  _memberEditRowIndex = rowIndex;
-  document.getElementById('m-member-add-btn').style.display = 'none';
-  const m = _memberList.find(x => x.rowIndex === rowIndex);
-  if (!m) return;
-  const isOwner = !_currentUser?.uid;
-  document.getElementById('m-member-body').innerHTML = buildMemberForm(m, isOwner);
-}
-
-function buildMemberForm(m, isOwner) {
-  const isEdit = !!m;
-  const emailReadonly = isEdit && !isOwner;
-  return `
-  <div style="padding:14px 16px;">
-    <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px;">${isEdit ? '✏️ メンバー編集' : '➕ メンバー追加'}</div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div class="mf-row">
-        <label class="mf-lbl">名前 <span class="req">*</span></label>
-        <input id="mf-name" class="mf-inp" type="text" value="${esc(m?.name || '')}" placeholder="例：山田 太郎">
-      </div>
-      <div class="mf-row">
-        <label class="mf-lbl">フリガナ <span class="req">*</span></label>
-        <input id="mf-furigana" class="mf-inp" type="text" value="${esc(m?.furigana || '')}" placeholder="例：ヤマダ タロウ">
-      </div>
-      <div class="mf-row">
-        <label class="mf-lbl">性別 <span class="req">*</span></label>
-        <div style="display:flex;gap:12px;align-items:center;padding:6px 0;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-gender" value="M" ${(!m || m.gender === 'M') ? 'checked' : ''}> 男
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-gender" value="F" ${(m?.gender === 'F') ? 'checked' : ''}> 女
-          </label>
-        </div>
-      </div>
-      <div class="mf-row">
-        <label class="mf-lbl">メールアドレス
-          ${emailReadonly ? '<span style="font-size:10px;color:var(--ink3);font-weight:400;margin-left:4px;">（オーナーアカウントのみ変更可）</span>' : ''}
-        </label>
-        ${emailReadonly
-          ? `<div style="padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);font-size:13px;color:var(--ink2);">${esc(m?.email || '（未設定）')}</div>`
-          : `<input id="mf-email" class="mf-inp" type="email" value="${esc(m?.email || '')}" placeholder="例：taro@example.com（任意）">`
-        }
-      </div>
-      <div class="mf-row">
-        <label class="mf-lbl">役割</label>
-        <div style="display:flex;gap:16px;padding:6px 0;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="mf-resp" ${m?.isResponsible ? 'checked' : ''}> 責任者
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="mf-cart" ${m?.isCart ? 'checked' : ''}> カート担当
-          </label>
-        </div>
-      </div>
-      ${isEdit ? `
-      <div class="mf-row">
-        <label class="mf-lbl">ステータス</label>
-        <div style="display:flex;gap:12px;align-items:center;padding:6px 0;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-valid" value="1" ${m.valid ? 'checked' : ''}> 有効
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-valid" value="0" ${!m.valid ? 'checked' : ''}> 無効
-          </label>
-        </div>
-        ${m.valid ? '<div style="font-size:11px;color:var(--amber);line-height:1.6;">⚠️ 無効にすると、この方に関する代理送信設定は自動的に削除されます。</div>' : ''}
-      </div>` : ''}
-      <div id="mf-err" style="display:none;color:var(--red);font-size:12px;padding:6px 10px;background:var(--red-l);border-radius:var(--r);"></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
-      <button class="btn btn-g" onclick="renderMemberList()">キャンセル</button>
-      <button class="btn btn-p" onclick="saveMemberForm(${isEdit}, ${isOwner})">保存</button>
-    </div>
-  </div>`;
-}
-
-async function saveMemberForm(isEdit, isOwner) {
-  const name     = (document.getElementById('mf-name')?.value || '').trim();
-  const furigana = (document.getElementById('mf-furigana')?.value || '').trim();
-  const gender   = document.querySelector('input[name="mf-gender"]:checked')?.value || '';
-  const email    = (document.getElementById('mf-email')?.value || '').trim();
-  const isResp   = document.getElementById('mf-resp')?.checked || false;
-  const isCart   = document.getElementById('mf-cart')?.checked || false;
-  const validVal = document.querySelector('input[name="mf-valid"]:checked')?.value;
-  const valid    = validVal !== undefined ? validVal === '1' : true;
-
-  const errEl = document.getElementById('mf-err');
-  if (!name || !furigana || !gender) {
-    errEl.style.display = '';
-    errEl.textContent = '名前・フリガナ・性別は必須です。';
-    return;
-  }
-  errEl.style.display = 'none';
-
-  const adminUid  = _currentUser?.uid  || '';
-  const adminName = _currentUser?.name || '';
-
-  try {
-    let res;
-    if (isEdit) {
-      res = await gasGet('updateMember', {
-        rowIndex: _memberEditRowIndex,
-        name, furigana, gender, email,
-        isResponsible: isResp ? '1' : '',
-        isCart: isCart ? '1' : '',
-        valid: valid ? '1' : '0',
-        isOwner: isOwner ? '1' : '',
-        adminUid, adminName
-      });
-    } else {
-      res = await gasGet('addMember', {
-        name, furigana, gender, email,
-        isResponsible: isResp ? '1' : '',
-        isCart: isCart ? '1' : '',
-        adminUid, adminName
-      });
-    }
-    if (!res.ok) throw new Error(res.error || '保存失敗');
-    toast(isEdit ? 'メンバー情報を更新しました' : 'メンバーを追加しました', 's');
-    // 一覧を再取得して再描画
-    const listRes = await gasGet('getMemberListAll');
-    if (listRes.ok) {
-      _memberList = listRes.members || [];
-      renderMemberList();
-    }
-  } catch(e) {
-    errEl.style.display = '';
-    errEl.textContent = 'エラー: ' + e.message;
-  }
-}
-
-function closeMemberForm() {
-  closeM('m-member');
-}
 
 </script>
 </body>
