@@ -120,6 +120,13 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cell-wrap.vertical{flex-direction:column;}
 .cell-wrap select.cs{flex:1;min-width:100px;}
 .cell-wrap.vertical select.cs{min-width:0;width:100%;max-width:100%;}
+.cell-wrap .ps-watch-wrap{flex:1;min-width:100px;display:flex;flex-direction:column;gap:2px;}
+.cell-wrap.vertical .ps-watch-wrap{min-width:0;width:100%;max-width:100%;}
+.ps-watch-wrap select.cs{width:100%;}
+.watch-label{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--ink3);cursor:pointer;white-space:nowrap;user-select:none;}
+.watch-label input[type="checkbox"]{cursor:pointer;margin:0;}
+.watch-label input[type="checkbox"]:disabled{cursor:not-allowed;}
+.watch-label:has(input:disabled){color:var(--ink3);opacity:.5;}
 .dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
 .sc-body{display:flex;flex:1;overflow:hidden;}
@@ -968,9 +975,10 @@ function buildSlotTable(bi, block) {
     html += '<tr><td class="td-slot-time">' + esc(slot.time) + '</td>';
     locNames.forEach((loc, li) => {
       const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
+      const watchOn = !!(slot.watch && slot.watch[loc]);
       html += `<td class="cell-w" style="background:${pc[li % pc.length]}20;"><div class="cell-wrap" id="cw-${bi}-${ri}-${li}">`;
       for (let pi = 0; pi < 3; pi++) {
-        html += buildPS(bi, ri, li, pi, uids[pi] || '', sa, nm);
+        html += buildPS(bi, ri, li, pi, uids[pi] || '', sa, nm, watchOn);
       }
       html += '</div></td>';
     });
@@ -996,12 +1004,32 @@ function buildSlotTable(bi, block) {
   return html;
 }
 
-function buildPS(bi, ri, li, pi, val, sa, nm) {
+function buildPS(bi, ri, li, pi, val, sa, nm, watchOn) {
   const id = `ps-${bi}-${ri}-${li}-${pi}`;
   let o = '<option value="">—</option>';
   sa.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
   if (val && !sa.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
-  return `<select class="cs" id="${id}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}" onchange="mu(${bi})">${o}</select>`;
+  const onchangeAttr = pi === 0 ? `mu(${bi});onPs0Change(${bi},${ri},${li});` : `mu(${bi})`;
+  const sel = `<select class="cs" id="${id}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}" onchange="${onchangeAttr}">${o}</select>`;
+  if (pi !== 0) return sel;
+  // 一番左（1人目）の選択欄にのみ見守りチェックボックスを付与
+  const cbId = `watch-${bi}-${ri}-${li}`;
+  const isDisabled = !val;
+  const isChecked = !!(watchOn && val);
+  const cb = `<label class="watch-label"><input type="checkbox" class="watch-cb" id="${cbId}" data-bi="${bi}" data-ri="${ri}" data-li="${li}"${isDisabled ? ' disabled' : ''}${isChecked ? ' checked' : ''} onchange="mu(${bi})"> 見守り</label>`;
+  return `<div class="ps-watch-wrap">${sel}${cb}</div>`;
+}
+
+function onPs0Change(bi, ri, li) {
+  const sel = document.getElementById(`ps-${bi}-${ri}-${li}-0`);
+  const cb  = document.getElementById(`watch-${bi}-${ri}-${li}`);
+  if (!sel || !cb) return;
+  if (sel.value) {
+    cb.disabled = false;
+  } else {
+    cb.disabled = true;
+    cb.checked = false;
+  }
 }
 
 function mu(bi) {
@@ -1067,13 +1095,16 @@ function collectBlock(bi) {
   }); // 単一値で保存
   const slots = (block.slots || []).map((slot, ri) => {
     const places = {};
+    const watch = {};
     locNames.forEach((loc, li) => {
       const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
       const uids = [];
       if (cw) cw.querySelectorAll('select.cs').forEach(s => { if (s.value) uids.push(s.value); });
       places[loc] = uids;
+      const cb = document.getElementById(`watch-${bi}-${ri}-${li}`);
+      watch[loc] = !!(cb && cb.checked);
     });
-    return { time: slot.time, places };
+    return { time: slot.time, places, watch };
   });
   return { responsible, cart, placeCart, usedPlaces, slots };
 }
