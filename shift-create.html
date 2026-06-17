@@ -456,6 +456,11 @@ let shiftDates    = [];
 let locations     = [];
 let cartNumbers   = [];
 let cartPresets   = [];
+// 設定タブ（タブ3）専用：タブ2「シフト作成」のlocations/cartNumbers/cartPresets（年月で絞り込まれた値）とは
+// 完全に分離し、設定タブを開いている間はタブ2側の再読み込みに影響されないようにする
+let settingsLocations    = [];
+let settingsCartNumbers  = [];
+let settingsCartPresets  = [];
 let memoMap       = {};
 let defaultSlot   = 15;
 let activeDateIdx = 0;
@@ -1202,9 +1207,9 @@ async function loadSettingsData() {
   setLoading(true, '設定を読み込み中...');
   try {
     const [lr, cr, pr, sr] = await Promise.all([gasGet('getLocations', {}), gasGet('getCartNumbers'), gasGet('getCartPresets'), gasGet('getDefaultSlot')]);
-    locations    = lr.ok ? lr.locations    : [];
-    cartNumbers  = cr.ok ? cr.cartNumbers  : [];
-    cartPresets  = pr.ok ? pr.cartPresets  : [];
+    settingsLocations    = lr.ok ? lr.locations    : [];
+    settingsCartNumbers  = cr.ok ? cr.cartNumbers  : [];
+    settingsCartPresets  = pr.ok ? pr.cartPresets  : [];
     defaultSlot  = sr.ok ? sr.defaultSlot  : 15;
     renderLocationList(); renderCartTags(); renderCartPresets();
     const sel = document.getElementById('default-slot-sel'); if (sel) sel.value = String(defaultSlot);
@@ -1215,8 +1220,8 @@ async function loadSettingsData() {
 function renderLocationList() {
   const list = document.getElementById('location-list');
   if (!list) return;
-  if (locations.length === 0) { list.innerHTML = '<div style="font-size:12px;color:var(--ink3);padding:8px 0;">場所が登録されていません</div>'; return; }
-  list.innerHTML = locations.map((loc, i) => `
+  if (settingsLocations.length === 0) { list.innerHTML = '<div style="font-size:12px;color:var(--ink3);padding:8px 0;">場所が登録されていません</div>'; return; }
+  list.innerHTML = settingsLocations.map((loc, i) => `
     <div class="setting-row">
       <div><div class="setting-name">${esc(loc.name)}</div>
       <div class="setting-detail">${loc.startYM || loc.endYM ? `期間: ${loc.startYM || '〜'} 〜 ${loc.endYM || '〜'}` : '常時有効'}</div></div>
@@ -1231,51 +1236,51 @@ function hideAddLocationForm() { document.getElementById('add-location-form').st
 function addLocation() {
   const name = document.getElementById('new-loc-name').value.trim();
   if (!name) { toast('場所名を入力してください', 'e'); return; }
-  locations.push({ name, startYM: document.getElementById('new-loc-start').value.trim(), endYM: document.getElementById('new-loc-end').value.trim() });
+  settingsLocations.push({ name, startYM: document.getElementById('new-loc-start').value.trim(), endYM: document.getElementById('new-loc-end').value.trim() });
   renderLocationList(); hideAddLocationForm();
 }
-function deleteLocation(i) { if (!confirm(`「${locations[i].name}」を削除しますか？`)) return; locations.splice(i, 1); renderLocationList(); }
-function openEditLocModal(i) { document.getElementById('edit-loc-idx').value = i; document.getElementById('edit-loc-name').value = locations[i].name; document.getElementById('edit-loc-start').value = locations[i].startYM||''; document.getElementById('edit-loc-end').value = locations[i].endYM||''; document.getElementById('edit-loc-modal').classList.add('on'); }
+function deleteLocation(i) { if (!confirm(`「${settingsLocations[i].name}」を削除しますか？`)) return; settingsLocations.splice(i, 1); renderLocationList(); }
+function openEditLocModal(i) { document.getElementById('edit-loc-idx').value = i; document.getElementById('edit-loc-name').value = settingsLocations[i].name; document.getElementById('edit-loc-start').value = settingsLocations[i].startYM||''; document.getElementById('edit-loc-end').value = settingsLocations[i].endYM||''; document.getElementById('edit-loc-modal').classList.add('on'); }
 function closeEditLocModal() { document.getElementById('edit-loc-modal').classList.remove('on'); }
 function saveEditLocation() {
   const i = parseInt(document.getElementById('edit-loc-idx').value);
   const name = document.getElementById('edit-loc-name').value.trim();
   if (!name) { toast('場所名を入力してください', 'e'); return; }
-  locations[i] = { name, startYM: document.getElementById('edit-loc-start').value.trim(), endYM: document.getElementById('edit-loc-end').value.trim() };
+  settingsLocations[i] = { name, startYM: document.getElementById('edit-loc-start').value.trim(), endYM: document.getElementById('edit-loc-end').value.trim() };
   renderLocationList(); closeEditLocModal();
 }
 async function saveLocations() {
-  try { await gasGet('saveLocations', { locations }); toast('場所設定を保存しました', 's'); createLoaded = false; }
+  try { await gasGet('saveLocations', { locations: settingsLocations }); toast('場所設定を保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
 function renderCartTags() {
-  document.getElementById('cart-tag-list').innerHTML = cartNumbers.map((n, i) =>
+  document.getElementById('cart-tag-list').innerHTML = settingsCartNumbers.map((n, i) =>
     `<span class="tag">${esc(n)}<button class="del-t" onclick="deleteCartNum(${i})">×</button></span>`).join('');
 }
-function addCartNum() { const v = document.getElementById('new-cart-num').value.trim(); if (!v) return; if (cartNumbers.includes(v)) { toast('すでに追加されています', 'e'); return; } cartNumbers.push(v); renderCartTags(); document.getElementById('new-cart-num').value = ''; }
-function deleteCartNum(i) { cartNumbers.splice(i, 1); renderCartTags(); }
+function addCartNum() { const v = document.getElementById('new-cart-num').value.trim(); if (!v) return; if (settingsCartNumbers.includes(v)) { toast('すでに追加されています', 'e'); return; } settingsCartNumbers.push(v); renderCartTags(); document.getElementById('new-cart-num').value = ''; }
+function deleteCartNum(i) { settingsCartNumbers.splice(i, 1); renderCartTags(); }
 async function saveCartNumbers() {
-  try { await gasGet('saveCartNumbers', { cartNumbers }); toast('カート番号を保存しました', 's'); createLoaded = false; }
+  try { await gasGet('saveCartNumbers', { cartNumbers: settingsCartNumbers }); toast('カート番号を保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
 function renderCartPresets() {
   const el = document.getElementById('cart-preset-list');
   if (!el) return;
-  el.innerHTML = cartPresets.map((p, i) =>
+  el.innerHTML = settingsCartPresets.map((p, i) =>
     `<span class="tag">${esc(p)}<button class="del-t" onclick="deleteCartPreset(${i})">×</button></span>`).join('');
 }
 function addCartPreset() {
   const v = document.getElementById('new-cart-preset').value.trim();
   if (!v) return;
-  if (cartPresets.includes(v)) { toast('すでに追加されています', 'e'); return; }
-  cartPresets.push(v); renderCartPresets();
+  if (settingsCartPresets.includes(v)) { toast('すでに追加されています', 'e'); return; }
+  settingsCartPresets.push(v); renderCartPresets();
   document.getElementById('new-cart-preset').value = '';
 }
-function deleteCartPreset(i) { cartPresets.splice(i, 1); renderCartPresets(); }
+function deleteCartPreset(i) { settingsCartPresets.splice(i, 1); renderCartPresets(); }
 async function saveCartPresets() {
-  try { await gasGet('saveCartPresets', { cartPresets }); toast('カートプリセットを保存しました', 's'); createLoaded = false; }
+  try { await gasGet('saveCartPresets', { cartPresets: settingsCartPresets }); toast('カートプリセットを保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
