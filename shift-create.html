@@ -691,6 +691,7 @@ function toggleWishNotApplied(el) {
 async function loadCreateData() {
   setLoading(true, 'シフトデータを読み込み中...');
   try {
+    Object.keys(bs).forEach(k => delete bs[k]); // 再読み込み時は保存状態をクリア
     const [flagsRes, appRes, shiftRes] = await Promise.all([
       gasGet('getMemberFlags'), gasGet('getApplicants', {}), gasGet('getShiftCreateData', {})
     ]);
@@ -723,7 +724,7 @@ function buildCreateTabs() {
   const tabs = dt.map((t, i) =>
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
-  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
+  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
 }
 
 function switchDateTab(i) {
@@ -929,6 +930,8 @@ function buildSlotTable(bi, block) {
   const locNames = getBlockLocNames(bi, block);
   const nm      = buildNameMap();
   const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; const dp = sk.indexOf('/'); const pp = sk.indexOf('('); const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk; return dn === block.date; }));
+  // この時間帯ブロック全体（block.time）に申し込んだ人を候補者とする（スロット行ごとではなくブロック単位）
+  const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; const sp = sk.indexOf(') '); const timeStr = sp >= 0 ? sk.slice(sp + 2) : sk; return timeStr === block.time; }));
   const placeCart = block.placeCart || {};
   if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
   const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
@@ -971,7 +974,6 @@ function buildSlotTable(bi, block) {
 
   // スロット行（奉仕者3固定）
   slots.forEach((slot, ri) => {
-    const startT = slot.time.split('~')[0]; const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; return sk.includes(') ' + startT) || sk.includes(' ' + startT); }));
     html += '<tr><td class="td-slot-time">' + esc(slot.time) + '</td>';
     locNames.forEach((loc, li) => {
       const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
@@ -1050,6 +1052,17 @@ function ug() {
   document.getElementById('gst').className = u ? 'save-st' : 'save-st saved';
   document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み';
   document.getElementById('gst').style.display = Object.keys(bs).length > 0 ? '' : 'none';
+}
+
+// 未保存の変更があるか判定（bsの値に1つでもfalseがあれば未保存あり）
+function hasUnsavedChanges() {
+  return Object.values(bs).some(v => !v);
+}
+
+// シフト作成タブの再読み込みボタン
+async function reloadCreateData() {
+  if (hasUnsavedChanges() && !confirm('未保存の変更が失われます。続行しますか？')) return;
+  await loadCreateData();
 }
 
 function toggleNotApplied(el) {
