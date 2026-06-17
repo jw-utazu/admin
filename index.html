@@ -514,7 +514,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     <!-- SIDEBAR -->
     <div class="sb">
       <div>
-        <div class="plbl">処理メニュー</div>
         <div class="ag">
           <button class="abtn" onclick="openMonthlyModal()">
             <div class="ab-ic ic-a">&#128640;</div>
@@ -526,6 +525,36 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">🗂 シフト管理アプリ</span><span class="ab-d">シフト作成・希望確認・設定</span></div>
             <span class="ab-ar">›</span>
           </a>
+          <button class="abtn" onclick="openMemberModal()">
+            <div class="ab-ic" style="background:#f0f9ff;color:#0369a1;">👥</div>
+            <div class="ab-tx"><span class="ab-n">メンバー管理</span><span class="ab-d">メンバーの追加・編集・有効無効</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openNoticeModal()">
+            <div class="ab-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</div>
+            <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openRequestModal()">
+            <div class="ab-ic" style="background:#fef3c7;color:#d97706;">💬</div>
+            <div class="ab-tx"><span class="ab-n">要望確認</span><span class="ab-d">未対応の要望を確認・対応</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openProxyModal()">
+            <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔄</div>
+            <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openPhotoMgmtModal('exhibit')">
+            <div class="ab-ic" style="background:#f0fdf4;color:#16a34a;">🖼</div>
+            <div class="ab-tx"><span class="ab-n">展示内容写真管理</span><span class="ab-d">カート展示写真のアップロード・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
+          <button class="abtn" onclick="openPhotoMgmtModal('road')">
+            <div class="ab-ic" style="background:#eff6ff;color:#2563eb;">🗺</div>
+            <div class="ab-tx"><span class="ab-n">道路許可書写真管理</span><span class="ab-d">道路使用許可書写真のアップロード・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
         </div>
       </div>
       <div>
@@ -538,45 +567,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
       <div>
         <div class="plbl">アプリ</div>
         <button onclick="openPwaModal()" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--blue-l);border:1.5px solid var(--blue);border-radius:var(--r);cursor:pointer;font-family:var(--sans);color:var(--blue);font-size:12px;font-weight:700;"><span style="font-size:15px;">📲</span><span>ホーム画面に追加</span></button>
-      </div>
-      <!-- 新機能ボタン -->
-      <div class="sec">
-        <div class="slab">追加機能</div>
-        <button class="abtn" onclick="openMemberModal()">
-          <div class="ab-ic" style="background:#f0f9ff;color:#0369a1;">👥</div>
-          <div class="ab-tx"><span class="ab-n">メンバー管理</span><span class="ab-d">メンバーの追加・編集・有効無効</span></div>
-          <span class="ab-ar">›</span>
-        </button>
-        <button class="abtn" onclick="openNoticeModal()">
-          <div class="ab-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</div>
-          <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
-          <span class="ab-ar">›</span>
-        </button>
-        <button class="abtn" onclick="openProxyModal()">
-          <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔄</div>
-          <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
-          <span class="ab-ar">›</span>
-        </button>
-        <button class="abtn" onclick="openRequestModal()">
-          <div class="ab-ic" style="background:#fef3c7;color:#d97706;">💬</div>
-          <div class="ab-tx"><span class="ab-n">要望確認</span><span class="ab-d">未対応の要望を確認・対応</span></div>
-          <span class="ab-ar">›</span>
-        </button>
-        <button class="abtn" onclick="execSyncAccess()">
-          <div class="ab-ic" style="background:var(--green-l);color:var(--green);">🔗</div>
-          <div class="ab-tx"><span class="ab-n">権限リストを同期</span><span class="ab-d">公開ファイルの編集者をインポート</span></div>
-          <span class="ab-ar">›</span>
-        </button>
-        <button class="abtn" onclick="openPhotoMgmtModal('exhibit')">
-          <div class="ab-ic" style="background:#f0fdf4;color:#16a34a;">🖼</div>
-          <div class="ab-tx"><span class="ab-n">展示内容写真管理</span><span class="ab-d">カート展示写真のアップロード・削除</span></div>
-          <span class="ab-ar">›</span>
-        </button>
-        <button class="abtn" onclick="openPhotoMgmtModal('road')">
-          <div class="ab-ic" style="background:#eff6ff;color:#2563eb;">🗺</div>
-          <div class="ab-tx"><span class="ab-n">道路許可書写真管理</span><span class="ab-d">道路使用許可書写真のアップロード・削除</span></div>
-          <span class="ab-ar">›</span>
-        </button>
       </div>
     </div>
   </div>
