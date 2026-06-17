@@ -462,6 +462,8 @@ let settingsLocations    = [];
 let settingsCartNumbers  = [];
 let settingsCartPresets  = [];
 let memoMap       = {};
+let respCounts    = {}; // UID別：当月の責任者 配置回数（保存済みデータのみ反映）
+let cartCounts    = {}; // UID別：当月のカート担当 配置回数（保存済みデータのみ反映）
 let defaultSlot   = 15;
 let activeDateIdx = 0;
 let activeTimeIdx = 0;
@@ -713,6 +715,8 @@ async function loadCreateData() {
     memoMap = {};
     (shiftRes.dates || []).forEach(d => { if (d.memo) memoMap[d.date + '_' + d.time] = d.memo; });
     defaultSlot  = shiftRes.defaultSlot  || 15;
+    respCounts   = shiftRes.respCounts   || {};
+    cartCounts   = shiftRes.cartCounts   || {};
     buildCreateTabs();
     buildLeftPanel();
     if (shiftDates.length > 0) { activeDateIdx = 0; activeTimeIdx = 0; buildTimeTabs(); }
@@ -773,6 +777,20 @@ function renderBlock() {
   ug();
 }
 
+// 指定した日付・時間帯に申込んでいる人だけを絞り込む共通ロジック
+// （appliedSlotsのdate部分がdateと一致し、blockTimeが指定されていれば開始時刻も一致するもののみ）
+function filterAppliedForSlot(date, blockTime) {
+  return applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => {
+    const sk = typeof s === 'object' ? s.slot : s;
+    const dp = sk.indexOf('/'); const pp = sk.indexOf('(');
+    const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk;
+    if (dn !== date) return false;
+    if (!blockTime) return true;
+    const startT = blockTime.split('~')[0];
+    return sk.includes(') ' + startT) || sk.includes(' ' + startT);
+  }));
+}
+
 function buildLeftPanel() {
   const tab = (window._dateTabs || [])[activeDateIdx];
   if (!tab) return;
@@ -780,16 +798,8 @@ function buildLeftPanel() {
   const block = dayBlocks[activeTimeIdx];
   const blockTime = block ? block.time : '';
 
-  // その時間帯に申込がある人のみ（appliedSlotsのdate部分がtab.dateと一致）
-  const applied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => {
-    const sk = typeof s === 'object' ? s.slot : s;
-    const dp = sk.indexOf('/'); const pp = sk.indexOf('(');
-    const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk;
-    if (dn !== tab.date) return false;
-    if (!blockTime) return true;
-    const startT = blockTime.split('~')[0];
-    return sk.includes(') ' + startT) || sk.includes(' ' + startT);
-  }));
+  // その時間帯に申込がある人のみ
+  const applied = filterAppliedForSlot(tab.date, blockTime);
   const notApplied = applicants.filter(a => !applied.find(b => b.uid === a.uid));
 
   document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）' + (blockTime ? ' ' + blockTime : '');
@@ -805,8 +815,8 @@ function buildLeftPanel() {
   let html = memoHtml + '<div class="lp-sec">申込者</div>';
   html += applied.map(a => {
     const badgeA = `<span class="sc-badge sc-a">申${a.appliedCount}</span>`;
-    const badgeR = a.respFlag ? `<span class="sc-badge sc-r">責</span>` : '';
-    const badgeK = a.cartFlag ? `<span class="sc-badge sc-k">カ</span>` : '';
+    const badgeR = a.respFlag ? `<span class="sc-badge sc-r">責${respCounts[a.uid] || 0}</span>` : '';
+    const badgeK = a.cartFlag ? `<span class="sc-badge sc-k">カ${cartCounts[a.uid] || 0}</span>` : '';
     // 選択中時間帯のコメント・カート不可を取得
     const slotObj = blockTime ? (a.appliedSlots || []).find(s => {
       const sk = typeof s === 'object' ? s.slot : s;
@@ -832,7 +842,7 @@ function buildLeftPanel() {
 function bKey(b) { return b.date + '_' + b.time; }
 
 function buildBlock(block, bi) {
-  const applied     = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; return sk.includes(block.date); }));
+  const applied     = filterAppliedForSlot(block.date, block.time);
   const respMembers = applied.filter(a => a.respFlag);
   const cartMembers = applied.filter(a => a.cartFlag);
   return `<div class="tb" id="tb-${bi}">
