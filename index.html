@@ -320,6 +320,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .loading-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);padding:8px 0;}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+/* ページローディング画面 */
+#loading{min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--surface);}
+#loading.show{display:flex;}
+.loading-logo{width:56px;height:56px;border-radius:14px;overflow:hidden;flex-shrink:0;}
+.loading-logo img{width:100%;height:100%;object-fit:cover;}
+.spin-lg{display:inline-block;width:28px;height:28px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+.loading-text{font-size:13px;color:var(--ink2);font-weight:500;}
 .exec-st{display:none;align-items:center;gap:8px;font-size:12px;color:var(--ink2);padding:8px 0;}
 .exec-st.show{display:flex;}
 
@@ -418,6 +425,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     </button>
     <div class="auth-err" id="auth-err"></div>
   </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="loading-logo"><img src="logo.png" alt="PW" onerror="this.style.display='none';this.parentNode.style.background='var(--blue)'"></div>
+  <div class="spin-lg"></div>
+  <div class="loading-text">読み込み中...</div>
 </div>
 
 <!-- APP -->
@@ -904,8 +918,9 @@ async function _processUserWithGasAuth(u, save) {
   if (save) {
     try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, isAdmin: true })); } catch(e) {}
   }
+  // ローディング画面へ遷移
   document.getElementById('auth').style.display = 'none';
-  document.getElementById('app').style.display  = 'flex';
+  document.getElementById('loading').classList.add('show');
   const av = document.getElementById('av');
   if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
   else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
@@ -962,7 +977,10 @@ async function loadAdminData() {
   try {
     d = await gasGet('adminData');
   } catch(e) {
-    toast('データの読み込みに失敗しました: '+e.message,'e');
+    // エラー時はローディングを閉じて認証画面に戻す
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('auth').style.display = 'flex';
+    showAuthErr('データの読み込みに失敗しました: ' + e.message);
     return;
   }
   adminData = d;
@@ -982,6 +1000,13 @@ async function loadAdminData() {
     slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
   }
   renderAll();
+  // 描画完了後にローディングを非表示・appを表示
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('app').style.display = 'flex';
+    });
+  });
 }
 
 function renderAll() {
