@@ -1921,7 +1921,7 @@ async function openNoticeModal() {
 async function refreshNoticeModal() {
   document.getElementById('m-notice-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const d = await gasGet('getNotices');
+    const d = await gasGet('getNoticesAdmin');
     const notices = d.notices || [];
     _noticeCache = notices;
     let html = `
@@ -1930,6 +1930,16 @@ async function refreshNoticeModal() {
         <div style="display:flex;flex-direction:column;gap:8px;">
           <input type="text" id="notice-title-in" placeholder="タイトル" class="fsel" style="font-size:13px;">
           <textarea id="notice-body-in" placeholder="内容" class="fsel" style="min-height:80px;resize:vertical;font-size:13px;font-family:inherit;"></textarea>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">表示開始日</div>
+              <input type="date" id="notice-start-in" class="fsel" style="font-size:12px;width:100%;">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:2px;">表示終了日</div>
+              <input type="date" id="notice-end-in" class="fsel" style="font-size:12px;width:100%;">
+            </div>
+          </div>
           <div style="display:flex;align-items:center;gap:8px;">
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" id="notice-display-in" checked> 表示ON</label>
             <button class="btn btn-p" onclick="saveNotice()" style="font-size:11px;padding:5px 12px;">保存</button>
@@ -1941,20 +1951,25 @@ async function refreshNoticeModal() {
     if (notices.length === 0) {
       html += '<div style="color:var(--ink3);font-size:12px;text-align:center;padding:16px;">お知らせはありません</div>';
     } else {
-      html += notices.map(n => `
+      html += notices.map(n => {
+        const isOn = n.display === 'ON';
+        const period = (n.startDate || n.endDate) ? `${n.startDate||''}〜${n.endDate||''}　` : '';
+        return `
         <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
             <div style="flex:1;">
               <div style="font-size:13px;font-weight:700;">${esc(n.title)}</div>
               <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc(n.body||'').slice(0,60)}${(n.body||'').length>60?'…':''}</div>
-              <div style="font-size:10px;color:var(--ink3);">表示: <span style="color:var(--green);">ON</span></div>
+              <div style="font-size:10px;color:var(--ink3);margin-top:2px;">${period}表示: <span style="color:${isOn?'var(--green)':'var(--red)'};">${isOn?'ON':'OFF'}</span></div>
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button class="btn ${isOn?'btn-d':'btn-p'}" onclick="toggleNotice(${n.id})" style="font-size:10px;padding:3px 8px;">${isOn?'非表示':'表示'}</button>
               <button class="btn btn-g" onclick="editNotice(${n.id})" style="font-size:10px;padding:3px 8px;">編集</button>
               <button class="btn btn-d" onclick="deleteNotice(${n.id})" style="font-size:10px;padding:3px 8px;">削除</button>
             </div>
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     }
     document.getElementById('m-notice-body').innerHTML = html;
     if (_noticeEditId) {
@@ -1962,7 +1977,9 @@ async function refreshNoticeModal() {
       if (n) {
         document.getElementById('notice-title-in').value = n.title || '';
         document.getElementById('notice-body-in').value  = n.body  || '';
-        document.getElementById('notice-display-in').checked = true;
+        document.getElementById('notice-display-in').checked = n.display === 'ON';
+        document.getElementById('notice-start-in').value = (n.startDate || '').replace(/\//g, '-');
+        document.getElementById('notice-end-in').value   = (n.endDate   || '').replace(/\//g, '-');
         document.getElementById('m-notice-body').scrollTop = 0;
       }
     }
@@ -1972,12 +1989,14 @@ async function refreshNoticeModal() {
   }
 }
 async function saveNotice() {
-  const title   = document.getElementById('notice-title-in').value.trim();
-  const body    = document.getElementById('notice-body-in').value.trim();
-  const display = document.getElementById('notice-display-in').checked;
+  const title     = document.getElementById('notice-title-in').value.trim();
+  const body      = document.getElementById('notice-body-in').value.trim();
+  const display   = document.getElementById('notice-display-in').checked;
+  const startDate = (document.getElementById('notice-start-in').value || '').replace(/-/g, '/');
+  const endDate   = (document.getElementById('notice-end-in').value   || '').replace(/-/g, '/');
   if (!title) { toast('タイトルを入力してください', 'e'); return; }
   try {
-    const payload = { action: 'saveNotice', title, body, display };
+    const payload = { action: 'saveNotice', title, body, display, startDate, endDate };
     if (_noticeEditId) payload.id = _noticeEditId;
     const res = await gasPost(payload);
     if (!res.ok) throw new Error(res.error || '保存失敗');
@@ -1998,6 +2017,14 @@ async function deleteNotice(id) {
     toast('削除しました', 's');
     await refreshNoticeModal();
   } catch (e) { toast('削除失敗: ' + e.message, 'e'); }
+}
+async function toggleNotice(id) {
+  try {
+    const res = await gasPost({ action: 'toggleNotice', id });
+    if (!res.ok) throw new Error(res.error || '切替失敗');
+    toast(`表示を${res.display === 'ON' ? 'ON' : 'OFF'}にしました`, 's');
+    await refreshNoticeModal();
+  } catch (e) { toast('切替失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
