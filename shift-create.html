@@ -99,7 +99,7 @@ th.col-name{background:var(--green4);color:var(--green-d);font-size:11px;border-
 td.col-name{border-right:2px solid var(--border2)!important;}
 
 .th-top{position:sticky;top:0;z-index:6;}
-td.cell-on{background:#dcfce7;cursor:pointer;position:relative;}
+td.cell-on{background:#dcfce7;position:relative;}
 td.cell-on:hover{background:#bbf7d0;}
 td.cell-off{background:var(--surface);}
 .check-mark{font-size:16px;color:var(--green);line-height:1;}
@@ -591,10 +591,11 @@ async function loadWishData() {
   try { await loadWishDataInternal(); } catch (e) { toast('読み込みエラー: ' + e.message, 'e'); } finally { setLoading(false); }
 }
 async function loadWishDataInternal() {
-  // getWishData と getMemberFlags を並行取得（memberFlagsが未取得の場合も対応）
-  const [res, flagsRes] = await Promise.all([
+  // getWishData と getMemberFlags と getShiftCreateData を並行取得
+  const [res, flagsRes, shiftRes] = await Promise.all([
     gasGet('getWishData', {}),
-    Object.keys(memberFlags).length > 0 ? Promise.resolve({ ok: true, flags: memberFlags }) : gasGet('getMemberFlags')
+    Object.keys(memberFlags).length > 0 ? Promise.resolve({ ok: true, flags: memberFlags }) : gasGet('getMemberFlags'),
+    gasGet('getShiftCreateData', {})
   ]);
   const year  = res.year  || new Date().getFullYear();
   const month = res.month || new Date().getMonth() + 1;
@@ -608,10 +609,28 @@ async function loadWishDataInternal() {
   document.getElementById('ws-total').textContent   = res.totalMembers || 0;
   if (!res.members || res.members.length === 0 || !res.slots || res.slots.length === 0) {
     document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">データがありません。<br>シフト希望シートが作成されているか確認してください。</div>';
-  } else { buildWishTable(res); }
+  } else { buildWishTable(res, shiftRes.ok ? shiftRes : null); }
 }
-function buildWishTable(data) {
+function buildAssignmentMap(shiftRes) {
+  const map = {};
+  if (!shiftRes || !shiftRes.dates) return map;
+  shiftRes.dates.forEach(block => {
+    const blockKey = block.date + '(' + block.weekday + ') ' + block.time;
+    (block.slots || []).forEach(slot => {
+      Object.values(slot.places || {}).forEach(uids => {
+        (uids || []).forEach(uid => {
+          if (!uid) return;
+          if (!map[uid]) map[uid] = new Set();
+          map[uid].add(blockKey);
+        });
+      });
+    });
+  });
+  return map;
+}
+function buildWishTable(data, shiftRes) {
   const { members, slots, matrix } = data;
+  const assignMap = buildAssignmentMap(shiftRes);
 
   // 日付+時間帯をカレンダー順にソート
   const sortedSlots = [...slots].sort((a, b) => {
@@ -646,6 +665,12 @@ function buildWishTable(data) {
     totalSlots[m.uid] = sortedSlots.filter(slot => matrix[m.uid] && matrix[m.uid][slot]).length;
   });
 
+  // 割当済みスロット数を計算
+  const totalAssigned = {};
+  members.forEach(m => {
+    totalAssigned[m.uid] = sortedSlots.filter(slot => assignMap[m.uid] && assignMap[m.uid].has(slot)).length;
+  });
+
   // 未申込者を抽出（memberFlagsの全メンバーのうち、matrixにいない人）
   const appliedUids = new Set(members.map(m => m.uid));
   const notAppliedMembers = Object.entries(memberFlags)
@@ -657,7 +682,8 @@ function buildWishTable(data) {
   html += '<thead>';
   html += '<tr><th class="col-name th-date" rowspan="2" style="position:sticky;top:0;left:0;z-index:11;">氏名</th>';
   dg.forEach(g => { html += `<th class="th-date" colspan="${g.times.length}" style="position:sticky;top:0;z-index:3;">${esc(g.date)}</th>`; });
-  html += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:0;z-index:11;min-width:50px;">合計</th></tr>';
+  html += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:50px;z-index:11;min-width:50px;">合計</th>';
+  html += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:0;z-index:11;min-width:50px;background:var(--purple-l);color:var(--purple);">割当</th></tr>';
   html += '<tr>';
   sortedSlots.forEach(slot => { const si = slot.indexOf(' '); html += `<th class="th-time" style="position:sticky;top:28px;z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
   html += '</tr></thead><tbody>';
@@ -667,19 +693,25 @@ function buildWishTable(data) {
     html += '<tr><td class="col-name" style="position:sticky;left:0;z-index:2;">' + esc(m.name) + '</td>';
     sortedSlots.forEach(slot => {
       const val = row[slot];
+      const isAssigned = !!(assignMap[m.uid] && assignMap[m.uid].has(slot));
       if (val) {
         const hc = typeof val === 'object' && val.comment;
-        html += `<td class="cell-data cell-on" onclick="showNote('${esc(m.name)}','${esc(slot)}','${hc ? esc(val.comment) : ''}')"><span class="check-mark">✅</span>${hc ? '<span class="note-mark">📝</span>' : ''}</td>`;
+        const tdClass = isAssigned ? 'cell-data cell-on' : 'cell-data';
+        html += `<td class="${tdClass}" style="cursor:pointer;" onclick="showNote('${esc(m.name)}','${esc(slot)}','${hc ? esc(val.comment) : ''}')"><span class="check-mark">〇</span>${hc ? '<span class="note-mark">📝</span>' : ''}</td>`;
+      } else if (isAssigned) {
+        html += `<td class="cell-data cell-on"><span class="check-mark">〇</span></td>`;
       } else { html += '<td class="cell-data cell-off"></td>'; }
     });
-    html += `<td class="cell-data" style="position:sticky;right:0;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${totalSlots[m.uid] || 0}</td>`;
+    html += `<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${totalSlots[m.uid] || 0}</td>`;
+    html += `<td class="cell-data" style="position:sticky;right:0;background:var(--purple-l);font-weight:700;color:var(--purple);z-index:2;">${totalAssigned[m.uid] || 0}</td>`;
     html += '</tr>';
   });
 
   // 申込数集計行
   html += '<tr style="background:var(--green4);"><td class="col-name" style="font-weight:700;color:var(--green-d);position:sticky;left:0;z-index:2;">申込数</td>';
   sortedSlots.forEach(slot => { let c = 0; members.forEach(m => { if (matrix[m.uid] && matrix[m.uid][slot]) c++; }); html += `<td class="cell-data" style="font-weight:700;color:var(--green);">${c}</td>`; });
-  html += '<td class="cell-data" style="position:sticky;right:0;background:var(--green4);z-index:2;"></td></tr>';
+  html += '<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);z-index:2;"></td>';
+  html += '<td class="cell-data" style="position:sticky;right:0;background:var(--purple-l);z-index:2;"></td></tr>';
   html += '</tbody></table></div>';
 
   // 未申込一覧（折りたたみ）
