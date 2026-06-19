@@ -1884,9 +1884,9 @@ function gasPost(actionOrPayload, params) {
     payload = actionOrPayload;
   }
   // 管理者UID・名前を自動付与
-  if (SESSION && SESSION.uid) {
-    payload.adminUid  = payload.adminUid  || SESSION.uid;
-    payload.adminName = payload.adminName || SESSION.name;
+  if (_currentUser && _currentUser.uid) {
+    payload.adminUid  = payload.adminUid  || _currentUser.uid;
+    payload.adminName = payload.adminName || _currentUser.name;
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
