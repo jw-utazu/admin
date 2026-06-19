@@ -51,6 +51,8 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hbtn:hover{background:var(--bg);}
 .hbtn.pub{background:var(--green);color:#fff;border-color:var(--green);}
 .hbtn.pub:hover{opacity:.9;}
+.hbtn.pub-off{background:var(--amber);color:#fff;border-color:var(--amber);}
+.hbtn.pub-off:hover{opacity:.9;}
 .acc-wrap{position:relative;}
 .acc-icon{width:28px;height:28px;border-radius:50%;background:var(--purple-l);border:1px solid #ddd6fe;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;}
 .acc-icon:hover{background:#ede9fe;}
@@ -273,7 +275,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
     </div>
     <div class="hdr-row2">
       <div style="flex:1;"></div>
-      <button class="hbtn pub" onclick="publishShift()">📣 シフト公開</button>
+      <button class="hbtn pub" id="publish-btn" onclick="togglePublish()">📣 シフト公開</button>
     </div>
   </div>
 
@@ -465,6 +467,7 @@ let memoMap       = {};
 let respCounts    = {}; // UID別：当月の責任者 配置回数（保存済みデータのみ反映）
 let cartCounts    = {}; // UID別：当月のカート担当 配置回数（保存済みデータのみ反映）
 let defaultSlot   = 15;
+let shiftPublished = false;
 let activeDateIdx = 0;
 let activeTimeIdx = 0;
 let curYM         = null;
@@ -551,7 +554,12 @@ function showApp() {
 // ============================================================
 async function loadInitData() {
   setLoading(true, 'データを読み込み中...');
-  try { await loadWishDataInternal(); setLoading(false); }
+  try {
+    const [, statusRes] = await Promise.all([loadWishDataInternal(), gasGet('getShiftPublishStatus')]);
+    shiftPublished = statusRes.ok && statusRes.published;
+    updatePublishBtn();
+    setLoading(false);
+  }
   catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
 }
 
@@ -1193,10 +1201,36 @@ async function saveAll() {
   buildTimeTabs();
 }
 
-async function publishShift() {
-  if (!confirm('シフトを公開しますか？\n公開後は全メンバーがシフトを確認できます。')) return;
-  try { await gasGet('publishShift', {}); toast('シフトを公開しました', 's'); }
-  catch (e) { toast('公開に失敗しました: ' + e.message, 'e'); }
+function updatePublishBtn() {
+  const btn = document.getElementById('publish-btn');
+  if (!btn) return;
+  if (shiftPublished) {
+    btn.textContent = '🔒 シフト非公開にする';
+    btn.className = 'hbtn pub-off';
+  } else {
+    btn.textContent = '📣 シフト公開';
+    btn.className = 'hbtn pub';
+  }
+}
+
+async function togglePublish() {
+  if (shiftPublished) {
+    if (!confirm('シフトを非公開にしますか？\n非公開後はメンバーがシフトを確認できなくなります。')) return;
+    try {
+      await gasGet('unpublishShift', {});
+      shiftPublished = false;
+      updatePublishBtn();
+      toast('シフトを非公開にしました', 's');
+    } catch (e) { toast('非公開化に失敗しました: ' + e.message, 'e'); }
+  } else {
+    if (!confirm('シフトを公開しますか？\n公開後は全メンバーがシフトを確認できます。')) return;
+    try {
+      await gasGet('publishShift', {});
+      shiftPublished = true;
+      updatePublishBtn();
+      toast('シフトを公開しました', 's');
+    } catch (e) { toast('公開に失敗しました: ' + e.message, 'e'); }
+  }
 }
 
 // 左パネルリサイズ
