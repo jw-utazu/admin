@@ -535,7 +535,13 @@ function showApp() {
   document.getElementById('app-screen').style.display = 'flex';
   const icon = document.getElementById('acc-icon');
   if (icon && adminUser && adminUser.picture) {
-    icon.innerHTML = `<img src="${adminUser.picture}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer">`;
+    const img = document.createElement('img');
+    img.src = adminUser.picture;
+    img.style.cssText = 'width:26px;height:26px;border-radius:50%;object-fit:cover;';
+    img.setAttribute('referrerpolicy', 'no-referrer');
+    img.onerror = () => { icon.innerHTML = '👤'; };
+    icon.innerHTML = '';
+    icon.appendChild(img);
   }
   loadInitData();
 }

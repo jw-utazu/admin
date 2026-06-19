@@ -924,8 +924,16 @@ async function _processUserWithGasAuth(u, save) {
   document.getElementById('auth').style.display = 'none';
   document.getElementById('loading').classList.add('show');
   const av = document.getElementById('av');
-  if (u.picture) av.innerHTML = '<img src="'+u.picture+'" alt="">';
-  else av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
+  if (u.picture) {
+    const img = document.createElement('img');
+    img.src = u.picture;
+    img.alt = '';
+    img.onerror = () => { av.innerHTML = ''; av.textContent = ([...u.name||u.email][0]||'?').toUpperCase(); };
+    av.innerHTML = '';
+    av.appendChild(img);
+  } else {
+    av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
+  }
   // デフォルトを翌月に設定
   const now = new Date();
   const nextM = now.getMonth() + 2; // 翌月（1ベース）
