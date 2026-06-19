@@ -1913,6 +1913,7 @@ function gasPost(actionOrPayload, params) {
 // お知らせ管理
 // ============================================================
 let _noticeEditId = null;
+let _noticeCache  = [];
 async function openNoticeModal() {
   openM('m-notice');
   await refreshNoticeModal();
@@ -1922,6 +1923,7 @@ async function refreshNoticeModal() {
   try {
     const d = await gasGet('getNotices');
     const notices = d.notices || [];
+    _noticeCache = notices;
     let html = `
       <div style="margin-bottom:14px;">
         <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">${_noticeEditId ? '編集中 (ID:'+_noticeEditId+')' : '新規追加'}</div>
@@ -1945,16 +1947,25 @@ async function refreshNoticeModal() {
             <div style="flex:1;">
               <div style="font-size:13px;font-weight:700;">${esc(n.title)}</div>
               <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${esc(n.body||'').slice(0,60)}${(n.body||'').length>60?'…':''}</div>
-              <div style="font-size:10px;color:var(--ink3);">表示: ${n.display?'<span style="color:var(--green);">ON</span>':'<span style="color:var(--red);">OFF</span>'}</div>
+              <div style="font-size:10px;color:var(--ink3);">表示: <span style="color:var(--green);">ON</span></div>
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0;">
-              <button class="btn btn-g" onclick="editNotice(${n.id},'${esc(n.title).replace(/'/g,"\\'")}','${esc(n.body||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:3px 8px;">編集</button>
+              <button class="btn btn-g" onclick="editNotice(${n.id})" style="font-size:10px;padding:3px 8px;">編集</button>
               <button class="btn btn-d" onclick="deleteNotice(${n.id})" style="font-size:10px;padding:3px 8px;">削除</button>
             </div>
           </div>
         </div>`).join('');
     }
     document.getElementById('m-notice-body').innerHTML = html;
+    if (_noticeEditId) {
+      const n = _noticeCache.find(x => String(x.id) === String(_noticeEditId));
+      if (n) {
+        document.getElementById('notice-title-in').value = n.title || '';
+        document.getElementById('notice-body-in').value  = n.body  || '';
+        document.getElementById('notice-display-in').checked = true;
+        document.getElementById('m-notice-body').scrollTop = 0;
+      }
+    }
     document.getElementById('m-notice-ft').innerHTML = `<button class="btn btn-g" onclick="closeM('m-notice')">閉じる</button>`;
   } catch (e) {
     document.getElementById('m-notice-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
@@ -1975,11 +1986,9 @@ async function saveNotice() {
     await refreshNoticeModal();
   } catch (e) { toast('保存失敗: ' + e.message, 'e'); }
 }
-function editNotice(id, title, body) {
+function editNotice(id) {
   _noticeEditId = id;
-  document.getElementById('notice-title-in') && (document.getElementById('notice-title-in').value = title);
-  document.getElementById('notice-body-in')  && (document.getElementById('notice-body-in').value  = body);
-  document.getElementById('notice-display-in') && (document.getElementById('notice-display-in').checked = true);
+  refreshNoticeModal();
 }
 async function deleteNotice(id) {
   if (!confirm('このお知らせを削除しますか？')) return;
