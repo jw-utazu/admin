@@ -827,10 +827,13 @@ const INTV_LIST  = [5,10,15,20,30];
 // ============================================================
 // 状態
 // ============================================================
-let curY=2026, curM=7;   // 対象月（当月をデフォルト）
-let scY=2026, scM=7;     // 日程設定カレンダー月
-let _currentUser = null; // ログイン中の管理者情報
-let slotY=2026, slotM=7; // 実施日カレンダー月
+const _initNow = new Date();
+const _initNM  = _initNow.getMonth() + 2; // 翌月（1ベース）
+let curY  = _initNM > 12 ? _initNow.getFullYear() + 1 : _initNow.getFullYear();
+let curM  = _initNM > 12 ? 1 : _initNM;  // 対象月（翌月をデフォルト）
+let scY   = curY, scM  = curM;            // 日程設定カレンダー月
+let _currentUser = null;                   // ログイン中の管理者情報
+let slotY = curY, slotM = curM;           // 実施日カレンダー月
 let adminData   = null;
 let activeKind  = null;  // 'apply'|'deadline'|'open'|null
 let dateEditMode = false;
