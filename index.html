@@ -566,6 +566,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
             <span class="ab-ar">›</span>
           </button>
+          <button class="abtn" onclick="openCoupleModal()">
+            <div class="ab-ic" style="background:#fdf2f8;color:#be185d;">💍</div>
+            <div class="ab-tx"><span class="ab-n">夫婦設定</span><span class="ab-d">夫婦ペアの追加・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
           <button class="abtn" onclick="openPhotoMgmtModal('exhibit')">
             <div class="ab-ic" style="background:#f0fdf4;color:#16a34a;">🖼</div>
             <div class="ab-tx"><span class="ab-n">展示内容写真管理</span><span class="ab-d">カート展示写真のアップロード・削除</span></div>
@@ -636,6 +641,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     <div class="mhd"><span class="mt">🔄 代理送信設定</span><button class="mx" onclick="closeM('m-proxy')">&#10005;</button></div>
     <div class="mbd" id="m-proxy-body">読み込み中...</div>
     <div class="mft" id="m-proxy-ft"><button class="btn btn-g" onclick="closeM('m-proxy')">閉じる</button></div>
+  </div>
+</div>
+<!-- 夫婦設定モーダル -->
+<div class="ov" id="m-couple">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">💍 夫婦設定</span><button class="mx" onclick="closeM('m-couple')">&#10005;</button></div>
+    <div class="mbd" id="m-couple-body">読み込み中...</div>
+    <div class="mft" id="m-couple-ft"><button class="btn btn-g" onclick="closeM('m-couple')">閉じる</button></div>
   </div>
 </div>
 <!-- 要望確認モーダル -->
@@ -2149,6 +2162,77 @@ async function deleteProxy(rowIndex) {
     if (!res.ok) throw new Error(res.error || '削除失敗');
     toast('解除しました', 's');
     await refreshProxyModal();
+  } catch (e) { toast('解除失敗: ' + e.message, 'e'); }
+}
+
+// ============================================================
+// 夫婦設定
+// ============================================================
+let _coupleMembers = [];
+async function openCoupleModal() {
+  openM('m-couple');
+  await refreshCoupleModal();
+}
+async function refreshCoupleModal() {
+  document.getElementById('m-couple-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
+  try {
+    const [coupleRes, memberRes] = await Promise.all([gasGet('getCoupleList'), gasGet('getMemberList')]);
+    _coupleMembers = (memberRes.members || []).filter(m => m.uid);
+    const couples  = coupleRes.couples || [];
+    const husbandOpts = _coupleMembers.filter(m => m.gender === 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+    const wifeOpts    = _coupleMembers.filter(m => m.gender !== 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+    let html = `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">夫婦ペアを追加</div>
+        <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;line-height:1.6;">追加すると、並び替えで夫が妻の直前に表示され、お互いに代理送信が可能になります。</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">夫</div>
+            <select id="couple-husband-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${husbandOpts}</select></div>
+          <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">妻</div>
+            <select id="couple-wife-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${wifeOpts}</select></div>
+        </div>
+        <button class="btn btn-p" onclick="addCouple()" style="font-size:11px;padding:5px 12px;">追加</button>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">登録済み（${couples.length}組）</div>`;
+    if (couples.length === 0) {
+      html += '<div style="color:var(--ink3);font-size:12px;text-align:center;padding:16px;">登録がありません</div>';
+    } else {
+      html += couples.map(c => {
+        const hm = _coupleMembers.find(m => m.uid === c.husbandUid);
+        const wm = _coupleMembers.find(m => m.uid === c.wifeUid);
+        return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:12px;">👨 ${esc(hm ? hm.name : c.husbandUid)} &nbsp;＆&nbsp; 👩 ${esc(wm ? wm.name : c.wifeUid)}</span>
+          <button class="btn btn-d" onclick="deleteCouple(${c.rowIndex})" style="font-size:10px;padding:3px 8px;">解除</button>
+        </div>`;
+      }).join('');
+    }
+    document.getElementById('m-couple-body').innerHTML = html;
+  } catch (e) {
+    document.getElementById('m-couple-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
+  }
+}
+async function addCouple() {
+  const husbandUid = document.getElementById('couple-husband-sel').value;
+  const wifeUid    = document.getElementById('couple-wife-sel').value;
+  if (!husbandUid || !wifeUid) { toast('夫と妻を両方選択してください', 'e'); return; }
+  if (husbandUid === wifeUid)  { toast('同じ人は設定できません', 'e'); return; }
+  try {
+    const res = await gasPost({ action: 'saveCouple', husbandUid, wifeUid });
+    if (!res.ok) {
+      if (res.error === 'duplicate') { toast('すでに登録されています', 'e'); return; }
+      throw new Error(res.error || '追加失敗');
+    }
+    toast('夫婦ペアを追加しました', 's');
+    await refreshCoupleModal();
+  } catch (e) { toast('追加失敗: ' + e.message, 'e'); }
+}
+async function deleteCouple(rowIndex) {
+  if (!confirm('この夫婦設定を解除しますか？')) return;
+  try {
+    const res = await gasPost({ action: 'deleteCouple', rowIndex });
+    if (!res.ok) throw new Error(res.error || '削除失敗');
+    toast('解除しました', 's');
+    await refreshCoupleModal();
   } catch (e) { toast('解除失敗: ' + e.message, 'e'); }
 }
 
