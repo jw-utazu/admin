@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PW管理アプリ 操作マニュアル — カレンダー・日程設定</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#18181b;--ink2:#52525b;--ink3:#a1a1aa;
+  --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
+  --border:#e4e4e7;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --amber:#d97706;--amber-l:#fffbeb;
+  --red:#dc2626;--red-l:#fef2f2;
+  --purple:#7c3aed;--purple-l:#f5f3ff;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;line-height:1.7;}
+.site-header{background:#92400e;color:#fff;padding:20px 24px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.site-header h1{font-size:1.2rem;font-weight:700;}
+.site-header p{font-size:.85rem;opacity:.85;margin-top:2px;}
+.toc{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin:24px auto;max-width:860px;}
+.toc h2{font-size:1rem;font-weight:700;margin-bottom:12px;}
+.toc ol{padding-left:20px;}
+.toc li{margin:4px 0;}
+.toc a{color:#d97706;text-decoration:none;font-size:.95rem;}
+.toc a:hover{text-decoration:underline;}
+.section{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px;margin:20px auto;max-width:860px;}
+.section-title{font-size:1.1rem;font-weight:700;border-left:4px solid #f59e0b;padding-left:12px;margin-bottom:20px;}
+.step-desc{margin-bottom:20px;}
+.step-desc h3{font-size:1rem;font-weight:700;margin-bottom:10px;}
+.step-desc ol,.step-desc ul{padding-left:20px;}
+.step-desc li{margin:6px 0;font-size:.95rem;}
+.ui-preview{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0;}
+.ui-preview-title{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;border-radius:50%;margin-right:6px;flex-shrink:0;vertical-align:middle;}
+.note-box{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-size:.9rem;color:#92400e;margin:12px 0;}
+.note-box::before{content:'💡 ';}
+.divider{height:1px;background:#e2e8f0;margin:20px 0;}
+/* カレンダー模倣 */
+.cal-mock{background:#fff;border:1px solid #e4e4e7;border-radius:10px;overflow:hidden;max-width:320px;margin:0 auto;}
+.cal-mock-hd{background:#fafafa;padding:8px 12px;font-size:13px;font-weight:700;border-bottom:1px solid #e4e4e7;display:flex;align-items:center;justify-content:space-between;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+.cal-dow{text-align:center;padding:5px 2px;font-size:10px;font-weight:700;color:#a1a1aa;background:#fafafa;border-bottom:1px solid #e4e4e7;}
+.cal-dow.sat{color:#2563eb;}.cal-dow.sun{color:#dc2626;}
+.cal-cell{min-height:38px;border-right:1px solid #e4e4e7;border-bottom:1px solid #e4e4e7;padding:2px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;position:relative;}
+.cal-cell:nth-child(7n){border-right:none;}
+.cal-cell.other{opacity:.3;}
+.cal-cell.sat .cn{color:#2563eb;}.cal-cell.sun .cn{color:#dc2626;}
+.cn{font-size:10px;font-weight:500;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
+.today-c .cn{background:#93c5fd;color:#1e3a8a;font-weight:700;}
+.chip-mock{font-size:8px;font-weight:700;border-radius:3px;padding:1px 3px;width:100%;text-align:center;line-height:1.4;}
+.chip-apply{background:#f0fdf4;color:#16a34a;}
+.chip-deadline{background:#fef2f2;color:#dc2626;}
+.chip-open{background:#eff6ff;color:#2563eb;}
+.chip-slot{background:#f5f3ff;color:#7c3aed;}
+.period-bar-mock{position:absolute;bottom:1px;left:0;right:0;height:3px;background:#f59e0b;border-radius:2px;}
+/* 凡例 */
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;}
+.legend-dot{width:10px;height:10px;border-radius:3px;}
+/* 日程カード模倣 */
+.dgc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;}
+.dgc-mock{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1.5px solid #e4e4e7;border-radius:10px;padding:10px 6px;background:#fff;text-align:center;min-height:64px;}
+.dgc-label{font-size:10px;font-weight:700;}
+.dgc-val{font-size:11px;font-weight:700;line-height:1.4;}
+/* 時間帯行模倣 */
+.time-row-mock{display:grid;grid-template-columns:1fr 16px 1fr auto;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #f0f0f0;}
+.time-sel-mock{border:1px solid #e4e4e7;border-radius:6px;padding:5px 8px;font-size:11px;background:#fff;text-align:center;}
+.del-btn-mock{width:22px;height:22px;border:1px solid #e4e4e7;border-radius:4px;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:11px;color:#a1a1aa;}
+@media(max-width:760px){.section{padding:20px 16px;}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>PW管理アプリ 操作マニュアル</h1>
+  <p>カレンダー・日程設定・実施日設定</p>
+</header>
+
+<nav class="toc">
+  <h2>目次</h2>
+  <ol>
+    <li><a href="#sec1">カレンダーの見方</a></li>
+    <li><a href="#sec2">実施日の詳細確認</a></li>
+    <li><a href="#sec3">日程設定（申込開始・締切・公開日）</a></li>
+    <li><a href="#sec4">実施日設定（時間帯スロット）</a></li>
+  </ol>
+</nav>
+
+<section class="section" id="sec1">
+  <h2 class="section-title">1. カレンダーの見方</h2>
+  <div class="step-desc">
+    <p style="font-size:.95rem;margin-bottom:12px;">メイン画面左側のカレンダーに、日程情報が色分けで表示されます。</p>
+    <ul>
+      <li><strong style="color:#16a34a;">緑チップ「申込開始」</strong> — シフト希望の申込が開始される日</li>
+      <li><strong style="color:#dc2626;">赤チップ「締切」</strong> — 申込の締め切り日</li>
+      <li><strong style="color:#2563eb;">青チップ「シフト公開」</strong> — シフト表が公開される日</li>
+      <li><strong style="color:#7c3aed;">紫チップ「スロット」</strong> — 実施日（奉仕活動がある日）</li>
+      <li><strong style="color:#d97706;">オレンジバー（下部）</strong> — 申込受付期間中の日</li>
+    </ul>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">カレンダー表示例</div>
+    <div class="cal-mock">
+      <div class="cal-mock-hd">
+        <span>◀</span>
+        <span>2026年 6月</span>
+        <span>▶</span>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-dow sun">日</div>
+        <div class="cal-dow">月</div>
+        <div class="cal-dow">火</div>
+        <div class="cal-dow">水</div>
+        <div class="cal-dow">木</div>
+        <div class="cal-dow">金</div>
+        <div class="cal-dow sat">土</div>
+        <!-- Row 1 -->
+        <div class="cal-cell other sun"><span class="cn">1</span></div>
+        <div class="cal-cell other"><span class="cn">2</span></div>
+        <div class="cal-cell other"><span class="cn">3</span></div>
+        <div class="cal-cell other"><span class="cn">4</span></div>
+        <div class="cal-cell other"><span class="cn">5</span></div>
+        <div class="cal-cell other"><span class="cn">6</span></div>
+        <div class="cal-cell other sat"><span class="cn">7</span></div>
+        <!-- Row 2 -->
+        <div class="cal-cell sun"><span class="cn">8</span></div>
+        <div class="cal-cell today-c"><span class="cn">9</span></div>
+        <div class="cal-cell"><span class="cn">10</span><span class="chip-mock chip-apply">申込開始</span><div class="period-bar-mock" style="left:50%;border-radius:2px 0 0 2px;background:linear-gradient(to right,transparent,#f59e0b);"></div></div>
+        <div class="cal-cell"><span class="cn">11</span><div class="period-bar-mock"></div></div>
+        <div class="cal-cell"><span class="cn">12</span><div class="period-bar-mock"></div></div>
+        <div class="cal-cell"><span class="cn">13</span><div class="period-bar-mock"></div></div>
+        <div class="cal-cell sat"><span class="cn">14</span><span class="chip-mock chip-slot">10:00</span></div>
+        <!-- Row 3 -->
+        <div class="cal-cell sun"><span class="cn">15</span><span class="chip-mock chip-deadline">締切</span><div class="period-bar-mock" style="right:50%;border-radius:0 2px 2px 0;background:linear-gradient(to left,transparent,#f59e0b);"></div></div>
+        <div class="cal-cell"><span class="cn">16</span></div>
+        <div class="cal-cell"><span class="cn">17</span></div>
+        <div class="cal-cell"><span class="cn">18</span></div>
+        <div class="cal-cell"><span class="cn">19</span></div>
+        <div class="cal-cell"><span class="cn">20</span><span class="chip-mock chip-open">シフト公開</span></div>
+        <div class="cal-cell sat"><span class="cn">21</span><span class="chip-mock chip-slot">10:00</span></div>
+      </div>
+    </div>
+    <div class="legend" style="margin-top:14px;">
+      <div class="legend-item"><div class="legend-dot" style="background:#f0fdf4;border:1px solid #16a34a;"></div><span style="color:#16a34a;">申込開始</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fef2f2;border:1px solid #dc2626;"></div><span style="color:#dc2626;">締切</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#eff6ff;border:1px solid #2563eb;"></div><span style="color:#2563eb;">シフト公開</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f5f3ff;border:1px solid #7c3aed;"></div><span style="color:#7c3aed;">実施日スロット</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;border-radius:2px;"></div><span style="color:#d97706;">申込期間中</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sec2">
+  <h2 class="section-title">2. 実施日の詳細確認</h2>
+  <div class="step-desc">
+    <h3>手順</h3>
+    <ol>
+      <li><span class="step-num">1</span>カレンダーで紫チップ（スロット）が表示されている日付をタップ</li>
+      <li><span class="step-num">2</span>カレンダー下に「実施日詳細」カードが展開される</li>
+      <li><span class="step-num">3</span>その日の時間帯スロット一覧が表示される</li>
+      <li><span class="step-num">4</span>閉じる場合は右上の「×」ボタンをタップ</li>
+    </ol>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">実施日詳細カード</div>
+    <div style="background:#fff;border:1.5px solid #7c3aed;border-radius:10px;overflow:hidden;max-width:360px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f5f3ff;border-bottom:1px solid #e4e4e7;">
+        <span style="font-size:12px;font-weight:700;color:#7c3aed;">📅 6月14日（土）の実施スロット</span>
+        <button style="border:none;background:none;color:#7c3aed;font-size:14px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:8px 12px;display:flex;flex-direction:column;gap:4px;">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0;">
+          <span style="font-family:monospace;font-size:12px;font-weight:500;color:#7c3aed;flex:1;">10:00 〜 12:00</span>
+          <span style="font-size:11px;color:#a1a1aa;">15分間隔</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+          <span style="font-family:monospace;font-size:12px;font-weight:500;color:#7c3aed;flex:1;">14:00 〜 16:00</span>
+          <span style="font-size:11px;color:#a1a1aa;">15分間隔</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sec3">
+  <h2 class="section-title">3. 日程設定（申込開始・締切・公開日）</h2>
+  <div class="step-desc">
+    <h3>日程カードの見方</h3>
+    <p style="font-size:.95rem;margin-bottom:10px;">カレンダー下の「日程一覧」カードに3つの日程が表示されます。</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:.9rem;"><span style="width:12px;height:12px;border-radius:3px;background:#f0fdf4;border:1.5px solid #16a34a;display:inline-block;"></span><strong style="color:#16a34a;">申込開始</strong> — 希望申込を受け付け開始する日</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:.9rem;"><span style="width:12px;height:12px;border-radius:3px;background:#fef2f2;border:1.5px solid #dc2626;display:inline-block;"></span><strong style="color:#dc2626;">締切日</strong> — 申込を締め切る日</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:.9rem;"><span style="width:12px;height:12px;border-radius:3px;background:#eff6ff;border:1.5px solid #2563eb;display:inline-block;"></span><strong style="color:#2563eb;">シフト公開</strong> — シフト表を公開する日</div>
+    </div>
+    <h3>日程を変更する手順</h3>
+    <ol>
+      <li><span class="step-num">1</span>日程カード内の変更したい項目（申込開始 / 締切日 / シフト公開）をタップ</li>
+      <li><span class="step-num">2</span>カレンダーが「編集モード」に切り替わる</li>
+      <li><span class="step-num">3</span>カレンダー上で新しい日付をタップして選択</li>
+      <li><span class="step-num">4</span>「保存」ボタンをタップして確定</li>
+      <li><span class="step-num">5</span>「🗑 一括リセット」で3つの日程をすべて削除できる</li>
+    </ol>
+    <div class="note-box">日程を設定しないと「募集開始処理」が正しく動作しません。毎月必ず設定してください。</div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">日程一覧カード</div>
+    <div style="background:#fff;border:1px solid #e4e4e7;border-radius:10px;overflow:hidden;max-width:420px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fafafa;border-bottom:1px solid #e4e4e7;">
+        <span style="font-size:12px;font-weight:700;">日程一覧</span>
+        <button style="padding:3px 9px;border:1px solid #fef2f2;border-radius:5px;background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">🗑 一括リセット</button>
+      </div>
+      <div class="dgc-grid" style="padding:10px 12px;">
+        <div class="dgc-mock" style="border-color:#16a34a;background:#f0fdf4;" title="タップして日付を選択">
+          <span class="dgc-label" style="color:#16a34a;">申込開始</span>
+          <span class="dgc-val">6/10<br><span style="font-size:9px;font-weight:400;color:#71717a;">（火）</span></span>
+        </div>
+        <div class="dgc-mock" style="border-color:#dc2626;background:#fef2f2;" title="タップして日付を選択">
+          <span class="dgc-label" style="color:#dc2626;">締切日</span>
+          <span class="dgc-val">6/15<br><span style="font-size:9px;font-weight:400;color:#71717a;">（日）</span></span>
+        </div>
+        <div class="dgc-mock" style="border-color:#2563eb;background:#eff6ff;" title="タップして日付を選択">
+          <span class="dgc-label" style="color:#2563eb;">シフト公開</span>
+          <span class="dgc-val">6/20<br><span style="font-size:9px;font-weight:400;color:#71717a;">（金）</span></span>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#64748b;margin-top:8px;">↑ 各カードをタップすると日付選択カレンダーが開く</div>
+  </div>
+</section>
+
+<section class="section" id="sec4">
+  <h2 class="section-title">4. 実施日設定（時間帯スロット）</h2>
+  <div class="step-desc">
+    <h3>手順</h3>
+    <ol>
+      <li><span class="step-num">1</span>カレンダー上で実施日（奉仕活動がある日）をタップ</li>
+      <li><span class="step-num">2</span>インラインポップアップで時間帯を設定する</li>
+      <li><span class="step-num">3</span>「＋ 時間帯を追加」でスロットを追加できる</li>
+      <li><span class="step-num">4</span>開始・終了時刻と間隔（分）を選択</li>
+      <li><span class="step-num">5</span>「保存」ボタンをタップ</li>
+      <li><span class="step-num">6</span>「🗑 一括リセット」で全実施日スロットを削除できる</li>
+    </ol>
+    <div class="note-box">間隔はシフト表の時間刻み（5分・10分・15分・20分・30分）です。奉仕の種類に合わせて選んでください。</div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">時間帯設定ポップアップ</div>
+    <div style="background:#fff;border:1px solid #e4e4e7;border-radius:10px;overflow:hidden;max-width:380px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fafafa;border-bottom:1px solid #e4e4e7;">
+        <span style="font-size:12px;font-weight:700;">6月14日（土）のスロット設定</span>
+        <span style="font-size:10px;color:#7c3aed;background:#f5f3ff;padding:1px 7px;border-radius:10px;font-weight:700;">土</span>
+      </div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
+        <div class="time-row-mock">
+          <div class="time-sel-mock">10:00</div>
+          <span style="text-align:center;color:#a1a1aa;font-size:12px;">〜</span>
+          <div class="time-sel-mock">12:00</div>
+          <select style="border:1px solid #e4e4e7;border-radius:6px;padding:5px;font-size:11px;background:#fff;outline:none;">
+            <option>15分</option>
+          </select>
+          <div class="del-btn-mock">🗑</div>
+        </div>
+        <div class="time-row-mock">
+          <div class="time-sel-mock">14:00</div>
+          <span style="text-align:center;color:#a1a1aa;font-size:12px;">〜</span>
+          <div class="time-sel-mock">16:00</div>
+          <select style="border:1px solid #e4e4e7;border-radius:6px;padding:5px;font-size:11px;background:#fff;outline:none;">
+            <option>15分</option>
+          </select>
+          <div class="del-btn-mock">🗑</div>
+        </div>
+        <button style="font-size:11px;font-weight:700;color:#2563eb;background:#eff6ff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;align-self:flex-start;">＋ 時間帯を追加</button>
+      </div>
+      <div style="padding:8px 12px;border-top:1px solid #e4e4e7;display:flex;gap:6px;justify-content:flex-end;background:#fafafa;">
+        <button style="padding:5px 12px;border:1px solid #e4e4e7;border-radius:6px;background:none;color:#52525b;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">キャンセル</button>
+        <button style="padding:5px 16px;border:none;border-radius:6px;background:#0d9488;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">保存</button>
+      </div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="step-desc">
+    <h3>実施日一覧の確認</h3>
+    <p style="font-size:.95rem;">カレンダー下の「実施日一覧」カードに、設定済みのすべての実施日と時間帯が表示されます。</p>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">実施日一覧カード</div>
+    <div style="background:#fff;border:1px solid #e4e4e7;border-radius:10px;overflow:hidden;max-width:360px;">
+      <div style="padding:6px 12px;background:#fafafa;border-bottom:1px solid #e4e4e7;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;background:#fafafa;">
+          <span style="font-size:12px;font-weight:700;color:#7c3aed;">6月14日（土）</span>
+          <span style="font-size:10px;color:#7c3aed;background:#f5f3ff;padding:1px 6px;border-radius:10px;font-weight:700;">土</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;padding-bottom:8px;">
+          <span style="font-family:monospace;font-size:11px;background:#f5f3ff;color:#7c3aed;padding:2px 7px;border-radius:4px;">10:00〜12:00</span>
+          <span style="font-family:monospace;font-size:11px;background:#f5f3ff;color:#7c3aed;padding:2px 7px;border-radius:4px;">14:00〜16:00</span>
+        </div>
+      </div>
+      <div style="padding:6px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;">
+          <span style="font-size:12px;font-weight:700;color:#7c3aed;">6月21日（土）</span>
+          <span style="font-size:10px;color:#7c3aed;background:#f5f3ff;padding:1px 6px;border-radius:10px;font-weight:700;">土</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;padding-bottom:4px;">
+          <span style="font-family:monospace;font-size:11px;background:#f5f3ff;color:#7c3aed;padding:2px 7px;border-radius:4px;">10:00〜12:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

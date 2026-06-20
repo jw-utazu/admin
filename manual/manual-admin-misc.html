@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PW管理アプリ 操作マニュアル — その他管理機能</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;line-height:1.7;}
+.site-header{background:#92400e;color:#fff;padding:20px 24px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.site-header h1{font-size:1.2rem;font-weight:700;}
+.site-header p{font-size:.85rem;opacity:.85;margin-top:2px;}
+.toc{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin:24px auto;max-width:860px;}
+.toc h2{font-size:1rem;font-weight:700;margin-bottom:12px;}
+.toc ol{padding-left:20px;}
+.toc li{margin:4px 0;}
+.toc a{color:#d97706;text-decoration:none;font-size:.95rem;}
+.toc a:hover{text-decoration:underline;}
+.section{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px;margin:20px auto;max-width:860px;}
+.section-title{font-size:1.1rem;font-weight:700;border-left:4px solid #f59e0b;padding-left:12px;margin-bottom:20px;}
+.step-desc{margin-bottom:20px;}
+.step-desc h3{font-size:1rem;font-weight:700;margin-bottom:10px;}
+.step-desc ol,.step-desc ul{padding-left:20px;}
+.step-desc li{margin:6px 0;font-size:.95rem;}
+.ui-preview{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0;}
+.ui-preview-title{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;border-radius:50%;margin-right:6px;flex-shrink:0;vertical-align:middle;}
+.note-box{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-size:.9rem;color:#92400e;margin:12px 0;}
+.note-box::before{content:'💡 ';}
+.divider{height:1px;background:#e2e8f0;margin:20px 0;}
+/* サイドバーボタン模倣 */
+.btn-sim{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;border:1px solid #e4e4e7;background:#fafafa;margin-bottom:6px;max-width:360px;position:relative;}
+.btn-sim-icon{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.btn-sim-text{flex:1;}
+.btn-sim-name{font-size:12px;font-weight:700;display:block;}
+.btn-sim-desc{font-size:10px;color:#71717a;display:block;margin-top:1px;}
+/* モーダル模倣 */
+.modal-mock{background:#fff;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;max-width:460px;}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e4e4e7;}
+.modal-title{font-size:13px;font-weight:700;}
+.modal-bd{padding:14px 16px;}
+.modal-ft{padding:10px 16px;border-top:1px solid #e4e4e7;display:flex;gap:7px;justify-content:flex-end;background:#fafafa;}
+.btn-primary{padding:7px 14px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-sec{padding:7px 14px;border:1px solid #e4e4e7;border-radius:8px;background:#fafafa;color:#52525b;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-danger{padding:7px 14px;border:none;border-radius:8px;background:#dc2626;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-green{padding:7px 14px;border:none;border-radius:8px;background:#16a34a;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+/* お知らせカード */
+.notice-card-mock{background:#fff;border:1px solid #e4e4e7;border-radius:10px;padding:12px;margin-bottom:8px;}
+.notice-title-mock{font-size:13px;font-weight:700;margin-bottom:4px;}
+.notice-body-mock{font-size:12px;color:#52525b;margin-bottom:8px;line-height:1.6;}
+.notice-actions{display:flex;gap:6px;}
+.notice-action-btn{padding:4px 10px;border:1px solid #e4e4e7;border-radius:6px;background:none;color:#52525b;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;}
+/* 要望行 */
+.req-row-mock{padding:10px 0;border-bottom:1px solid #f0f0f0;display:flex;flex-direction:column;gap:4px;}
+.req-row-mock:last-child{border-bottom:none;}
+.req-meta{font-size:10px;color:#a1a1aa;}
+.req-body{font-size:13px;}
+.req-status-open{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;}
+.req-status-done{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#dcfce7;color:#15803d;}
+/* 写真グリッド */
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
+.photo-card-mock{border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;aspect-ratio:1;}
+.photo-card-img{background:#f1f5f9;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#a1a1aa;font-size:20px;}
+/* 代理送信行 */
+.proxy-row-mock{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;gap:8px;font-size:13px;}
+.proxy-row-mock:last-child{border-bottom:none;}
+@media(max-width:760px){.section{padding:20px 16px;}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>PW管理アプリ 操作マニュアル</h1>
+  <p>その他管理機能</p>
+</header>
+
+<nav class="toc">
+  <h2>目次</h2>
+  <ol>
+    <li><a href="#sec1">お知らせ管理</a></li>
+    <li><a href="#sec2">要望確認</a></li>
+    <li><a href="#sec3">バグ報告確認</a></li>
+    <li><a href="#sec4">展示内容写真管理</a></li>
+    <li><a href="#sec5">代理送信設定</a></li>
+  </ol>
+</nav>
+
+<section class="section" id="sec1">
+  <h2 class="section-title">1. お知らせ管理</h2>
+  <div class="step-desc">
+    <p style="font-size:.95rem;margin-bottom:12px;">奉仕者アプリに表示される「お知らせ」を作成・編集・削除できます。</p>
+    <h3>お知らせを追加する</h3>
+    <ol>
+      <li><span class="step-num">1</span>サイドバーの「📢 お知らせ管理」をタップ</li>
+      <li><span class="step-num">2</span>「＋ 追加」ボタンをタップ</li>
+      <li><span class="step-num">3</span>タイトルと本文を入力</li>
+      <li><span class="step-num">4</span>「保存」をタップ</li>
+    </ol>
+    <h3 style="margin-top:16px;">お知らせを編集・削除する</h3>
+    <ol>
+      <li><span class="step-num">1</span>お知らせ一覧から対象のカードを探す</li>
+      <li><span class="step-num">2</span>「編集」ボタンで内容を変更 / 「削除」ボタンで削除</li>
+    </ol>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">サイドバーから開く</div>
+    <div class="btn-sim">
+      <div class="btn-sim-icon" style="background:#f0fdfa;">📢</div>
+      <div class="btn-sim-text">
+        <span class="btn-sim-name">お知らせ管理</span>
+        <span class="btn-sim-desc">お知らせの追加・編集・削除</span>
+      </div>
+      <span style="color:#a1a1aa;font-size:14px;">›</span>
+      <span style="position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">① タップ</span>
+    </div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">お知らせ一覧モーダル</div>
+    <div class="modal-mock">
+      <div class="modal-hd">
+        <span class="modal-title">📢 お知らせ管理</span>
+        <button style="width:24px;height:24px;border:none;background:none;font-size:16px;color:#71717a;cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-bd">
+        <div style="margin-bottom:12px;display:flex;justify-content:flex-end;">
+          <button style="padding:6px 14px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">＋ 追加</button>
+        </div>
+        <div class="notice-card-mock">
+          <div class="notice-title-mock">6月の奉仕について</div>
+          <div class="notice-body-mock">今月は6月14日（土）と21日（土）に奉仕が予定されています。</div>
+          <div class="notice-actions">
+            <button class="notice-action-btn">✏️ 編集</button>
+            <button class="notice-action-btn" style="color:#dc2626;border-color:#fca5a5;">🗑 削除</button>
+          </div>
+        </div>
+        <div class="notice-card-mock">
+          <div class="notice-title-mock">シフト希望受付中</div>
+          <div class="notice-body-mock">6月10日〜15日の間にシフト希望を送ってください。</div>
+          <div class="notice-actions">
+            <button class="notice-action-btn">✏️ 編集</button>
+            <button class="notice-action-btn" style="color:#dc2626;border-color:#fca5a5;">🗑 削除</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn-sec">閉じる</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sec2">
+  <h2 class="section-title">2. 要望確認</h2>
+  <div class="step-desc">
+    <p style="font-size:.95rem;margin-bottom:12px;">奉仕者アプリから送られた機能改善要望を確認・管理できます。</p>
+    <h3>手順</h3>
+    <ol>
+      <li><span class="step-num">1</span>サイドバーの「💬 要望確認」をタップ</li>
+      <li><span class="step-num">2</span>要望一覧が表示される</li>
+      <li><span class="step-num">3</span>対応済みの要望は「対応済みにする」をタップしてステータスを更新</li>
+    </ol>
+    <div class="note-box">未対応の要望は黄色バッジ、対応済みは緑バッジで表示されます。</div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">サイドバーから開く</div>
+    <div class="btn-sim">
+      <div class="btn-sim-icon" style="background:#fef3c7;">💬</div>
+      <div class="btn-sim-text">
+        <span class="btn-sim-name">要望確認</span>
+        <span class="btn-sim-desc">未対応の要望を確認・対応</span>
+      </div>
+      <span style="color:#a1a1aa;font-size:14px;">›</span>
+      <span style="position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">① タップ</span>
+    </div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">要望一覧モーダル</div>
+    <div class="modal-mock">
+      <div class="modal-hd">
+        <span class="modal-title">💬 要望確認</span>
+        <button style="width:24px;height:24px;border:none;background:none;font-size:16px;color:#71717a;cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-bd" style="padding:0 16px;">
+        <div class="req-row-mock">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span class="req-status-open">未対応</span>
+            <span class="req-meta">2026/06/10 — 山田 太郎</span>
+          </div>
+          <div class="req-body">シフト表をPDFでダウンロードできるようにしてほしいです。</div>
+          <div style="margin-top:6px;">
+            <button style="padding:3px 10px;border:1px solid #16a34a;border-radius:6px;background:none;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">対応済みにする ✓</button>
+          </div>
+        </div>
+        <div class="req-row-mock">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span class="req-status-done">対応済み</span>
+            <span class="req-meta">2026/05/20 — 田中 花子</span>
+          </div>
+          <div class="req-body" style="color:#a1a1aa;">カレンダーに次の月も表示してほしいです。</div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn-sec">閉じる</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sec3">
+  <h2 class="section-title">3. バグ報告確認</h2>
+  <div class="step-desc">
+    <p style="font-size:.95rem;margin-bottom:12px;">奉仕者アプリから送られたバグ報告を確認できます。操作方法は「要望確認」と同じです。</p>
+    <h3>手順</h3>
+    <ol>
+      <li><span class="step-num">1</span>サイドバーの「🐛 バグ報告確認」をタップ</li>
+      <li><span class="step-num">2</span>バグ報告一覧が表示される</li>
+      <li><span class="step-num">3</span>内容を確認し、対応済みになったら「対応済みにする」をタップ</li>
+    </ol>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">サイドバーから開く</div>
+    <div class="btn-sim">
+      <div class="btn-sim-icon" style="background:#fee2e2;">🐛</div>
+      <div class="btn-sim-text">
+        <span class="btn-sim-name">バグ報告確認</span>
+        <span class="btn-sim-desc">ユーザーからのバグ報告を確認・対応</span>
+      </div>
+      <span style="color:#a1a1aa;font-size:14px;">›</span>
+      <span style="position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">① タップ</span>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sec4">
+  <h2 class="section-title">4. 展示内容写真管理</h2>
+  <div class="step-desc">
+    <p style="font-size:.95rem;margin-bottom:12px;">カート奉仕で使用する展示内容（書籍・雑誌など）の写真をアップロード・管理します。奉仕者アプリの「カート表示」として公開されます。</p>
+    <h3>写真をアップロードする</h3>
+    <ol>
+      <li><span class="step-num">1</span>サイドバーの「🖼 展示内容写真管理」をタップ</li>
+      <li><span class="step-num">2</span>モーダル右下の「📤 写真を追加」ボタンをタップ</li>
+      <li><span class="step-num">3</span>ファイル選択ダイアログが開くので、写真ファイルを選択（複数可）</li>
+      <li><span class="step-num">4</span>アップロードが完了すると写真一覧に表示される</li>
+    </ol>
+    <h3 style="margin-top:16px;">写真を削除する</h3>
+    <ol>
+      <li><span class="step-num">1</span>写真一覧で削除したい写真をタップ</li>
+      <li><span class="step-num">2</span>「削除」ボタンをタップ</li>
+    </ol>
+    <div class="note-box">JPEG・PNG形式の画像に対応しています。複数枚を一度に選択してアップロードできます。</div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">サイドバーから開く</div>
+    <div class="btn-sim">
+      <div class="btn-sim-icon" style="background:#f0fdf4;">🖼</div>
+      <div class="btn-sim-text">
+        <span class="btn-sim-name">展示内容写真管理</span>
+        <span class="btn-sim-desc">カート展示写真のアップロード・削除</span>
+      </div>
+      <span style="color:#a1a1aa;font-size:14px;">›</span>
+      <span style="position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">① タップ</span>
+    </div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">写真管理モーダル</div>
+    <div class="modal-mock">
+      <div class="modal-hd">
+        <span class="modal-title">🖼 展示内容写真管理</span>
+        <button style="width:24px;height:24px;border:none;background:none;font-size:16px;color:#71717a;cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-bd">
+        <div class="photo-grid">
+          <div class="photo-card-mock"><div class="photo-card-img">📸</div></div>
+          <div class="photo-card-mock"><div class="photo-card-img">📸</div></div>
+          <div class="photo-card-mock"><div class="photo-card-img">📸</div></div>
+          <div class="photo-card-mock" style="border-style:dashed;background:#fafafa;"><div class="photo-card-img" style="font-size:16px;color:#a1a1aa;">＋</div></div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn-sec">閉じる</button>
+        <label class="btn-primary" style="cursor:pointer;display:inline-block;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;">
+          📤 写真を追加
+          <input type="file" accept="image/*" multiple style="display:none;">
+        </label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sec5">
+  <h2 class="section-title">5. 代理送信設定</h2>
+  <div class="step-desc">
+    <p style="font-size:.95rem;margin-bottom:12px;">特定のメンバーの代わりにシフト希望を送信できるユーザーを設定します。スマートフォンを持っていないメンバーの希望を代理入力する場合に使用します。</p>
+    <h3>代理送信者を追加する</h3>
+    <ol>
+      <li><span class="step-num">1</span>サイドバーの「🔄 代理送信設定」をタップ</li>
+      <li><span class="step-num">2</span>「追加」ボタンをタップ</li>
+      <li><span class="step-num">3</span>代理送信する <strong>送信者（代理を行う人）</strong> と <strong>対象者（希望を送られる人）</strong> を選択</li>
+      <li><span class="step-num">4</span>「保存」をタップ</li>
+    </ol>
+    <h3 style="margin-top:16px;">代理送信者を削除する</h3>
+    <ol>
+      <li><span class="step-num">1</span>設定一覧から削除したい行の「削除」をタップ</li>
+    </ol>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">サイドバーから開く</div>
+    <div class="btn-sim">
+      <div class="btn-sim-icon" style="background:#ede9fe;">🔄</div>
+      <div class="btn-sim-text">
+        <span class="btn-sim-name">代理送信設定</span>
+        <span class="btn-sim-desc">代理送信の追加・削除</span>
+      </div>
+      <span style="color:#a1a1aa;font-size:14px;">›</span>
+      <span style="position:absolute;top:-8px;right:-8px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">① タップ</span>
+    </div>
+  </div>
+  <div class="ui-preview">
+    <div class="ui-preview-title">代理送信設定モーダル</div>
+    <div class="modal-mock">
+      <div class="modal-hd">
+        <span class="modal-title">🔄 代理送信設定</span>
+        <button style="width:24px;height:24px;border:none;background:none;font-size:16px;color:#71717a;cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-bd">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button style="padding:6px 14px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">＋ 追加</button>
+        </div>
+        <div style="background:#fafafa;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;">
+          <div style="padding:8px 12px;background:#f5f3ff;border-bottom:1px solid #e4e4e7;display:grid;grid-template-columns:1fr 14px 1fr auto;gap:8px;align-items:center;font-size:11px;font-weight:700;color:#7c3aed;">
+            <span>送信者（代理する人）</span>
+            <span style="text-align:center;color:#a1a1aa;">→</span>
+            <span>対象者（される人）</span>
+            <span></span>
+          </div>
+          <div class="proxy-row-mock" style="padding:8px 12px;display:grid;grid-template-columns:1fr 14px 1fr auto;gap:8px;align-items:center;">
+            <span style="font-size:12px;font-weight:700;">山田 太郎</span>
+            <span style="text-align:center;color:#a1a1aa;font-size:12px;">→</span>
+            <span style="font-size:12px;font-weight:700;">鈴木 次郎</span>
+            <button style="padding:3px 8px;border:1px solid #fca5a5;border-radius:6px;background:#fef2f2;color:#dc2626;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">削除</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn-sec">閉じる</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
