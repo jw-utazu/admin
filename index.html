@@ -581,6 +581,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
         </div>
       </div>
       <div>
+        <div class="plbl">マニュアル</div>
+        <button class="abtn" onclick="openM('m-manual')">
+          <div class="ab-ic" style="background:#eff6ff;color:#2563eb;">📖</div>
+          <div class="ab-tx"><span class="ab-n">操作マニュアル</span><span class="ab-d">各機能の操作手順を確認</span></div>
+          <span class="ab-ar">›</span>
+        </button>
+      </div>
+      <div>
         <div class="plbl">アプリ</div>
         <button onclick="openPwaModal()" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--blue-l);border:1.5px solid var(--blue);border-radius:var(--r);cursor:pointer;font-family:var(--sans);color:var(--blue);font-size:12px;font-weight:700;"><span style="font-size:15px;">📲</span><span>ホーム画面に追加</span></button>
       </div>
@@ -644,6 +652,46 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     <div class="mhd"><span class="mt">🐛 バグ報告確認</span><button class="mx" onclick="closeM('m-bug-report')">&#10005;</button></div>
     <div class="mbd" id="m-bug-report-body">読み込み中...</div>
     <div class="mft" id="m-bug-report-ft"><button class="btn btn-g" onclick="closeM('m-bug-report')">閉じる</button></div>
+  </div>
+</div>
+<!-- マニュアル選択モーダル -->
+<div class="ov" id="m-manual">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">📖 操作マニュアル</span><button class="mx" onclick="closeM('m-manual')">&#10005;</button></div>
+    <div class="mbd" style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+      <p style="font-size:11px;color:var(--ink3);margin-bottom:2px;">読みたいマニュアルを選んでください</p>
+      <a href="./manual/manual-admin-login.html" target="_blank" class="abtn">
+        <div class="ab-ic" style="background:#eff6ff;color:#2563eb;">🔑</div>
+        <div class="ab-tx"><span class="ab-n">ログイン・基本操作</span><span class="ab-d">ログイン手順と画面の見方</span></div>
+        <span class="ab-ar">›</span>
+      </a>
+      <a href="./manual/manual-admin-calendar.html" target="_blank" class="abtn">
+        <div class="ab-ic" style="background:#f0fdf4;color:#16a34a;">📅</div>
+        <div class="ab-tx"><span class="ab-n">カレンダー・日程設定</span><span class="ab-d">申込期間・実施日の設定方法</span></div>
+        <span class="ab-ar">›</span>
+      </a>
+      <a href="./manual/manual-admin-batch.html" target="_blank" class="abtn">
+        <div class="ab-ic" style="background:var(--amber-l);color:var(--amber);">🚀</div>
+        <div class="ab-tx"><span class="ab-n">募集開始処理</span><span class="ab-d">月次バッチ処理の手順</span></div>
+        <span class="ab-ar">›</span>
+      </a>
+      <a href="./manual/manual-admin-member.html" target="_blank" class="abtn">
+        <div class="ab-ic" style="background:#f0f9ff;color:#0369a1;">👥</div>
+        <div class="ab-tx"><span class="ab-n">メンバー管理</span><span class="ab-d">メンバーの追加・編集手順</span></div>
+        <span class="ab-ar">›</span>
+      </a>
+      <a href="./manual/manual-admin-shift.html" target="_blank" class="abtn">
+        <div class="ab-ic" style="background:var(--purple-l);color:var(--purple);">🗂</div>
+        <div class="ab-tx"><span class="ab-n">シフト管理</span><span class="ab-d">シフト作成・公開の手順</span></div>
+        <span class="ab-ar">›</span>
+      </a>
+      <a href="./manual/manual-admin-misc.html" target="_blank" class="abtn">
+        <div class="ab-ic" style="background:var(--teal-l);color:var(--teal);">⚙️</div>
+        <div class="ab-tx"><span class="ab-n">その他の機能</span><span class="ab-d">お知らせ・写真・要望管理など</span></div>
+        <span class="ab-ar">›</span>
+      </a>
+    </div>
+    <div class="mft"><button class="btn btn-g" onclick="closeM('m-manual')">閉じる</button></div>
   </div>
 </div>
 <div class="ov" id="m-pwa">
