@@ -761,8 +761,7 @@ async function loadCreateData() {
     memoMap = {};
     (shiftRes.dates || []).forEach(d => { if (d.memo) memoMap[d.date + '_' + d.time] = d.memo; });
     defaultSlot  = shiftRes.defaultSlot  || 15;
-    respCounts   = shiftRes.respCounts   || {};
-    cartCounts   = shiftRes.cartCounts   || {};
+    recalcCounts();
     buildCreateTabs();
     buildLeftPanel();
     if (shiftDates.length > 0) { activeDateIdx = 0; activeTimeIdx = 0; buildTimeTabs(); }
@@ -835,6 +834,17 @@ function filterAppliedForSlot(date, blockTime) {
     const startT = blockTime.split('~')[0];
     return sk.includes(') ' + startT) || sk.includes(' ' + startT);
   }));
+}
+
+function recalcCounts() {
+  respCounts = {};
+  cartCounts = {};
+  shiftDates.forEach(block => {
+    const resp = block.responsible || {};
+    [resp.r1, resp.r2].filter(Boolean).forEach(uid => { respCounts[uid] = (respCounts[uid] || 0) + 1; });
+    const cart = block.cart || {};
+    [cart.ki1, cart.ki2, cart.ko1, cart.ko2].filter(Boolean).forEach(uid => { cartCounts[uid] = (cartCounts[uid] || 0) + 1; });
+  });
 }
 
 function buildLeftPanel() {
@@ -1194,7 +1204,11 @@ async function saveBlock(bi) {
   try {
     const data = collectBlock(bi);
     await gasGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots });
+    block.responsible = data.responsible;
+    block.cart = data.cart;
+    recalcCounts();
     bs[bKey(block)] = true; markSaved(bi); ug(); toast('保存しました', 's');
+    buildLeftPanel();
   } catch (e) { if (st) st.textContent = '● 未保存'; toast('保存に失敗しました: ' + e.message, 'e'); }
   finally { if (btn) btn.disabled = false; }
 }
