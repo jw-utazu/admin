@@ -2308,8 +2308,26 @@ async function buildMstep3() {
   body.innerHTML = '<div class="loading-row"><div class="spin"></div>前月データを読み込み中...</div>';
   try {
     const d = await gasGet('adminData');
-    const curSlots  = d.currentSlots  || [];
-    const prevSlots = d.prevSlots     || [];
+    // 現在編集中のslots（ローカル）からcurSlotsを生成（カレンダーシートの保存済みデータは使わない）
+    const _DOW = ['日','月','火','水','木','金','土'];
+    function _weekNum(y, m, d) {
+      const date = new Date(y, m-1, d);
+      const dow = date.getDay();
+      const monDow = dow === 0 ? 6 : dow - 1;
+      const thisMonday = new Date(date); thisMonday.setDate(d - monDow);
+      const monthStart = new Date(y, m-1, 1);
+      const msDay = monthStart.getDay();
+      const msMon = msDay === 0 ? 6 : msDay - 1;
+      const firstMonday = new Date(monthStart); firstMonday.setDate(1 - msMon);
+      return Math.floor((thisMonday - firstMonday) / (7 * 86400000)) + 1;
+    }
+    const curSlots = slots.map(s => {
+      const dt = new Date(s.y, s.m - 1, s.d);
+      const dateLabel = s.m + '/' + s.d + '(' + _DOW[dt.getDay()] + ')';
+      const week = '第' + _weekNum(s.y, s.m, s.d) + '週';
+      return { week, dateLabel, time: s.time, interval: s.interval, y: s.y, m: s.m, d: s.d };
+    });
+    const prevSlots = d.prevSlots || [];
     const groups    = {}, prevGroups  = {};
     curSlots.forEach(s  => { const k = s.dateLabel; if (!groups[k])     groups[k]     = { dl: s.dateLabel, wk: s.week, times: [] }; groups[k].times.push(s.time); });
     prevSlots.forEach(s => { const k = s.dateLabel; if (!prevGroups[k]) prevGroups[k] = { dl: s.dateLabel, wk: s.week, times: [] }; prevGroups[k].times.push(s.time); });
@@ -2399,8 +2417,10 @@ function buildMstep4() {
     </div>`
   ).join('');
   document.getElementById('mstep4-done').style.display = 'none';
-  document.getElementById('mstep4-back').style.display = '';
-  document.getElementById('mstep4-exec').style.display = '';
+  const _backStep = monthlyChecks.form ? 3 : 2;
+  document.getElementById('mstep4-nav').innerHTML =
+    `<button class="ms-btn sec" onclick="monthlyStep(${_backStep})" id="mstep4-back">← 戻る</button>` +
+    '<button class="ms-btn primary" onclick="execMonthly()" id="mstep4-exec">実行</button>';
 }
 
 async function execMonthly() {
