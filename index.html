@@ -2170,7 +2170,7 @@ async function deleteProxy(rowIndex) {
 // ============================================================
 let _coupleMembers = [];
 function _coupleSurname(furigana) {
-  const idx = furigana.indexOf(' ');
+  const idx = furigana.search(/[ 　]/); // 半角・全角スペース両対応
   return idx > 0 ? furigana.substring(0, idx) : furigana;
 }
 async function openCoupleModal() {
