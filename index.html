@@ -2169,9 +2169,9 @@ async function deleteProxy(rowIndex) {
 // 夫婦設定
 // ============================================================
 let _coupleMembers = [];
-function _coupleSurname(name) {
-  const idx = name.indexOf(' ');
-  return idx > 0 ? name.substring(0, idx) : name;
+function _coupleSurname(furigana) {
+  const idx = furigana.indexOf(' ');
+  return idx > 0 ? furigana.substring(0, idx) : furigana;
 }
 async function openCoupleModal() {
   openM('m-couple');
@@ -2191,11 +2191,11 @@ async function refreshCoupleModal() {
     // 名字が2件以上存在するもののみ候補にする（単独名字は夫婦候補外）
     const surnameCounts = {};
     _coupleMembers.forEach(m => {
-      const s = _coupleSurname(m.name);
+      const s = _coupleSurname(m.furigana);
       surnameCounts[s] = (surnameCounts[s] || 0) + 1;
     });
     const eligible = _coupleMembers.filter(m =>
-      surnameCounts[_coupleSurname(m.name)] >= 2 && !registeredUids.has(m.uid)
+      surnameCounts[_coupleSurname(m.furigana)] >= 2 && !registeredUids.has(m.uid)
     );
 
     const husbandOpts = eligible.filter(m => m.gender === 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
