@@ -359,6 +359,23 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .toast.s{background:var(--green);}.toast.e{background:var(--red);}
 @keyframes t-up{from{opacity:0;transform:translateY(8px);}}
 
+/* 処理中フルスクリーンオーバーレイ */
+#proc-ov{position:fixed;inset:0;z-index:8000;background:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;}
+#proc-ov.show{display:flex;}
+.proc-logo{width:56px;height:56px;border-radius:14px;overflow:hidden;background:var(--blue);flex-shrink:0;box-shadow:0 4px 20px rgba(37,99,235,.2);}
+.proc-logo img{width:100%;height:100%;object-fit:cover;}
+.proc-spin{width:44px;height:44px;border:4px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
+.proc-title{font-size:20px;font-weight:700;color:var(--ink);text-align:center;}
+.proc-sub{font-size:13px;color:var(--ink2);text-align:center;line-height:1.6;}
+.proc-steps{width:100%;max-width:320px;display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.proc-step-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);font-size:13px;}
+.proc-step-ic{width:22px;text-align:center;flex-shrink:0;}
+.proc-step-lbl{flex:1;}
+.proc-step-st{font-size:11px;font-weight:700;color:var(--ink3);white-space:nowrap;}
+.proc-step-st.running{color:var(--amber);}
+.proc-step-st.done{color:var(--green);}
+.proc-step-st.err{color:var(--red);}
+
 /* 時間選択用selectの見た目 */
 .time-sel option{font-family:var(--mono);}
 
@@ -903,6 +920,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
       <button class="btn btn-d" id="m-day-reset-btn" onclick="resetDaySettings()" style="display:none;">リセット</button>
     </div>
   </div>
+</div>
+
+<!-- 処理中フルスクリーンオーバーレイ -->
+<div id="proc-ov">
+  <div class="proc-logo"><img src="logo.png" alt="PW" onerror="this.style.display='none'"></div>
+  <div class="proc-spin" id="proc-spin"></div>
+  <div class="proc-title" id="proc-title">処理しています...</div>
+  <div class="proc-sub" id="proc-sub">少々お待ちください</div>
+  <div class="proc-steps" id="proc-steps" style="display:none;"></div>
+  <button id="proc-close-btn" onclick="hideProc()" style="display:none;margin-top:4px;padding:8px 24px;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);background:var(--surface2);color:var(--ink2);">閉じる</button>
 </div>
 
 <div class="ta" id="ta"></div>
@@ -1543,15 +1570,19 @@ function updSaveDatesBtn() {
   btn.className = 'save-dates-btn' + (datesChanged ? ' active' : '');
 }
 async function saveDates() {
+  showProc('設定を保存しています...', '少々お待ちください');
   try {
-    await gasGet('saveDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open});
-    toast('日程を保存しました','s');
+    await gasGet('saveDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open });
     datesChanged = false;
     updSaveDatesBtn();
-    buildInfoArea();
-    buildCalScroll();
-    updStatus();
-  } catch(e){ toast('保存に失敗しました: '+e.message,'e'); }
+    setProcMsg('再読み込み中...', 'データを更新しています');
+    try { await refreshAdminData(); } catch (_) {}
+    hideProc();
+    toast('日程を保存しました', 's');
+  } catch (e) {
+    hideProc();
+    toast('保存に失敗しました: ' + e.message, 'e');
+  }
 }
 
 // ============================================================
@@ -2129,15 +2160,17 @@ async function saveNotice() {
   const startDate = (document.getElementById('notice-start-in').value || '').replace(/-/g, '/');
   const endDate   = (document.getElementById('notice-end-in').value   || '').replace(/-/g, '/');
   if (!title) { toast('タイトルを入力してください', 'e'); return; }
+  showProc('お知らせを保存しています...', '少々お待ちください');
   try {
     const payload = { action: 'saveNotice', title, body, display, startDate, endDate };
     if (_noticeEditId) payload.id = _noticeEditId;
     const res = await gasPost(payload);
     if (!res.ok) throw new Error(res.error || '保存失敗');
     _noticeEditId = null;
-    toast('お知らせを保存しました', 's');
     await refreshNoticeModal();
-  } catch (e) { toast('保存失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('お知らせを保存しました', 's');
+  } catch (e) { hideProc(); toast('保存失敗: ' + e.message, 'e'); }
 }
 function editNotice(id) {
   _noticeEditId = id;
@@ -2145,20 +2178,24 @@ function editNotice(id) {
 }
 async function deleteNotice(id) {
   if (!confirm('このお知らせを削除しますか？')) return;
+  showProc('削除しています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'deleteNotice', id });
     if (!res.ok) throw new Error(res.error || '削除失敗');
-    toast('削除しました', 's');
     await refreshNoticeModal();
-  } catch (e) { toast('削除失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('削除しました', 's');
+  } catch (e) { hideProc(); toast('削除失敗: ' + e.message, 'e'); }
 }
 async function toggleNotice(id) {
+  showProc('更新しています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'toggleNotice', id });
     if (!res.ok) throw new Error(res.error || '切替失敗');
-    toast(`表示を${res.display === 'ON' ? 'ON' : 'OFF'}にしました`, 's');
     await refreshNoticeModal();
-  } catch (e) { toast('切替失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast(`表示を${res.display === 'ON' ? 'ON' : 'OFF'}にしました`, 's');
+  } catch (e) { hideProc(); toast('切替失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
@@ -2210,21 +2247,25 @@ async function addProxy() {
   const toUid   = document.getElementById('proxy-to-sel').value;
   if (!fromUid || !toUid) { toast('両方選択してください', 'e'); return; }
   if (fromUid === toUid)  { toast('同じ人は設定できません', 'e'); return; }
+  showProc('代理設定を追加しています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'saveProxySetting', fromUid, toUid });
     if (!res.ok) throw new Error(res.error || '追加失敗');
-    toast('代理設定を追加しました', 's');
     await refreshProxyModal();
-  } catch (e) { toast('追加失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('代理設定を追加しました', 's');
+  } catch (e) { hideProc(); toast('追加失敗: ' + e.message, 'e'); }
 }
 async function deleteProxy(rowIndex) {
   if (!confirm('この代理設定を解除しますか？')) return;
+  showProc('解除しています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'deleteProxySetting', rowIndex });
     if (!res.ok) throw new Error(res.error || '削除失敗');
-    toast('解除しました', 's');
     await refreshProxyModal();
-  } catch (e) { toast('解除失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('解除しました', 's');
+  } catch (e) { hideProc(); toast('解除失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
@@ -2298,24 +2339,28 @@ async function addCouple() {
   const wifeUid    = document.getElementById('couple-wife-sel').value;
   if (!husbandUid || !wifeUid) { toast('夫と妻を両方選択してください', 'e'); return; }
   if (husbandUid === wifeUid)  { toast('同じ人は設定できません', 'e'); return; }
+  showProc('夫婦ペアを追加しています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'saveCouple', husbandUid, wifeUid });
     if (!res.ok) {
-      if (res.error === 'duplicate') { toast('すでに登録されています', 'e'); return; }
+      if (res.error === 'duplicate') { hideProc(); toast('すでに登録されています', 'e'); return; }
       throw new Error(res.error || '追加失敗');
     }
-    toast('夫婦ペアを追加しました', 's');
     await refreshCoupleModal();
-  } catch (e) { toast('追加失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('夫婦ペアを追加しました', 's');
+  } catch (e) { hideProc(); toast('追加失敗: ' + e.message, 'e'); }
 }
 async function deleteCouple(rowIndex) {
   if (!confirm('この夫婦設定を解除しますか？')) return;
+  showProc('解除しています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'deleteCouple', rowIndex });
     if (!res.ok) throw new Error(res.error || '削除失敗');
-    toast('解除しました', 's');
     await refreshCoupleModal();
-  } catch (e) { toast('解除失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('解除しました', 's');
+  } catch (e) { hideProc(); toast('解除失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
@@ -2350,12 +2395,14 @@ async function refreshRequestModal() {
   }
 }
 async function resolveRequest(rowIndex) {
+  showProc('対応済みにしています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'resolveRequest', rowIndex });
     if (!res.ok) throw new Error(res.error || '更新失敗');
-    toast('対応済みにしました', 's');
     await refreshRequestModal();
-  } catch (e) { toast('更新失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('対応済みにしました', 's');
+  } catch (e) { hideProc(); toast('更新失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
@@ -2407,12 +2454,14 @@ async function refreshBugReportModal() {
   }
 }
 async function resolveBugReport(rowIndex) {
+  showProc('対応済みにしています...', '少々お待ちください');
   try {
     const res = await gasPost({ action: 'resolveBugReport', rowIndex });
     if (!res.ok) throw new Error(res.error || '更新失敗');
-    toast('対応済みにしました', 's');
     await refreshBugReportModal();
-  } catch (e) { toast('更新失敗: ' + e.message, 'e'); }
+    hideProc();
+    toast('対応済みにしました', 's');
+  } catch (e) { hideProc(); toast('更新失敗: ' + e.message, 'e'); }
 }
 
 // ============================================================
@@ -2593,66 +2642,43 @@ async function execMonthly() {
   document.getElementById('mstep4-back').style.display = 'none';
   document.getElementById('mstep4-exec').style.display = 'none';
 
+  const tasks = [{ id: 'calregen', label: '💾 日程・実施日を保存' }];
+  if (monthlyChecks.calpub) tasks.push({ id: 'calpub', label: '📅 予定表公開' });
+  if (monthlyChecks.form)   tasks.push({ id: 'form',   label: '📝 シフトフォーム作成' });
+  if (monthlyChecks.shift)  tasks.push({ id: 'shift',  label: '🗂 シフト作成準備' });
+
+  closeM('m-monthly');
+  showProc('募集開始処理を実行しています', '完了までそのままお待ちください');
+  showProcSteps(tasks);
+
   async function runTask(id, fn) {
-    document.getElementById('mpic-' + id).textContent = '⏳';
-    document.getElementById('mpst-' + id).textContent = '実行中...';
-    document.getElementById('mpst-' + id).className = 'ms-prog-st running';
-    try {
-      await fn();
-      document.getElementById('mpic-' + id).textContent = '✅';
-      document.getElementById('mpst-' + id).textContent = '完了';
-      document.getElementById('mpst-' + id).className = 'ms-prog-st done';
-    } catch (e) {
-      document.getElementById('mpic-' + id).textContent = '❌';
-      document.getElementById('mpst-' + id).textContent = 'エラー: ' + e.message;
-      document.getElementById('mpst-' + id).className = 'ms-prog-st err';
-      throw e;
-    }
+    setProcStep(id, 'running');
+    try { await fn(); setProcStep(id, 'done'); }
+    catch (e) { setProcStep(id, 'err', 'エラー: ' + e.message); throw e; }
   }
 
   try {
     // ① 必須：日程・実施日を保存（カレンダー履歴への追記も含む）
-    const cleanSlots = slots.map(s => ({
-      ...s,
-      interval: parseInt(s.interval) || 15,
-      y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d)
-    }));
-    await runTask('calregen', () =>
-      gasGet('updateCalendarSlots', {
-        slots: cleanSlots, year: curY, month: curM,
-        apply: dates.apply, deadline: dates.deadline, open: dates.open
-      })
-    );
-
-    if (monthlyChecks.calpub) {
-      await runTask('calpub', () =>
-        gasGet('publishCalendar', { year: curY, month: curM })
-      );
-    }
+    const cleanSlots = slots.map(s => ({ ...s, interval: parseInt(s.interval) || 15, y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d) }));
+    await runTask('calregen', () => gasGet('updateCalendarSlots', { slots: cleanSlots, year: curY, month: curM, apply: dates.apply, deadline: dates.deadline, open: dates.open }));
+    if (monthlyChecks.calpub) await runTask('calpub', () => gasGet('publishCalendar', { year: curY, month: curM }));
     if (monthlyChecks.form) {
-      // Step3で選択した紐づけを収集
       document.querySelectorAll('.map-sel-m').forEach(s => { monthlyMappingResult[s.dataset.key] = s.value; });
-      await runTask('form', () =>
-        gasGet('createFormSheet', { year: curY, month: curM, mapping: monthlyMappingResult })
-      );
+      await runTask('form', () => gasGet('createFormSheet', { year: curY, month: curM, mapping: monthlyMappingResult }));
     }
+    if (monthlyChecks.shift) await runTask('shift', () => gasGet('createShiftSheet', { year: curY, month: curM }));
 
-    if (monthlyChecks.shift) {
-      await runTask('shift', () =>
-        gasGet('createShiftSheet', { year: curY, month: curM })
-      );
-    }
-
-    document.getElementById('mstep4-done').style.display = 'block';
-    document.getElementById('mstep4-nav').innerHTML =
-      '<button class="ms-btn primary" onclick="closeM(&quot;m-monthly&quot;)">閉じる</button>';
     datesChanged = false;
     updSaveDatesBtn();
+    document.getElementById('proc-steps').style.display = 'none';
+    setProcMsg('再読み込み中...', '処理が完了しました。データを更新しています');
+    try { await refreshAdminData(); } catch (_) {}
+    hideProc();
     toast('募集開始処理が完了しました', 's');
   } catch (e) {
-    document.getElementById('mstep4-nav').innerHTML =
-      '<button class="ms-btn sec" onclick="monthlyStep(monthlyChecks.form ? 3 : 2)">← 戻る</button>' +
-      '<button class="ms-btn primary" onclick="execMonthly()">再実行</button>';
+    document.getElementById('proc-spin').style.display = 'none';
+    setProcMsg('エラーが発生しました', 'ネットワークの状態を確認して、もう一度最初からお試しください');
+    document.getElementById('proc-close-btn').style.display = '';
     toast('処理中にエラーが発生しました', 'e');
   }
 }
@@ -2743,15 +2769,7 @@ async function onPhotoFilesSelected(event) {
   let completed = 0;
   let failed = 0;
 
-  const updateProgress = () => {
-    body.innerHTML = '<div style="text-align:center;padding:20px;">'
-      + '<div class="spin"></div>'
-      + '<div style="margin-top:10px;font-size:14px;color:var(--ink2);">'
-      + total + '枚中 ' + completed + '枚完了...'
-      + (failed > 0 ? '<span style="color:var(--red);"> (' + failed + '枚失敗)</span>' : '')
-      + '</div></div>';
-  };
-  updateProgress();
+  showProc('写真をアップロードしています...', total + '枚中 0枚完了');
 
   // base64変換を全ファイル並列で実行
   const base64List = await Promise.all(files.map(f => fileToBase64(f)));
@@ -2772,8 +2790,14 @@ async function onPhotoFilesSelected(event) {
       failed++;
       console.error('アップロード失敗:', file.name, e.message);
     }
-    updateProgress();
+    setProcMsg(undefined, total + '枚中 ' + (completed + failed) + '枚処理済み' + (failed > 0 ? '（' + failed + '枚失敗）' : ''));
   }));
+
+  // リスト再読み込み
+  const inp = document.getElementById('photo-upload-input');
+  if (inp) inp.value = '';
+  await loadPhotoMgmtList();
+  hideProc();
 
   if (failed === 0) {
     toast(total + '枚のアップロードが完了しました', 's');
@@ -2782,11 +2806,6 @@ async function onPhotoFilesSelected(event) {
   } else {
     toast('アップロードに失敗しました', 'e');
   }
-
-  // リスト再読み込み
-  const inp = document.getElementById('photo-upload-input');
-  if (inp) inp.value = '';
-  await loadPhotoMgmtList();
 }
 
 function fileToBase64(file) {
@@ -2800,11 +2819,14 @@ function fileToBase64(file) {
 
 async function deletePhoto(fileId) {
   if (!confirm('この写真を削除しますか？')) return;
+  showProc('写真を削除しています...', '少々お待ちください');
   try {
     await gasGet('deletePhoto', { fileId });
-    toast('削除しました', 's');
     await loadPhotoMgmtList();
+    hideProc();
+    toast('削除しました', 's');
   } catch(e) {
+    hideProc();
     toast('削除に失敗しました: ' + e.message, 'e');
   }
 }
@@ -2967,6 +2989,7 @@ async function saveMemberForm(isEdit, isOwner) {
   const adminUid  = _currentUser?.uid  || '';
   const adminName = _currentUser?.name || '';
 
+  showProc(isEdit ? 'メンバー情報を更新しています...' : 'メンバーを追加しています...', '少々お待ちください');
   try {
     let res;
     if (isEdit) {
@@ -2988,14 +3011,16 @@ async function saveMemberForm(isEdit, isOwner) {
       });
     }
     if (!res.ok) throw new Error(res.error || '保存失敗');
-    toast(isEdit ? 'メンバー情報を更新しました' : 'メンバーを追加しました', 's');
     // 一覧を再取得して再描画
     const listRes = await gasGet('getMemberListAll');
     if (listRes.ok) {
       _memberList = listRes.members || [];
       renderMemberList();
     }
+    hideProc();
+    toast(isEdit ? 'メンバー情報を更新しました' : 'メンバーを追加しました', 's');
   } catch(e) {
+    hideProc();
     errEl.style.display = '';
     errEl.textContent = 'エラー: ' + e.message;
   }
@@ -3003,6 +3028,53 @@ async function saveMemberForm(isEdit, isOwner) {
 
 function closeMemberForm() {
   closeM('m-member');
+}
+
+// ============================================================
+// 処理中フルスクリーンオーバーレイ
+// ============================================================
+function showProc(title, sub) {
+  document.getElementById('proc-title').textContent = title || '処理しています...';
+  document.getElementById('proc-sub').textContent = sub !== undefined ? sub : '少々お待ちください';
+  document.getElementById('proc-spin').style.display = '';
+  document.getElementById('proc-steps').style.display = 'none';
+  document.getElementById('proc-steps').innerHTML = '';
+  document.getElementById('proc-close-btn').style.display = 'none';
+  document.getElementById('proc-ov').classList.add('show');
+}
+function hideProc() {
+  document.getElementById('proc-ov').classList.remove('show');
+}
+function setProcMsg(title, sub) {
+  if (title !== undefined) document.getElementById('proc-title').textContent = title;
+  if (sub !== undefined) document.getElementById('proc-sub').textContent = sub;
+}
+function showProcSteps(tasks) {
+  const el = document.getElementById('proc-steps');
+  el.innerHTML = tasks.map(t =>
+    `<div class="proc-step-row"><span class="proc-step-ic" id="psic-${t.id}">⏸</span><span class="proc-step-lbl">${t.label}</span><span class="proc-step-st" id="psst-${t.id}">待機中</span></div>`
+  ).join('');
+  el.style.display = 'flex';
+}
+function setProcStep(id, state, errMsg) {
+  const ic = document.getElementById('psic-' + id);
+  const st = document.getElementById('psst-' + id);
+  if (!ic || !st) return;
+  if (state === 'running') { ic.textContent = '⏳'; st.textContent = '実行中...'; st.className = 'proc-step-st running'; }
+  else if (state === 'done') { ic.textContent = '✅'; st.textContent = '完了'; st.className = 'proc-step-st done'; }
+  else if (state === 'err') { ic.textContent = '❌'; st.textContent = errMsg || 'エラー'; st.className = 'proc-step-st err'; }
+}
+async function refreshAdminData() {
+  const d = await gasGet('adminData');
+  adminData = d;
+  if (d.eventDates) {
+    const toObj = str => { if (!str) return null; const p = str.split('/'); return p.length === 2 ? { y: curY, m: parseInt(p[0]), d: parseInt(p[1]) } : null; };
+    dates.apply    = toObj(d.eventDates['申込開始']);
+    dates.deadline = toObj(d.eventDates['締切']);
+    dates.open     = toObj(d.eventDates['シフト公開']);
+  }
+  if (d.currentSlots) slots = d.currentSlots.map(s => ({ y: s.y || curY, m: s.m || curM, d: s.d, time: s.time, interval: parseInt(s.interval) || 15 }));
+  renderAll();
 }
 
 </script>
