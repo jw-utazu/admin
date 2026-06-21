@@ -2169,6 +2169,10 @@ async function deleteProxy(rowIndex) {
 // 夫婦設定
 // ============================================================
 let _coupleMembers = [];
+function _coupleSurname(name) {
+  const idx = name.indexOf(' ');
+  return idx > 0 ? name.substring(0, idx) : name;
+}
 async function openCoupleModal() {
   openM('m-couple');
   await refreshCoupleModal();
@@ -2179,8 +2183,24 @@ async function refreshCoupleModal() {
     const [coupleRes, memberRes] = await Promise.all([gasGet('getCoupleList'), gasGet('getMemberList')]);
     _coupleMembers = (memberRes.members || []).filter(m => m.uid);
     const couples  = coupleRes.couples || [];
-    const husbandOpts = _coupleMembers.filter(m => m.gender === 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
-    const wifeOpts    = _coupleMembers.filter(m => m.gender !== 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+
+    // 登録済みのUIDを除外対象に
+    const registeredUids = new Set();
+    couples.forEach(c => { registeredUids.add(c.husbandUid); registeredUids.add(c.wifeUid); });
+
+    // 名字が2件以上存在するもののみ候補にする（単独名字は夫婦候補外）
+    const surnameCounts = {};
+    _coupleMembers.forEach(m => {
+      const s = _coupleSurname(m.name);
+      surnameCounts[s] = (surnameCounts[s] || 0) + 1;
+    });
+    const eligible = _coupleMembers.filter(m =>
+      surnameCounts[_coupleSurname(m.name)] >= 2 && !registeredUids.has(m.uid)
+    );
+
+    const husbandOpts = eligible.filter(m => m.gender === 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+    const wifeOpts    = eligible.filter(m => m.gender !== 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+
     let html = `
       <div style="margin-bottom:14px;">
         <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">夫婦ペアを追加</div>
