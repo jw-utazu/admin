@@ -451,6 +451,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .mf-inp{border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--sans);font-size:13px;color:var(--ink);outline:none;width:100%;}
 .mf-inp:focus{border-color:var(--blue);}
 .req{color:var(--red);}
+/* PW モード切り替えタブ */
+.pw-type-bar{display:flex;gap:0;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.pw-type-tab{padding:6px 18px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink2);border-radius:0;transition:all .15s;}
+.pw-type-tab:first-child{border-radius:6px 0 0 6px;}
+.pw-type-tab:last-child{border-radius:0 6px 6px 0;border-left:none;}
+.pw-type-tab.active{background:#7c3aed;color:#fff;border-color:#7c3aed;}
+.pw-type-tab.active.normal{background:var(--green,#16a34a);border-color:var(--green,#16a34a);}
+/* 両方バッジ */
+.badge-both{display:inline-block;background:#ea580c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:5px;cursor:pointer;}
+/* 限定PW対象メンバーモーダル */
+.lm-row{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border);}
+.lm-uid{font-family:var(--mono);font-size:11px;color:var(--ink3);width:80px;flex-shrink:0;}
+.lm-name{flex:1;font-size:13px;font-weight:600;}
+.lm-date{font-size:11px;color:var(--ink3);width:80px;text-align:right;}
+.lm-del{padding:2px 8px;border:none;background:var(--red-l);color:var(--red);border-radius:4px;cursor:pointer;font-family:var(--sans);font-size:11px;}
 </style>
 </head>
 <body>
@@ -512,6 +527,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
       <button class="so-btn" onclick="signOut()">ログアウト</button>
     </div>
   </header>
+
+  <!-- PWモード切替タブ -->
+  <div class="pw-type-bar" id="pw-type-bar">
+    <button class="pw-type-tab active normal" id="pw-tab-normal" onclick="switchPwType('normal')">通常PW</button>
+    <button class="pw-type-tab" id="pw-tab-limited" onclick="switchPwType('limited')">限定PW</button>
+  </div>
 
   <!-- 年月ドロップダウン -->
   <div class="ym-dropdown" id="ym-dropdown">
@@ -624,6 +645,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">バグ報告確認</span><span class="ab-d">ユーザーからのバグ報告を確認・対応</span></div>
             <span class="ab-ar">›</span>
           </button>
+          <button class="abtn" id="btn-limited-members" style="display:none;" onclick="openLimitedMembersModal()">
+            <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔐</div>
+            <div class="ab-tx"><span class="ab-n">対象メンバー管理</span><span class="ab-d">限定PW対象メンバーの追加・削除</span></div>
+            <span class="ab-ar">›</span>
+          </button>
           <button class="abtn" onclick="openProxyModal()">
             <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔄</div>
             <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
@@ -665,6 +691,38 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 </div>
 
 <!-- MODALS -->
+<!-- 限定PW 対象メンバー管理モーダル -->
+<div class="ov" id="m-limited-members">
+  <div class="modal" style="max-width:540px;">
+    <div class="mhd"><span class="mt">🔐 限定PW 対象メンバー管理</span><button class="mx" onclick="closeM('m-limited-members')">&#10005;</button></div>
+    <div class="mbd" style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:12px;font-weight:700;white-space:nowrap;">期間ラベル：</label>
+        <input type="text" id="lm-label-input" class="mf-inp" placeholder="例：2026年6月特別PW" style="flex:1;" />
+        <button class="btn btn-p" onclick="saveLimitedLabel()">保存</button>
+      </div>
+      <div id="lm-member-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);">
+        <div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn" style="background:var(--red-l);color:var(--red);border-color:var(--red-l);" onclick="clearAllLimitedMembers()">全削除</button>
+      <button class="btn btn-g" onclick="closeM('m-limited-members')">閉じる</button>
+      <button class="btn btn-p" onclick="openAddLimitedMemberPicker()">＋ メンバー追加</button>
+    </div>
+  </div>
+</div>
+<!-- 限定PWメンバー追加ピッカー -->
+<div class="ov" id="m-limited-add">
+  <div class="modal" style="max-width:440px;">
+    <div class="mhd"><span class="mt">メンバーを選択</span><button class="mx" onclick="closeM('m-limited-add')">&#10005;</button></div>
+    <div class="mbd" style="padding:8px;">
+      <input type="text" id="lm-search" class="mf-inp" placeholder="氏名で絞り込み..." oninput="filterLimitedPicker()" style="margin-bottom:8px;" />
+      <div id="lm-picker-list" style="max-height:320px;overflow-y:auto;"></div>
+    </div>
+    <div class="mft"><button class="btn btn-g" onclick="closeM('m-limited-add')">閉じる</button></div>
+  </div>
+</div>
 <!-- メンバー管理モーダル -->
 <div class="ov" id="m-member">
   <div class="modal" style="max-width:560px;">
@@ -961,6 +1019,7 @@ const INTV_LIST  = [5,10,15,20,30];
 // ============================================================
 // 状態
 // ============================================================
+let currentPwType = 'normal'; // 'normal' | 'limited'
 const _initNow = new Date();
 const _initNM  = _initNow.getMonth() + 2; // 翌月（1ベース）
 let curY  = _initNM > 12 ? _initNow.getFullYear() + 1 : _initNow.getFullYear();
@@ -1125,8 +1184,10 @@ function showAuthErr(msg) {
 // ============================================================
 function gasGet(action, params) {
   const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  // type パラメータを自動付与（認証系・メンバー取得など type 不要なアクションは GAS 側で無視する）
+  const p = Object.assign({ type: currentPwType }, params || {});
   let url = GAS_URL+'?action='+action+'&callback='+cbName;
-  if (params) url += '&params='+encodeURIComponent(JSON.stringify(params));
+  url += '&params='+encodeURIComponent(JSON.stringify(p));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
   return fetch(url, { redirect: 'follow', signal: controller.signal })
@@ -1355,6 +1416,150 @@ function buildCalGrid(gid, y, m, mode) {
 // ============================================================
 function swTab(id,btn){
   // 設定タブ廃止 - カレンダー統合
+}
+
+// ============================================================
+// PW モード切り替え
+// ============================================================
+async function switchPwType(type) {
+  if (currentPwType === type) return;
+  currentPwType = type;
+  document.getElementById('pw-tab-normal').className  = 'pw-type-tab' + (type === 'normal'  ? ' active normal' : '');
+  document.getElementById('pw-tab-limited').className = 'pw-type-tab' + (type === 'limited' ? ' active' : '');
+  // 限定PW ボタン表示切り替え
+  document.getElementById('btn-limited-members').style.display = type === 'limited' ? '' : 'none';
+  // データ再読み込み
+  toast(type === 'limited' ? '限定PWモードに切り替えました' : '通常PWモードに切り替えました', 's');
+  try {
+    await loadData();
+  } catch (e) {
+    toast('データ読み込みエラー: ' + e.message, 'e');
+  }
+}
+
+// ============================================================
+// 限定PW 対象メンバー管理
+// ============================================================
+let _limitedMembersCache = [];
+let _allMembersForPicker  = [];
+
+async function openLimitedMembersModal() {
+  openM('m-limited-members');
+  await refreshLimitedMemberList();
+}
+
+async function refreshLimitedMemberList() {
+  const listEl = document.getElementById('lm-member-list');
+  listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
+  try {
+    const res = await gasGet('getLimitedMembers');
+    if (!res.ok) throw new Error(res.error);
+    _limitedMembersCache = res.members || [];
+    document.getElementById('lm-label-input').value = res.label || '';
+    if (_limitedMembersCache.length === 0) {
+      listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px;">対象メンバーが登録されていません</div>';
+      return;
+    }
+    listEl.innerHTML = _limitedMembersCache.map(m =>
+      `<div class="lm-row">
+        <span class="lm-uid">${m.uid}</span>
+        <span class="lm-name">${m.name}</span>
+        <span class="lm-date">${m.addedAt}</span>
+        <button class="lm-del" onclick="removeLimitedMember('${m.uid}')">削除</button>
+      </div>`
+    ).join('');
+  } catch (e) {
+    listEl.innerHTML = `<div style="padding:16px;color:var(--red);font-size:12px;">エラー: ${e.message}</div>`;
+  }
+}
+
+async function saveLimitedLabel() {
+  const label = document.getElementById('lm-label-input').value.trim();
+  try {
+    const res = await gasGet('updateLimitedMemberLabel', { label });
+    if (!res.ok) throw new Error(res.error);
+    toast('期間ラベルを保存しました', 's');
+  } catch (e) {
+    toast('保存失敗: ' + e.message, 'e');
+  }
+}
+
+async function removeLimitedMember(uid) {
+  if (!confirm(`UID: ${uid} を対象メンバーから削除しますか？`)) return;
+  try {
+    const res = await gasGet('removeLimitedMember', { uid });
+    if (!res.ok) throw new Error(res.error);
+    toast('削除しました', 's');
+    await refreshLimitedMemberList();
+  } catch (e) {
+    toast('削除失敗: ' + e.message, 'e');
+  }
+}
+
+async function clearAllLimitedMembers() {
+  if (!confirm('全メンバーを削除します。よろしいですか？\n（期間終了時に使用してください）')) return;
+  try {
+    const res = await gasGet('clearLimitedMembers');
+    if (!res.ok) throw new Error(res.error);
+    toast('全メンバーを削除しました', 's');
+    await refreshLimitedMemberList();
+  } catch (e) {
+    toast('削除失敗: ' + e.message, 'e');
+  }
+}
+
+async function openAddLimitedMemberPicker() {
+  openM('m-limited-add');
+  document.getElementById('lm-search').value = '';
+  const pickerEl = document.getElementById('lm-picker-list');
+  pickerEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--ink3);">読み込み中...</div>';
+  try {
+    if (_allMembersForPicker.length === 0) {
+      const res = await gasGet('getMembers');
+      _allMembersForPicker = (res.ok && res.members) ? res.members : [];
+    }
+    renderLimitedPicker(_allMembersForPicker);
+  } catch (e) {
+    pickerEl.innerHTML = `<div style="padding:12px;color:var(--red);font-size:12px;">エラー: ${e.message}</div>`;
+  }
+}
+
+function filterLimitedPicker() {
+  const q = document.getElementById('lm-search').value.trim();
+  const filtered = q ? _allMembersForPicker.filter(m => m.name.includes(q) || m.kana.includes(q) || m.uid.includes(q)) : _allMembersForPicker;
+  renderLimitedPicker(filtered);
+}
+
+function renderLimitedPicker(members) {
+  const existingUids = new Set((_limitedMembersCache||[]).map(m => m.uid));
+  const html = members.map(m => {
+    const already = existingUids.has(m.uid);
+    return `<div class="lm-row">
+      <span class="lm-uid">${m.uid}</span>
+      <span class="lm-name">${m.name}</span>
+      ${already
+        ? '<span style="font-size:11px;color:var(--ink3);">登録済</span>'
+        : `<button class="btn btn-p" style="padding:2px 8px;font-size:11px;" onclick="addLimitedMember('${m.uid}','${m.name.replace(/'/g,"\\'")}')">追加</button>`
+      }
+    </div>`;
+  }).join('') || '<div style="padding:12px;color:var(--ink3);font-size:13px;">該当なし</div>';
+  document.getElementById('lm-picker-list').innerHTML = html;
+}
+
+async function addLimitedMember(uid, name) {
+  try {
+    const res = await gasGet('addLimitedMember', { uid, name });
+    if (!res.ok) throw new Error(res.error);
+    toast(`${name} を追加しました`, 's');
+    _limitedMembersCache = [...(_limitedMembersCache||[]), { uid, name, addedAt: '' }];
+    renderLimitedPicker(_allMembersForPicker.filter(m => {
+      const q = document.getElementById('lm-search').value.trim();
+      return !q || m.name.includes(q) || m.kana.includes(q) || m.uid.includes(q);
+    }));
+    refreshLimitedMemberList();
+  } catch (e) {
+    toast('追加失敗: ' + e.message, 'e');
+  }
 }
 
 // ============================================================

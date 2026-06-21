@@ -240,6 +240,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 .tag .del-t:hover{color:var(--red);}
 .exec-btn{width:100%;padding:12px;border-radius:var(--r);border:1px solid #fca5a5;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;background:var(--red-l);color:var(--red);}
 .exec-btn:hover{background:#fecaca;}
+.badge-both{display:inline-block;background:#ea580c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:5px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -452,6 +453,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 const GAS_URL   = 'https://script.google.com/macros/s/AKfycby-Y1bOKg-4YbDe0EO-K0K1BvmnVAShclyIWFWt-1ogiCgZM1Se6Rl_22mYtMtNGymo/exec';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
 
+let currentPwType = (() => { try { return new URLSearchParams(location.search).get('type') || 'normal'; } catch(e) { return 'normal'; } })();
 let adminUser     = null;
 let memberFlags   = {};
 let applicants    = [];
@@ -459,6 +461,7 @@ let shiftDates    = [];
 let locations     = [];
 let cartNumbers   = [];
 let cartPresets   = [];
+let conflictMap   = {}; // uid -> { hasLimitedApply|hasNormalApply: dates[], hasLimitedSlot|hasNormalSlot: dates[] }
 // 設定タブ（タブ3）専用：タブ2「シフト作成」のlocations/cartNumbers/cartPresets（年月で絞り込まれた値）とは
 // 完全に分離し、設定タブを開いている間はタブ2側の再読み込みに影響されないようにする
 let settingsLocations    = [];
@@ -482,8 +485,9 @@ window._blockCols = {};
 // ============================================================
 function gasGet(action, params) {
   const cb = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const p = Object.assign({ type: currentPwType }, params || {});
   let url  = GAS_URL + '?action=' + action + '&callback=' + cb;
-  if (params) url += '&params=' + encodeURIComponent(JSON.stringify(params));
+  url += '&params=' + encodeURIComponent(JSON.stringify(p));
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
   return fetch(url, { redirect: 'follow', signal: ctrl.signal })
@@ -761,6 +765,7 @@ async function loadCreateData() {
     locations    = shiftRes.locations    || [];
     cartNumbers  = shiftRes.cartNumbers  || [];
     cartPresets  = shiftRes.cartPresets  || [];
+    conflictMap  = shiftRes.conflictMap  || {};
     memoMap = {};
     (shiftRes.dates || []).forEach(d => { if (d.memo) memoMap[d.date + '_' + d.time] = d.memo; });
     defaultSlot  = shiftRes.defaultSlot  || 15;
@@ -887,7 +892,8 @@ function buildLeftPanel() {
     const cartNgHtml = cartNg ? `<span style="font-size:10px;color:var(--red);font-weight:700;">🚫カート不可</span>` : '';
     const noteHtml   = note   ? `<span style="font-size:10px;color:var(--ink2);">📝${esc(note)}</span>` : '';
     const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
-    return `<div class="mr-wrap"><div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}</div>`;
+    const bothBadge = a.sameDayBoth ? `<span class="badge-both" title="同日の通常PWにも申込があります。どちらか一方のシフトにしか入れません。">両方</span>` : '';
+    return `<div class="mr-wrap"><div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}</div>`;
   }).join('');
   if (notApplied.length > 0) {
     html += `<div class="lp-sec lp-sec-toggle" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
@@ -1087,7 +1093,7 @@ function buildSlotTable(bi, block) {
       const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
       const watchOn = !!(slot.watch && slot.watch[loc]);
       html += `<td class="cell-w" style="background:${pc[li % pc.length]}20;"><div class="cell-wrap" id="cw-${bi}-${ri}-${li}">`;
-      for (let pi = 0; pi < 3; pi++) { html += buildPS(bi, ri, li, pi, uids[pi] || '', sa, nm, watchOn); }
+      for (let pi = 0; pi < 3; pi++) { html += buildPS(bi, ri, li, pi, uids[pi] || '', sa, nm, watchOn, block.date); }
       html += '</div></td>';
     });
     html += '</tr>';
@@ -1108,11 +1114,24 @@ function buildSlotTable(bi, block) {
   return html;
 }
 
-function buildPS(bi, ri, li, pi, val, sa, nm, watchOn) {
+function buildPS(bi, ri, li, pi, val, sa, nm, watchOn, dateKey) {
   const id = `ps-${bi}-${ri}-${li}-${pi}`;
+
+  // conflictInfo のラベルを option text に付与
+  function conflictSuffix(uid) {
+    const ci = conflictMap[uid];
+    if (!ci || !dateKey) return '';
+    const parts = [];
+    if ((ci.hasLimitedApply || []).includes(dateKey)) parts.push('⚠限定申込');
+    if ((ci.hasNormalApply  || []).includes(dateKey)) parts.push('⚠通常申込');
+    if ((ci.hasLimitedSlot  || []).includes(dateKey)) parts.push('⚠限定割当');
+    if ((ci.hasNormalSlot   || []).includes(dateKey)) parts.push('⚠通常割当');
+    return parts.length ? ' [' + parts.join(' ') + ']' : '';
+  }
+
   let o = '<option value="">—</option>';
-  sa.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
-  if (val && !sa.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
+  sa.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}${conflictSuffix(a.uid)}</option>`; });
+  if (val && !sa.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}${conflictSuffix(val)}</option>`;
   const onchangeAttr = pi === 0 ? `mu(${bi});onPs0Change(${bi},${ri},${li});` : `mu(${bi})`;
   const sel = `<select class="cs" id="${id}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}" onchange="${onchangeAttr}">${o}</select>`;
   if (pi !== 0) return sel;
