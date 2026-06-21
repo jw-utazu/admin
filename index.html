@@ -452,12 +452,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .mf-inp:focus{border-color:var(--blue);}
 .req{color:var(--red);}
 /* PW モード切り替えタブ */
-.pw-type-bar{display:flex;gap:0;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
-.pw-type-tab{padding:6px 18px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink2);border-radius:0;transition:all .15s;}
-.pw-type-tab:first-child{border-radius:6px 0 0 6px;}
-.pw-type-tab:last-child{border-radius:0 6px 6px 0;border-left:none;}
+.pw-type-bar{display:flex;gap:0;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap;row-gap:4px;}
+.pw-type-tab{padding:6px 14px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink2);border-radius:0;transition:all .15s;white-space:nowrap;}
+.pw-tab-first{border-radius:6px 0 0 6px;}
+.pw-tab-add{border-left:none;border-radius:0 6px 6px 0;color:var(--blue);padding:6px 10px;font-size:15px;}
 .pw-type-tab.active{background:#7c3aed;color:#fff;border-color:#7c3aed;}
-.pw-type-tab.active.normal{background:var(--green,#16a34a);border-color:var(--green,#16a34a);}
+.pw-type-tab.active.normal-tab{background:var(--green,#16a34a);border-color:var(--green,#16a34a);}
+/* 限定タブ内の編集アイコン */
+.lt-edit-ic{font-size:9px;margin-left:5px;opacity:0.6;vertical-align:middle;}
+.pw-type-tab.active .lt-edit-ic{opacity:1;color:#fff;}
 /* 両方バッジ */
 .badge-both{display:inline-block;background:#ea580c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:5px;cursor:pointer;}
 /* 限定PW対象メンバーモーダル */
@@ -528,11 +531,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     </div>
   </header>
 
-  <!-- PWモード切替タブ -->
-  <div class="pw-type-bar" id="pw-type-bar">
-    <button class="pw-type-tab active normal" id="pw-tab-normal" onclick="switchPwType('normal')">通常PW</button>
-    <button class="pw-type-tab" id="pw-tab-limited" onclick="switchPwType('limited')">限定PW</button>
-  </div>
+  <!-- PWモード切替タブ（JS で動的レンダリング） -->
+  <div class="pw-type-bar" id="pw-type-bar"></div>
 
   <!-- 年月ドロップダウン -->
   <div class="ym-dropdown" id="ym-dropdown">
@@ -709,6 +709,39 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
       <button class="btn" style="background:var(--red-l);color:var(--red);border-color:var(--red-l);" onclick="clearAllLimitedMembers()">全削除</button>
       <button class="btn btn-g" onclick="closeM('m-limited-members')">閉じる</button>
       <button class="btn btn-p" onclick="openAddLimitedMemberPicker()">＋ メンバー追加</button>
+    </div>
+  </div>
+</div>
+<!-- 限定PW 追加モーダル -->
+<div class="ov" id="m-add-limited-slot">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">🔐 限定PW 追加</span><button class="mx" onclick="closeM('m-add-limited-slot')">&#10005;</button></div>
+    <div class="mbd">
+      <div class="fg">
+        <label class="fl">タブ名</label>
+        <input type="text" id="add-slot-name" class="finp" placeholder="例：スペシャルPW・奉仕者B PW" maxlength="20" />
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-g" onclick="closeM('m-add-limited-slot')">キャンセル</button>
+      <button class="btn btn-p" onclick="confirmAddLimitedSlot()">追加</button>
+    </div>
+  </div>
+</div>
+<!-- 限定PW 編集モーダル -->
+<div class="ov" id="m-edit-limited-slot">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">🔐 限定PW 設定</span><button class="mx" onclick="closeM('m-edit-limited-slot')">&#10005;</button></div>
+    <div class="mbd">
+      <div class="fg">
+        <label class="fl">タブ名</label>
+        <input type="text" id="edit-slot-name" class="finp" maxlength="20" />
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-d" id="edit-slot-delete-btn" onclick="confirmDeleteLimitedSlot()">削除</button>
+      <button class="btn btn-g" onclick="closeM('m-edit-limited-slot')">キャンセル</button>
+      <button class="btn btn-p" onclick="confirmUpdateLimitedSlot()">保存</button>
     </div>
   </div>
 </div>
@@ -1019,7 +1052,8 @@ const INTV_LIST  = [5,10,15,20,30];
 // ============================================================
 // 状態
 // ============================================================
-let currentPwType = 'normal'; // 'normal' | 'limited'
+let currentPwType = 'normal'; // 'normal' | 'limited' | 'limited2' | ...
+let limitedSlots  = [];       // [{id:'limited', name:'限定PW'}, ...]
 const _initNow = new Date();
 const _initNM  = _initNow.getMonth() + 2; // 翌月（1ベース）
 let curY  = _initNM > 12 ? _initNow.getFullYear() + 1 : _initNow.getFullYear();
@@ -1239,6 +1273,12 @@ async function loadAdminData() {
   if (d.currentSlots) {
     slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
   }
+  if (d.limitedSlots && d.limitedSlots.length > 0) {
+    limitedSlots = d.limitedSlots;
+  } else if (limitedSlots.length === 0) {
+    limitedSlots = [{ id: 'limited', name: '限定PW' }];
+  }
+  renderPwTypeTabs();
   renderAll();
   loadCalPubStatus();
   // 描画完了後にローディングを非表示・appを表示
@@ -1419,19 +1459,43 @@ function swTab(id,btn){
 }
 
 // ============================================================
+// PW タブ描画
+// ============================================================
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderPwTypeTabs() {
+  const bar = document.getElementById('pw-type-bar');
+  if (!bar) return;
+  const isNormal = currentPwType === 'normal';
+  let html = `<button class="pw-type-tab pw-tab-first${isNormal ? ' active normal-tab' : ''}" onclick="switchPwType('normal')">通常PW</button>`;
+
+  limitedSlots.forEach((slot, idx) => {
+    const isActive = currentPwType === slot.id;
+    const borderL  = 'border-left:none;';
+    html += `<button class="pw-type-tab${isActive ? ' active' : ''}" style="${borderL}" onclick="switchPwType('${escHtml(slot.id)}')">${escHtml(slot.name)}<span class="lt-edit-ic" onclick="openEditLimitedSlotModal('${escHtml(slot.id)}');event.stopPropagation()">✏</span></button>`;
+  });
+
+  html += `<button class="pw-type-tab pw-tab-add" onclick="openAddLimitedSlotModal()">＋</button>`;
+  bar.innerHTML = html;
+
+  // 限定PW 対象メンバー管理ボタンの表示切り替え
+  const btnLm = document.getElementById('btn-limited-members');
+  if (btnLm) btnLm.style.display = currentPwType !== 'normal' ? '' : 'none';
+}
+
+// ============================================================
 // PW モード切り替え
 // ============================================================
 async function switchPwType(type) {
   if (currentPwType === type) return;
   currentPwType = type;
-  document.getElementById('pw-tab-normal').className  = 'pw-type-tab' + (type === 'normal'  ? ' active normal' : '');
-  document.getElementById('pw-tab-limited').className = 'pw-type-tab' + (type === 'limited' ? ' active' : '');
-  // 限定PW ボタン表示切り替え
-  document.getElementById('btn-limited-members').style.display = type === 'limited' ? '' : 'none';
-  // データ再読み込み
-  toast(type === 'limited' ? '限定PWモードに切り替えました' : '通常PWモードに切り替えました', 's');
+  renderPwTypeTabs();
+  const slotName = limitedSlots.find(s => s.id === type);
+  toast(type === 'normal' ? '通常PWモードに切り替えました' : `${slotName ? slotName.name : '限定PW'}モードに切り替えました`, 's');
   try {
-    await loadData();
+    await loadAdminData();
   } catch (e) {
     toast('データ読み込みエラー: ' + e.message, 'e');
   }
@@ -1444,6 +1508,10 @@ let _limitedMembersCache = [];
 let _allMembersForPicker  = [];
 
 async function openLimitedMembersModal() {
+  // モーダルタイトルを現在の限定PWスロット名に更新
+  const slot = limitedSlots.find(s => s.id === currentPwType);
+  const title = document.querySelector('#m-limited-members .mt');
+  if (title) title.textContent = `🔐 ${slot ? slot.name : '限定PW'} 対象メンバー管理`;
   openM('m-limited-members');
   await refreshLimitedMemberList();
 }
@@ -1503,6 +1571,79 @@ async function clearAllLimitedMembers() {
     if (!res.ok) throw new Error(res.error);
     toast('全メンバーを削除しました', 's');
     await refreshLimitedMemberList();
+  } catch (e) {
+    toast('削除失敗: ' + e.message, 'e');
+  }
+}
+
+// ============================================================
+// 限定PWスロット管理（追加・編集・削除）
+// ============================================================
+let _editingSlotId = null;
+
+function openAddLimitedSlotModal() {
+  document.getElementById('add-slot-name').value = '';
+  openM('m-add-limited-slot');
+}
+
+async function confirmAddLimitedSlot() {
+  const name = document.getElementById('add-slot-name').value.trim();
+  if (!name) { toast('タブ名を入力してください', 'e'); return; }
+  try {
+    const res = await gasGet('addLimitedSlot', { name });
+    if (!res.ok) throw new Error(res.error);
+    closeM('m-add-limited-slot');
+    limitedSlots.push({ id: res.id, name: res.name });
+    renderPwTypeTabs();
+    toast(`「${res.name}」を追加しました`, 's');
+  } catch (e) {
+    toast('追加失敗: ' + e.message, 'e');
+  }
+}
+
+function openEditLimitedSlotModal(id) {
+  _editingSlotId = id;
+  const slot = limitedSlots.find(s => s.id === id);
+  if (!slot) return;
+  document.getElementById('edit-slot-name').value = slot.name;
+  // 最後の1件は削除不可
+  document.getElementById('edit-slot-delete-btn').style.display = limitedSlots.length <= 1 ? 'none' : '';
+  openM('m-edit-limited-slot');
+}
+
+async function confirmUpdateLimitedSlot() {
+  const name = document.getElementById('edit-slot-name').value.trim();
+  if (!name) { toast('タブ名を入力してください', 'e'); return; }
+  if (!_editingSlotId) return;
+  try {
+    const res = await gasGet('updateLimitedSlot', { id: _editingSlotId, name });
+    if (!res.ok) throw new Error(res.error);
+    const slot = limitedSlots.find(s => s.id === _editingSlotId);
+    if (slot) slot.name = name;
+    renderPwTypeTabs();
+    closeM('m-edit-limited-slot');
+    toast('タブ名を変更しました', 's');
+  } catch (e) {
+    toast('保存失敗: ' + e.message, 'e');
+  }
+}
+
+async function confirmDeleteLimitedSlot() {
+  if (!_editingSlotId) return;
+  const slot = limitedSlots.find(s => s.id === _editingSlotId);
+  if (!confirm(`「${slot ? slot.name : _editingSlotId}」を削除しますか？\n（スプレッドシートのデータは残ります）`)) return;
+  try {
+    const res = await gasGet('deleteLimitedSlot', { id: _editingSlotId });
+    if (!res.ok) throw new Error(res.error);
+    limitedSlots = limitedSlots.filter(s => s.id !== _editingSlotId);
+    // 削除したタブが選択中だった場合は通常PWへ戻す
+    if (currentPwType === _editingSlotId) {
+      currentPwType = limitedSlots.length > 0 ? limitedSlots[0].id : 'normal';
+      await loadAdminData();
+    }
+    renderPwTypeTabs();
+    closeM('m-edit-limited-slot');
+    toast('削除しました', 's');
   } catch (e) {
     toast('削除失敗: ' + e.message, 'e');
   }
