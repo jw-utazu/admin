@@ -96,6 +96,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-bottom:1px solid var(--border);}
 .cal-ym-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .cal-ym-nav-btn:hover{background:var(--border);}
+.cal-pub-badge{display:flex;align-items:center;gap:4px;padding:4px 10px;border:none;border-radius:20px;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;line-height:1;}
+.cal-pub-badge.loading{background:var(--surface2);color:var(--ink3);cursor:default;}
+.cal-pub-badge.published{background:var(--green-l);color:var(--green);}
+.cal-pub-badge.unpublished{background:#f3f4f6;color:var(--ink3);}
+.cal-pub-badge.published:hover{background:#dcfce7;}
+.cal-pub-badge.unpublished:hover{background:#e5e7eb;}
 .mini-cal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
 .cal-dows{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface2);border-bottom:1px solid var(--border);}
 .cdow{text-align:center;padding:6px 2px;font-size:10px;font-weight:700;color:var(--ink3);}
@@ -438,6 +444,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .rb-cart{background:#f0fdf4;color:#15803d;}
 .btn-edit-member{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);flex-shrink:0;}
 .btn-edit-member:hover{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
+.btn-delete-member{font-size:11px;padding:4px 8px;border:1px solid var(--red-l);border-radius:6px;background:var(--red-l);cursor:pointer;color:var(--red);font-family:var(--sans);flex-shrink:0;}
+.btn-delete-member:hover{background:var(--red);color:#fff;border-color:var(--red);}
 .mf-row{display:flex;flex-direction:column;gap:4px;}
 .mf-lbl{font-size:11px;font-weight:700;color:var(--ink2);}
 .mf-inp{border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--sans);font-size:13px;color:var(--ink);outline:none;width:100%;}
@@ -526,6 +534,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <span id="cal-ym-label">読み込み中...</span>
             <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
           </div>
+          <button id="cal-pub-badge" class="cal-pub-badge loading" onclick="toggleCalPub()">
+            <span id="cal-pub-badge-text">確認中...</span>
+          </button>
         </div>
         <!-- スクロールエリア（2ヶ月） -->
         <div class="cal-scroll-area" id="cal-scroll-area"></div>
@@ -1168,6 +1179,7 @@ async function loadAdminData() {
     slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
   }
   renderAll();
+  loadCalPubStatus();
   // 描画完了後にローディングを非表示・appを表示
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -1923,6 +1935,49 @@ async function execShiftPub(){
 }
 
 // ============================================================
+// 予定表公開ステータスバッジ
+// ============================================================
+let calPubStatus = null;
+
+async function loadCalPubStatus() {
+  const badge = document.getElementById('cal-pub-badge');
+  const text  = document.getElementById('cal-pub-badge-text');
+  if (!badge || !text) return;
+  try {
+    const r = await gasGet('getCalPubStatus');
+    calPubStatus = r.published;
+    badge.className = 'cal-pub-badge ' + (r.published ? 'published' : 'unpublished');
+    text.textContent = r.published ? '📅 公開中' : '🔒 非公開';
+  } catch(e) {
+    badge.className = 'cal-pub-badge loading';
+    text.textContent = '確認中...';
+  }
+}
+
+async function toggleCalPub() {
+  if (calPubStatus === null) return;
+  if (calPubStatus) {
+    if (!confirm('予定表を非公開にしますか？\n奉仕者はカレンダー情報（日程・実施日）を確認できなくなります。')) return;
+    const badge = document.getElementById('cal-pub-badge');
+    const text  = document.getElementById('cal-pub-badge-text');
+    badge.className = 'cal-pub-badge loading';
+    text.textContent = '処理中...';
+    try {
+      await gasGet('unpublishCalendar');
+      calPubStatus = false;
+      badge.className = 'cal-pub-badge unpublished';
+      text.textContent = '🔒 非公開';
+      toast('予定表を非公開にしました', 's');
+    } catch(e) {
+      toast('エラー: ' + e.message, 'e');
+      loadCalPubStatus();
+    }
+  } else {
+    openCalPubModal();
+  }
+}
+
+// ============================================================
 // 予定表公開
 // ============================================================
 async function openCalPubModal(){
@@ -1979,6 +2034,7 @@ async function execCalPub(){
     document.getElementById('cp-done').style.display='block';
     document.getElementById('m-cp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-cal-pub')">閉じる</button>`;
     toast('予定表を公開しました','s');
+    loadCalPubStatus();
   }catch(e){
     document.getElementById('cp-st').classList.remove('show');
     document.getElementById('cp-exec-btn').disabled=false;
@@ -2873,7 +2929,10 @@ function renderMemberList() {
           ${m.isResponsible ? '<span class="role-badge rb-resp">責任者</span>' : ''}
           ${m.isCart        ? '<span class="role-badge rb-cart">カート</span>' : ''}
         </div>
-        <button class="btn-edit-member" onclick="openMemberEditForm(${m.rowIndex})">編集</button>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-edit-member" onclick="openMemberEditForm(${m.rowIndex})">編集</button>
+          <button class="btn-delete-member" onclick="confirmDeleteMember(${m.rowIndex})">削除</button>
+        </div>
       </div>`;
     });
     return s;
@@ -3030,6 +3089,30 @@ function closeMemberForm() {
   closeM('m-member');
 }
 
+async function confirmDeleteMember(rowIndex) {
+  const m = _memberList.find(x => x.rowIndex === rowIndex);
+  if (!m) return;
+  if (!confirm(`「${m.name}」を削除しますか？\nこの操作は元に戻せません。`)) return;
+
+  const adminUid  = _currentUser?.uid  || '';
+  const adminName = _currentUser?.name || '';
+  showProc('メンバーを削除しています...', '少々お待ちください');
+  try {
+    const res = await gasGet('deleteMember', { rowIndex, adminUid, adminName });
+    if (!res.ok) throw new Error(res.error || '削除失敗');
+    const listRes = await gasGet('getMemberListAll');
+    if (listRes.ok) {
+      _memberList = listRes.members || [];
+      renderMemberList();
+    }
+    hideProc();
+    toast(`「${m.name}」を削除しました`, 's');
+  } catch(e) {
+    hideProc();
+    toast('削除に失敗しました: ' + e.message, 'e');
+  }
+}
+
 // ============================================================
 // 処理中フルスクリーンオーバーレイ
 // ============================================================
@@ -3075,6 +3158,7 @@ async function refreshAdminData() {
   }
   if (d.currentSlots) slots = d.currentSlots.map(s => ({ y: s.y || curY, m: s.m || curM, d: s.d, time: s.time, interval: parseInt(s.interval) || 15 }));
   renderAll();
+  loadCalPubStatus();
 }
 
 </script>
