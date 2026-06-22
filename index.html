@@ -1794,12 +1794,11 @@ async function confirmDeleteLimitedSlot() {
     const res = await gasGet('deleteLimitedSlot', { id: _editingSlotId, deleteSheets });
     if (!res.ok) throw new Error(res.error);
     limitedSlots = limitedSlots.filter(s => s.id !== _editingSlotId);
-    hideProc();
     if (currentPwType === _editingSlotId) {
       currentPwType = limitedSlots.length > 0 ? limitedSlots[0].id : 'normal';
-      await loadAdminData();
     }
-    renderPwTypeTabs();
+    await loadAdminData();
+    hideProc();
     closeM('m-edit-limited-slot');
     toast('削除しました', 's');
   } catch (e) {
