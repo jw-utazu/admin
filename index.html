@@ -81,7 +81,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .layout{display:grid;grid-template-columns:1fr 272px;flex:1;min-height:calc(100vh - 50px);position:relative;}
 @media(max-width:780px){.layout{grid-template-columns:1fr;}.sb{border-left:none;border-top:1px solid var(--border);}}
 /* タブ切り替えローディングオーバーレイ */
-#tab-switch-ov{position:absolute;inset:0;background:rgba(255,255,255,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:80;backdrop-filter:blur(2px);}
+#tab-switch-ov{position:fixed;inset:0;background:rgba(255,255,255,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:8000;backdrop-filter:blur(2px);}
 #tab-switch-ov.show{display:flex;}
 .tab-sw-spin{width:48px;height:48px;border:4px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
 .tab-sw-text{font-size:15px;font-weight:700;color:var(--ink);}
@@ -1739,8 +1739,7 @@ function openEditLimitedSlotModal(id) {
   const slot = limitedSlots.find(s => s.id === id);
   if (!slot) return;
   document.getElementById('edit-slot-name').value = slot.name;
-  // 最後の1件は削除不可
-  document.getElementById('edit-slot-delete-btn').style.display = limitedSlots.length <= 1 ? 'none' : '';
+  document.getElementById('edit-slot-delete-btn').style.display = '';
   openM('m-edit-limited-slot');
 }
 
@@ -1764,12 +1763,38 @@ async function confirmUpdateLimitedSlot() {
 async function confirmDeleteLimitedSlot() {
   if (!_editingSlotId) return;
   const slot = limitedSlots.find(s => s.id === _editingSlotId);
-  if (!confirm(`「${slot ? slot.name : _editingSlotId}」を削除しますか？\n（スプレッドシートのデータは残ります）`)) return;
+  const slotName = slot ? slot.name : _editingSlotId;
+
+  // データ状態を確認
+  showProc('データを確認しています...', '少々お待ちください');
+  let check;
   try {
-    const res = await gasGet('deleteLimitedSlot', { id: _editingSlotId });
+    check = await gasGet('checkLimitedSlotForDelete', { id: _editingSlotId });
+    if (!check.ok) throw new Error(check.error);
+  } catch (e) {
+    hideProc();
+    toast('確認失敗: ' + e.message, 'e');
+    return;
+  }
+  hideProc();
+
+  // シート削除が必要か判定（メンバー1人以上 かつ 申込日等すべて設定済み かつ 実施日1件以上 → シート保持）
+  const deleteSheets = !(check.memberCount >= 1 && check.hasEventDates && check.calSlotCount >= 1);
+
+  let msg;
+  if (deleteSheets) {
+    msg = `「${slotName}」を削除しますか？\n\nメンバーまたはカレンダーのデータが未入力のため、\n関連するシートもすべて削除されます。\n\nこの操作は取り消せません。`;
+  } else {
+    msg = `「${slotName}」を削除しますか？\n（スプレッドシートのシートとデータは保持されます）`;
+  }
+  if (!confirm(msg)) return;
+
+  showProc('削除しています...', '少々お待ちください');
+  try {
+    const res = await gasGet('deleteLimitedSlot', { id: _editingSlotId, deleteSheets });
     if (!res.ok) throw new Error(res.error);
     limitedSlots = limitedSlots.filter(s => s.id !== _editingSlotId);
-    // 削除したタブが選択中だった場合は通常PWへ戻す
+    hideProc();
     if (currentPwType === _editingSlotId) {
       currentPwType = limitedSlots.length > 0 ? limitedSlots[0].id : 'normal';
       await loadAdminData();
@@ -1778,6 +1803,7 @@ async function confirmDeleteLimitedSlot() {
     closeM('m-edit-limited-slot');
     toast('削除しました', 's');
   } catch (e) {
+    hideProc();
     toast('削除失敗: ' + e.message, 'e');
   }
 }
