@@ -714,12 +714,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 </div>
 <!-- 限定PW 追加モーダル -->
 <div class="ov" id="m-add-limited-slot">
-  <div class="modal sm">
+  <div class="modal" style="max-width:440px;">
     <div class="mhd"><span class="mt">🔐 限定PW 追加</span><button class="mx" onclick="closeM('m-add-limited-slot')">&#10005;</button></div>
     <div class="mbd">
       <div class="fg">
         <label class="fl">タブ名</label>
         <input type="text" id="add-slot-name" class="finp" placeholder="例：スペシャルPW・奉仕者B PW" maxlength="20" />
+      </div>
+      <div class="fg" style="margin-top:12px;">
+        <label class="fl">対象メンバー（任意）</label>
+        <input type="text" id="add-slot-member-search" class="finp" placeholder="氏名で絞り込み..." oninput="filterAddSlotPicker()" style="margin-bottom:6px;" />
+        <div id="add-slot-picker-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;"></div>
+        <div id="add-slot-selected-count" style="margin-top:6px;font-size:12px;color:var(--ink3);"></div>
       </div>
     </div>
     <div class="mft">
@@ -1581,9 +1587,63 @@ async function clearAllLimitedMembers() {
 // ============================================================
 let _editingSlotId = null;
 
+let _addSlotSelectedMembers = new Map(); // uid -> {uid, name}
+
 function openAddLimitedSlotModal() {
   document.getElementById('add-slot-name').value = '';
+  document.getElementById('add-slot-member-search').value = '';
+  _addSlotSelectedMembers = new Map();
+  document.getElementById('add-slot-selected-count').textContent = '';
   openM('m-add-limited-slot');
+  _loadAddSlotMembers();
+}
+
+async function _loadAddSlotMembers() {
+  const pickerEl = document.getElementById('add-slot-picker-list');
+  pickerEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--ink3);font-size:12px;">読み込み中...</div>';
+  try {
+    if (_allMembersForPicker.length === 0) {
+      const res = await gasGet('getMemberList');
+      _allMembersForPicker = (res.ok && res.members) ? res.members : [];
+    }
+    renderAddSlotPicker(_allMembersForPicker);
+  } catch (e) {
+    pickerEl.innerHTML = `<div style="padding:10px;color:var(--red);font-size:12px;">エラー: ${e.message}</div>`;
+  }
+}
+
+function filterAddSlotPicker() {
+  const q = document.getElementById('add-slot-member-search').value.trim();
+  const filtered = q ? _allMembersForPicker.filter(m => m.name.includes(q) || (m.furigana||'').includes(q) || m.uid.includes(q)) : _allMembersForPicker;
+  renderAddSlotPicker(filtered);
+}
+
+function renderAddSlotPicker(members) {
+  const html = members.map(m => {
+    const selected = _addSlotSelectedMembers.has(m.uid);
+    return `<div class="lm-row">
+      <span class="lm-uid">${m.uid}</span>
+      <span class="lm-name">${m.name}</span>
+      ${selected
+        ? `<button class="lm-del" onclick="toggleAddSlotMember('${m.uid}','${m.name.replace(/'/g,"\\'")}')">解除</button>`
+        : `<button class="btn btn-p" style="padding:2px 8px;font-size:11px;" onclick="toggleAddSlotMember('${m.uid}','${m.name.replace(/'/g,"\\'")}')">追加</button>`
+      }
+    </div>`;
+  }).join('') || '<div style="padding:10px;color:var(--ink3);font-size:13px;">該当なし</div>';
+  document.getElementById('add-slot-picker-list').innerHTML = html;
+  const count = _addSlotSelectedMembers.size;
+  document.getElementById('add-slot-selected-count').textContent = count > 0 ? `選択中: ${count}名` : '';
+}
+
+function toggleAddSlotMember(uid, name) {
+  if (_addSlotSelectedMembers.has(uid)) {
+    _addSlotSelectedMembers.delete(uid);
+  } else {
+    _addSlotSelectedMembers.set(uid, { uid, name });
+  }
+  const q = document.getElementById('add-slot-member-search').value.trim();
+  const filtered = q ? _allMembersForPicker.filter(m => m.name.includes(q) || (m.furigana||'').includes(q) || m.uid.includes(q)) : _allMembersForPicker;
+  renderAddSlotPicker(filtered);
 }
 
 async function confirmAddLimitedSlot() {
@@ -1595,7 +1655,15 @@ async function confirmAddLimitedSlot() {
     closeM('m-add-limited-slot');
     limitedSlots.push({ id: res.id, name: res.name });
     renderPwTypeTabs();
-    toast(`「${res.name}」を追加しました`, 's');
+    const selectedMembers = [..._addSlotSelectedMembers.values()];
+    if (selectedMembers.length > 0) {
+      for (const m of selectedMembers) {
+        try { await gasGet('addLimitedMember', { uid: m.uid, name: m.name, type: res.id }); } catch (_) {}
+      }
+      toast(`「${res.name}」を追加し、${selectedMembers.length}名のメンバーを設定しました`, 's');
+    } else {
+      toast(`「${res.name}」を追加しました`, 's');
+    }
   } catch (e) {
     toast('追加失敗: ' + e.message, 'e');
   }
@@ -1656,7 +1724,7 @@ async function openAddLimitedMemberPicker() {
   pickerEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--ink3);">読み込み中...</div>';
   try {
     if (_allMembersForPicker.length === 0) {
-      const res = await gasGet('getMembers');
+      const res = await gasGet('getMemberList');
       _allMembersForPicker = (res.ok && res.members) ? res.members : [];
     }
     renderLimitedPicker(_allMembersForPicker);
@@ -1667,7 +1735,7 @@ async function openAddLimitedMemberPicker() {
 
 function filterLimitedPicker() {
   const q = document.getElementById('lm-search').value.trim();
-  const filtered = q ? _allMembersForPicker.filter(m => m.name.includes(q) || m.kana.includes(q) || m.uid.includes(q)) : _allMembersForPicker;
+  const filtered = q ? _allMembersForPicker.filter(m => m.name.includes(q) || (m.furigana||'').includes(q) || m.uid.includes(q)) : _allMembersForPicker;
   renderLimitedPicker(filtered);
 }
 
@@ -1695,7 +1763,7 @@ async function addLimitedMember(uid, name) {
     _limitedMembersCache = [...(_limitedMembersCache||[]), { uid, name, addedAt: '' }];
     renderLimitedPicker(_allMembersForPicker.filter(m => {
       const q = document.getElementById('lm-search').value.trim();
-      return !q || m.name.includes(q) || m.kana.includes(q) || m.uid.includes(q);
+      return !q || m.name.includes(q) || (m.furigana||'').includes(q) || m.uid.includes(q);
     }));
     refreshLimitedMemberList();
   } catch (e) {
