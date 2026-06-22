@@ -78,8 +78,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .ym-dd-btn{padding:6px 14px;border:none;border-radius:var(--r);background:var(--blue);color:#fff;font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;}
 
 /* LAYOUT */
-.layout{display:grid;grid-template-columns:1fr 272px;flex:1;min-height:calc(100vh - 50px);}
+.layout{display:grid;grid-template-columns:1fr 272px;flex:1;min-height:calc(100vh - 50px);position:relative;}
 @media(max-width:780px){.layout{grid-template-columns:1fr;}.sb{border-left:none;border-top:1px solid var(--border);}}
+/* タブ切り替えローディングオーバーレイ */
+#tab-switch-ov{position:absolute;inset:0;background:rgba(255,255,255,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:80;backdrop-filter:blur(2px);}
+#tab-switch-ov.show{display:flex;}
+.tab-sw-spin{width:48px;height:48px;border:4px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
+.tab-sw-text{font-size:15px;font-weight:700;color:var(--ink);}
+.tab-sw-sub{font-size:12px;color:var(--ink3);}
+#pw-type-bar .pw-type-tab:disabled{opacity:.5;cursor:not-allowed;}
 
 /* CAL PANEL */
 .cp{overflow-y:auto;display:flex;flex-direction:column;}
@@ -544,6 +551,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   </div>
 
   <div class="layout">
+    <!-- タブ切り替えローディングオーバーレイ -->
+    <div id="tab-switch-ov">
+      <div class="tab-sw-spin"></div>
+      <div class="tab-sw-text" id="tab-sw-text">データを読み込み中...</div>
+      <div class="tab-sw-sub">しばらくお待ちください</div>
+    </div>
     <!-- CAL PANEL -->
     <div class="cp">
       <!-- タブなし（カレンダーのみ） -->
@@ -1496,14 +1509,32 @@ function renderPwTypeTabs() {
 // ============================================================
 async function switchPwType(type) {
   if (currentPwType === type) return;
+
+  // ローディングオーバーレイを表示し、タブを全て無効化
+  const ov = document.getElementById('tab-switch-ov');
+  const txtEl = document.getElementById('tab-sw-text');
+  const label = type === 'normal' ? '通常PW' : (limitedSlots.find(s => s.id === type)?.name || '限定PW');
+  if (txtEl) txtEl.textContent = `${label} のデータを読み込み中...`;
+  if (ov) ov.classList.add('show');
+  document.querySelectorAll('#pw-type-bar .pw-type-tab').forEach(btn => btn.disabled = true);
+
+  // currentPwType を更新（gasGet の type パラメータに使用）
+  const prevType = currentPwType;
   currentPwType = type;
-  renderPwTypeTabs();
-  const slotName = limitedSlots.find(s => s.id === type);
-  toast(type === 'normal' ? '通常PWモードに切り替えました' : `${slotName ? slotName.name : '限定PW'}モードに切り替えました`, 's');
+
   try {
+    // データ取得完了後に画面を切り替える（loadAdminData 内で renderPwTypeTabs/renderAll が呼ばれる）
     await loadAdminData();
+    const slotName = limitedSlots.find(s => s.id === type);
+    toast(type === 'normal' ? '通常PWモードに切り替えました' : `${slotName ? slotName.name : '限定PW'}モードに切り替えました`, 's');
   } catch (e) {
+    currentPwType = prevType;
+    renderPwTypeTabs();
     toast('データ読み込みエラー: ' + e.message, 'e');
+  } finally {
+    if (ov) ov.classList.remove('show');
+    // renderPwTypeTabs で再描画されるが、エラー時のために念のため解除
+    document.querySelectorAll('#pw-type-bar .pw-type-tab').forEach(btn => btn.disabled = false);
   }
 }
 
@@ -1649,22 +1680,56 @@ function toggleAddSlotMember(uid, name) {
 async function confirmAddLimitedSlot() {
   const name = document.getElementById('add-slot-name').value.trim();
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
+
+  const selectedMembers = [..._addSlotSelectedMembers.values()];
+  const tasks = [{ id: 'slot', label: `🔐 限定PW「${name}」を作成` }];
+  if (selectedMembers.length > 0) tasks.push({ id: 'members', label: `👥 メンバー設定（${selectedMembers.length}名）` });
+
+  closeM('m-add-limited-slot');
+  showProc('限定PW を追加しています', '完了までそのままお待ちください');
+  showProcSteps(tasks);
+
+  async function runStep(id, fn) {
+    setProcStep(id, 'running');
+    try { const r = await fn(); setProcStep(id, 'done'); return r; }
+    catch (e) { setProcStep(id, 'err', 'エラー: ' + e.message); throw e; }
+  }
+
   try {
-    const res = await gasGet('addLimitedSlot', { name });
-    if (!res.ok) throw new Error(res.error);
-    closeM('m-add-limited-slot');
+    const res = await runStep('slot', async () => {
+      const r = await gasGet('addLimitedSlot', { name });
+      if (!r.ok) throw new Error(r.error);
+      return r;
+    });
+
     limitedSlots.push({ id: res.id, name: res.name });
     renderPwTypeTabs();
-    const selectedMembers = [..._addSlotSelectedMembers.values()];
+
     if (selectedMembers.length > 0) {
+      setProcStep('members', 'running');
+      let failed = 0;
       for (const m of selectedMembers) {
-        try { await gasGet('addLimitedMember', { uid: m.uid, name: m.name, type: res.id }); } catch (_) {}
+        try { await gasGet('addLimitedMember', { uid: m.uid, name: m.name, type: res.id }); }
+        catch (_) { failed++; }
       }
-      toast(`「${res.name}」を追加し、${selectedMembers.length}名のメンバーを設定しました`, 's');
+      if (failed > 0) {
+        setProcStep('members', 'err', `${failed}名失敗`);
+        await new Promise(r => setTimeout(r, 600));
+        hideProc();
+        toast(`「${res.name}」を追加しましたが、${failed}名の設定に失敗しました`, 'e');
+      } else {
+        setProcStep('members', 'done');
+        await new Promise(r => setTimeout(r, 600));
+        hideProc();
+        toast(`「${res.name}」を追加し、${selectedMembers.length}名のメンバーを設定しました`, 's');
+      }
     } else {
+      await new Promise(r => setTimeout(r, 400));
+      hideProc();
       toast(`「${res.name}」を追加しました`, 's');
     }
   } catch (e) {
+    hideProc();
     toast('追加失敗: ' + e.message, 'e');
   }
 }
