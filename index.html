@@ -1292,10 +1292,8 @@ async function loadAdminData() {
   if (d.currentSlots) {
     slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
   }
-  if (d.limitedSlots && d.limitedSlots.length > 0) {
+  if (d.limitedSlots) {
     limitedSlots = d.limitedSlots;
-  } else if (limitedSlots.length === 0) {
-    limitedSlots = [{ id: 'limited', name: '限定PW' }];
   }
   renderPwTypeTabs();
   renderAll();
