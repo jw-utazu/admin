@@ -1611,7 +1611,10 @@ async function switchPwType(type) {
 
   // 年月ドロップダウンは通常PWのみ表示
   const ymDd = document.getElementById('ym-dropdown');
-  if (ymDd) ymDd.classList.remove('open');  // 非表示の場合は閉じる
+  if (ymDd) {
+    ymDd.classList.remove('open');
+    ymDd.style.display = type !== 'normal' ? 'none' : '';
+  }
 
   // ローディングオーバーレイを表示し、タブを全て無効化
   const ov = document.getElementById('tab-switch-ov');
