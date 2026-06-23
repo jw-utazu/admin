@@ -97,7 +97,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .tb.on{color:var(--blue);border-bottom-color:var(--blue);font-weight:700;}
 
 /* カレンダーコンテナ（スクロール可） */
-.cal-scroll-area{height:420px;overflow-y:auto;padding:14px;border-bottom:1px solid var(--border);}
+.cal-scroll-area{height:560px;overflow-y:auto;padding:14px;border-bottom:1px solid var(--border);}
 .cal-month-block{margin-bottom:20px;}
 .cal-month-label{display:none;}
 .cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-bottom:1px solid var(--border);}
@@ -1404,10 +1404,13 @@ function renderAll() {
   if (slotsArea) slotsArea.style.display = isLimited ? 'none' : '';
   const datesArea = document.getElementById('info-dates-card');
   if (datesArea) datesArea.style.display = isLimited ? 'none' : '';
+  // 限定PWではカレンダーエリアを非表示にしてフェーズカードを前面に出す
+  const calArea = document.getElementById('cal-scroll-area');
+  if (calArea) calArea.style.display = isLimited ? 'none' : '';
   updYmTitle();
   updStatus();
   updDateViews();
-  buildCalScroll();
+  if (!isLimited) buildCalScroll();
   buildSlotSetList();
   buildInfoArea();
 }
@@ -1470,13 +1473,18 @@ function calcStatus() {
 }
 
 // ============================================================
-// カレンダースクロール（3ヶ月表示: 前月・当月・翌月）
+// カレンダースクロール（当月から6ヶ月分表示）
 // ============================================================
 function buildCalScroll() {
   const area = document.getElementById('cal-scroll-area');
   area.innerHTML = '';
-  // 前月・当月の2ヶ月を描画
-  const months = [ prevMonth(curY,curM), {y:curY,m:curM} ];
+  // 当月から6ヶ月分を描画
+  const months = [];
+  let my = curY, mm = curM;
+  for (let i = 0; i < 6; i++) {
+    months.push({y: my, m: mm});
+    if (mm === 12) { my++; mm = 1; } else { mm++; }
+  }
   months.forEach(({y,m}) => {
     const block = document.createElement('div');
     block.className = 'cal-month-block';
@@ -2262,17 +2270,20 @@ async function savePhases() {
   const ovTxt = document.getElementById('tab-sw-text');
   if (ov) { ov.style.display = 'flex'; if (ovTxt) ovTxt.textContent = 'フェーズを保存中...'; }
   try {
+    const toYMD = obj => obj ? `${obj.y}/${String(obj.m).padStart(2,'0')}/${String(obj.d).padStart(2,'0')}` : '';
     const phasesForGas = adminPhases.map(p => ({
-      apply:       p.apply    ? `${p.apply.m}/${p.apply.d}`       : '',
-      deadline:    p.deadline ? `${p.deadline.m}/${p.deadline.d}` : '',
-      open:        p.open     ? `${p.open.m}/${p.open.d}`         : '',
+      apply:    toYMD(p.apply),
+      deadline: toYMD(p.deadline),
+      open:     toYMD(p.open),
       slots: (p.slots || []).map(s => ({
-        date:     `${s.y}/${String(s.m).padStart(2,'0')}/${String(s.d).padStart(2,'0')}`,
+        y:        s.y,
+        m:        s.m,
+        d:        s.d,
         time:     s.time,
         interval: s.interval || 15
       }))
     }));
-    const res = await gasGet('updateLimitedCalendarSlots', { type: currentPwType, phases: JSON.stringify(phasesForGas) });
+    const res = await gasGet('updateLimitedCalendarSlots', { type: currentPwType, phases: phasesForGas });
     if (!res.ok) throw new Error(res.error || '保存失敗');
     buildPhaseManageArea(true);
   } catch (e) {
