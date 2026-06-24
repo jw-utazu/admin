@@ -1099,6 +1099,17 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   </div>
 </div>
 
+<!-- 限定PW 実施日設定モーダル -->
+<div class="ov" id="m-slot-edit">
+  <div class="modal sm">
+    <div class="mhd">
+      <span class="mt" id="m-slot-edit-title">実施日の設定</span>
+      <button class="mx" onclick="closeSlotEditModal()">&#10005;</button>
+    </div>
+    <div id="m-slot-edit-body"></div>
+  </div>
+</div>
+
 <!-- 処理中フルスクリーンオーバーレイ -->
 <div id="proc-ov">
   <div class="proc-logo"><img src="logo.png" alt="PW" onerror="this.style.display='none'"></div>
@@ -2155,12 +2166,99 @@ function setDayAsSlot() {
   popupTimes = exist.length>0
     ? exist.map(s=>parseTimeStr(s.time,s.interval))
     : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
-  renderPopup(y,m,d);
-  // popup-areaが見えるようにスクロール
-  setTimeout(()=>{
-    const el=document.getElementById('popup-area');
-    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
-  },100);
+  if(currentPwType !== 'normal'){
+    const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
+    document.getElementById('m-slot-edit-title').textContent=m+'/'+d+'（'+dow+'）第'+wn+'週 実施日設定';
+    renderPopupModal(y,m,d);
+    openM('m-slot-edit');
+  } else {
+    renderPopup(y,m,d);
+    // popup-areaが見えるようにスクロール
+    setTimeout(()=>{
+      const el=document.getElementById('popup-area');
+      if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+    },100);
+  }
+}
+
+function renderPopupModal(y,m,d){
+  const area=document.getElementById('m-slot-edit-body');
+  const timeOpts=h=>HOURS_LIST.map(v=>`<option value="${v}"${v===h?' selected':''}>${v}</option>`).join('');
+  const minOpts =mn=>MINS_LIST.map(v=>`<option value="${v}"${v===mn?' selected':''}>${v}</option>`).join('');
+  const intvOpts=i=>INTV_LIST.map(v=>`<option value="${v}"${v===i?' selected':''}>${v}分</option>`).join('');
+  const rowsHtml=popupTimes.map((t,i)=>`
+    <div class="sp-time-row">
+      <div style="display:flex;gap:2px;">
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sh=this.value">${timeOpts(t.sh)}</select>
+        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sm=this.value">${minOpts(t.sm)}</select>
+      </div>
+      <span class="time-wave">〜</span>
+      <div style="display:flex;gap:2px;">
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].eh=this.value">${timeOpts(t.eh)}</select>
+        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
+        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].em=this.value">${minOpts(t.em)}</select>
+      </div>
+      <select class="intv-sel" onchange="popupTimes[${i}].intv=parseInt(this.value)">${intvOpts(t.intv)}</select>
+      <button class="sp-del-btn" onclick="delSpTimeModal(${i})">&#10005;</button>
+    </div>`).join('');
+  area.innerHTML=`<div class="sp-wrap">
+    <div class="sp-body">${rowsHtml}</div>
+    <div style="padding:6px 12px;">
+      <button class="sp-add-btn" onclick="addSpTimeModal()">&#65291; 時間帯を追加</button>
+    </div>
+    <div class="sp-ft">
+      <button class="btn btn-g" onclick="closeSlotEditModal()" style="font-size:11px;padding:5px 12px;">キャンセル</button>
+      <button class="btn btn-p" onclick="confirmSlotModal()" style="font-size:11px;padding:5px 12px;">確定</button>
+    </div>
+  </div>`;
+}
+function addSpTimeModal(){
+  popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
+  renderPopupModal(popupDay.y,popupDay.m,popupDay.d);
+}
+function delSpTimeModal(i){
+  popupTimes.splice(i,1);
+  if(popupTimes.length===0)popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
+  renderPopupModal(popupDay.y,popupDay.m,popupDay.d);
+}
+function closeSlotEditModal(){closeM('m-slot-edit');popupDay=null;}
+async function confirmSlotModal(){
+  if(!popupDay)return;
+  const{y,m,d}=popupDay;
+  // global slots に反映（カレンダー表示用）
+  slots=slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+  popupTimes.forEach(t=>{
+    const time=parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em;
+    slots.push({y,m,d,time,interval:parseInt(t.intv)||15});
+  });
+  // adminPhases に反映（保存用）— 申込〜締切範囲が一致するフェーズ優先、なければ先頭
+  if(adminPhases.length>0){
+    let ti=0;
+    if(adminPhases.length>1){
+      const dt=new Date(y,m-1,d);
+      for(let i=0;i<adminPhases.length;i++){
+        const p=adminPhases[i];
+        if(p.apply&&p.deadline){
+          const a=new Date(p.apply.y,p.apply.m-1,p.apply.d);
+          const de=new Date(p.deadline.y,p.deadline.m-1,p.deadline.d);
+          if(dt>=a&&dt<=de){ti=i;break;}
+        }
+      }
+    }
+    const ph=adminPhases[ti];
+    if(!ph.slots)ph.slots=[];
+    ph.slots=ph.slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+    popupTimes.forEach(t=>{
+      const time=parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em;
+      ph.slots.push({y,m,d,time,interval:parseInt(t.intv)||15});
+    });
+  }
+  popupDay=null;
+  closeM('m-slot-edit');
+  buildCalScroll();
+  buildPhaseManageArea(true);
+  await savePhases();
 }
 
 function resetDaySettings() {
