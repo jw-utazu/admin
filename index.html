@@ -1123,69 +1123,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 <div class="ta" id="ta"></div>
 
 <!-- フェーズ追加・編集モーダル -->
-<div class="ov" id="m-phase-modal">
-  <div class="modal" style="max-width:500px;width:96%;max-height:90vh;overflow-y:auto;">
-    <div class="mhd">
-      <span class="mt" id="phase-modal-title">フェーズを追加</span>
-      <button class="mx" onclick="closePhaseModal()">&#10005;</button>
-    </div>
-    <div style="padding:14px;">
-      <!-- 受付日程 -->
-      <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">受付日程</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:12px;width:90px;flex-shrink:0;">📅 申込開始日</span>
-          <input type="date" id="pm-apply" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:var(--sans);">
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:12px;width:90px;flex-shrink:0;">⏰ 締切日</span>
-          <input type="date" id="pm-deadline" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:var(--sans);">
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:12px;width:90px;flex-shrink:0;">🗂 シフト公開日</span>
-          <input type="date" id="pm-open" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:var(--sans);">
-        </div>
-      </div>
-      <!-- 実施日スロット -->
-      <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">実施日・時刻</div>
-      <div id="pm-slots-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-      <button id="pm-add-slot-btn" onclick="openSlotPopover(null,-1)" style="width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--r);background:none;font-size:12px;color:var(--ink2);cursor:pointer;font-family:var(--sans);">＋ 実施日を追加</button>
-      <!-- インライン実施日フォーム -->
-      <div id="pm-slot-form" style="display:none;margin-top:8px;background:var(--surface2);border-radius:var(--r);padding:10px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:8px;" id="sp-title">実施日を追加</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label for="sp-date" style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">📅 日付</label>
-            <input type="date" id="sp-date" name="sp-date" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label for="sp-time" style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">⏰ 開始</label>
-            <input type="time" id="sp-time" name="sp-time" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label for="sp-interval" style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">🔁 間隔</label>
-            <select id="sp-interval" name="sp-interval" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
-              <option value="10">10分</option>
-              <option value="15" selected>15分</option>
-              <option value="20">20分</option>
-              <option value="30">30分</option>
-              <option value="45">45分</option>
-              <option value="60">60分</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
-          <button type="button" onclick="closeSlotPopover()" style="padding:5px 14px;border:1px solid var(--border);border-radius:var(--r);background:none;font-size:12px;font-family:var(--sans);cursor:pointer;">キャンセル</button>
-          <button type="button" onclick="confirmSlotPopover()" style="padding:5px 14px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer;">確定</button>
-        </div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--border);justify-content:flex-end;">
-      <button onclick="closePhaseModal()" style="padding:7px 18px;border:1px solid var(--border);border-radius:var(--r);background:none;font-size:13px;font-family:var(--sans);cursor:pointer;">キャンセル</button>
-      <button onclick="savePhaseModal()" style="padding:7px 18px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;">保存</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ============================================================
@@ -1206,14 +1143,16 @@ const INTV_LIST  = [5,10,15,20,30];
 let currentPwType = 'normal'; // 'normal' | 'limited' | 'limited2' | ...
 let limitedSlots  = [];       // [{id:'limited', name:'限定PW'}, ...]
 const _initNow = new Date();
-let curY  = _initNow.getFullYear();
-let curM  = _initNow.getMonth() + 1;  // 対象月（今月をデフォルト）
+const _nextM = new Date(_initNow.getFullYear(), _initNow.getMonth() + 1, 1);
+let curY  = _nextM.getFullYear();
+let curM  = _nextM.getMonth() + 1;  // 対象月（来月をデフォルト）
 let scY   = curY, scM  = curM;            // 日程設定カレンダー月
 let _currentUser = null;                   // ログイン中の管理者情報
 let slotY = curY, slotM = curM;           // 実施日カレンダー月
-let calY  = curY, calM  = curM;           // カレンダー表示月（限定PW専用）
+let calY  = _initNow.getFullYear(), calM  = _initNow.getMonth() + 1;  // カレンダー表示月（限定PW専用）
 let adminData   = null;
 let adminPhases = [];  // 限定PWフェーズ一覧（getAdminData で取得）
+let currentPhaseIndex = 0; // 現在編集中のフェーズ番号
 let activeKind  = null;  // 'apply'|'deadline'|'open'|null
 let dateEditMode = false;
 let slotMode    = false;
@@ -1330,11 +1269,12 @@ async function _processUserWithGasAuth(u, save) {
     av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
   }
   const now = new Date();
-  curY = now.getFullYear();
-  curM = now.getMonth() + 1; // 今月をデフォルト
+  const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  curY = _nm.getFullYear();
+  curM = _nm.getMonth() + 1; // 来月をデフォルト
   scY = curY; scM = curM;
   slotY = curY; slotM = curM;
-  calY = curY; calM = curM;
+  calY = now.getFullYear(); calM = now.getMonth() + 1;
   setLoadingStep(3, 'データを読み込み中...');
   loadAdminData();
 }
@@ -1428,7 +1368,11 @@ async function loadAdminData() {
   if (d.limitedSlots) {
     limitedSlots = d.limitedSlots;
   }
-  if (d.phases) adminPhases = d.phases;
+  if (d.phases) {
+    adminPhases = d.phases;
+    currentPhaseIndex = 0;
+    if (currentPwType !== 'normal') syncSlotsFromPhases();
+  }
   renderPwTypeTabs();
   renderAll();
   loadCalPubStatus();
@@ -1628,7 +1572,11 @@ async function loadAdminDataWithOverlay() {
   } else {
     slots = [];
   }
-  if (d.phases) adminPhases = d.phases;
+  if (d.phases) {
+    adminPhases = d.phases;
+    currentPhaseIndex = 0;
+    if (currentPwType !== 'normal') syncSlotsFromPhases();
+  }
   renderAll();
   loadCalPubStatus();
 }
@@ -1642,7 +1590,12 @@ function buildCalGrid(gid, y, m, mode) {
   const today = new Date(); today.setHours(0,0,0,0);
   const fDow = first.getDay(), off = fDow===0?6:fDow-1;
   const toDate = obj => obj ? new Date(obj.y,obj.m-1,obj.d).getTime() : null;
-  const ap = toDate(dates.apply), dl = toDate(dates.deadline), op = toDate(dates.open);
+  let _dApply = dates.apply, _dDeadline = dates.deadline, _dOpen = dates.open;
+  if (currentPwType !== 'normal' && mode === 'main') {
+    const _ph = adminPhases[currentPhaseIndex];
+    _dApply = _ph ? _ph.apply : null; _dDeadline = _ph ? _ph.deadline : null; _dOpen = _ph ? _ph.open : null;
+  }
+  const ap = toDate(_dApply), dl = toDate(_dDeadline), op = toDate(_dOpen);
   let h='';
   for(let i=0;i<off;i++) h+='<div class="cc other"></div>';
   for(let d=1;d<=last.getDate();d++){
@@ -1742,6 +1695,7 @@ async function switchPwType(type) {
   // currentPwType を更新（gasGet の type パラメータに使用）
   const prevType = currentPwType;
   currentPwType = type;
+  currentPhaseIndex = 0;
 
   try {
     // データ取得完了後に画面を切り替える（loadAdminData 内で renderPwTypeTabs/renderAll が呼ばれる）
@@ -2106,23 +2060,46 @@ function closeSlotDetail(){
 let daySelectTarget = null;
 
 function openDaySelectModal(y,m,d) {
-  if(d < 1) return; // 空白セルは無視
+  if(d < 1) return;
   daySelectTarget = {y,m,d};
   const dt = new Date(y,m-1,d);
   const dow = DOW7[dt.getDay()===0?6:dt.getDay()-1];
   document.getElementById('m-day-select-title').textContent = m+'/'+d+'（'+dow+'） の設定';
+  buildDaySelectContent(y,m,d);
+  openM('m-day-select');
+}
 
-  const isApply    = dates.apply    && dates.apply.y===y    && dates.apply.m===m    && dates.apply.d===d;
-  const isDeadline = dates.deadline && dates.deadline.y===y && dates.deadline.m===m && dates.deadline.d===d;
-  const isOpen     = dates.open     && dates.open.y===y     && dates.open.m===m     && dates.open.d===d;
-  const hasSlot    = slots.some(s=>s.y===y&&s.m===m&&s.d===d);
-  const hasAny     = isApply||isDeadline||isOpen||hasSlot;
+function buildDaySelectContent(y,m,d) {
+  const isLimited = currentPwType !== 'normal';
+  let isApply, isDeadline, isOpen, hasSlot;
+  if (isLimited) {
+    const ph = adminPhases[currentPhaseIndex] || {};
+    isApply    = ph.apply    && ph.apply.y===y    && ph.apply.m===m    && ph.apply.d===d;
+    isDeadline = ph.deadline && ph.deadline.y===y && ph.deadline.m===m && ph.deadline.d===d;
+    isOpen     = ph.open     && ph.open.y===y     && ph.open.m===m     && ph.open.d===d;
+    hasSlot    = (ph.slots||[]).some(s=>s.y===y&&s.m===m&&s.d===d);
+  } else {
+    isApply    = dates.apply    && dates.apply.y===y    && dates.apply.m===m    && dates.apply.d===d;
+    isDeadline = dates.deadline && dates.deadline.y===y && dates.deadline.m===m && dates.deadline.d===d;
+    isOpen     = dates.open     && dates.open.y===y     && dates.open.m===m     && dates.open.d===d;
+    hasSlot    = slots.some(s=>s.y===y&&s.m===m&&s.d===d);
+  }
+  const hasAny = isApply||isDeadline||isOpen||hasSlot;
+  document.getElementById('m-day-reset-btn').style.display = hasAny ? 'inline-flex' : 'none';
 
-  const btn = document.getElementById('m-day-reset-btn');
-  btn.style.display = hasAny ? 'inline-flex' : 'none';
+  let phaseTabs = '';
+  if (isLimited) {
+    const tabs = adminPhases.map((p, i) => {
+      const active = i === currentPhaseIndex;
+      return `<button onclick="switchPhaseInModal(${i})" style="padding:3px 9px;border:1px solid ${active?'var(--blue)':'var(--border)'};border-radius:5px;background:${active?'var(--blue)':'var(--surface)'};color:${active?'#fff':'var(--ink2)'};font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">フェーズ ${i+1}</button>`;
+    }).join('');
+    phaseTabs = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);align-items:center;">
+      <span style="font-size:11px;color:var(--ink3);flex-shrink:0;">対象フェーズ：</span>${tabs}
+      <button onclick="addNewPhaseFromModal()" style="padding:3px 8px;border:1px solid var(--blue);border-radius:5px;background:var(--blue-l);color:var(--blue);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">＋</button>
+    </div>`;
+  }
 
-  const btnsEl = document.getElementById('m-day-select-btns');
-  btnsEl.innerHTML = `
+  document.getElementById('m-day-select-btns').innerHTML = phaseTabs + `
     <button class="abtn" onclick="setDayAs('apply')" style="border-color:${isApply?'var(--green)':'var(--border)'};background:${isApply?'var(--green-l)':''};">
       <div class="ab-ic ic-g">&#128203;</div>
       <div class="ab-tx"><span class="ab-n" style="color:var(--green);">申込開始日</span><span class="ab-d">${isApply?'✓ 設定済み':'この日を申込開始日にする'}</span></div>
@@ -2139,30 +2116,56 @@ function openDaySelectModal(y,m,d) {
       <div class="ab-ic ic-t">&#127775;</div>
       <div class="ab-tx"><span class="ab-n" style="color:var(--purple);">実施日</span><span class="ab-d">${hasSlot?'✓ 設定済み（クリックで時間帯編集）':'この日を実施日にする'}</span></div>
     </button>`;
-  openM('m-day-select');
+}
+
+function switchPhaseInModal(i) {
+  currentPhaseIndex = i;
+  buildPhaseManageArea(true);
+  buildCalScroll();
+  if (daySelectTarget) buildDaySelectContent(daySelectTarget.y, daySelectTarget.m, daySelectTarget.d);
 }
 
 function setDayAs(kind) {
   if(!daySelectTarget) return;
   const {y,m,d} = daySelectTarget;
-  datesBak = JSON.parse(JSON.stringify(dates));
-  dates[kind] = {y,m,d};
-  closeM('m-day-select');
-  updDateViews();
-  buildCalScroll();
-  buildInfoArea();
-  // 変更フラグを立てて保存ボタンを活性化
-  datesChanged = true;
-  updSaveDatesBtn();
+  const isLimited = currentPwType !== 'normal';
+  if (isLimited) {
+    if (adminPhases.length === 0) {
+      adminPhases.push({apply:null,deadline:null,open:null,applyRaw:null,deadlineRaw:null,openRaw:null,slots:[]});
+      currentPhaseIndex = 0;
+    }
+    const ph = adminPhases[currentPhaseIndex];
+    ph[kind] = {y,m,d};
+    ph[kind+'Raw'] = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    closeM('m-day-select');
+    buildPhaseManageArea(true);
+    buildCalScroll();
+    savePhases();
+  } else {
+    datesBak = JSON.parse(JSON.stringify(dates));
+    dates[kind] = {y,m,d};
+    closeM('m-day-select');
+    updDateViews();
+    buildCalScroll();
+    buildInfoArea();
+    datesChanged = true;
+    updSaveDatesBtn();
+  }
 }
 
 function setDayAsSlot() {
   if(!daySelectTarget) return;
   const {y,m,d} = daySelectTarget;
   closeM('m-day-select');
-  // 既存スロットから読み込み
   popupDay = {y,m,d};
-  const exist = slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
+  const isLimited = currentPwType !== 'normal';
+  let exist;
+  if (isLimited) {
+    const ph = adminPhases[currentPhaseIndex] || {};
+    exist = (ph.slots||[]).filter(s=>s.y===y&&s.m===m&&s.d===d);
+  } else {
+    exist = slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
+  }
   popupTimes = exist.length>0
     ? exist.map(s=>parseTimeStr(s.time,s.interval))
     : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
@@ -2226,28 +2229,19 @@ async function confirmSlotModal(){
   popupDay=null;
   closeM('m-slot-edit');
   if(currentPwType !== 'normal'){
-    // 限定PW: adminPhases にも反映して即時保存
-    if(adminPhases.length>0){
-      let ti=0;
-      if(adminPhases.length>1){
-        const dt=new Date(y,m-1,d);
-        for(let i=0;i<adminPhases.length;i++){
-          const p=adminPhases[i];
-          if(p.apply&&p.deadline){
-            const a=new Date(p.apply.y,p.apply.m-1,p.apply.d);
-            const de=new Date(p.deadline.y,p.deadline.m-1,p.deadline.d);
-            if(dt>=a&&dt<=de){ti=i;break;}
-          }
-        }
-      }
-      const ph=adminPhases[ti];
-      if(!ph.slots)ph.slots=[];
-      ph.slots=ph.slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
-      popupTimes.forEach(t=>{
-        const time=parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em;
-        ph.slots.push({y,m,d,time,interval:parseInt(t.intv)||15});
-      });
+    // 限定PW: 現在のフェーズに反映して即時保存
+    if(adminPhases.length === 0){
+      adminPhases.push({apply:null,deadline:null,open:null,applyRaw:null,deadlineRaw:null,openRaw:null,slots:[]});
+      currentPhaseIndex = 0;
     }
+    const ph=adminPhases[currentPhaseIndex];
+    if(!ph.slots)ph.slots=[];
+    ph.slots=ph.slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+    popupTimes.forEach(t=>{
+      const time=parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em;
+      ph.slots.push({y,m,d,time,interval:parseInt(t.intv)||15});
+    });
+    syncSlotsFromPhases();
     buildCalScroll();
     buildPhaseManageArea(true);
     await savePhases();
@@ -2263,21 +2257,33 @@ async function confirmSlotModal(){
 function resetDaySettings() {
   if(!daySelectTarget) return;
   const {y,m,d} = daySelectTarget;
-  // 受付日程リセット
-  ['apply','deadline','open'].forEach(k=>{
-    if(dates[k]&&dates[k].y===y&&dates[k].m===m&&dates[k].d===d) dates[k]=null;
-  });
-  // スロットリセット
-  slots = slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+  const isLimited = currentPwType !== 'normal';
   closeM('m-day-select');
-  updDateViews();
-  buildCalScroll();
-  buildSlotSetList();
-  buildInfoArea();
-  // GASに保存
-  gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
-    .then(()=>toast('設定をリセットしました','s'))
-    .catch(e=>toast('保存に失敗しました: '+e.message,'e'));
+  if (isLimited) {
+    const ph = adminPhases[currentPhaseIndex];
+    if (ph) {
+      ['apply','deadline','open'].forEach(k=>{
+        if(ph[k]&&ph[k].y===y&&ph[k].m===m&&ph[k].d===d){ph[k]=null;ph[k+'Raw']=null;}
+      });
+      ph.slots = (ph.slots||[]).filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+    }
+    syncSlotsFromPhases();
+    buildPhaseManageArea(true);
+    buildCalScroll();
+    savePhases().then(()=>toast('設定をリセットしました','s')).catch(e=>toast('保存に失敗: '+e.message,'e'));
+  } else {
+    ['apply','deadline','open'].forEach(k=>{
+      if(dates[k]&&dates[k].y===y&&dates[k].m===m&&dates[k].d===d) dates[k]=null;
+    });
+    slots = slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
+    updDateViews();
+    buildCalScroll();
+    buildSlotSetList();
+    buildInfoArea();
+    gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
+      .then(()=>toast('設定をリセットしました','s'))
+      .catch(e=>toast('保存に失敗しました: '+e.message,'e'));
+  }
 }
 
 // ============================================================
@@ -2329,9 +2335,10 @@ function buildInfoArea() {
 // ============================================================
 // フェーズ管理UI（限定PW）
 // ============================================================
-let _phaseEditIndex = -1;
-let _pmSlots = [];
-let _slotPopoverEditIdx = -1;
+function syncSlotsFromPhases() {
+  slots = [];
+  adminPhases.forEach(ph => { (ph.slots||[]).forEach(s => slots.push(s)); });
+}
 
 function buildPhaseManageArea(isLimited) {
   const card = document.getElementById('phase-manage-card');
@@ -2339,181 +2346,89 @@ function buildPhaseManageArea(isLimited) {
   if (!isLimited) { card.style.display = 'none'; return; }
   card.style.display = 'block';
 
-  const fmt = obj => {
-    if (!obj) return '<span style="color:var(--ink3)">未設定</span>';
+  const phases = adminPhases || [];
+  if (currentPhaseIndex >= phases.length) currentPhaseIndex = Math.max(0, phases.length - 1);
+
+  const fmtVal = obj => {
+    if (!obj) return '<span class="dgc-val unset">未設定</span>';
     const dt = new Date(obj.y, obj.m - 1, obj.d);
     const dow = DOW7[dt.getDay() === 0 ? 6 : dt.getDay() - 1];
-    return `${obj.m}/${obj.d}（${dow}）`;
-  };
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const isActivePhase = (p) => {
-    if (!p.apply || !p.deadline) return false;
-    const a = new Date(p.apply.y, p.apply.m - 1, p.apply.d);
-    const d = new Date(p.deadline.y, p.deadline.m - 1, p.deadline.d);
-    return today >= a && today <= d;
+    return `<span>${obj.m}/${obj.d}（${dow}）</span>`;
   };
 
-  const phases = adminPhases || [];
-  const itemsHtml = phases.length === 0
-    ? '<div style="padding:12px;text-align:center;color:var(--ink3);font-size:12px;">フェーズがありません</div>'
-    : phases.map((p, i) => {
-      const active = isActivePhase(p);
-      const slotCount = (p.slots || []).length;
-      return `<div class="phase-list-item ${active ? 'active-phase' : ''}">
-        <span class="phase-badge">フェーズ ${i + 1}${active ? ' ✓' : ''}</span>
-        <div class="phase-dates" style="flex:1;">
-          <span style="color:var(--green)">申込: ${fmt(p.apply)}</span>
-          <span style="margin:0 4px;color:var(--border)">|</span>
-          <span style="color:var(--amber,#d97706)">締切: ${fmt(p.deadline)}</span>
-          <span style="margin:0 4px;color:var(--border)">|</span>
-          <span style="color:var(--blue)">公開: ${fmt(p.open)}</span>
-          <br><span style="color:var(--ink3);font-size:11px;">実施日 ${slotCount}件</span>
-        </div>
-        <button class="phase-edit-btn" onclick="openPhaseModal(${i})">編集</button>
-        <button class="phase-del-btn" onclick="deletePhase(${i})">削除</button>
-      </div>`;
-    }).join('');
-
-  card.innerHTML = `
-    <div class="dsp-card">
-      <div class="dsp-hd" style="display:flex;align-items:center;justify-content:space-between;">
-        <span class="dsp-title">フェーズ一覧</span>
-        <button onclick="openPhaseModal(-1)" style="padding:3px 9px;border:1px solid var(--accent);border-radius:5px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">＋ フェーズを追加</button>
-      </div>
-      <div style="padding:8px;">${itemsHtml}</div>
-    </div>`;
-}
-
-function openPhaseModal(idx) {
-  _phaseEditIndex = idx;
-  const titleEl = document.getElementById('phase-modal-title');
-  if (idx < 0) {
-    titleEl.textContent = 'フェーズを追加';
-    document.getElementById('pm-apply').value = '';
-    document.getElementById('pm-deadline').value = '';
-    document.getElementById('pm-open').value = '';
-    _pmSlots = [];
-  } else {
-    titleEl.textContent = `フェーズ ${idx + 1} を編集`;
-    const p = adminPhases[idx];
-    const toInput = obj => obj ? `${obj.y}-${String(obj.m).padStart(2,'0')}-${String(obj.d).padStart(2,'0')}` : '';
-    document.getElementById('pm-apply').value = toInput(p.apply);
-    document.getElementById('pm-deadline').value = toInput(p.deadline);
-    document.getElementById('pm-open').value = toInput(p.open);
-    _pmSlots = (p.slots || []).map(s => ({
-      date: `${s.y}-${String(s.m).padStart(2,'0')}-${String(s.d).padStart(2,'0')}`,
-      time: s.time || '',
-      interval: s.interval || 15
-    }));
-  }
-  renderPmSlotList();
-  openM('m-phase-modal');
-}
-
-function closePhaseModal() {
-  closeSlotPopover();
-  closeM('m-phase-modal');
-}
-
-function renderPmSlotList() {
-  const list = document.getElementById('pm-slots-list');
-  if (_pmSlots.length === 0) {
-    list.innerHTML = '<div style="color:var(--ink3);font-size:12px;padding:4px 2px;">実施日がありません</div>';
-    return;
-  }
-  const DOW_S = ['月','火','水','木','金','土','日'];
-  list.innerHTML = _pmSlots.map((s, i) => {
-    let dateLabel = '日付未設定';
-    if (s.date) {
-      const [y, m, d] = s.date.split('-').map(Number);
-      const dow = DOW_S[new Date(y, m - 1, d).getDay() === 0 ? 6 : new Date(y, m - 1, d).getDay() - 1];
-      dateLabel = `${m}/${d}（${dow}）`;
-    }
-    const timeLabel = s.time || '時刻未設定';
-    return `<div class="pm-slot-row" onclick="openSlotPopover(null,${i})" title="クリックで編集">
-      <span style="flex:1.2;font-size:12px;">${dateLabel}</span>
-      <span style="flex:.9;font-size:12px;color:var(--ink2);">${timeLabel}〜</span>
-      <span style="flex:.8;font-size:12px;color:var(--ink3);">${s.interval}分</span>
-      <button class="pm-del" onclick="event.stopPropagation();deletePmSlot(${i})">✕</button>
-    </div>`;
+  const tabsHtml = phases.map((p, i) => {
+    const active = i === currentPhaseIndex;
+    return `<button onclick="switchPhase(${i})" style="padding:3px 9px;border:1px solid ${active?'var(--blue)':'var(--border)'};border-radius:5px;background:${active?'var(--blue)':'var(--surface)'};color:${active?'#fff':'var(--ink2)'};font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">フェーズ ${i+1}</button>`;
   }).join('');
-}
 
-function deletePmSlot(i) {
-  _pmSlots.splice(i, 1);
-  renderPmSlotList();
-}
-
-function openSlotPopover(_triggerEl, editIdx) {
-  _slotPopoverEditIdx = editIdx;
-  const titleEl = document.getElementById('sp-title');
-  if (editIdx < 0) {
-    titleEl.textContent = '実施日を追加';
-    document.getElementById('sp-date').value = '';
-    document.getElementById('sp-time').value = '';
-    document.getElementById('sp-interval').value = '15';
+  let contentHtml = '';
+  if (phases.length === 0) {
+    contentHtml = '<div style="padding:14px;text-align:center;color:var(--ink3);font-size:12px;">カレンダーの日付をクリックして申込開始日などを設定してください</div>';
   } else {
-    titleEl.textContent = '実施日を編集';
-    const s = _pmSlots[editIdx];
-    document.getElementById('sp-date').value = s.date || '';
-    document.getElementById('sp-time').value = s.time || '';
-    document.getElementById('sp-interval').value = String(s.interval || 15);
+    const ph = phases[currentPhaseIndex];
+    contentHtml += `<div class="date-grid-cards">
+      <div class="dgc g"><span class="dgc-label">申込開始</span><span class="dgc-val">${fmtVal(ph.apply)}</span></div>
+      <div class="dgc a"><span class="dgc-label">締切日</span><span class="dgc-val">${fmtVal(ph.deadline)}</span></div>
+      <div class="dgc b"><span class="dgc-label">シフト公開</span><span class="dgc-val">${fmtVal(ph.open)}</span></div>
+    </div>`;
+    const phSlots = ph.slots || [];
+    if (phSlots.length === 0) {
+      contentHtml += '<div style="padding:8px 12px;font-size:11px;color:var(--ink3);border-top:1px solid var(--border);">実施日がありません。カレンダーの日付をクリックして追加できます。</div>';
+    } else {
+      const groups = {};
+      phSlots.forEach(s => { const k=s.y+'/'+s.m+'/'+s.d; if(!groups[k])groups[k]={y:s.y,m:s.m,d:s.d,times:[]}; groups[k].times.push(s); });
+      contentHtml += `<div style="border-top:1px solid var(--border);">${Object.values(groups).map(g => {
+        const dt=new Date(g.y,g.m-1,g.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];
+        const wn=getWeekNum(g.y,g.m,g.d);
+        return `<div class="slc-group" style="cursor:pointer" onclick="openDaySelectModal(${g.y},${g.m},${g.d})">
+          <div class="slc-date-row"><span class="slc-date">${g.m}/${g.d}（${dow}）</span><span class="slc-week">第${wn}週</span></div>
+          <div class="slc-times">${g.times.map(t=>`<span class="slc-chip">${t.time}</span>`).join('')}</div>
+        </div>`;
+      }).join('')}</div>`;
+    }
+    if (phases.length > 1) {
+      contentHtml += `<div style="padding:6px 12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
+        <button onclick="deleteCurPhase()" style="padding:3px 9px;border:1px solid var(--red-l);border-radius:5px;background:var(--red-l);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">🗑 このフェーズを削除</button>
+      </div>`;
+    }
   }
-  document.getElementById('pm-slot-form').style.display = 'block';
+
+  card.innerHTML = `<div class="dsp-card">
+    <div class="dsp-hd" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;row-gap:4px;">
+      <span class="dsp-title" style="margin-right:auto;">フェーズ設定</span>
+      ${tabsHtml}
+      <button onclick="addNewPhase()" style="padding:3px 9px;border:1px solid var(--blue);border-radius:5px;background:var(--blue-l);color:var(--blue);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">＋</button>
+    </div>
+    ${contentHtml}
+  </div>`;
 }
 
-function closeSlotPopover() {
-  document.getElementById('pm-slot-form').style.display = 'none';
+function switchPhase(i) {
+  currentPhaseIndex = i;
+  buildPhaseManageArea(true);
+  buildCalScroll();
 }
 
-function confirmSlotPopover() {
-  const date     = document.getElementById('sp-date').value;
-  const time     = document.getElementById('sp-time').value;
-  const interval = parseInt(document.getElementById('sp-interval').value) || 15;
-  if (!date || !time) { toast('日付と開始時刻を入力してください', 'w'); return; }
-  if (_slotPopoverEditIdx < 0) {
-    _pmSlots.push({ date, time, interval });
-  } else {
-    _pmSlots[_slotPopoverEditIdx] = { date, time, interval };
-  }
-  renderPmSlotList();
-  closeSlotPopover();
-}
-
-function parseDateInput(val) {
-  if (!val) return null;
-  const [y, m, d] = val.split('-').map(Number);
-  return { y, m, d };
-}
-
-async function savePhaseModal() {
-  const apply    = parseDateInput(document.getElementById('pm-apply').value);
-  const deadline = parseDateInput(document.getElementById('pm-deadline').value);
-  const open     = parseDateInput(document.getElementById('pm-open').value);
-  const slots = _pmSlots
-    .filter(s => s.date && s.time)
-    .map(s => {
-      const [y, m, d] = s.date.split('-').map(Number);
-      return { y, m, d, time: s.time, interval: s.interval || 15 };
-    });
-
-  const applyRaw    = apply    ? `${apply.y}-${String(apply.m).padStart(2,'0')}-${String(apply.d).padStart(2,'0')}` : null;
-  const deadlineRaw = deadline ? `${deadline.y}-${String(deadline.m).padStart(2,'0')}-${String(deadline.d).padStart(2,'0')}` : null;
-  const openRaw     = open     ? `${open.y}-${String(open.m).padStart(2,'0')}-${String(open.d).padStart(2,'0')}` : null;
-
-  const phase = { apply, deadline, open, applyRaw, deadlineRaw, openRaw, slots };
-  if (_phaseEditIndex < 0) {
-    adminPhases.push(phase);
-  } else {
-    adminPhases[_phaseEditIndex] = phase;
-  }
-  closePhaseModal();
+async function addNewPhase() {
+  adminPhases.push({apply:null,deadline:null,open:null,applyRaw:null,deadlineRaw:null,openRaw:null,slots:[]});
+  currentPhaseIndex = adminPhases.length - 1;
+  buildPhaseManageArea(true);
+  buildCalScroll();
   await savePhases();
 }
 
-async function deletePhase(idx) {
-  if (!confirm(`フェーズ ${idx + 1} を削除しますか？`)) return;
-  adminPhases.splice(idx, 1);
+async function addNewPhaseFromModal() {
+  closeM('m-day-select');
+  await addNewPhase();
+}
+
+async function deleteCurPhase() {
+  if (!confirm(`フェーズ ${currentPhaseIndex + 1} を削除しますか？`)) return;
+  adminPhases.splice(currentPhaseIndex, 1);
+  if (currentPhaseIndex >= adminPhases.length) currentPhaseIndex = Math.max(0, adminPhases.length - 1);
+  syncSlotsFromPhases();
+  buildPhaseManageArea(true);
+  buildCalScroll();
   await savePhases();
 }
 
@@ -2537,7 +2452,6 @@ async function savePhases() {
     }));
     const res = await gasPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas });
     if (!res.ok) throw new Error(res.error || '保存失敗');
-    alert('DEBUG: ' + JSON.stringify(res.debug || res));
     buildPhaseManageArea(true);
   } catch (e) {
     alert('フェーズの保存に失敗しました: ' + e.message);
@@ -4200,7 +4114,11 @@ async function refreshAdminData() {
     dates.open     = toObj(d.eventDates['シフト公開']);
   }
   if (d.currentSlots) slots = d.currentSlots.map(s => ({ y: s.y || curY, m: s.m || curM, d: s.d, time: s.time, interval: parseInt(s.interval) || 15 }));
-  if (d.phases) adminPhases = d.phases;
+  if (d.phases) {
+    adminPhases = d.phases;
+    currentPhaseIndex = 0;
+    if (currentPwType !== 'normal') syncSlotsFromPhases();
+  }
   renderAll();
   loadCalPubStatus();
   loadAutoPublishSettings();
