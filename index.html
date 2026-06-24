@@ -1200,7 +1200,7 @@ let curM  = _initNow.getMonth() + 1;  // 対象月（今月をデフォルト）
 let scY   = curY, scM  = curM;            // 日程設定カレンダー月
 let _currentUser = null;                   // ログイン中の管理者情報
 let slotY = curY, slotM = curM;           // 実施日カレンダー月
-let calY  = curY, calM  = curM;           // カレンダー表示月（シフト管理月と独立）
+let calY  = curY, calM  = curM;           // カレンダー表示月（限定PW専用）
 let adminData   = null;
 let adminPhases = [];  // 限定PWフェーズ一覧（getAdminData で取得）
 let activeKind  = null;  // 'apply'|'deadline'|'open'|null
@@ -1387,11 +1387,10 @@ function gasGet(action, params) {
 // ============================================================
 async function loadAdminData() {
   updYmTitle();
-  // タイムトリガーをバックグラウンドで自動セットアップ（エラーはUI影響なし）
   gasGet('setupTriggers').catch(() => {});
   let d;
   try {
-    d = await gasGet('adminData');
+    d = await gasGet('adminData', { year: curY, month: curM });
   } catch(e) {
     // エラー時はローディングを閉じて認証画面に戻す
     document.getElementById('loading').classList.remove('show');
@@ -1490,7 +1489,6 @@ function applyYmChange() {
   curY = parseInt(document.getElementById('ym-year').value);
   curM = parseInt(document.getElementById('ym-month').value);
   scY=curY; scM=curM; slotY=curY; slotM=curM;
-  calY=curY; calM=curM;
   document.getElementById('ym-dropdown').classList.remove('open');
   loadAdminData();
 }
@@ -1567,16 +1565,61 @@ function chM(dir) {
   if (curM < 1)  { curM = 12; curY--; }
   scY = curY; scM = curM;
   slotY = curY; slotM = curM;
-  calY = curY; calM = curM;
-  updYmTitle();
-  buildCalScroll();
-  buildInfoArea();
+  // 通常PW: ローディングオーバーレイを出してデータ再取得
+  const isLimited = currentPwType !== 'normal';
+  if (!isLimited) {
+    const ov = document.getElementById('tab-switch-ov');
+    const txtEl = document.getElementById('tab-sw-text');
+    if (txtEl) txtEl.textContent = curY + '年' + curM + '月のデータを読み込み中...';
+    if (ov) ov.classList.add('show');
+    loadAdminDataWithOverlay().finally(() => {
+      if (ov) ov.classList.remove('show');
+    });
+  } else {
+    calY = curY; calM = curM;
+    updYmTitle();
+    buildCalScroll();
+    buildInfoArea();
+  }
 }
 function chCalM(dir) {
   calM += dir;
   if (calM > 12) { calM = 1; calY++; }
   if (calM < 1)  { calM = 12; calY--; }
   buildCalScroll();
+}
+
+async function loadAdminDataWithOverlay() {
+  updYmTitle();
+  gasGet('setupTriggers').catch(() => {});
+  let d;
+  try {
+    d = await gasGet('adminData', { year: curY, month: curM });
+  } catch(e) {
+    toast('データの読み込みに失敗しました: ' + e.message, 'e');
+    return;
+  }
+  adminData = d;
+  if (d.eventDates) {
+    const toObj = str => {
+      if (!str) return null;
+      const p = str.split('/');
+      return p.length===2 ? {y:curY, m:parseInt(p[0]), d:parseInt(p[1])} : null;
+    };
+    dates.apply    = toObj(d.eventDates['申込開始']);
+    dates.deadline = toObj(d.eventDates['締切']);
+    dates.open     = toObj(d.eventDates['シフト公開']);
+  } else {
+    dates.apply = dates.deadline = dates.open = null;
+  }
+  if (d.currentSlots) {
+    slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
+  } else {
+    slots = [];
+  }
+  if (d.phases) adminPhases = d.phases;
+  renderAll();
+  loadCalPubStatus();
 }
 
 // ============================================================
@@ -2395,7 +2438,7 @@ async function savePhases() {
         interval: s.interval || 15
       }))
     }));
-    const res = await gasGet('updateLimitedCalendarSlots', { type: currentPwType, phases: phasesForGas });
+    const res = await gasPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas });
     if (!res.ok) throw new Error(res.error || '保存失敗');
     buildPhaseManageArea(true);
   } catch (e) {
@@ -2845,7 +2888,12 @@ async function loadCalPubStatus() {
     const r = await gasGet('getCalPubStatus');
     calPubStatus = r.published;
     badge.className = 'cal-pub-badge ' + (r.published ? 'published' : 'unpublished');
-    text.textContent = r.published ? '📅 公開中' : '🔒 非公開';
+    if (r.published && r.publishedYM) {
+      const [py, pm] = r.publishedYM.split('.').map(Number);
+      text.textContent = '📅 ' + py + '年' + pm + '月 公開中';
+    } else {
+      text.textContent = r.published ? '📅 公開中' : '🔒 非公開';
+    }
   } catch(e) {
     badge.className = 'cal-pub-badge loading';
     text.textContent = '確認中...';
@@ -2879,59 +2927,42 @@ async function toggleCalPub() {
 // 予定表公開
 // ============================================================
 async function openCalPubModal(){
+  const fmt=obj=>{if(!obj)return '<span style="color:var(--ink3)">未設定</span>';const dt=new Date(obj.y,obj.m-1,obj.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];return obj.m+'/'+obj.d+'（'+dow+'）';};
+  const slotGroups={};
+  slots.forEach(s=>{const k=s.m+'/'+s.d;if(!slotGroups[k])slotGroups[k]=[];slotGroups[k].push(s.time);});
+  const slotKeys=Object.keys(slotGroups).sort((a,b)=>{const[am,ad]=a.split('/').map(Number),[bm,bd]=b.split('/').map(Number);return am!==bm?am-bm:ad-bd;});
+  const slotHtml=slotKeys.length>0
+    ? slotKeys.map(k=>`<div class="sumrow"><span class="sumk" style="color:var(--purple);">実施日</span><span class="sumv" style="color:var(--purple);">${k}（${slotGroups[k].length}枠）</span></div>`).join('')
+    : '<div class="sumrow"><span class="sumk" style="color:var(--ink3);">実施日</span><span class="sumv" style="color:var(--ink3);">未設定</span></div>';
   openM('m-cal-pub');
-  document.getElementById('m-cp-body').innerHTML='<div class="loading-row"><div class="spin"></div>情報を取得中...</div>';
-  document.getElementById('m-cp-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-cal-pub\')">閉じる</button>';
-  try{
-    const d=await gasGet('adminData');
-    const fmt=obj=>{if(!obj)return '<span style="color:var(--ink3)">未設定</span>';const dt=new Date(obj.y,obj.m-1,obj.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];return obj.m+'/'+obj.d+'（'+dow+'）';};
-    // 実施日をスロットから収集
-    const slotGroups={};
-    slots.forEach(s=>{const k=s.m+'/'+s.d;if(!slotGroups[k])slotGroups[k]=[];slotGroups[k].push(s.time);});
-    const slotKeys=Object.keys(slotGroups).sort((a,b)=>{const[am,ad]=a.split('/').map(Number),[bm,bd]=b.split('/').map(Number);return am!==bm?am-bm:ad-bd;});
-    const slotHtml=slotKeys.length>0
-      ? slotKeys.map(k=>`<div class="sumrow"><span class="sumk" style="color:var(--purple);">実施日</span><span class="sumv" style="color:var(--purple);">${k}（${slotGroups[k].length}枠）</span></div>`).join('')
-      : '<div class="sumrow"><span class="sumk" style="color:var(--ink3);">実施日</span><span class="sumv" style="color:var(--ink3);">未設定</span></div>';
-    let yrOpts='',moOpts='';
-    for(let y=curY-1;y<=curY+2;y++) yrOpts+=`<option value="${y}"${y===curY?' selected':''}>${y}年</option>`;
-    for(let m=1;m<=12;m++) moOpts+=`<option value="${m}"${m===curM?' selected':''}>${m}月</option>`;
-    document.getElementById('m-cp-body').innerHTML=`
-      <div class="fg"><label class="fl">対象年月</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <select class="fsel" id="cp-year">${yrOpts}</select>
-          <select class="fsel" id="cp-month">${moOpts}</select>
-        </div>
+  document.getElementById('m-cp-body').innerHTML=`
+    <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px;">
+      <span style="background:var(--blue-l);color:var(--blue);padding:3px 10px;border-radius:20px;">${curY}年${curM}月</span> のカレンダーを公開します
+    </div>
+    <div class="fg">
+      <label class="fl">受付日程・実施日</label>
+      <div class="sumbox">
+        <div class="sumrow"><span class="sumk">申込開始</span><span class="sumv" style="color:var(--green);">${fmt(dates.apply)}</span></div>
+        <div class="sumrow"><span class="sumk" style="color:var(--red);">締切</span><span class="sumv" style="color:var(--red);">${fmt(dates.deadline)}</span></div>
+        <div class="sumrow"><span class="sumk">シフト公開</span><span class="sumv" style="color:var(--blue);">${fmt(dates.open)}</span></div>
+        ${slotHtml}
       </div>
-      <div class="fg">
-        <label class="fl">受付日程・実施日</label>
-        <div class="sumbox">
-          <div class="sumrow"><span class="sumk">申込開始</span><span class="sumv" style="color:var(--green);">${fmt(dates.apply)}</span></div>
-          <div class="sumrow"><span class="sumk" style="color:var(--red);">締切</span><span class="sumv" style="color:var(--red);">${fmt(dates.deadline)}</span></div>
-          <div class="sumrow"><span class="sumk">シフト公開</span><span class="sumv" style="color:var(--blue);">${fmt(dates.open)}</span></div>
-          ${slotHtml}
-        </div>
-      </div>
-      <div class="exec-st" id="cp-st"><div class="spin"></div>予定表公開中...</div>
-      <div class="done-box" id="cp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div></div>`;
-    document.getElementById('m-cp-ft').innerHTML=`
-      <button class="btn btn-g" onclick="closeM('m-cal-pub')">キャンセル</button>
-      <button class="btn btn-s" id="cp-exec-btn" onclick="execCalPub()">公開する</button>`;
-  }catch(e){
-    document.getElementById('m-cp-body').innerHTML='<div style="color:var(--red);font-size:12px;">取得に失敗しました: '+e.message+'</div>';
-  }
+    </div>
+    <div class="exec-st" id="cp-st"><div class="spin"></div>予定表公開中...</div>
+    <div class="done-box" id="cp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div></div>`;
+  document.getElementById('m-cp-ft').innerHTML=`
+    <button class="btn btn-g" onclick="closeM('m-cal-pub')">キャンセル</button>
+    <button class="btn btn-s" id="cp-exec-btn" onclick="execCalPub()">${curY}年${curM}月を公開する</button>`;
 }
 async function execCalPub(){
-  const y=parseInt(document.getElementById('cp-year').value);
-  const m=parseInt(document.getElementById('cp-month').value);
   document.getElementById('cp-exec-btn').disabled=true;
   document.getElementById('cp-st').classList.add('show');
   try{
-    // スプレッドシートコピー廃止→スクリプトプロパティへの書き込みのみ
-    await gasGet('publishCalendar',{year:y,month:m});
+    await gasGet('publishCalendar',{year:curY,month:curM});
     document.getElementById('cp-st').classList.remove('show');
     document.getElementById('cp-done').style.display='block';
     document.getElementById('m-cp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-cal-pub')">閉じる</button>`;
-    toast('予定表を公開しました','s');
+    toast(curY+'年'+curM+'月の予定表を公開しました','s');
     loadCalPubStatus();
   }catch(e){
     document.getElementById('cp-st').classList.remove('show');
@@ -3622,7 +3653,7 @@ async function execMonthly() {
         open:     toYMD(p.open),
         slots: (p.slots || []).map(s => ({ y: s.y, m: s.m, d: s.d, time: s.time, interval: s.interval || 15 }))
       }));
-      await runTask('calregen', () => gasGet('updateLimitedCalendarSlots', { phases: phasesForGas }));
+      await runTask('calregen', () => gasPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas }));
     } else {
       // 通常PW: フラット形式（B3/B4/B5 + Row9以降）でカレンダーシートに保存（カレンダー履歴への追記も含む）
       const cleanSlots = slots.map(s => ({ ...s, interval: parseInt(s.interval) || 15, y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d) }));
