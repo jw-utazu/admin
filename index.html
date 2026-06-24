@@ -1447,6 +1447,9 @@ function renderAll() {
   // 限定PWでもカレンダーエリアを表示
   const calArea = document.getElementById('cal-scroll-area');
   if (calArea) calArea.style.display = '';
+  // cal-view-nav は限定PWのみ表示（通常PWは前月+管理月の2ヶ月固定のため不要）
+  const calViewNavBar = document.getElementById('cal-view-nav-bar');
+  if (calViewNavBar) calViewNavBar.style.display = isLimited ? '' : 'none';
   updYmTitle();
   updStatus();
   updDateViews();
@@ -1524,12 +1527,17 @@ function buildCalScroll() {
   const area = document.getElementById('cal-scroll-area');
   area.innerHTML = '';
   updCalViewLabel();
-  // カレンダー表示月から6ヶ月分を描画
+  // 通常PW: 前月 + 管理月の2ヶ月固定 / 限定PW: calY/calM から6ヶ月
   const months = [];
-  let my = calY, mm = calM;
-  for (let i = 0; i < 6; i++) {
-    months.push({y: my, m: mm});
-    if (mm === 12) { my++; mm = 1; } else { mm++; }
+  if (currentPwType === 'normal') {
+    months.push(prevMonth(curY, curM));
+    months.push({y: curY, m: curM});
+  } else {
+    let my = calY, mm = calM;
+    for (let i = 0; i < 6; i++) {
+      months.push({y: my, m: mm});
+      if (mm === 12) { my++; mm = 1; } else { mm++; }
+    }
   }
   months.forEach(({y,m}) => {
     const block = document.createElement('div');
