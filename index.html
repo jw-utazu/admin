@@ -103,7 +103,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-bottom:1px solid var(--border);}
 .cal-ym-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .cal-ym-nav-btn:hover{background:var(--border);}
-.cal-ym-section-label{font-size:10px;font-weight:700;color:var(--ink3);white-space:nowrap;}
+.cal-ym-section-label{font-size:20px;font-weight:700;color:var(--ink);white-space:nowrap;letter-spacing:-.02em;}
 .cal-view-nav{display:flex;align-items:center;gap:6px;padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);}
 .cal-view-nav-label{font-size:10px;color:var(--ink3);font-weight:700;white-space:nowrap;}
 #cal-view-label{font-size:12px;font-weight:700;color:var(--ink2);}
@@ -1138,43 +1138,40 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
       <!-- 実施日スロット -->
       <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">実施日・時刻</div>
       <div id="pm-slots-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-      <button id="pm-add-slot-btn" onclick="openSlotPopover(this,-1)" style="width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--r);background:none;font-size:12px;color:var(--ink2);cursor:pointer;font-family:var(--sans);">＋ 実施日を追加</button>
+      <button id="pm-add-slot-btn" onclick="openSlotPopover(null,-1)" style="width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--r);background:none;font-size:12px;color:var(--ink2);cursor:pointer;font-family:var(--sans);">＋ 実施日を追加</button>
+      <!-- インライン実施日フォーム -->
+      <div id="pm-slot-form" style="display:none;margin-top:8px;background:var(--surface2);border-radius:var(--r);padding:10px;border:1px solid var(--border);">
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:8px;" id="sp-title">実施日を追加</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label for="sp-date" style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">📅 日付</label>
+            <input type="date" id="sp-date" name="sp-date" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label for="sp-time" style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">⏰ 開始</label>
+            <input type="time" id="sp-time" name="sp-time" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label for="sp-interval" style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">🔁 間隔</label>
+            <select id="sp-interval" name="sp-interval" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
+              <option value="10">10分</option>
+              <option value="15" selected>15分</option>
+              <option value="20">20分</option>
+              <option value="30">30分</option>
+              <option value="45">45分</option>
+              <option value="60">60分</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+          <button type="button" onclick="closeSlotPopover()" style="padding:5px 14px;border:1px solid var(--border);border-radius:var(--r);background:none;font-size:12px;font-family:var(--sans);cursor:pointer;">キャンセル</button>
+          <button type="button" onclick="confirmSlotPopover()" style="padding:5px 14px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer;">確定</button>
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--border);justify-content:flex-end;">
       <button onclick="closePhaseModal()" style="padding:7px 18px;border:1px solid var(--border);border-radius:var(--r);background:none;font-size:13px;font-family:var(--sans);cursor:pointer;">キャンセル</button>
       <button onclick="savePhaseModal()" style="padding:7px 18px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;">保存</button>
-    </div>
-  </div>
-</div>
-
-<!-- 実施日設定ポップオーバー -->
-<div id="pm-slot-popover" style="display:none;position:fixed;z-index:9300;">
-  <div style="background:var(--surface);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);border:1px solid var(--border);padding:14px;min-width:268px;">
-    <div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:10px;" id="sp-title">実施日を追加</div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <label style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">📅 日付</label>
-        <input type="date" id="sp-date" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <label style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">⏰ 開始</label>
-        <input type="time" id="sp-time" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <label style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">🔁 間隔</label>
-        <select id="sp-interval" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
-          <option value="10">10分</option>
-          <option value="15" selected>15分</option>
-          <option value="20">20分</option>
-          <option value="30">30分</option>
-          <option value="45">45分</option>
-          <option value="60">60分</option>
-        </select>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-      <button onclick="closeSlotPopover()" style="padding:5px 14px;border:1px solid var(--border);border-radius:var(--r);background:none;font-size:12px;font-family:var(--sans);cursor:pointer;">キャンセル</button>
-      <button onclick="confirmSlotPopover()" style="padding:5px 14px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer;">確定</button>
     </div>
   </div>
 </div>
@@ -2285,7 +2282,7 @@ function renderPmSlotList() {
       dateLabel = `${m}/${d}（${dow}）`;
     }
     const timeLabel = s.time || '時刻未設定';
-    return `<div class="pm-slot-row" onclick="openSlotPopover(this,${i})" title="クリックで編集">
+    return `<div class="pm-slot-row" onclick="openSlotPopover(null,${i})" title="クリックで編集">
       <span style="flex:1.2;font-size:12px;">${dateLabel}</span>
       <span style="flex:.9;font-size:12px;color:var(--ink2);">${timeLabel}〜</span>
       <span style="flex:.8;font-size:12px;color:var(--ink3);">${s.interval}分</span>
@@ -2299,7 +2296,7 @@ function deletePmSlot(i) {
   renderPmSlotList();
 }
 
-function openSlotPopover(triggerEl, editIdx) {
+function openSlotPopover(_triggerEl, editIdx) {
   _slotPopoverEditIdx = editIdx;
   const titleEl = document.getElementById('sp-title');
   if (editIdx < 0) {
@@ -2314,22 +2311,11 @@ function openSlotPopover(triggerEl, editIdx) {
     document.getElementById('sp-time').value = s.time || '';
     document.getElementById('sp-interval').value = String(s.interval || 15);
   }
-  const popover = document.getElementById('pm-slot-popover');
-  popover.style.display = 'block';
-  const rect = triggerEl.getBoundingClientRect();
-  const pw = 284;
-  let left = rect.left + rect.width / 2 - pw / 2;
-  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
-  popover.style.left = left + 'px';
-  if (window.innerHeight - rect.bottom >= 220) {
-    popover.style.top = (rect.bottom + 6) + 'px';
-  } else {
-    popover.style.top = Math.max(8, rect.top - 220) + 'px';
-  }
+  document.getElementById('pm-slot-form').style.display = 'block';
 }
 
 function closeSlotPopover() {
-  document.getElementById('pm-slot-popover').style.display = 'none';
+  document.getElementById('pm-slot-form').style.display = 'none';
 }
 
 function confirmSlotPopover() {
