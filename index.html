@@ -103,6 +103,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-bottom:1px solid var(--border);}
 .cal-ym-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .cal-ym-nav-btn:hover{background:var(--border);}
+.cal-ym-section-label{font-size:10px;font-weight:700;color:var(--ink3);padding:1px 7px;background:var(--bg);border-radius:10px;white-space:nowrap;letter-spacing:.02em;}
+.cal-view-nav{display:flex;align-items:center;gap:6px;padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);}
+.cal-view-nav-label{font-size:10px;color:var(--ink3);font-weight:700;white-space:nowrap;}
+#cal-view-label{font-size:12px;font-weight:700;color:var(--ink2);}
 .cal-pub-badge{display:flex;align-items:center;gap:4px;padding:4px 10px;border:none;border-radius:20px;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;line-height:1;}
 .cal-pub-badge.loading{background:var(--surface2);color:var(--ink3);cursor:default;}
 .cal-pub-badge.published{background:var(--green-l);color:var(--green);}
@@ -584,12 +588,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <button class="cal-ym-nav-btn" onclick="chM(-1)">&#8249;</button>
             <span id="cal-ym-label">読み込み中...</span>
             <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
+            <span class="cal-ym-section-label">シフト管理</span>
           </div>
           <button id="cal-pub-badge" class="cal-pub-badge loading" onclick="toggleCalPub()">
             <span id="cal-pub-badge-text">確認中...</span>
           </button>
         </div>
-        <!-- スクロールエリア（2ヶ月） -->
+        <!-- カレンダー表示月ナビ -->
+        <div class="cal-view-nav">
+          <span class="cal-view-nav-label">カレンダー</span>
+          <button class="cal-ym-nav-btn" onclick="chCalM(-1)">&#8249;</button>
+          <span id="cal-view-label">読み込み中...</span>
+          <button class="cal-ym-nav-btn" onclick="chCalM(1)">&#8250;</button>
+        </div>
+        <!-- スクロールエリア（6ヶ月） -->
         <div class="cal-scroll-area" id="cal-scroll-area"></div>
         <!-- カレンダー下 情報エリア -->
         <div class="cal-info-area">
@@ -1191,6 +1203,7 @@ let curM  = _initNow.getMonth() + 1;  // 対象月（今月をデフォルト）
 let scY   = curY, scM  = curM;            // 日程設定カレンダー月
 let _currentUser = null;                   // ログイン中の管理者情報
 let slotY = curY, slotM = curM;           // 実施日カレンダー月
+let calY  = curY, calM  = curM;           // カレンダー表示月（シフト管理月と独立）
 let adminData   = null;
 let adminPhases = [];  // 限定PWフェーズ一覧（getAdminData で取得）
 let activeKind  = null;  // 'apply'|'deadline'|'open'|null
@@ -1313,6 +1326,7 @@ async function _processUserWithGasAuth(u, save) {
   curM = now.getMonth() + 1; // 今月をデフォルト
   scY = curY; scM = curM;
   slotY = curY; slotM = curM;
+  calY = curY; calM = curM;
   setLoadingStep(3, 'データを読み込み中...');
   loadAdminData();
 }
@@ -1454,6 +1468,10 @@ function updYmTitle() {
   const el2 = document.getElementById('cal-ym-label');
   if(el2) el2.textContent = t;
 }
+function updCalViewLabel() {
+  const el = document.getElementById('cal-view-label');
+  if(el) el.textContent = calY+'年'+calM+'月';
+}
 function toggleYmDropdown() {
   const dd = document.getElementById('ym-dropdown');
   if (!dd.classList.contains('open')) {
@@ -1472,6 +1490,7 @@ function applyYmChange() {
   curY = parseInt(document.getElementById('ym-year').value);
   curM = parseInt(document.getElementById('ym-month').value);
   scY=curY; scM=curM; slotY=curY; slotM=curM;
+  calY=curY; calM=curM;
   document.getElementById('ym-dropdown').classList.remove('open');
   loadAdminData();
 }
@@ -1507,9 +1526,10 @@ function calcStatus() {
 function buildCalScroll() {
   const area = document.getElementById('cal-scroll-area');
   area.innerHTML = '';
-  // 当月から6ヶ月分を描画
+  updCalViewLabel();
+  // カレンダー表示月から6ヶ月分を描画
   const months = [];
-  let my = curY, mm = curM;
+  let my = calY, mm = calM;
   for (let i = 0; i < 6; i++) {
     months.push({y: my, m: mm});
     if (mm === 12) { my++; mm = 1; } else { mm++; }
@@ -1542,9 +1562,16 @@ function chM(dir) {
   if (curM < 1)  { curM = 12; curY--; }
   scY = curY; scM = curM;
   slotY = curY; slotM = curM;
+  calY = curY; calM = curM;
   updYmTitle();
   buildCalScroll();
   buildInfoArea();
+}
+function chCalM(dir) {
+  calM += dir;
+  if (calM > 12) { calM = 1; calY++; }
+  if (calM < 1)  { calM = 12; calY--; }
+  buildCalScroll();
 }
 
 // ============================================================
