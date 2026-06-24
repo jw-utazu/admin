@@ -1154,9 +1154,8 @@ const INTV_LIST  = [5,10,15,20,30];
 let currentPwType = 'normal'; // 'normal' | 'limited' | 'limited2' | ...
 let limitedSlots  = [];       // [{id:'limited', name:'限定PW'}, ...]
 const _initNow = new Date();
-const _initNM  = _initNow.getMonth() + 2; // 翌月（1ベース）
-let curY  = _initNM > 12 ? _initNow.getFullYear() + 1 : _initNow.getFullYear();
-let curM  = _initNM > 12 ? 1 : _initNM;  // 対象月（翌月をデフォルト）
+let curY  = _initNow.getFullYear();
+let curM  = _initNow.getMonth() + 1;  // 対象月（今月をデフォルト）
 let scY   = curY, scM  = curM;            // 日程設定カレンダー月
 let _currentUser = null;                   // ログイン中の管理者情報
 let slotY = curY, slotM = curM;           // 実施日カレンダー月
@@ -1277,11 +1276,9 @@ async function _processUserWithGasAuth(u, save) {
   } else {
     av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
   }
-  // デフォルトを翌月に設定
   const now = new Date();
-  const nextM = now.getMonth() + 2; // 翌月（1ベース）
-  curY = nextM > 12 ? now.getFullYear() + 1 : now.getFullYear();
-  curM = nextM > 12 ? 1 : nextM;
+  curY = now.getFullYear();
+  curM = now.getMonth() + 1; // 今月をデフォルト
   scY = curY; scM = curM;
   slotY = curY; slotM = curM;
   setLoadingStep(3, 'データを読み込み中...');
