@@ -594,14 +594,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <span id="cal-pub-badge-text">確認中...</span>
           </button>
         </div>
-        <!-- カレンダー表示月ナビ -->
-        <div class="cal-view-nav">
+        <!-- カレンダー表示月ナビ（限定PWのみ表示） -->
+        <div class="cal-view-nav" id="cal-view-nav-bar">
           <span class="cal-view-nav-label">カレンダー</span>
           <button class="cal-ym-nav-btn" onclick="chCalM(-1)">&#8249;</button>
           <span id="cal-view-label">読み込み中...</span>
           <button class="cal-ym-nav-btn" onclick="chCalM(1)">&#8250;</button>
         </div>
-        <!-- スクロールエリア（6ヶ月） -->
+        <!-- スクロールエリア -->
         <div class="cal-scroll-area" id="cal-scroll-area"></div>
         <!-- カレンダー下 情報エリア -->
         <div class="cal-info-area">
