@@ -1397,20 +1397,20 @@ async function loadAdminData() {
 
 function renderAll() {
   const isLimited = currentPwType !== 'normal';
-  // 年月ナビ・実施日エリアは限定PWでは不要
+  // 年月ナビは限定PWでは不要なため非表示
   const nav = document.getElementById('cal-ym-nav');
   if (nav) nav.style.visibility = isLimited ? 'hidden' : 'visible';
   const slotsArea = document.getElementById('info-slots-card');
   if (slotsArea) slotsArea.style.display = isLimited ? 'none' : '';
   const datesArea = document.getElementById('info-dates-card');
   if (datesArea) datesArea.style.display = isLimited ? 'none' : '';
-  // 限定PWではカレンダーエリアを非表示にしてフェーズカードを前面に出す
+  // 限定PWでもカレンダーエリアを表示
   const calArea = document.getElementById('cal-scroll-area');
-  if (calArea) calArea.style.display = isLimited ? 'none' : '';
+  if (calArea) calArea.style.display = '';
   updYmTitle();
   updStatus();
   updDateViews();
-  if (!isLimited) buildCalScroll();
+  buildCalScroll();
   buildSlotSetList();
   buildInfoArea();
 }
