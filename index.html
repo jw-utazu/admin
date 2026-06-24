@@ -490,8 +490,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .phase-dates{flex:1;font-size:12px;color:var(--ink2);line-height:1.6;}
 .phase-edit-btn{padding:3px 9px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:11px;cursor:pointer;font-family:var(--sans);}
 .phase-del-btn{padding:3px 9px;border:1px solid var(--red-l);border-radius:4px;background:var(--red-l);color:var(--red);font-size:11px;cursor:pointer;font-family:var(--sans);}
-.pm-slot-row{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--surface2);border-radius:5px;}
-.pm-slot-row input,.pm-slot-row select{padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:var(--sans);background:#fff;}
+.pm-slot-row{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--surface2);border-radius:5px;cursor:pointer;transition:background .12s;}
+.pm-slot-row:hover{background:var(--surface3,#e8eaf0);}
 .pm-slot-row .pm-del{padding:3px 8px;border:none;background:var(--red-l);color:var(--red);border-radius:4px;cursor:pointer;font-size:11px;font-family:var(--sans);}
 </style>
 </head>
@@ -669,13 +669,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
     </div>
 
     <!-- フェーズ追加・編集モーダル -->
-    <div class="modal" id="m-phase-modal" style="display:none;z-index:9100;">
-      <div class="modal-box" style="max-width:500px;width:96%;max-height:90vh;overflow-y:auto;">
-        <div class="modal-hd">
-          <span id="phase-modal-title">フェーズを追加</span>
-          <button class="modal-close" onclick="closePhaseModal()">&#10005;</button>
+    <div class="ov" id="m-phase-modal">
+      <div class="modal" style="max-width:500px;width:96%;max-height:90vh;overflow-y:auto;">
+        <div class="mhd">
+          <span class="mt" id="phase-modal-title">フェーズを追加</span>
+          <button class="mx" onclick="closePhaseModal()">&#10005;</button>
         </div>
-        <div class="modal-body" style="padding:14px;">
+        <div style="padding:14px;">
           <!-- 受付日程 -->
           <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">受付日程</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
@@ -695,11 +695,43 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
           <!-- 実施日スロット -->
           <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">実施日・時刻</div>
           <div id="pm-slots-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-          <button onclick="addPmSlotRow()" style="width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--r);background:none;font-size:12px;color:var(--ink2);cursor:pointer;font-family:var(--sans);">＋ 実施日を追加</button>
+          <button id="pm-add-slot-btn" onclick="openSlotPopover(this,-1)" style="width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--r);background:none;font-size:12px;color:var(--ink2);cursor:pointer;font-family:var(--sans);">＋ 実施日を追加</button>
         </div>
         <div style="display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--border);justify-content:flex-end;">
           <button onclick="closePhaseModal()" style="padding:7px 18px;border:1px solid var(--border);border-radius:var(--r);background:none;font-size:13px;font-family:var(--sans);cursor:pointer;">キャンセル</button>
           <button onclick="savePhaseModal()" style="padding:7px 18px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 実施日設定ポップオーバー -->
+    <div id="pm-slot-popover" style="display:none;position:fixed;z-index:9300;">
+      <div style="background:var(--surface);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);border:1px solid var(--border);padding:14px;min-width:268px;">
+        <div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:10px;" id="sp-title">実施日を追加</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">📅 日付</label>
+            <input type="date" id="sp-date" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">⏰ 開始</label>
+            <input type="time" id="sp-time" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:11px;color:var(--ink3);width:55px;flex-shrink:0;">🔁 間隔</label>
+            <select id="sp-interval" style="flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-family:var(--sans);">
+              <option value="10">10分</option>
+              <option value="15" selected>15分</option>
+              <option value="20">20分</option>
+              <option value="30">30分</option>
+              <option value="45">45分</option>
+              <option value="60">60分</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+          <button onclick="closeSlotPopover()" style="padding:5px 14px;border:1px solid var(--border);border-radius:var(--r);background:none;font-size:12px;font-family:var(--sans);cursor:pointer;">キャンセル</button>
+          <button onclick="confirmSlotPopover()" style="padding:5px 14px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer;">確定</button>
         </div>
       </div>
     </div>
@@ -2125,7 +2157,9 @@ function buildInfoArea() {
 // ============================================================
 // フェーズ管理UI（限定PW）
 // ============================================================
-let _phaseEditIndex = -1; // -1=新規, >=0=編集
+let _phaseEditIndex = -1;
+let _pmSlots = [];
+let _slotPopoverEditIdx = -1;
 
 function buildPhaseManageArea(isLimited) {
   const card = document.getElementById('phase-manage-card');
@@ -2180,16 +2214,13 @@ function buildPhaseManageArea(isLimited) {
 
 function openPhaseModal(idx) {
   _phaseEditIndex = idx;
-  const modal = document.getElementById('m-phase-modal');
   const titleEl = document.getElementById('phase-modal-title');
-  modal.style.display = 'flex';
-
   if (idx < 0) {
     titleEl.textContent = 'フェーズを追加';
     document.getElementById('pm-apply').value = '';
     document.getElementById('pm-deadline').value = '';
     document.getElementById('pm-open').value = '';
-    document.getElementById('pm-slots-list').innerHTML = '';
+    _pmSlots = [];
   } else {
     titleEl.textContent = `フェーズ ${idx + 1} を編集`;
     const p = adminPhases[idx];
@@ -2197,31 +2228,95 @@ function openPhaseModal(idx) {
     document.getElementById('pm-apply').value = toInput(p.apply);
     document.getElementById('pm-deadline').value = toInput(p.deadline);
     document.getElementById('pm-open').value = toInput(p.open);
-    const slotList = document.getElementById('pm-slots-list');
-    slotList.innerHTML = '';
-    (p.slots || []).forEach(s => addPmSlotRow(s));
+    _pmSlots = (p.slots || []).map(s => ({
+      date: `${s.y}-${String(s.m).padStart(2,'0')}-${String(s.d).padStart(2,'0')}`,
+      time: s.time || '',
+      interval: s.interval || 15
+    }));
   }
+  renderPmSlotList();
+  openM('m-phase-modal');
 }
 
 function closePhaseModal() {
-  document.getElementById('m-phase-modal').style.display = 'none';
+  closeSlotPopover();
+  closeM('m-phase-modal');
 }
 
-function addPmSlotRow(slot) {
+function renderPmSlotList() {
   const list = document.getElementById('pm-slots-list');
-  const row = document.createElement('div');
-  row.className = 'pm-slot-row';
-  const dateVal = slot ? `${slot.y}-${String(slot.m).padStart(2,'0')}-${String(slot.d).padStart(2,'0')}` : '';
-  const timeVal = slot ? (slot.time || '') : '';
-  const intVal = slot ? (slot.interval || 15) : 15;
-  row.innerHTML = `
-    <input type="date" class="pm-s-date" value="${dateVal}" style="flex:1.2;">
-    <input type="time" class="pm-s-time" value="${timeVal}" style="flex:.9;">
-    <select class="pm-s-int" style="flex:.8;">
-      ${[10,15,20,30,45,60].map(v=>`<option value="${v}"${v==intVal?' selected':''}>${v}分</option>`).join('')}
-    </select>
-    <button class="pm-del" onclick="this.parentNode.remove()">✕</button>`;
-  list.appendChild(row);
+  if (_pmSlots.length === 0) {
+    list.innerHTML = '<div style="color:var(--ink3);font-size:12px;padding:4px 2px;">実施日がありません</div>';
+    return;
+  }
+  const DOW_S = ['月','火','水','木','金','土','日'];
+  list.innerHTML = _pmSlots.map((s, i) => {
+    let dateLabel = '日付未設定';
+    if (s.date) {
+      const [y, m, d] = s.date.split('-').map(Number);
+      const dow = DOW_S[new Date(y, m - 1, d).getDay() === 0 ? 6 : new Date(y, m - 1, d).getDay() - 1];
+      dateLabel = `${m}/${d}（${dow}）`;
+    }
+    const timeLabel = s.time || '時刻未設定';
+    return `<div class="pm-slot-row" onclick="openSlotPopover(this,${i})" title="クリックで編集">
+      <span style="flex:1.2;font-size:12px;">${dateLabel}</span>
+      <span style="flex:.9;font-size:12px;color:var(--ink2);">${timeLabel}〜</span>
+      <span style="flex:.8;font-size:12px;color:var(--ink3);">${s.interval}分</span>
+      <button class="pm-del" onclick="event.stopPropagation();deletePmSlot(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deletePmSlot(i) {
+  _pmSlots.splice(i, 1);
+  renderPmSlotList();
+}
+
+function openSlotPopover(triggerEl, editIdx) {
+  _slotPopoverEditIdx = editIdx;
+  const titleEl = document.getElementById('sp-title');
+  if (editIdx < 0) {
+    titleEl.textContent = '実施日を追加';
+    document.getElementById('sp-date').value = '';
+    document.getElementById('sp-time').value = '';
+    document.getElementById('sp-interval').value = '15';
+  } else {
+    titleEl.textContent = '実施日を編集';
+    const s = _pmSlots[editIdx];
+    document.getElementById('sp-date').value = s.date || '';
+    document.getElementById('sp-time').value = s.time || '';
+    document.getElementById('sp-interval').value = String(s.interval || 15);
+  }
+  const popover = document.getElementById('pm-slot-popover');
+  popover.style.display = 'block';
+  const rect = triggerEl.getBoundingClientRect();
+  const pw = 284;
+  let left = rect.left + rect.width / 2 - pw / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+  popover.style.left = left + 'px';
+  if (window.innerHeight - rect.bottom >= 220) {
+    popover.style.top = (rect.bottom + 6) + 'px';
+  } else {
+    popover.style.top = Math.max(8, rect.top - 220) + 'px';
+  }
+}
+
+function closeSlotPopover() {
+  document.getElementById('pm-slot-popover').style.display = 'none';
+}
+
+function confirmSlotPopover() {
+  const date     = document.getElementById('sp-date').value;
+  const time     = document.getElementById('sp-time').value;
+  const interval = parseInt(document.getElementById('sp-interval').value) || 15;
+  if (!date || !time) { toast('日付と開始時刻を入力してください', 'w'); return; }
+  if (_slotPopoverEditIdx < 0) {
+    _pmSlots.push({ date, time, interval });
+  } else {
+    _pmSlots[_slotPopoverEditIdx] = { date, time, interval };
+  }
+  renderPmSlotList();
+  closeSlotPopover();
 }
 
 function parseDateInput(val) {
@@ -2234,16 +2329,12 @@ async function savePhaseModal() {
   const apply    = parseDateInput(document.getElementById('pm-apply').value);
   const deadline = parseDateInput(document.getElementById('pm-deadline').value);
   const open     = parseDateInput(document.getElementById('pm-open').value);
-  const slotRows = document.querySelectorAll('#pm-slots-list .pm-slot-row');
-  const slots = [];
-  slotRows.forEach(row => {
-    const dateStr = row.querySelector('.pm-s-date').value;
-    const time    = row.querySelector('.pm-s-time').value;
-    const intv    = parseInt(row.querySelector('.pm-s-int').value) || 15;
-    if (!dateStr || !time) return;
-    const [y, m, d] = dateStr.split('-').map(Number);
-    slots.push({ y, m, d, time, interval: intv });
-  });
+  const slots = _pmSlots
+    .filter(s => s.date && s.time)
+    .map(s => {
+      const [y, m, d] = s.date.split('-').map(Number);
+      return { y, m, d, time: s.time, interval: s.interval || 15 };
+    });
 
   const applyRaw    = apply    ? `${apply.y}-${String(apply.m).padStart(2,'0')}-${String(apply.d).padStart(2,'0')}` : null;
   const deadlineRaw = deadline ? `${deadline.y}-${String(deadline.m).padStart(2,'0')}-${String(deadline.d).padStart(2,'0')}` : null;
@@ -3500,9 +3591,22 @@ async function execMonthly() {
   }
 
   try {
-    // ① 必須：日程・実施日を保存（カレンダー履歴への追記も含む）
-    const cleanSlots = slots.map(s => ({ ...s, interval: parseInt(s.interval) || 15, y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d) }));
-    await runTask('calregen', () => gasGet('updateCalendarSlots', { slots: cleanSlots, year: curY, month: curM, apply: dates.apply, deadline: dates.deadline, open: dates.open }));
+    // ① 必須：日程・実施日を保存
+    if (currentPwType !== 'normal') {
+      // 限定PW: フェーズ形式（PHASE/DATE）でカレンダーシートに保存
+      const toYMD = obj => obj ? `${obj.y}/${String(obj.m).padStart(2,'0')}/${String(obj.d).padStart(2,'0')}` : '';
+      const phasesForGas = adminPhases.map(p => ({
+        apply:    toYMD(p.apply),
+        deadline: toYMD(p.deadline),
+        open:     toYMD(p.open),
+        slots: (p.slots || []).map(s => ({ y: s.y, m: s.m, d: s.d, time: s.time, interval: s.interval || 15 }))
+      }));
+      await runTask('calregen', () => gasGet('updateLimitedCalendarSlots', { phases: phasesForGas }));
+    } else {
+      // 通常PW: フラット形式（B3/B4/B5 + Row9以降）でカレンダーシートに保存（カレンダー履歴への追記も含む）
+      const cleanSlots = slots.map(s => ({ ...s, interval: parseInt(s.interval) || 15, y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d) }));
+      await runTask('calregen', () => gasGet('updateCalendarSlots', { slots: cleanSlots, year: curY, month: curM, apply: dates.apply, deadline: dates.deadline, open: dates.open }));
+    }
     if (monthlyChecks.calpub) await runTask('calpub', () => gasGet('publishCalendar', { year: curY, month: curM }));
     if (monthlyChecks.form) {
       document.querySelectorAll('.map-sel-m').forEach(s => { monthlyMappingResult[s.dataset.key] = s.value; });
