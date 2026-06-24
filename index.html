@@ -2537,6 +2537,7 @@ async function savePhases() {
     }));
     const res = await gasPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas });
     if (!res.ok) throw new Error(res.error || '保存失敗');
+    alert('DEBUG: ' + JSON.stringify(res.debug || res));
     buildPhaseManageArea(true);
   } catch (e) {
     alert('フェーズの保存に失敗しました: ' + e.message);
@@ -2649,7 +2650,7 @@ function toggleSlotMode() {
     document.getElementById('slot-mlbl').textContent=slotY+'年'+slotM+'月';
     buildCalGrid('cg-slot',slotY,slotM,'slot');
   } else {
-    closePopup();
+    closeSlotEditModal();
   }
 }
 function chSlotM(dir){
@@ -2664,7 +2665,10 @@ function onSlotClick(y,m,d,el) {
   popupTimes=exist.length>0
     ? exist.map(s=>parseTimeStr(s.time,s.interval))
     : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
-  renderPopup(y,m,d);
+  const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
+  document.getElementById('m-slot-edit-title').textContent=m+'/'+d+'（'+dow+'）第'+wn+'週 実施日設定';
+  renderPopupModal(y,m,d);
+  openM('m-slot-edit');
 }
 function parseTimeStr(timeStr,interval){
   const p=timeStr.match(/(\d{1,2}):(\d{2})[~〜](\d{1,2}):(\d{2})/);
