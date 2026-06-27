@@ -1061,6 +1061,21 @@ function buildLeftPanel() {
     ? `<div style="margin:6px 12px;padding:6px 8px;background:#fef9c3;border:1px solid #fde68a;border-radius:var(--r);font-size:11px;color:#92400e;white-space:pre-wrap;">${esc(memo)}</div>`
     : '';
 
+  // 現在のブロックに割り当て済みの UID セットを構築
+  const assignedUids = new Set();
+  if (block) {
+    (block.slots || []).forEach(slot => {
+      Object.values(slot.places || {}).forEach(uids => {
+        (uids || []).forEach(uid => { if (uid) assignedUids.add(uid); });
+      });
+    });
+    const resp = block.responsible || {};
+    if (resp.r1) assignedUids.add(resp.r1);
+    if (resp.r2) assignedUids.add(resp.r2);
+    const cart = block.cart || {};
+    ['ki1','ki2','ko1','ko2'].forEach(k => { if (cart[k]) assignedUids.add(cart[k]); });
+  }
+
   let html = memoHtml + '<div class="lp-sec">申込者</div>';
   html += applied.map(a => {
     const badgeA = `<span class="sc-badge sc-a">申${a.appliedCount}</span>`;
@@ -1078,7 +1093,8 @@ function buildLeftPanel() {
     const noteHtml   = note   ? `<span style="font-size:10px;color:var(--ink2);">📝${esc(note)}</span>` : '';
     const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
     const bothBadge = a.sameDayBoth ? `<span class="badge-both" title="同日の通常PWにも申込があります。どちらか一方のシフトにしか入れません。">両方</span>` : '';
-    return `<div class="mr-wrap"><div class="mr"><div class="m-dot d-on"></div><div class="m-name">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}</div>`;
+    const dotClass = assignedUids.has(a.uid) ? 'd-on' : 'd-off';
+    return `<div class="mr-wrap"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}</div>`;
   }).join('');
   if (notApplied.length > 0) {
     html += `<div class="lp-sec lp-sec-toggle" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
