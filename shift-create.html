@@ -767,7 +767,7 @@ async function loadCreateData() {
     cartPresets  = shiftRes.cartPresets  || [];
     conflictMap  = shiftRes.conflictMap  || {};
     memoMap = {};
-    (shiftRes.dates || []).forEach(d => { if (d.memo) memoMap[d.date + '_' + d.time] = d.memo; });
+    if (shiftRes.memoMap) Object.assign(memoMap, shiftRes.memoMap);
     defaultSlot  = shiftRes.defaultSlot  || 15;
     recalcCounts();
     buildCreateTabs();
@@ -1257,6 +1257,9 @@ async function saveBlock(bi) {
     await gasGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots });
     block.responsible = data.responsible;
     block.cart = data.cart;
+    block.slots = data.slots;
+    block.place = { p1: (data.usedPlaces || [])[0] || '', p2: (data.usedPlaces || [])[1] || '' };
+    block.placeCart = data.placeCart || {};
     recalcCounts();
     bs[bKey(block)] = true; markSaved(bi); ug(); toast('保存しました', 's');
     buildLeftPanel();
@@ -1270,31 +1273,32 @@ async function saveDayAll() {
   const dayBlocks = shiftDates.filter(d => d.date === tab.date);
   const curIdx = activeTimeIdx;
   for (let i = 0; i < dayBlocks.length; i++) {
-    // 各時間帯タブを順番にレンダリングして保存
     activeTimeIdx = i;
-    buildTimeTabs();
+    // 現在表示中のブロックはすでにDOMに存在するため再レンダリング不要
+    // （再レンダリングするとサーバーの空データでユーザー入力が上書きされる）
+    if (i !== curIdx) buildTimeTabs();
     await saveBlock(i);
   }
-  // 元のタブに戻す
   activeTimeIdx = curIdx;
   buildTimeTabs();
 }
 
 async function saveAll() {
   const tabs = window._dateTabs || [];
-  const curDateIdx = activeDateIdx;
-  const curTimeIdx = activeTimeIdx;
+  const origDateIdx = activeDateIdx;
+  const origTimeIdx = activeTimeIdx;
   for (let di = 0; di < tabs.length; di++) {
     activeDateIdx = di;
     const dayBlocks = shiftDates.filter(d => d.date === tabs[di].date);
     for (let bi = 0; bi < dayBlocks.length; bi++) {
       activeTimeIdx = bi;
-      buildTimeTabs();
+      // 現在表示中のブロックはすでにDOMに存在するため再レンダリング不要
+      if (di !== origDateIdx || bi !== origTimeIdx) buildTimeTabs();
       await saveBlock(bi);
     }
   }
-  activeDateIdx = curDateIdx;
-  activeTimeIdx = curTimeIdx;
+  activeDateIdx = origDateIdx;
+  activeTimeIdx = origTimeIdx;
   buildTimeTabs();
 }
 
