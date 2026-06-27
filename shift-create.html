@@ -256,6 +256,11 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 .cmp-label{font-size:11px;color:var(--purple);font-weight:700;white-space:nowrap;}
 .cmp-sel{border:1px solid #ddd6fe;border-radius:var(--r);padding:4px 8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--surface);color:var(--ink);}
 .cmp-content{overflow-y:auto;flex:1;background:var(--bg);padding:14px;}
+/* ===== リサイズ仕切り ===== */
+.rsz-bar{width:6px;flex-shrink:0;cursor:col-resize;user-select:none;background:var(--border2);transition:background .12s;position:relative;}
+.rsz-bar::after{content:'';position:absolute;inset:0 -3px;z-index:10;}
+.rsz-bar:hover,.rsz-bar.dragging{background:var(--blue);opacity:.7;}
+.rsz-bar.purple:hover,.rsz-bar.purple.dragging{background:var(--purple);opacity:.7;}
 </style>
 </head>
 <body>
@@ -322,6 +327,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
     </div>
   </div>
 
+  <div class="rsz-bar" id="split-rsz" style="display:none;" title="ドラッグして幅を調整"></div>
   <!-- TAB2: シフト作成 -->
   <div class="tab-content" id="tab-create">
     <div class="dtabs" id="dtabs" style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;overflow-x:auto;flex-shrink:0;align-items:center;"><div style="padding:10px 14px;font-size:12px;color:var(--ink3);">読み込み中...</div></div>
@@ -349,6 +355,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
           <div style="padding:24px;color:var(--ink3);text-align:center;">「シフト作成」タブを選択すると読み込みます</div>
         </div>
       </div>
+      <div class="rsz-bar purple" id="cmp-rsz" style="display:none;" title="ドラッグして幅を調整"></div>
       <div class="cmp-panel" id="cmp-panel">
         <div class="cmp-sel-bar">
           <span class="cmp-label">比較表示</span>
@@ -621,15 +628,22 @@ function toggleSplitView() {
   splitMode = !splitMode;
   const wrapper = document.getElementById('content-wrapper');
   const btn = document.getElementById('split-btn');
+  const rsz = document.getElementById('split-rsz');
   if (splitMode) {
+    document.getElementById('tab-wish').style.flex = '';
+    document.getElementById('tab-create').style.flex = '';
     wrapper.classList.add('split');
     btn.classList.add('on');
     btn.textContent = '⊡ 分割解除';
+    if (rsz) rsz.style.display = 'block';
     if (!createLoaded) loadCreateData();
   } else {
     wrapper.classList.remove('split');
     btn.classList.remove('on');
     btn.textContent = '⬛ 分割表示';
+    if (rsz) rsz.style.display = 'none';
+    document.getElementById('tab-wish').style.flex = '';
+    document.getElementById('tab-create').style.flex = '';
     switchMainTab('wish', document.getElementById('mtab-wish'));
   }
 }
@@ -639,15 +653,21 @@ function toggleCompareMode() {
   compareMode = !compareMode;
   const panel = document.getElementById('cmp-panel');
   const btn = document.getElementById('cmp-toggle-btn');
+  const rsz = document.getElementById('cmp-rsz');
   if (compareMode) {
     panel.classList.add('on');
+    if (rsz) rsz.style.display = 'block';
     btn.textContent = '⊡ 比較解除';
     btn.style.cssText = 'border-color:var(--purple);color:var(--purple);white-space:nowrap;';
     populateCmpDateSel();
   } else {
     panel.classList.remove('on');
+    if (rsz) rsz.style.display = 'none';
     btn.textContent = '⬜ 比較';
     btn.style.cssText = 'border-color:var(--teal);color:var(--teal);white-space:nowrap;';
+    const rmWrap = document.querySelector('#tab-create .rm-wrap');
+    if (rmWrap) rmWrap.style.flex = '';
+    panel.style.flex = '';
   }
 }
 function populateCmpDateSel() {
@@ -1515,6 +1535,35 @@ document.getElementById('lpResize').addEventListener('mousedown', e => {
   const up = () => { document.getElementById('lpResize').classList.remove('dragging'); document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
   document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
 });
+
+// ===== 分割・比較パネル リサイズ =====
+(function() {
+  function initRsz(bar, getA, getB, minA, minB) {
+    bar.addEventListener('mousedown', e => {
+      e.preventDefault();
+      bar.classList.add('dragging');
+      const panA = getA(), panB = getB();
+      const startX = e.clientX, startW = panA.offsetWidth;
+      const total = panA.offsetWidth + panB.offsetWidth;
+      const mv = e => {
+        const w = Math.max(minA, Math.min(total - minB, startW + (e.clientX - startX)));
+        panA.style.flex = `0 0 ${w}px`;
+        panB.style.flex = '1 1 0';
+      };
+      const up = () => {
+        bar.classList.remove('dragging');
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+      };
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+  }
+  const sr = document.getElementById('split-rsz');
+  if (sr) initRsz(sr, () => document.getElementById('tab-wish'), () => document.getElementById('tab-create'), 240, 240);
+  const cr = document.getElementById('cmp-rsz');
+  if (cr) initRsz(cr, () => document.querySelector('#tab-create .rm-wrap'), () => document.getElementById('cmp-panel'), 200, 200);
+})();
 
 // ============================================================
 // TAB3: 設定
