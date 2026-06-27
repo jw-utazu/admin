@@ -1513,13 +1513,15 @@ async function saveAll() {
   const tabs = window._dateTabs || [];
   const origDateIdx = activeDateIdx;
   const origTimeIdx = activeTimeIdx;
+  // 現在表示中のブロックを最初に保存（DOM が正しい状態のうちに収集する）
+  await saveBlock(origTimeIdx);
   for (let di = 0; di < tabs.length; di++) {
     activeDateIdx = di;
     const dayBlocks = shiftDates.filter(d => d.date === tabs[di].date);
     for (let bi = 0; bi < dayBlocks.length; bi++) {
+      if (di === origDateIdx && bi === origTimeIdx) continue;
       activeTimeIdx = bi;
-      // 現在表示中のブロックはすでにDOMに存在するため再レンダリング不要
-      if (di !== origDateIdx || bi !== origTimeIdx) buildTimeTabs();
+      buildTimeTabs();
       await saveBlock(bi);
     }
   }
