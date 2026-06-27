@@ -241,6 +241,21 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 .exec-btn{width:100%;padding:12px;border-radius:var(--r);border:1px solid #fca5a5;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;background:var(--red-l);color:var(--red);}
 .exec-btn:hover{background:#fecaca;}
 .badge-both{display:inline-block;background:#ea580c;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:5px;cursor:pointer;}
+/* ===== 分割表示 ===== */
+.main-tabs{align-items:center;}
+#content-wrapper{display:flex;flex:1;min-height:0;overflow:hidden;flex-direction:column;}
+#content-wrapper.split{flex-direction:row;}
+#content-wrapper.split>#tab-wish,#content-wrapper.split>#tab-create{display:flex!important;flex:1;min-width:0;}
+#content-wrapper.split>#tab-wish{border-right:1px solid var(--border);}
+.split-btn{padding:5px 12px;border:1px solid var(--border);border-radius:var(--r);background:none;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;color:var(--ink2);white-space:nowrap;transition:all .15s;}
+.split-btn.on{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
+/* ===== 比較パネル ===== */
+.cmp-panel{display:none;flex-direction:column;flex:1;min-width:0;border-left:2px solid var(--purple);overflow:hidden;}
+.cmp-panel.on{display:flex;}
+.cmp-sel-bar{padding:8px 14px;background:var(--purple-l);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.cmp-label{font-size:11px;color:var(--purple);font-weight:700;white-space:nowrap;}
+.cmp-sel{border:1px solid #ddd6fe;border-radius:var(--r);padding:4px 8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--surface);color:var(--ink);}
+.cmp-content{overflow-y:auto;flex:1;background:var(--bg);padding:14px;}
 </style>
 </head>
 <body>
@@ -285,8 +300,11 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
     <button class="mtab on"  id="mtab-wish"     onclick="switchMainTab('wish',this)">📋 希望確認</button>
     <button class="mtab"     id="mtab-create"   onclick="switchMainTab('create',this)">✏️ シフト作成</button>
     <button class="mtab"     id="mtab-settings" onclick="switchMainTab('settings',this)">⚙️ 設定</button>
+    <div style="flex:1;"></div>
+    <button class="split-btn" id="split-btn" onclick="toggleSplitView()">⬛ 分割表示</button>
   </div>
 
+  <div id="content-wrapper">
   <!-- TAB1: 希望確認 -->
   <div class="tab-content on" id="tab-wish">
     <div class="wish-summary">
@@ -323,12 +341,21 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);gap:8px;flex-shrink:0;">
           <div class="dtabs-time" id="dtabs-time"></div>
           <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button class="tb-btn" id="cmp-toggle-btn" style="border-color:var(--teal);color:var(--teal);white-space:nowrap;" onclick="toggleCompareMode()">⬜ 比較</button>
             <button class="tb-btn" style="border-color:var(--green);color:var(--green);" onclick="saveDayAll()">💾 この日付をすべて保存</button>
           </div>
         </div>
         <div class="rm" id="main-content">
           <div style="padding:24px;color:var(--ink3);text-align:center;">「シフト作成」タブを選択すると読み込みます</div>
         </div>
+      </div>
+      <div class="cmp-panel" id="cmp-panel">
+        <div class="cmp-sel-bar">
+          <span class="cmp-label">比較表示</span>
+          <select class="cmp-sel" id="cmp-date-sel" onchange="onCmpDateChange()"><option value="">日付を選択...</option></select>
+          <select class="cmp-sel" id="cmp-time-sel" onchange="onCmpTimeChange()"><option value="">時間帯を選択...</option></select>
+        </div>
+        <div class="cmp-content" id="cmp-content"><div style="padding:24px;color:var(--ink3);text-align:center;">比較する日付・時間帯を選択してください</div></div>
       </div>
     </div>
   </div>
@@ -415,6 +442,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 
     </div>
   </div>
+  </div><!-- end content-wrapper -->
 </div>
 
 <!-- コメントポップアップ -->
@@ -573,12 +601,148 @@ async function loadInitData() {
 // タブ切り替え
 // ============================================================
 function switchMainTab(name, btn) {
+  if (splitMode && (name === 'wish' || name === 'create')) return;
+  if (splitMode && name === 'settings') {
+    splitMode = false;
+    document.getElementById('content-wrapper').classList.remove('split');
+    const sb = document.getElementById('split-btn');
+    if (sb) { sb.classList.remove('on'); sb.textContent = '⬛ 分割表示'; }
+  }
   document.querySelectorAll('.main-tabs .mtab').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('on'));
   document.getElementById('tab-' + name).classList.add('on');
   if (name === 'create' && !createLoaded) loadCreateData();
   if (name === 'settings' && !settingsLoaded) loadSettingsData();
+}
+// ===== 分割表示 =====
+let splitMode = false;
+function toggleSplitView() {
+  splitMode = !splitMode;
+  const wrapper = document.getElementById('content-wrapper');
+  const btn = document.getElementById('split-btn');
+  if (splitMode) {
+    wrapper.classList.add('split');
+    btn.classList.add('on');
+    btn.textContent = '⊡ 分割解除';
+    if (!createLoaded) loadCreateData();
+  } else {
+    wrapper.classList.remove('split');
+    btn.classList.remove('on');
+    btn.textContent = '⬛ 分割表示';
+    switchMainTab('wish', document.getElementById('mtab-wish'));
+  }
+}
+// ===== 比較モード =====
+let compareMode = false, cmpDateIdx = 0, cmpTimeIdx = 0;
+function toggleCompareMode() {
+  compareMode = !compareMode;
+  const panel = document.getElementById('cmp-panel');
+  const btn = document.getElementById('cmp-toggle-btn');
+  if (compareMode) {
+    panel.classList.add('on');
+    btn.textContent = '⊡ 比較解除';
+    btn.style.cssText = 'border-color:var(--purple);color:var(--purple);white-space:nowrap;';
+    populateCmpDateSel();
+  } else {
+    panel.classList.remove('on');
+    btn.textContent = '⬜ 比較';
+    btn.style.cssText = 'border-color:var(--teal);color:var(--teal);white-space:nowrap;';
+  }
+}
+function populateCmpDateSel() {
+  const sel = document.getElementById('cmp-date-sel');
+  if (!sel) return;
+  const dt = window._dateTabs || [];
+  sel.innerHTML = '<option value="">日付を選択...</option>';
+  dt.forEach((t, i) => { sel.innerHTML += `<option value="${i}">${esc(t.date)}（${esc(t.weekday)}）</option>`; });
+  document.getElementById('cmp-time-sel').innerHTML = '<option value="">時間帯を選択...</option>';
+}
+function onCmpDateChange() {
+  const dateSel = document.getElementById('cmp-date-sel');
+  const timeSel = document.getElementById('cmp-time-sel');
+  const i = parseInt(dateSel.value);
+  if (isNaN(i)) {
+    timeSel.innerHTML = '<option value="">時間帯を選択...</option>';
+    document.getElementById('cmp-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">比較する日付・時間帯を選択してください</div>';
+    return;
+  }
+  cmpDateIdx = i;
+  const tab = (window._dateTabs || [])[i];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  timeSel.innerHTML = '<option value="">時間帯を選択...</option>';
+  dayBlocks.forEach((b, bi) => { timeSel.innerHTML += `<option value="${bi}">${esc(b.time)}</option>`; });
+  document.getElementById('cmp-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">時間帯を選択してください</div>';
+}
+function onCmpTimeChange() {
+  const timeSel = document.getElementById('cmp-time-sel');
+  const bi = parseInt(timeSel.value);
+  if (isNaN(bi)) return;
+  cmpTimeIdx = bi;
+  renderCmpBlock();
+}
+function renderCmpBlock() {
+  const tab = (window._dateTabs || [])[cmpDateIdx];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  const block = dayBlocks[cmpTimeIdx];
+  if (!block) return;
+  document.getElementById('cmp-content').innerHTML = buildCmpBlock(block);
+}
+function getCmpColPlaces(block) {
+  if (block.usedPlaces && block.usedPlaces.length > 0) return [...block.usedPlaces];
+  if (block.place && (block.place.p1 || block.place.p2)) return [block.place.p1, block.place.p2].filter(Boolean);
+  return locations.filter(l => !l.startYM && !l.endYM).map(l => l.name);
+}
+function buildCmpBlock(block) {
+  const nm = buildNameMap();
+  const cols = getCmpColPlaces(block);
+  const slots = block.slots || [];
+  const resp = block.responsible || {};
+  const cart = block.cart || {};
+  const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
+  const r1name = resp.r1 ? (nm[resp.r1] || resp.r1) : '—';
+  const r2name = resp.r2 ? (nm[resp.r2] || resp.r2) : '—';
+  const { ki1='', ki2='', ko1='', ko2='' } = cart;
+  let html = `<div class="tb">`;
+  html += `<div class="tb-hd"><span class="tb-time" style="color:var(--purple);">${esc(block.date)}（${esc(block.weekday)}） ${esc(block.time)}</span></div>`;
+  html += `<div class="resp-area"><div class="area-title">責任者（最大2名）</div><div class="ra-row">
+    <div class="ra-item"><span class="ra-label">担当①</span><span style="font-size:13px;font-weight:700;">${esc(r1name)}</span></div>
+    <div class="ra-item"><span class="ra-label">担当②</span><span style="font-size:13px;font-weight:700;">${esc(r2name)}</span></div>
+  </div></div>`;
+  html += `<div class="cart-area"><div class="area-title cart-title">カート担当者</div>
+    <div class="tbl-wrap"><table class="cart-tbl">
+      <thead><tr><th style="width:90px;"></th><th colspan="2">持ち込み</th><th colspan="2">持ち帰り</th></tr></thead>
+      <tbody><tr><td class="row-lbl">担当者</td>
+        <td style="font-weight:700;">${esc(ki1 ? (nm[ki1]||ki1) : '—')}</td><td style="font-weight:700;">${esc(ki2 ? (nm[ki2]||ki2) : '—')}</td>
+        <td style="font-weight:700;">${esc(ko1 ? (nm[ko1]||ko1) : '—')}</td><td style="font-weight:700;">${esc(ko2 ? (nm[ko2]||ko2) : '—')}</td>
+      </tr></tbody>
+    </table></div>
+  </div>`;
+  if (slots.length === 0) {
+    html += `<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>`;
+  } else if (cols.length === 0) {
+    html += `<div style="padding:12px;color:var(--ink3);font-size:12px;">場所が設定されていません</div>`;
+  } else {
+    html += `<div class="tbl-wrap"><table class="shift-tbl"><thead><tr><th class="th-slot-time">場所</th>`;
+    cols.forEach((loc, li) => { html += `<th class="th-place" style="background:${pc[li%pc.length]};">${esc(loc||'—')}</th>`; });
+    html += `</tr></thead><tbody>`;
+    slots.forEach(slot => {
+      html += `<tr><td class="td-slot-time">${esc(slot.time)}</td>`;
+      cols.forEach((loc, li) => {
+        const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
+        const names = uids.map(uid => nm[uid]||uid).filter(Boolean);
+        html += `<td class="cell-w" style="background:${pc[li%pc.length]}20;">`;
+        html += names.length > 0 ? names.map(n => `<div style="padding:2px 0;font-size:12px;">${esc(n)}</div>`).join('') : `<div style="color:var(--ink3);">—</div>`;
+        html += `</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+  return html;
 }
 function toggleAccMenu() {
   document.getElementById('acc-menu').classList.toggle('on');
@@ -787,6 +951,7 @@ function buildCreateTabs() {
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
   document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
+  if (compareMode) populateCmpDateSel();
 }
 
 function switchDateTab(i) {
