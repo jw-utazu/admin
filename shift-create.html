@@ -485,7 +485,8 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 <div class="ta" id="ta"></div>
 
 <script>
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycby-Y1bOKg-4YbDe0EO-K0K1BvmnVAShclyIWFWt-1ogiCgZM1Se6Rl_22mYtMtNGymo/exec';
+const GAS_URL   = 'https://nqtswiynoxawccldqcwi.supabase.co/functions/v1/api';
+const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xdHN3aXlub3hhd2NjbGRxY3dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MzQxNjIsImV4cCI6MjA5ODMxMDE2Mn0.M-AnCBnXBI1FIyouoa5ttF6mb8PF2YqHfv180PqQWQU';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
 
 let currentPwType = (() => { try { return new URLSearchParams(location.search).get('type') || 'normal'; } catch(e) { return 'normal'; } })();
@@ -524,7 +525,7 @@ function gasGet(action, params) {
   url += '&params=' + encodeURIComponent(JSON.stringify(p));
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
-  return fetch(url, { redirect: 'follow', signal: ctrl.signal })
+  return fetch(url, { redirect: 'follow', signal: ctrl.signal, headers: { 'Authorization': 'Bearer ' + ANON_KEY } })
     .then(r => { clearTimeout(timer); return r.json(); })
     .then(d => {
       if (d && d.error && !d.ok) throw new Error(d.error);
@@ -536,7 +537,7 @@ function gasAuthGet(email, source) {
   const url = GAS_URL + '?action=auth&source=' + encodeURIComponent(source) + '&email=' + encodeURIComponent(email);
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
-  return fetch(url, { redirect: 'follow', signal: ctrl.signal })
+  return fetch(url, { redirect: 'follow', signal: ctrl.signal, headers: { 'Authorization': 'Bearer ' + ANON_KEY } })
     .then(r => { clearTimeout(timer); return r.json(); })
     .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
 }
