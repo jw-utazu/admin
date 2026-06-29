@@ -519,32 +519,25 @@ window._blockCols = {};
 // GAS通信
 // ============================================================
 function gasGet(action, params) {
-  const cb = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   const p = Object.assign({ type: currentPwType }, params || {});
-  let url  = GAS_URL + '?action=' + action + '&callback=' + cb;
+  let url  = GAS_URL + '?action=' + action;
   url += '&params=' + encodeURIComponent(JSON.stringify(p));
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
   return fetch(url, { redirect: 'follow', signal: ctrl.signal })
-    .then(r => r.text())
-    .then(t => {
-      clearTimeout(timer);
-      const s = t.indexOf('('), e = t.lastIndexOf(')');
-      if (s < 0 || e < 0) throw new Error('レスポンス形式エラー');
-      const d = JSON.parse(t.slice(s + 1, e));
+    .then(r => { clearTimeout(timer); return r.json(); })
+    .then(d => {
       if (d && d.error && !d.ok) throw new Error(d.error);
       return d;
     })
     .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
 }
 function gasAuthGet(email, source) {
-  const cb = '_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-  const url = GAS_URL + '?action=auth&source=' + encodeURIComponent(source) + '&email=' + encodeURIComponent(email) + '&callback=' + cb;
+  const url = GAS_URL + '?action=auth&source=' + encodeURIComponent(source) + '&email=' + encodeURIComponent(email);
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
   return fetch(url, { redirect: 'follow', signal: ctrl.signal })
-    .then(r => r.text())
-    .then(t => { clearTimeout(timer); const s = t.indexOf('('), e = t.lastIndexOf(')'); return JSON.parse(t.slice(s + 1, e)); })
+    .then(r => { clearTimeout(timer); return r.json(); })
     .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
 }
 
@@ -1254,7 +1247,10 @@ function buildSlotTable(bi, block) {
 
   const allLocs = locations.map(l => l.name);
   // 空欄("")を含む固定列配列 — これを全セクションで統一して使う
-  const colPlaces = getColPlaces(bi, block);
+  // NOTE: HTML生成中はまだ旧DOMが残っているため getColPlaces でのDOM読み込みを行わない。
+  // DOM読み込みは collectBlock / onPlaceChange のみで行う。
+  initBlockCols(bi, block);
+  const colPlaces = [...window._blockCols[bKey(block)]];
 
   function makeLocSel(li, val) {
     let o = '<option value="">—</option>';
