@@ -1229,19 +1229,11 @@ async function _processUserWithGasAuth(u, save) {
   setLoadingStep(2, '管理者権限を確認中...');
   try {
     // fetch方式（リダイレクト追従対応・Android Chrome対応）
-    const cbName = '_authcb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const url = GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email) + '&callback=' + cbName;
+    const url = GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
     const res = await fetch(url, { redirect: 'follow', signal: controller.signal })
-      .then(r => r.text())
-      .then(text => {
-        clearTimeout(timer);
-        const start = text.indexOf('(');
-        const end   = text.lastIndexOf(')');
-        if (start === -1 || end === -1) throw new Error('レスポンス形式エラー');
-        return JSON.parse(text.slice(start + 1, end));
-      })
+      .then(r => { clearTimeout(timer); return r.json(); })
       .catch(err => {
         clearTimeout(timer);
         if (err.name === 'AbortError') throw new Error('タイムアウト');
@@ -1307,21 +1299,15 @@ function showAuthErr(msg) {
 // GAS通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
 // ============================================================
 function gasGet(action, params) {
-  const cbName = '_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   // type パラメータを自動付与（認証系・メンバー取得など type 不要なアクションは GAS 側で無視する）
   const p = Object.assign({ type: currentPwType }, params || {});
-  let url = GAS_URL+'?action='+action+'&callback='+cbName;
+  let url = GAS_URL+'?action='+action;
   url += '&params='+encodeURIComponent(JSON.stringify(p));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
   return fetch(url, { redirect: 'follow', signal: controller.signal })
-    .then(r => r.text())
-    .then(text => {
-      clearTimeout(timer);
-      const start = text.indexOf('(');
-      const end   = text.lastIndexOf(')');
-      if (start === -1 || end === -1) throw new Error('レスポンス形式エラー');
-      const d = JSON.parse(text.slice(start + 1, end));
+    .then(r => { clearTimeout(timer); return r.json(); })
+    .then(d => {
       if (d && d.error && !d.ok) throw new Error(d.error);
       return d;
     })
