@@ -53,10 +53,14 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .pw-tab-sc.on{background:var(--purple);color:#fff;border-color:var(--purple);}
 /* 場所列の追加・削除 */
 .tbl-wrap{position:relative;}
-.col-add-fab{display:none;position:absolute;right:4px;bottom:4px;width:30px;height:30px;border-radius:50%;background:var(--purple);color:#fff;border:none;cursor:pointer;font-size:16px;font-weight:700;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:5;font-family:var(--sans);align-items:center;justify-content:center;}
-.tbl-wrap:hover .col-add-fab{display:flex;}
 .col-del-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--ink3);padding:2px 3px;border-radius:3px;flex-shrink:0;line-height:1.2;font-family:var(--sans);}
 .col-del-btn:hover{background:rgba(220,38,38,.12);color:#dc2626;}
+/* 列の挿入（境界線付近にホバーしたときだけ、その境界の＋を表示） */
+.th-place{position:relative;}
+.col-ins-zone{position:absolute;left:-9px;top:0;bottom:0;width:18px;z-index:6;display:flex;align-items:center;justify-content:center;}
+.col-ins-zone.right{left:auto;right:-9px;}
+.col-ins-btn{display:none;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;border:2px solid #fff;cursor:pointer;font-size:12px;font-weight:700;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.3);font-family:var(--sans);align-items:center;justify-content:center;padding:0;}
+.col-ins-zone:hover .col-ins-btn{display:flex;}
 .hbtn.pub{background:var(--green);color:#fff;border-color:var(--green);}
 .hbtn.pub:hover{opacity:.9;}
 .hbtn.pub-off{background:var(--amber);color:#fff;border-color:var(--amber);}
@@ -1291,10 +1295,23 @@ function addColEnd(bi) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
+  insColAt(bi, block, block.usedPlaces ? block.usedPlaces.length : 0, true);
+}
+
+// 指定位置に列を挿入（li の位置＝その列の左に入る）
+function insCol(bi, li) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
+  if (!block) return;
+  insColAt(bi, block, li, false);
+}
+
+function insColAt(bi, block, li, isEnd) {
   syncBlockStateFromDom(bi, block);
-  block.usedPlaces.push('');
-  block.placeCart.push('');
-  (block.slots || []).forEach(s => { s.places.push([]); s.watch.push(false); });
+  const pos = isEnd ? block.usedPlaces.length : li;
+  block.usedPlaces.splice(pos, 0, '');
+  block.placeCart.splice(pos, 0, '');
+  (block.slots || []).forEach(s => { s.places.splice(pos, 0, []); s.watch.splice(pos, 0, false); });
   window._blockCols[bKey(block)] = [...block.usedPlaces];
   mu(bi); renderBlock();
 }
@@ -1355,6 +1372,10 @@ function buildSlotTable(bi, block) {
   html += '<tr><th class="th-slot-time">場所</th>';
   colPlaces.forEach((loc, li) => {
     html += `<th class="th-place" style="background:${pc[li % pc.length]};padding:4px 6px;">`;
+    html += `<div class="col-ins-zone"><button class="col-ins-btn" onclick="insCol(${bi},${li})" title="ここに列を挿入">＋</button></div>`;
+    if (li === colPlaces.length - 1) {
+      html += `<div class="col-ins-zone right"><button class="col-ins-btn" onclick="addColEnd(${bi})" title="右端に列を追加">＋</button></div>`;
+    }
     html += `<div style="display:flex;align-items:center;gap:3px;">`;
     html += makeLocSel(li, loc);
     html += `<button class="col-del-btn" onclick="delCol(${bi},${li})" title="この列を削除">✕</button>`;
@@ -1384,10 +1405,7 @@ function buildSlotTable(bi, block) {
     });
     html += '</tr>';
   });
-  html += '</tbody></table>';
-  // 列追加ボタン（表の右下にホバーで表示）
-  html += `<button class="col-add-fab" onclick="addColEnd(${bi})" title="右端に場所列を追加">＋</button>`;
-  html += '</div>';
+  html += '</tbody></table></div>';
 
   // ResizeObserver で cell-wrap の幅を監視して縦横切替
   requestAnimationFrame(() => requestAnimationFrame(() => {
