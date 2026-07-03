@@ -693,22 +693,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">🗂 シフト管理アプリ</span><span class="ab-d">シフト作成・希望確認・設定</span></div>
             <span class="ab-ar">›</span>
           </a>
-          <button class="abtn" onclick="openMemberModal()">
+          <button class="abtn normal-only" onclick="openMemberModal()">
             <div class="ab-ic" style="background:#f0f9ff;color:#0369a1;">👥</div>
             <div class="ab-tx"><span class="ab-n">メンバー管理</span><span class="ab-d">メンバーの追加・編集・有効無効</span></div>
             <span class="ab-ar">›</span>
           </button>
-          <button class="abtn" onclick="openNoticeModal()">
+          <button class="abtn normal-only" onclick="openNoticeModal()">
             <div class="ab-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</div>
             <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
             <span class="ab-ar">›</span>
           </button>
-          <button class="abtn" onclick="openRequestModal()">
+          <button class="abtn normal-only" onclick="openRequestModal()">
             <div class="ab-ic" style="background:#fef3c7;color:#d97706;">💬</div>
             <div class="ab-tx"><span class="ab-n">要望確認</span><span class="ab-d">未対応の要望を確認・対応</span></div>
             <span class="ab-ar">›</span>
           </button>
-          <button class="abtn" onclick="openBugReportModal()">
+          <button class="abtn normal-only" onclick="openBugReportModal()">
             <div class="ab-ic" style="background:#fee2e2;color:#b91c1c;">🐛</div>
             <div class="ab-tx"><span class="ab-n">バグ報告確認</span><span class="ab-d">ユーザーからのバグ報告を確認・対応</span></div>
             <span class="ab-ar">›</span>
@@ -718,12 +718,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">対象メンバー管理</span><span class="ab-d">限定PW対象メンバーの追加・削除</span></div>
             <span class="ab-ar">›</span>
           </button>
-          <button class="abtn" onclick="openProxyModal()">
+          <button class="abtn normal-only" onclick="openProxyModal()">
             <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔄</div>
             <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
             <span class="ab-ar">›</span>
           </button>
-          <button class="abtn" onclick="openCoupleModal()">
+          <button class="abtn normal-only" onclick="openCoupleModal()">
             <div class="ab-ic" style="background:#fdf2f8;color:#be185d;">💍</div>
             <div class="ab-tx"><span class="ab-n">夫婦設定</span><span class="ab-d">夫婦ペアの追加・削除</span></div>
             <span class="ab-ar">›</span>
@@ -1655,6 +1655,11 @@ function renderPwTypeTabs() {
   // 限定PW 対象メンバー管理ボタンの表示切り替え
   const btnLm = document.getElementById('btn-limited-members');
   if (btnLm) btnLm.style.display = currentPwType !== 'normal' ? '' : 'none';
+
+  // 通常PW専用ボタン（メンバー管理・お知らせ・要望・バグ報告・代理・夫婦）の表示切り替え
+  document.querySelectorAll('.abtn.normal-only').forEach(b => {
+    b.style.display = currentPwType === 'normal' ? '' : 'none';
+  });
 }
 
 // ============================================================
@@ -3621,9 +3626,19 @@ function buildMstep2() {
     return am!==bm ? am-bm : ad-bd;
   });
   let html = '<div style="font-size:12px;color:var(--ink2);margin-bottom:6px;">以下の設定で処理を実行します</div>';
-  html += '<div class="ms-info-row"><span class="ms-info-k">申込開始</span><span class="ms-info-v" style="color:var(--green);">' + fmt(dates.apply) + '</span></div>';
-  html += '<div class="ms-info-row"><span class="ms-info-k">締切日</span><span class="ms-info-v" style="color:var(--red);">' + fmt(dates.deadline) + '</span></div>';
-  html += '<div class="ms-info-row"><span class="ms-info-k">シフト公開</span><span class="ms-info-v" style="color:var(--blue);">' + fmt(dates.open) + '</span></div>';
+  if (currentPwType !== 'normal') {
+    // 限定PW: 日程はフェーズ（adminPhases）に保存されている
+    adminPhases.forEach((ph, i) => {
+      if (adminPhases.length > 1) html += `<div style="font-size:11px;font-weight:700;color:var(--ink2);margin-top:${i>0?'8px':'0'};">第${i+1}フェーズ</div>`;
+      html += '<div class="ms-info-row"><span class="ms-info-k">申込開始</span><span class="ms-info-v" style="color:var(--green);">' + fmt(ph.apply) + '</span></div>';
+      html += '<div class="ms-info-row"><span class="ms-info-k">締切日</span><span class="ms-info-v" style="color:var(--red);">' + fmt(ph.deadline) + '</span></div>';
+      html += '<div class="ms-info-row"><span class="ms-info-k">シフト公開</span><span class="ms-info-v" style="color:var(--blue);">' + fmt(ph.open) + '</span></div>';
+    });
+  } else {
+    html += '<div class="ms-info-row"><span class="ms-info-k">申込開始</span><span class="ms-info-v" style="color:var(--green);">' + fmt(dates.apply) + '</span></div>';
+    html += '<div class="ms-info-row"><span class="ms-info-k">締切日</span><span class="ms-info-v" style="color:var(--red);">' + fmt(dates.deadline) + '</span></div>';
+    html += '<div class="ms-info-row"><span class="ms-info-k">シフト公開</span><span class="ms-info-v" style="color:var(--blue);">' + fmt(dates.open) + '</span></div>';
+  }
   if (slotKeys.length > 0) {
     slotKeys.forEach(k => {
       html += '<div class="ms-info-row"><span class="ms-info-k" style="color:var(--purple);">実施日</span><span class="ms-info-v" style="color:var(--purple);">' + k + '（' + slotGroups[k].length + '枠）</span></div>';
