@@ -51,6 +51,12 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hbtn:hover{background:var(--bg);}
 .pw-tab-sc{padding:5px 14px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .pw-tab-sc.on{background:var(--purple);color:#fff;border-color:var(--purple);}
+/* 場所列の追加・削除 */
+.tbl-wrap{position:relative;}
+.col-add-fab{display:none;position:absolute;right:4px;bottom:4px;width:30px;height:30px;border-radius:50%;background:var(--purple);color:#fff;border:none;cursor:pointer;font-size:16px;font-weight:700;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:5;font-family:var(--sans);align-items:center;justify-content:center;}
+.tbl-wrap:hover .col-add-fab{display:flex;}
+.col-del-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--ink3);padding:2px 3px;border-radius:3px;flex-shrink:0;line-height:1.2;font-family:var(--sans);}
+.col-del-btn:hover{background:rgba(220,38,38,.12);color:#dc2626;}
 .hbtn.pub{background:var(--green);color:#fff;border-color:var(--green);}
 .hbtn.pub:hover{opacity:.9;}
 .hbtn.pub-off{background:var(--amber);color:#fff;border-color:var(--amber);}
@@ -809,7 +815,7 @@ function buildCmpBlock(block) {
     slots.forEach(slot => {
       html += `<tr><td class="td-slot-time">${esc(slot.time)}</td>`;
       cols.forEach((loc, li) => {
-        const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
+        const uids = Array.isArray(slot.places) ? ((slot.places || [])[li] || []) : ((slot.places && slot.places[loc]) ? slot.places[loc] : []);
         const names = uids.map(uid => nm[uid]||uid).filter(Boolean);
         html += `<td class="cell-w" style="background:${pc[li%pc.length]}20;">`;
         html += names.length > 0 ? names.map(n => `<div style="padding:2px 0;font-size:12px;">${esc(n)}</div>`).join('') : `<div style="color:var(--ink3);">—</div>`;
@@ -1270,23 +1276,42 @@ function getColPlaces(bi, block) {
   return cols;
 }
 
-function addColBefore(bi, li) {
+// 現在のDOM入力をブロック状態に書き戻す（列操作・再描画で未保存編集を失わないため）
+function syncBlockStateFromDom(bi, block) {
+  const data = collectBlock(bi);
+  if (!data) return;
+  block.responsible = data.responsible;
+  block.cart        = data.cart;
+  block.slots       = data.slots;
+  block.placeCart   = data.placeCart;
+  block.usedPlaces  = data.usedPlaces;
+}
+
+function addColEnd(bi) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
-  const cols = getColPlaces(bi, block);
-  cols.splice(li, 0, '');
-  window._blockCols[bKey(block)] = cols;
+  syncBlockStateFromDom(bi, block);
+  block.usedPlaces.push('');
+  block.placeCart.push('');
+  (block.slots || []).forEach(s => { s.places.push([]); s.watch.push(false); });
+  window._blockCols[bKey(block)] = [...block.usedPlaces];
   mu(bi); renderBlock();
 }
 
-function addColAfter(bi, li) {
+function delCol(bi, li) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
-  const cols = getColPlaces(bi, block);
-  cols.splice(li + 1, 0, '');
-  window._blockCols[bKey(block)] = cols;
+  syncBlockStateFromDom(bi, block);
+  if ((block.usedPlaces || []).length <= 1) { toast('最後の列は削除できません', 'e'); return; }
+  const hasContent = (block.slots || []).some(s => ((s.places||[])[li] || []).length > 0);
+  const label = block.usedPlaces[li] || '（場所未設定）';
+  if (!confirm(`列「${label}」を削除しますか？` + (hasContent ? '\n※ この列に配置された奉仕者も削除されます。' : ''))) return;
+  block.usedPlaces.splice(li, 1);
+  block.placeCart.splice(li, 1);
+  (block.slots || []).forEach(s => { s.places.splice(li, 1); s.watch.splice(li, 1); });
+  window._blockCols[bKey(block)] = [...block.usedPlaces];
   mu(bi); renderBlock();
 }
 
@@ -1297,7 +1322,10 @@ function buildPlaceSelectUI(bi, block) {
 function onPlaceChange(bi) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
-  if (block) getColPlaces(bi, block); // DOM値を_blockColsに同期
+  if (!block) return;
+  // 中身は列番号で紐づくため、場所名の変更で内容は動かさない（DOM状態を保持したまま同期のみ）
+  syncBlockStateFromDom(bi, block);
+  window._blockCols[bKey(block)] = [...block.usedPlaces];
   mu(bi); renderBlock();
 }
 
@@ -1306,14 +1334,13 @@ function buildSlotTable(bi, block) {
   const nm      = buildNameMap();
   const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; const dp = sk.indexOf('/'); const pp = sk.indexOf('('); const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk; return dn === block.date; }));
   const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; const sp = sk.indexOf(') '); const timeStr = sp >= 0 ? sk.slice(sp + 2) : sk; return timeStr === block.time; }));
-  const placeCart = block.placeCart || {};
+  const placeCart = block.placeCart || [];
   if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
   const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
 
   const allLocs = locations.map(l => l.name);
   // 空欄("")を含む固定列配列 — これを全セクションで統一して使う
-  // NOTE: HTML生成中はまだ旧DOMが残っているため getColPlaces でのDOM読み込みを行わない。
-  // DOM読み込みは collectBlock / onPlaceChange のみで行う。
+  // 中身（奉仕者・カート番号）は列番号で紐づき、場所名は列のラベルにすぎない
   initBlockCols(bi, block);
   const colPlaces = [...window._blockCols[bKey(block)]];
 
@@ -1323,46 +1350,44 @@ function buildSlotTable(bi, block) {
     return `<select id="place-sel-${bi}-${li}" class="cart-sel-place" onchange="onPlaceChange(${bi})" style="width:100%;font-weight:700;font-size:12px;">${o}</select>`;
   }
 
-  const addBtnSt = 'background:var(--surface2);border:1px solid var(--border2);border-radius:4px;cursor:pointer;font-size:10px;padding:2px 4px;color:var(--ink3);white-space:nowrap;line-height:1.4;flex-shrink:0;font-family:var(--sans);';
-
-  // ヘッダー行（場所名ドロップダウン ＋ 列追加ボタン）
+  // ヘッダー行（場所名ドロップダウン ＋ 列削除ボタン）
   let html = '<div class="tbl-wrap"><table class="shift-tbl"><thead>';
   html += '<tr><th class="th-slot-time">場所</th>';
   colPlaces.forEach((loc, li) => {
     html += `<th class="th-place" style="background:${pc[li % pc.length]};padding:4px 6px;">`;
     html += `<div style="display:flex;align-items:center;gap:3px;">`;
-    html += `<button style="${addBtnSt}" onclick="addColBefore(${bi},${li})" title="左に場所列を追加">◀+</button>`;
     html += makeLocSel(li, loc);
-    html += `<button style="${addBtnSt}" onclick="addColAfter(${bi},${li})" title="右に場所列を追加">+▶</button>`;
+    html += `<button class="col-del-btn" onclick="delCol(${bi},${li})" title="この列を削除">✕</button>`;
     html += `</div></th>`;
   });
   html += '</tr>';
 
-  // カート番号選択行
+  // カート番号選択行（列番号で紐づけ）
   html += '<tr class="th-cart-row"><td class="td-slot-time" style="font-size:10px;color:var(--ink3);font-weight:700;padding:3px 8px;">カート番号</td>';
   colPlaces.forEach((loc, li) => {
-    if (!loc) { html += `<td class="cart-cell" style="background:#f4f4f5;min-width:120px;"></td>`; return; }
-    const savedVal = placeCart[loc] || '';
+    const savedVal = placeCart[li] || '';
     let opts0 = '<option value="">—</option>';
     cartPresets.forEach(p => { opts0 += `<option value="${esc(p)}"${p === savedVal ? ' selected' : ''}>${esc(p)}</option>`; });
     html += `<td class="cart-cell" style="background:${pc[li % pc.length]}20;"><select class="cart-sel-place" id="pc-${bi}-${li}-0" onchange="mu(${bi})" style="width:100%;">${opts0}</select></td>`;
   });
   html += '</tr></thead><tbody>';
 
-  // スロット行（奉仕者3固定）
+  // スロット行（奉仕者3固定・列番号で紐づけ）
   slots.forEach((slot, ri) => {
     html += '<tr><td class="td-slot-time">' + esc(slot.time) + '</td>';
     colPlaces.forEach((loc, li) => {
-      if (!loc) { html += `<td class="cell-w" style="background:#f4f4f5;min-width:120px;"></td>`; return; }
-      const uids = (slot.places && slot.places[loc]) ? slot.places[loc] : [];
-      const watchOn = !!(slot.watch && slot.watch[loc]);
+      const uids = (slot.places || [])[li] || [];
+      const watchOn = !!((slot.watch || [])[li]);
       html += `<td class="cell-w" style="background:${pc[li % pc.length]}20;"><div class="cell-wrap" id="cw-${bi}-${ri}-${li}">`;
       for (let pi = 0; pi < 3; pi++) { html += buildPS(bi, ri, li, pi, uids[pi] || '', sa, nm, watchOn, block.date); }
       html += '</div></td>';
     });
     html += '</tr>';
   });
-  html += '</tbody></table></div>';
+  html += '</tbody></table>';
+  // 列追加ボタン（表の右下にホバーで表示）
+  html += `<button class="col-add-fab" onclick="addColEnd(${bi})" title="右端に場所列を追加">＋</button>`;
+  html += '</div>';
 
   // ResizeObserver で cell-wrap の幅を監視して縦横切替
   requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1499,28 +1524,27 @@ function collectBlock(bi) {
   const responsible = { r1: (document.getElementById('resp1-'+bi)||{}).value||'', r2: (document.getElementById('resp2-'+bi)||{}).value||'' };
   const cart = { ki1:(document.getElementById('ci1-'+bi)||{}).value||'', kc1:(document.getElementById('cn1-'+bi)||{}).value||'', ki2:(document.getElementById('ci2-'+bi)||{}).value||'', kc2:(document.getElementById('cn2-'+bi)||{}).value||'', ko1:(document.getElementById('co1-'+bi)||{}).value||'', oc1:(document.getElementById('con1-'+bi)||{}).value||'', ko2:(document.getElementById('co2-'+bi)||{}).value||'', oc2:(document.getElementById('con2-'+bi)||{}).value||'' };
   // 現在の列状態を同期して収集（colPlacesは空欄含む固定列、インデックスはDOMと一致）
+  // 中身は列番号（インデックス）で紐づけて収集する
   const colPlaces = getColPlaces(bi, block);
-  const permanentLocs = locations.filter(l => !l.startYM && !l.endYM).map(l => l.name);
   const usedPlaces = [...colPlaces];
-  const locNames = usedPlaces.filter(v => v).length > 0 ? usedPlaces.filter(v => v) : permanentLocs;
-  // 場所ごとカート番号収集（colPlacesのインデックス基準）
-  const placeCart = {};
-  colPlaces.forEach((loc, li) => {
-    if (!loc) return;
+  const placeCart = colPlaces.map((loc, li) => {
     const sel = document.getElementById(`pc-${bi}-${li}-0`);
-    placeCart[loc] = sel ? sel.value : '';
+    return sel ? sel.value : ((block.placeCart || [])[li] || '');
   });
   const slots = (block.slots || []).map((slot, ri) => {
-    const places = {};
-    const watch = {};
+    const places = [];
+    const watch = [];
     colPlaces.forEach((loc, li) => {
-      if (!loc) return;
       const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
       const uids = [];
-      if (cw) cw.querySelectorAll('select.cs').forEach(s => { if (s.value) uids.push(s.value); });
-      places[loc] = uids;
+      if (cw) {
+        cw.querySelectorAll('select.cs').forEach(s => { if (s.value) uids.push(s.value); });
+      } else {
+        ((slot.places || [])[li] || []).forEach(u => { if (u) uids.push(u); });
+      }
+      places.push(uids);
       const cb = document.getElementById(`watch-${bi}-${ri}-${li}`);
-      watch[loc] = !!(cb && cb.checked);
+      watch.push(cb ? !!cb.checked : !!((slot.watch || [])[li]));
     });
     return { time: slot.time, places, watch };
   });
@@ -1543,7 +1567,7 @@ async function saveBlock(bi) {
     block.slots = data.slots;
     block.place = { p1: (data.usedPlaces || [])[0] || '', p2: (data.usedPlaces || [])[1] || '' };
     block.usedPlaces = data.usedPlaces || [];
-    block.placeCart = data.placeCart || {};
+    block.placeCart = data.placeCart || [];
     recalcCounts();
     bs[bKey(block)] = true; markSaved(bi); ug(); toast('保存しました', 's');
     buildLeftPanel();
