@@ -688,7 +688,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
             <div class="ab-tx"><span class="ab-n">🚀 募集開始処理</span><span class="ab-d">予定表公開・フォーム作成</span></div>
             <span class="ab-ar">›</span>
           </button>
-          <a class="abtn" href="./shift-create.html" target="_blank">
+          <a class="abtn" id="btn-shift-create" href="./shift-create.html" target="_blank">
             <div class="ab-ic ic-p">&#128202;</div>
             <div class="ab-tx"><span class="ab-n">🗂 シフト管理アプリ</span><span class="ab-d">シフト作成・希望確認・設定</span></div>
             <span class="ab-ar">›</span>
@@ -1660,6 +1660,10 @@ function renderPwTypeTabs() {
   document.querySelectorAll('.abtn.normal-only').forEach(b => {
     b.style.display = currentPwType === 'normal' ? '' : 'none';
   });
+
+  // シフト管理アプリへのリンクに現在のPWタイプを引き継ぐ
+  const btnSc = document.getElementById('btn-shift-create');
+  if (btnSc) btnSc.href = './shift-create.html' + (currentPwType !== 'normal' ? '?type=' + encodeURIComponent(currentPwType) : '');
 }
 
 // ============================================================

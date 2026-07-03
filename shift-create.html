@@ -49,6 +49,8 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hdr-title{font-size:14px;font-weight:700;flex:1;}
 .hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .hbtn:hover{background:var(--bg);}
+.pw-tab-sc{padding:5px 14px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+.pw-tab-sc.on{background:var(--purple);color:#fff;border-color:var(--purple);}
 .hbtn.pub{background:var(--green);color:#fff;border-color:var(--green);}
 .hbtn.pub:hover{opacity:.9;}
 .hbtn.pub-off{background:var(--amber);color:#fff;border-color:var(--amber);}
@@ -295,6 +297,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
       </div>
     </div>
     <div class="hdr-row2">
+      <div id="pw-tabs" style="display:none;gap:6px;align-items:center;"></div>
       <div style="flex:1;"></div>
       <a class="hbtn" href="./manual/manual-admin-shift.html" target="_blank">📖 マニュアル</a>
       <button class="hbtn pub" id="publish-btn" onclick="togglePublish()">📣 シフト公開</button>
@@ -590,9 +593,15 @@ function showApp() {
 async function loadInitData() {
   setLoading(true, 'データを読み込み中...');
   try {
-    const [, statusRes] = await Promise.all([loadWishDataInternal(), gasGet('getShiftPublishStatus')]);
+    const [, statusRes, slotsRes] = await Promise.all([
+      loadWishDataInternal(),
+      gasGet('getShiftPublishStatus'),
+      gasGet('getLimitedSlots', {})
+    ]);
     shiftPublished = statusRes.ok && statusRes.published;
     updatePublishBtn();
+    pwTypeList = slotsRes.ok ? (slotsRes.slots || []) : [];
+    renderPwTabsSc();
     setLoading(false);
   }
   catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
@@ -601,6 +610,61 @@ async function loadInitData() {
 // ============================================================
 // タブ切り替え
 // ============================================================
+// ============================================================
+// PWタイプタブ（通常PW / 限定PW切り替え）
+// ============================================================
+let pwTypeList = [];  // [{id:'limited2', name:'テストPW'}, ...]
+
+function renderPwTabsSc() {
+  const bar = document.getElementById('pw-tabs');
+  if (!bar) return;
+  if (pwTypeList.length === 0) { bar.style.display = 'none'; return; }
+  let html = `<button class="pw-tab-sc${currentPwType === 'normal' ? ' on' : ''}" onclick="switchPwTypeSc('normal')">通常PW</button>`;
+  pwTypeList.forEach(s => {
+    html += `<button class="pw-tab-sc${currentPwType === s.id ? ' on' : ''}" onclick="switchPwTypeSc('${s.id}')">${esc(s.name)}</button>`;
+  });
+  bar.innerHTML = html;
+  bar.style.display = 'flex';
+}
+
+async function switchPwTypeSc(type) {
+  if (currentPwType === type) return;
+  currentPwType = type;
+  renderPwTabsSc();
+
+  // キャッシュ・状態をリセット
+  curYM = null;
+  createLoaded = false;
+  settingsLoaded = false;
+  memberFlags = {};
+  applicants = [];
+  shiftDates = [];
+  Object.keys(bs).forEach(k => delete bs[k]);
+  window._blockCols = {};
+
+  const label = type === 'normal' ? '通常PW' : (pwTypeList.find(s => s.id === type)?.name || '限定PW');
+  setLoading(true, label + ' のデータを読み込み中...');
+  try {
+    // 公開状態は常に更新
+    const statusRes = await gasGet('getShiftPublishStatus');
+    shiftPublished = statusRes.ok && statusRes.published;
+    updatePublishBtn();
+
+    // 表示中のタブ（分割表示なら両方）を再読み込み
+    const wishOn     = splitMode || document.getElementById('tab-wish').classList.contains('on');
+    const createOn   = splitMode || document.getElementById('tab-create').classList.contains('on');
+    const settingsOn = document.getElementById('tab-settings').classList.contains('on');
+    if (wishOn) await loadWishDataInternal();
+    setLoading(false);
+    // loadCreateData / loadSettingsData は自前でオーバーレイを表示する
+    if (createOn)   await loadCreateData();
+    if (settingsOn) await loadSettingsData();
+  } catch (e) {
+    setLoading(false);
+    toast('読み込みエラー: ' + e.message, 'e');
+  }
+}
+
 function switchMainTab(name, btn) {
   if (splitMode && (name === 'wish' || name === 'create')) return;
   if (splitMode && name === 'settings') {
