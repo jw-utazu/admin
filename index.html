@@ -3399,12 +3399,17 @@ async function refreshRequestModal() {
   document.getElementById('m-request-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
     const d = await gasGet('getRequests');
-    const requests = (d.requests || []).filter(r => r.status === '未対応');
-    let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">未対応: ${requests.length}件</div>`;
-    if (requests.length === 0) {
-      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">未対応の要望はありません 🎉</div>';
+    const all     = d.requests || [];
+    const pending = all.filter(r => r.status === '未対応');
+    const done    = all.filter(r => r.status !== '未対応');
+    let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">未対応: ${pending.length}件 / 対応済み: ${done.length}件</div>`;
+    if (pending.length === 0 && done.length === 0) {
+      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">要望はありません 🎉</div>';
     } else {
-      html += requests.map(r => `
+      if (pending.length === 0) {
+        html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:12px;">未対応の要望はありません 🎉</div>';
+      } else {
+        html += pending.map(r => `
         <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);">
           <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
             <span style="font-size:12px;font-weight:700;">${esc(r.name)}</span>
@@ -3413,6 +3418,19 @@ async function refreshRequestModal() {
           <div style="font-size:13px;color:var(--ink);white-space:pre-wrap;margin-bottom:8px;">${esc(r.body||'')}</div>
           <button class="btn btn-g" onclick="resolveRequest(${r.rowIndex})" style="font-size:11px;padding:4px 10px;">対応済みにする</button>
         </div>`).join('');
+      }
+      if (done.length > 0) {
+        html += `<details style="margin-top:10px;"><summary style="font-size:11px;font-weight:700;color:var(--ink3);cursor:pointer;padding:4px 0;">対応済み (${done.length}件)</summary>`;
+        html += done.map(r => `
+          <div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-top:6px;background:var(--surface2);">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:12px;font-weight:700;color:var(--ink2);">${esc(r.name)}</span>
+              <span style="font-size:10px;color:var(--ink3);">${esc(r.sentAt||'')}</span>
+            </div>
+            <div style="font-size:13px;color:var(--ink2);white-space:pre-wrap;">${esc(r.body||'')}</div>
+          </div>`).join('');
+        html += '</details>';
+      }
     }
     document.getElementById('m-request-body').innerHTML = html;
   } catch (e) {
