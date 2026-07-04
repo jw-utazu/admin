@@ -498,7 +498,7 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 <div class="ta" id="ta"></div>
 
 <script>
-const GAS_URL   = 'https://nqtswiynoxawccldqcwi.supabase.co/functions/v1/api';
+const API_URL   = 'https://nqtswiynoxawccldqcwi.supabase.co/functions/v1/api';
 const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xdHN3aXlub3hhd2NjbGRxY3dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MzQxNjIsImV4cCI6MjA5ODMxMDE2Mn0.M-AnCBnXBI1FIyouoa5ttF6mb8PF2YqHfv180PqQWQU';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
 
@@ -530,11 +530,11 @@ const bs = {};
 window._blockCols = {};
 
 // ============================================================
-// GAS通信
+// API通信
 // ============================================================
-function gasGet(action, params) {
+function apiGet(action, params) {
   const p = Object.assign({ type: currentPwType }, params || {});
-  let url  = GAS_URL + '?action=' + action;
+  let url  = API_URL + '?action=' + action;
   url += '&params=' + encodeURIComponent(JSON.stringify(p));
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
@@ -546,8 +546,8 @@ function gasGet(action, params) {
     })
     .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
 }
-function gasAuthGet(email, source) {
-  const url = GAS_URL + '?action=auth&source=' + encodeURIComponent(source) + '&email=' + encodeURIComponent(email);
+function apiAuthGet(email, source) {
+  const url = API_URL + '?action=auth&source=' + encodeURIComponent(source) + '&email=' + encodeURIComponent(email);
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
   return fetch(url, { redirect: 'follow', signal: ctrl.signal, headers: { 'Authorization': 'Bearer ' + ANON_KEY } })
@@ -573,7 +573,7 @@ async function onGoogleLogin(resp) {
   try {
     setLoading(true, '認証中...');
     const payload = JSON.parse(atob(resp.credential.split('.')[1]));
-    const d = await gasAuthGet(payload.email, 'admin');
+    const d = await apiAuthGet(payload.email, 'admin');
     if (!d.ok || !d.isAdmin) { setLoading(false); toast('管理者権限がありません', 'e'); return; }
     adminUser = { email: payload.email, name: d.name || payload.email, uid: d.uid || '', isAdmin: true, picture: payload.picture || '' };
     localStorage.setItem('adminUser', JSON.stringify(adminUser));
@@ -605,8 +605,8 @@ async function loadInitData() {
   try {
     const [, statusRes, slotsRes] = await Promise.all([
       loadWishDataInternal(),
-      gasGet('getShiftPublishStatus'),
-      gasGet('getLimitedSlots', {})
+      apiGet('getShiftPublishStatus'),
+      apiGet('getLimitedSlots', {})
     ]);
     shiftPublished = statusRes.ok && statusRes.published;
     updatePublishBtn();
@@ -656,7 +656,7 @@ async function switchPwTypeSc(type) {
   setLoading(true, label + ' のデータを読み込み中...');
   try {
     // 公開状態は常に更新
-    const statusRes = await gasGet('getShiftPublishStatus');
+    const statusRes = await apiGet('getShiftPublishStatus');
     shiftPublished = statusRes.ok && statusRes.published;
     updatePublishBtn();
 
@@ -851,9 +851,9 @@ async function loadWishData() {
 async function loadWishDataInternal() {
   // getWishData と getMemberFlags と getShiftCreateData を並行取得
   const [res, flagsRes, shiftRes] = await Promise.all([
-    gasGet('getWishData', {}),
-    Object.keys(memberFlags).length > 0 ? Promise.resolve({ ok: true, flags: memberFlags }) : gasGet('getMemberFlags'),
-    gasGet('getShiftCreateData', {})
+    apiGet('getWishData', {}),
+    Object.keys(memberFlags).length > 0 ? Promise.resolve({ ok: true, flags: memberFlags }) : apiGet('getMemberFlags'),
+    apiGet('getShiftCreateData', {})
   ]);
   const year  = res.year  || new Date().getFullYear();
   const month = res.month || new Date().getMonth() + 1;
@@ -1005,7 +1005,7 @@ async function loadCreateData() {
     Object.keys(bs).forEach(k => delete bs[k]); // 再読み込み時は保存状態をクリア
     window._blockCols = {};
     const [flagsRes, appRes, shiftRes] = await Promise.all([
-      gasGet('getMemberFlags'), gasGet('getApplicants', {}), gasGet('getShiftCreateData', {})
+      apiGet('getMemberFlags'), apiGet('getApplicants', {}), apiGet('getShiftCreateData', {})
     ]);
     const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
     const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
@@ -1579,7 +1579,7 @@ async function saveBlock(bi) {
   if (st) { st.style.display = ''; st.textContent = '保存中...'; }
   try {
     const data = collectBlock(bi);
-    await gasGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots });
+    await apiGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots });
     block.responsible = data.responsible;
     block.cart = data.cart;
     block.slots = data.slots;
@@ -1649,7 +1649,7 @@ async function togglePublish() {
   if (shiftPublished) {
     if (!confirm('シフトを非公開にしますか？\n非公開後はメンバーがシフトを確認できなくなります。')) return;
     try {
-      await gasGet('unpublishShift', {});
+      await apiGet('unpublishShift', {});
       shiftPublished = false;
       updatePublishBtn();
       toast('シフトを非公開にしました', 's');
@@ -1657,7 +1657,7 @@ async function togglePublish() {
   } else {
     if (!confirm('シフトを公開しますか？\n公開後は全メンバーがシフトを確認できます。')) return;
     try {
-      await gasGet('publishShift', {});
+      await apiGet('publishShift', {});
       shiftPublished = true;
       updatePublishBtn();
       toast('シフトを公開しました', 's');
@@ -1717,7 +1717,7 @@ document.getElementById('lpResize').addEventListener('mousedown', e => {
 async function loadSettingsData() {
   setLoading(true, '設定を読み込み中...');
   try {
-    const [lr, cr, pr, sr] = await Promise.all([gasGet('getLocations', {}), gasGet('getCartNumbers'), gasGet('getCartPresets'), gasGet('getDefaultSlot')]);
+    const [lr, cr, pr, sr] = await Promise.all([apiGet('getLocations', {}), apiGet('getCartNumbers'), apiGet('getCartPresets'), apiGet('getDefaultSlot')]);
     settingsLocations    = lr.ok ? lr.locations    : [];
     settingsCartNumbers  = cr.ok ? cr.cartNumbers  : [];
     settingsCartPresets  = pr.ok ? pr.cartPresets  : [];
@@ -1761,7 +1761,7 @@ function saveEditLocation() {
   renderLocationList(); closeEditLocModal();
 }
 async function saveLocations() {
-  try { await gasGet('saveLocations', { locations: settingsLocations }); toast('場所設定を保存しました', 's'); createLoaded = false; }
+  try { await apiGet('saveLocations', { locations: settingsLocations }); toast('場所設定を保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
@@ -1772,7 +1772,7 @@ function renderCartTags() {
 function addCartNum() { const v = document.getElementById('new-cart-num').value.trim(); if (!v) return; if (settingsCartNumbers.includes(v)) { toast('すでに追加されています', 'e'); return; } settingsCartNumbers.push(v); renderCartTags(); document.getElementById('new-cart-num').value = ''; }
 function deleteCartNum(i) { settingsCartNumbers.splice(i, 1); renderCartTags(); }
 async function saveCartNumbers() {
-  try { await gasGet('saveCartNumbers', { cartNumbers: settingsCartNumbers }); toast('カート番号を保存しました', 's'); createLoaded = false; }
+  try { await apiGet('saveCartNumbers', { cartNumbers: settingsCartNumbers }); toast('カート番号を保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
@@ -1791,13 +1791,13 @@ function addCartPreset() {
 }
 function deleteCartPreset(i) { settingsCartPresets.splice(i, 1); renderCartPresets(); }
 async function saveCartPresets() {
-  try { await gasGet('saveCartPresets', { cartPresets: settingsCartPresets }); toast('カートプリセットを保存しました', 's'); createLoaded = false; }
+  try { await apiGet('saveCartPresets', { cartPresets: settingsCartPresets }); toast('カートプリセットを保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
 async function saveDefaultSlot() {
   const v = parseInt(document.getElementById('default-slot-sel').value);
-  try { await gasGet('saveDefaultSlot', { defaultSlot: v }); defaultSlot = v; toast('デフォルトスロット分数を保存しました', 's'); }
+  try { await apiGet('saveDefaultSlot', { defaultSlot: v }); defaultSlot = v; toast('デフォルトスロット分数を保存しました', 's'); }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
@@ -1805,7 +1805,7 @@ async function execCreateShiftSheet() {
   if (!confirm('現在のシフトデータをバックアップし、3シートをクリアします。\n実行してもよいですか？')) return;
   setLoading(true, 'シフト作成枠を作成中...');
   try {
-    const res = await gasGet('createShiftSheet', curYM ? { year: curYM.year, month: curYM.month } : {});
+    const res = await apiGet('createShiftSheet', curYM ? { year: curYM.year, month: curYM.month } : {});
     if (!res.ok) throw new Error(res.error || '失敗');
     toast('シフト作成枠を作成しました（' + (res.yearMonth || '') + '）', 's');
     createLoaded = false;
