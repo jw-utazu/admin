@@ -65,7 +65,7 @@ function tryAutoLogin() {
         return;
       }
     }
-  } catch(e) {}
+  } catch(e) { console.warn('[auto-login]', e); }
 
   // One Tap（PCブラウザ向け）
   if (!window.google || !google.accounts) return;
@@ -75,7 +75,7 @@ function tryAutoLogin() {
       try {
         const p = JSON.parse(atob(r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
         processUser({ email: p.email, name: p.name, picture: p.picture });
-      } catch(e) {}
+      } catch(e) { console.warn('[one-tap]', e); }
     },
     auto_select: true,
     cancel_on_tap_outside: false,
@@ -1390,7 +1390,7 @@ async function saveDates() {
     datesChanged = false;
     updSaveDatesBtn();
     setProcMsg('再読み込み中...', 'データを更新しています');
-    try { await refreshAdminData(); } catch (_) {}
+    try { await refreshAdminData(); } catch (e) { console.warn('[refreshAdminData]', e); }
     hideProc();
     toast('日程を保存しました', 's');
   } catch (e) {
@@ -2552,7 +2552,7 @@ async function execMonthly() {
     updSaveDatesBtn();
     document.getElementById('proc-steps').style.display = 'none';
     setProcMsg('再読み込み中...', '処理が完了しました。データを更新しています');
-    try { await refreshAdminData(); } catch (_) {}
+    try { await refreshAdminData(); } catch (e) { console.warn('[refreshAdminData]', e); }
     hideProc();
     toast('募集開始処理が完了しました', 's');
   } catch (e) {
@@ -2643,7 +2643,7 @@ async function onPhotoFilesSelected(event) {
   try {
     const res = await apiGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
     startIndex = ((res && res.photos) || []).length + 1;
-  } catch(_) {}
+  } catch(e) { console.warn('[onPhotoFilesSelected]', e); }
 
   const total = files.length;
   let completed = 0;
@@ -3002,7 +3002,7 @@ async function loadAutoPublishSettings() {
     const shiftChk = document.getElementById('auto-pub-shift-chk');
     if (calChk)   calChk.checked   = r.calAuto;
     if (shiftChk) shiftChk.checked = r.shiftAuto;
-  } catch (_) {}
+  } catch (e) { console.warn('[loadAutoPublishSettings]', e); }
 }
 
 async function onAutoPublishChange() {
