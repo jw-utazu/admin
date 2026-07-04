@@ -1636,6 +1636,8 @@ function swTab(id,btn){
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+// esc は escHtml の別名（旧実装同様 null/undefined/0/false/'' は '' として扱う）
+function esc(s) { return escHtml(s || ''); }
 
 function renderPwTypeTabs() {
   const bar = document.getElementById('pw-type-bar');
@@ -3523,14 +3525,6 @@ async function execSyncAccess() {
   } catch (e) { toast('同期失敗: ' + e.message, 'e'); }
 }
 
-// ============================================================
-// エスケープユーティリティ（既存にない場合）
-// ============================================================
-if (typeof esc === 'undefined') {
-  function esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-}
 // ============================================================
 // 月次一括処理
 // ============================================================
