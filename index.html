@@ -1127,10 +1127,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 // ============================================================
 // 設定
 // ============================================================
-const GAS_URL   = 'https://nqtswiynoxawccldqcwi.supabase.co/functions/v1/api';
+const API_URL   = 'https://nqtswiynoxawccldqcwi.supabase.co/functions/v1/api';
 const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xdHN3aXlub3hhd2NjbGRxY3dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MzQxNjIsImV4cCI6MjA5ODMxMDE2Mn0.M-AnCBnXBI1FIyouoa5ttF6mb8PF2YqHfv180PqQWQU';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
-// ALLOWED配列は廃止（GASの管理者一覧シートで判定）
+// ALLOWED配列は廃止（管理者一覧はサーバー側で判定）
 const DOW7      = ['月','火','水','木','金','土','日'];
 // 時間の選択肢 0〜23
 const HOURS_LIST = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
@@ -1230,7 +1230,7 @@ async function _processUserWithGasAuth(u, save) {
   setLoadingStep(2, '管理者権限を確認中...');
   try {
     // fetch方式（リダイレクト追従対応・Android Chrome対応）
-    const url = GAS_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email);
+    const url = API_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
     const res = await fetch(url, { redirect: 'follow', signal: controller.signal, headers: { 'Authorization': 'Bearer ' + ANON_KEY } })
@@ -1297,12 +1297,12 @@ function showAuthErr(msg) {
 }
 
 // ============================================================
-// GAS通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
+// API通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
 // ============================================================
-function gasGet(action, params) {
-  // type パラメータを自動付与（認証系・メンバー取得など type 不要なアクションは GAS 側で無視する）
+function apiGet(action, params) {
+  // type パラメータを自動付与（認証系・メンバー取得など type 不要なアクションはサーバー側で無視する）
   const p = Object.assign({ type: currentPwType }, params || {});
-  let url = GAS_URL+'?action='+action;
+  let url = API_URL+'?action='+action;
   url += '&params='+encodeURIComponent(JSON.stringify(p));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
@@ -1314,8 +1314,8 @@ function gasGet(action, params) {
     })
     .catch(err => {
       clearTimeout(timer);
-      if (err.name === 'AbortError') throw new Error('通信タイムアウト（GASが応答しませんでした）');
-      throw new Error(err.message || '通信エラー（GASへの接続に失敗）');
+      if (err.name === 'AbortError') throw new Error('通信タイムアウト（サーバーが応答しませんでした）');
+      throw new Error(err.message || '通信エラー（サーバーへの接続に失敗）');
     });
 }
 
@@ -1324,10 +1324,10 @@ function gasGet(action, params) {
 // ============================================================
 async function loadAdminData() {
   updYmTitle();
-  gasGet('setupTriggers').catch(() => {});
+  apiGet('setupTriggers').catch(() => {});
   let d;
   try {
-    d = await gasGet('adminData', { year: curY, month: curM });
+    d = await apiGet('adminData', { year: curY, month: curM });
   } catch(e) {
     // エラー時はローディングを閉じて認証画面に戻す
     document.getElementById('loading').classList.remove('show');
@@ -1336,8 +1336,8 @@ async function loadAdminData() {
     return;
   }
   adminData = d;
-  // GASのD3/F3の年月を取得（ただしUI上の対象月はcurY/curMを使う）
-  // slots・datesはGASから読み取る
+  // サーバーから対象月の年月を取得（ただしUI上の対象月はcurY/curMを使う）
+  // slots・datesはサーバーから読み取る
   if (d.eventDates) {
     const toObj = str => {
       if (!str) return null;
@@ -1532,10 +1532,10 @@ function chCalM(dir) {
 
 async function loadAdminDataWithOverlay() {
   updYmTitle();
-  gasGet('setupTriggers').catch(() => {});
+  apiGet('setupTriggers').catch(() => {});
   let d;
   try {
-    d = await gasGet('adminData', { year: curY, month: curM });
+    d = await apiGet('adminData', { year: curY, month: curM });
   } catch(e) {
     toast('データの読み込みに失敗しました: ' + e.message, 'e');
     return;
@@ -1687,7 +1687,7 @@ async function switchPwType(type) {
   if (ov) ov.classList.add('show');
   document.querySelectorAll('#pw-type-bar .pw-type-tab').forEach(btn => btn.disabled = true);
 
-  // currentPwType を更新（gasGet の type パラメータに使用）
+  // currentPwType を更新（apiGet の type パラメータに使用）
   const prevType = currentPwType;
   currentPwType = type;
   currentPhaseIndex = 0;
@@ -1727,7 +1727,7 @@ async function refreshLimitedMemberList() {
   const listEl = document.getElementById('lm-member-list');
   listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
   try {
-    const res = await gasGet('getLimitedMembers');
+    const res = await apiGet('getLimitedMembers');
     if (!res.ok) throw new Error(res.error);
     _limitedMembersCache = res.members || [];
     document.getElementById('lm-label-input').value = res.label || '';
@@ -1751,7 +1751,7 @@ async function refreshLimitedMemberList() {
 async function saveLimitedLabel() {
   const label = document.getElementById('lm-label-input').value.trim();
   try {
-    const res = await gasGet('updateLimitedMemberLabel', { label });
+    const res = await apiGet('updateLimitedMemberLabel', { label });
     if (!res.ok) throw new Error(res.error);
     toast('期間ラベルを保存しました', 's');
   } catch (e) {
@@ -1762,7 +1762,7 @@ async function saveLimitedLabel() {
 async function removeLimitedMember(uid) {
   if (!confirm(`UID: ${uid} を対象メンバーから削除しますか？`)) return;
   try {
-    const res = await gasGet('removeLimitedMember', { uid });
+    const res = await apiGet('removeLimitedMember', { uid });
     if (!res.ok) throw new Error(res.error);
     toast('削除しました', 's');
     await refreshLimitedMemberList();
@@ -1774,7 +1774,7 @@ async function removeLimitedMember(uid) {
 async function clearAllLimitedMembers() {
   if (!confirm('全メンバーを削除します。よろしいですか？\n（期間終了時に使用してください）')) return;
   try {
-    const res = await gasGet('clearLimitedMembers');
+    const res = await apiGet('clearLimitedMembers');
     if (!res.ok) throw new Error(res.error);
     toast('全メンバーを削除しました', 's');
     await refreshLimitedMemberList();
@@ -1804,7 +1804,7 @@ async function _loadAddSlotMembers() {
   pickerEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--ink3);font-size:12px;">読み込み中...</div>';
   try {
     if (_allMembersForPicker.length === 0) {
-      const res = await gasGet('getMemberList');
+      const res = await apiGet('getMemberList');
       _allMembersForPicker = (res.ok && res.members) ? res.members : [];
     }
     renderAddSlotPicker(_allMembersForPicker);
@@ -1867,7 +1867,7 @@ async function confirmAddLimitedSlot() {
 
   try {
     const res = await runStep('slot', async () => {
-      const r = await gasGet('addLimitedSlot', { name });
+      const r = await apiGet('addLimitedSlot', { name });
       if (!r.ok) throw new Error(r.error);
       return r;
     });
@@ -1879,7 +1879,7 @@ async function confirmAddLimitedSlot() {
       setProcStep('members', 'running');
       let failed = 0;
       for (const m of selectedMembers) {
-        try { await gasGet('addLimitedMember', { uid: m.uid, name: m.name, type: res.id }); }
+        try { await apiGet('addLimitedMember', { uid: m.uid, name: m.name, type: res.id }); }
         catch (_) { failed++; }
       }
       if (failed > 0) {
@@ -1918,7 +1918,7 @@ async function confirmUpdateLimitedSlot() {
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
   if (!_editingSlotId) return;
   try {
-    const res = await gasGet('updateLimitedSlot', { id: _editingSlotId, name });
+    const res = await apiGet('updateLimitedSlot', { id: _editingSlotId, name });
     if (!res.ok) throw new Error(res.error);
     const slot = limitedSlots.find(s => s.id === _editingSlotId);
     if (slot) slot.name = name;
@@ -1939,7 +1939,7 @@ async function confirmDeleteLimitedSlot() {
   showProc('データを確認しています...', '少々お待ちください');
   let check;
   try {
-    check = await gasGet('checkLimitedSlotForDelete', { id: _editingSlotId });
+    check = await apiGet('checkLimitedSlotForDelete', { id: _editingSlotId });
     if (!check.ok) throw new Error(check.error);
   } catch (e) {
     hideProc();
@@ -1961,7 +1961,7 @@ async function confirmDeleteLimitedSlot() {
 
   showProc('削除しています...', '少々お待ちください');
   try {
-    const res = await gasGet('deleteLimitedSlot', { id: _editingSlotId, deleteSheets });
+    const res = await apiGet('deleteLimitedSlot', { id: _editingSlotId, deleteSheets });
     if (!res.ok) throw new Error(res.error);
     limitedSlots = limitedSlots.filter(s => s.id !== _editingSlotId);
     if (currentPwType === _editingSlotId) {
@@ -1984,7 +1984,7 @@ async function openAddLimitedMemberPicker() {
   pickerEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--ink3);">読み込み中...</div>';
   try {
     if (_allMembersForPicker.length === 0) {
-      const res = await gasGet('getMemberList');
+      const res = await apiGet('getMemberList');
       _allMembersForPicker = (res.ok && res.members) ? res.members : [];
     }
     renderLimitedPicker(_allMembersForPicker);
@@ -2017,7 +2017,7 @@ function renderLimitedPicker(members) {
 
 async function addLimitedMember(uid, name) {
   try {
-    const res = await gasGet('addLimitedMember', { uid, name });
+    const res = await apiGet('addLimitedMember', { uid, name });
     if (!res.ok) throw new Error(res.error);
     toast(`${name} を追加しました`, 's');
     _limitedMembersCache = [...(_limitedMembersCache||[]), { uid, name, addedAt: '' }];
@@ -2276,7 +2276,7 @@ function resetDaySettings() {
     buildCalScroll();
     buildSlotSetList();
     buildInfoArea();
-    gasGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
+    apiGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
       .then(()=>toast('設定をリセットしました','s'))
       .catch(e=>toast('保存に失敗しました: '+e.message,'e'));
   }
@@ -2446,7 +2446,7 @@ async function savePhases() {
         interval: s.interval || 15
       }))
     }));
-    const res = await gasPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas });
+    const res = await apiPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas });
     if (!res.ok) throw new Error(res.error || '保存失敗');
     buildPhaseManageArea(true);
   } catch (e) {
@@ -2533,7 +2533,7 @@ function updSaveDatesBtn() {
 async function saveDates() {
   showProc('設定を保存しています...', '少々お待ちください');
   try {
-    await gasGet('saveDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open });
+    await apiGet('saveDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open });
     datesChanged = false;
     updSaveDatesBtn();
     setProcMsg('再読み込み中...', 'データを更新しています');
@@ -2725,7 +2725,7 @@ async function openFormModal(){
   document.getElementById('m-form-body').innerHTML='<div class="loading-row"><div class="spin"></div>データを読み込み中...</div>';
   document.getElementById('m-form-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-form\')">閉じる</button>';
   try {
-    const d = await gasGet('adminData');
+    const d = await apiGet('adminData');
     fcAdminData = d;
     fcN=1;
     renderFormModal(d);
@@ -2870,7 +2870,7 @@ async function execFormCreate(){
   if(bk) bk.style.display='none';
   document.getElementById('fc-st').classList.add('show');
   try{
-    await gasGet('createForm',{mapping:mappingResult,year:fy,month:fm});
+    await apiGet('createForm',{mapping:mappingResult,year:fy,month:fm});
     document.getElementById('fc-st').classList.remove('show');
     document.getElementById('fc-done').style.display='block';
     document.getElementById('fc-done-sub').textContent=fy+'年'+fm+'月のフォームを作成しました。';
@@ -2906,7 +2906,7 @@ async function execShiftPub(){
   document.getElementById('sp-exec-btn').disabled=true;
   document.getElementById('sp-st').classList.add('show');
   try{
-    await gasGet('publishShift',{});
+    await apiGet('publishShift',{});
     document.getElementById('sp-st').classList.remove('show');
     document.getElementById('sp-done').style.display='block';
     document.getElementById('m-sp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-shift-pub')">閉じる</button>`;
@@ -2928,7 +2928,7 @@ async function loadCalPubStatus() {
   const text  = document.getElementById('cal-pub-badge-text');
   if (!badge || !text) return;
   try {
-    const r = await gasGet('getCalPubStatus');
+    const r = await apiGet('getCalPubStatus');
     calPubStatus = r.published;
     badge.className = 'cal-pub-badge ' + (r.published ? 'published' : 'unpublished');
     if (r.published && r.publishedYM) {
@@ -2952,7 +2952,7 @@ async function toggleCalPub() {
     badge.className = 'cal-pub-badge loading';
     text.textContent = '処理中...';
     try {
-      await gasGet('unpublishCalendar');
+      await apiGet('unpublishCalendar');
       calPubStatus = false;
       badge.className = 'cal-pub-badge unpublished';
       text.textContent = '🔒 非公開';
@@ -3001,7 +3001,7 @@ async function execCalPub(){
   document.getElementById('cp-exec-btn').disabled=true;
   document.getElementById('cp-st').classList.add('show');
   try{
-    await gasGet('publishCalendar',{year:curY,month:curM});
+    await apiGet('publishCalendar',{year:curY,month:curM});
     document.getElementById('cp-st').classList.remove('show');
     document.getElementById('cp-done').style.display='block';
     document.getElementById('m-cp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-cal-pub')">閉じる</button>`;
@@ -3067,9 +3067,9 @@ function toast(msg,type){
 })();
 
 // ============================================================
-// gasPost ヘルパー（POST方式・写真アップロード等の大容量データ用）
+// apiPost ヘルパー（POST方式・写真アップロード等の大容量データ用）
 // ============================================================
-function gasPost(actionOrPayload, params) {
+function apiPost(actionOrPayload, params) {
   let payload;
   if (typeof actionOrPayload === 'string') {
     payload = Object.assign({ action: actionOrPayload }, params);
@@ -3083,7 +3083,7 @@ function gasPost(actionOrPayload, params) {
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
-  return fetch(GAS_URL, {
+  return fetch(API_URL, {
     method: 'POST',
     redirect: 'follow',
     signal: controller.signal,
@@ -3098,8 +3098,8 @@ function gasPost(actionOrPayload, params) {
     })
     .catch(err => {
       clearTimeout(timer);
-      if (err.name === 'AbortError') throw new Error('通信タイムアウト（GASが応答しませんでした）');
-      throw new Error(err.message || '通信エラー（GASへの接続に失敗）');
+      if (err.name === 'AbortError') throw new Error('通信タイムアウト（サーバーが応答しませんでした）');
+      throw new Error(err.message || '通信エラー（サーバーへの接続に失敗）');
     });
 }
 
@@ -3115,7 +3115,7 @@ async function openNoticeModal() {
 async function refreshNoticeModal() {
   document.getElementById('m-notice-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const d = await gasGet('getNoticesAdmin');
+    const d = await apiGet('getNoticesAdmin');
     const notices = d.notices || [];
     _noticeCache = notices;
     let html = `
@@ -3193,7 +3193,7 @@ async function saveNotice() {
   try {
     const payload = { action: 'saveNotice', title, body, display, startDate, endDate };
     if (_noticeEditId) payload.id = _noticeEditId;
-    const res = await gasPost(payload);
+    const res = await apiPost(payload);
     if (!res.ok) throw new Error(res.error || '保存失敗');
     _noticeEditId = null;
     await refreshNoticeModal();
@@ -3209,7 +3209,7 @@ async function deleteNotice(id) {
   if (!confirm('このお知らせを削除しますか？')) return;
   showProc('削除しています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'deleteNotice', id });
+    const res = await apiPost({ action: 'deleteNotice', id });
     if (!res.ok) throw new Error(res.error || '削除失敗');
     await refreshNoticeModal();
     hideProc();
@@ -3219,7 +3219,7 @@ async function deleteNotice(id) {
 async function toggleNotice(id) {
   showProc('更新しています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'toggleNotice', id });
+    const res = await apiPost({ action: 'toggleNotice', id });
     if (!res.ok) throw new Error(res.error || '切替失敗');
     await refreshNoticeModal();
     hideProc();
@@ -3238,7 +3238,7 @@ async function openProxyModal() {
 async function refreshProxyModal() {
   document.getElementById('m-proxy-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const [proxyRes, memberRes] = await Promise.all([gasGet('getProxySettings'), gasGet('getMemberList')]);
+    const [proxyRes, memberRes] = await Promise.all([apiGet('getProxySettings'), apiGet('getMemberList')]);
     _proxyMembers = (memberRes.members || []).filter(m => m.uid);
     const settings = proxyRes.settings || [];
     const memberOpts = _proxyMembers.map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
@@ -3278,7 +3278,7 @@ async function addProxy() {
   if (fromUid === toUid)  { toast('同じ人は設定できません', 'e'); return; }
   showProc('代理設定を追加しています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'saveProxySetting', fromUid, toUid });
+    const res = await apiPost({ action: 'saveProxySetting', fromUid, toUid });
     if (!res.ok) throw new Error(res.error || '追加失敗');
     await refreshProxyModal();
     hideProc();
@@ -3289,7 +3289,7 @@ async function deleteProxy(rowIndex) {
   if (!confirm('この代理設定を解除しますか？')) return;
   showProc('解除しています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'deleteProxySetting', rowIndex });
+    const res = await apiPost({ action: 'deleteProxySetting', rowIndex });
     if (!res.ok) throw new Error(res.error || '削除失敗');
     await refreshProxyModal();
     hideProc();
@@ -3312,7 +3312,7 @@ async function openCoupleModal() {
 async function refreshCoupleModal() {
   document.getElementById('m-couple-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const [coupleRes, memberRes] = await Promise.all([gasGet('getCoupleList'), gasGet('getMemberList')]);
+    const [coupleRes, memberRes] = await Promise.all([apiGet('getCoupleList'), apiGet('getMemberList')]);
     _coupleMembers = (memberRes.members || []).filter(m => m.uid);
     const couples  = coupleRes.couples || [];
 
@@ -3370,7 +3370,7 @@ async function addCouple() {
   if (husbandUid === wifeUid)  { toast('同じ人は設定できません', 'e'); return; }
   showProc('夫婦ペアを追加しています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'saveCouple', husbandUid, wifeUid });
+    const res = await apiPost({ action: 'saveCouple', husbandUid, wifeUid });
     if (!res.ok) {
       if (res.error === 'duplicate') { hideProc(); toast('すでに登録されています', 'e'); return; }
       throw new Error(res.error || '追加失敗');
@@ -3384,7 +3384,7 @@ async function deleteCouple(rowIndex) {
   if (!confirm('この夫婦設定を解除しますか？')) return;
   showProc('解除しています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'deleteCouple', rowIndex });
+    const res = await apiPost({ action: 'deleteCouple', rowIndex });
     if (!res.ok) throw new Error(res.error || '削除失敗');
     await refreshCoupleModal();
     hideProc();
@@ -3402,7 +3402,7 @@ async function openRequestModal() {
 async function refreshRequestModal() {
   document.getElementById('m-request-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const d = await gasGet('getRequests');
+    const d = await apiGet('getRequests');
     const all     = d.requests || [];
     const pending = all.filter(r => r.status === '未対応');
     const done    = all.filter(r => r.status !== '未対応');
@@ -3444,7 +3444,7 @@ async function refreshRequestModal() {
 async function resolveRequest(rowIndex) {
   showProc('対応済みにしています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'resolveRequest', rowIndex });
+    const res = await apiPost({ action: 'resolveRequest', rowIndex });
     if (!res.ok) throw new Error(res.error || '更新失敗');
     await refreshRequestModal();
     hideProc();
@@ -3462,7 +3462,7 @@ async function openBugReportModal() {
 async function refreshBugReportModal() {
   document.getElementById('m-bug-report-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const d = await gasGet('getBugReports');
+    const d = await apiGet('getBugReports');
     const all     = d.reports || [];
     const pending = all.filter(r => r.status === '未対応');
     const done    = all.filter(r => r.status !== '未対応');
@@ -3503,7 +3503,7 @@ async function refreshBugReportModal() {
 async function resolveBugReport(rowIndex) {
   showProc('対応済みにしています...', '少々お待ちください');
   try {
-    const res = await gasPost({ action: 'resolveBugReport', rowIndex });
+    const res = await apiPost({ action: 'resolveBugReport', rowIndex });
     if (!res.ok) throw new Error(res.error || '更新失敗');
     await refreshBugReportModal();
     hideProc();
@@ -3517,7 +3517,7 @@ async function resolveBugReport(rowIndex) {
 async function execSyncAccess() {
   if (!confirm('公開ファイルの編集者・閲覧者をアクセス許可リストに同期しますか？')) return;
   try {
-    const res = await gasGet('syncAccessList');
+    const res = await apiGet('syncAccessList');
     if (!res.ok) throw new Error(res.error || '同期失敗');
     toast(`同期完了（${res.added}件追加）`, 's');
   } catch (e) { toast('同期失敗: ' + e.message, 'e'); }
@@ -3569,7 +3569,7 @@ async function buildMstep3() {
   const body = document.getElementById('mstep3-body');
   body.innerHTML = '<div class="loading-row"><div class="spin"></div>前月データを読み込み中...</div>';
   try {
-    const d = await gasGet('adminData');
+    const d = await apiGet('adminData');
     // 現在編集中のslots（ローカル）からcurSlotsを生成（カレンダーシートの保存済みデータは使わない）
     const _DOW = ['日','月','火','水','木','金','土'];
     function _weekNum(y, m, d) {
@@ -3725,18 +3725,18 @@ async function execMonthly() {
         open:     toYMD(p.open),
         slots: (p.slots || []).map(s => ({ y: s.y, m: s.m, d: s.d, time: s.time, interval: s.interval || 15 }))
       }));
-      await runTask('calregen', () => gasPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas }));
+      await runTask('calregen', () => apiPost({ action: 'updateLimitedCalendarSlots', type: currentPwType, phases: phasesForGas }));
     } else {
       // 通常PW: フラット形式（B3/B4/B5 + Row9以降）でカレンダーシートに保存（カレンダー履歴への追記も含む）
       const cleanSlots = slots.map(s => ({ ...s, interval: parseInt(s.interval) || 15, y: parseInt(s.y), m: parseInt(s.m), d: parseInt(s.d) }));
-      await runTask('calregen', () => gasGet('updateCalendarSlots', { slots: cleanSlots, year: curY, month: curM, apply: dates.apply, deadline: dates.deadline, open: dates.open }));
+      await runTask('calregen', () => apiGet('updateCalendarSlots', { slots: cleanSlots, year: curY, month: curM, apply: dates.apply, deadline: dates.deadline, open: dates.open }));
     }
-    if (monthlyChecks.calpub) await runTask('calpub', () => gasGet('publishCalendar', { year: curY, month: curM }));
+    if (monthlyChecks.calpub) await runTask('calpub', () => apiGet('publishCalendar', { year: curY, month: curM }));
     if (monthlyChecks.form) {
       document.querySelectorAll('.map-sel-m').forEach(s => { monthlyMappingResult[s.dataset.key] = s.value; });
-      await runTask('form', () => gasGet('createFormSheet', { year: curY, month: curM, mapping: monthlyMappingResult }));
+      await runTask('form', () => apiGet('createFormSheet', { year: curY, month: curM, mapping: monthlyMappingResult }));
     }
-    if (monthlyChecks.shift) await runTask('shift', () => gasGet('createShiftSheet', { year: curY, month: curM }));
+    if (monthlyChecks.shift) await runTask('shift', () => apiGet('createShiftSheet', { year: curY, month: curM }));
 
     datesChanged = false;
     updSaveDatesBtn();
@@ -3777,7 +3777,7 @@ async function loadPhotoMgmtList() {
   const body = document.getElementById('m-photo-mgmt-body');
   body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin"></div> 読み込み中...</div>';
   try {
-    const res = await gasGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
+    const res = await apiGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
     const photos = (res && res.photos) || [];
     // 年月セレクタ
     const ymHtml = buildPhotoYmSelector();
@@ -3831,7 +3831,7 @@ async function onPhotoFilesSelected(event) {
   // 既存写真数を確認してindexを決める
   let startIndex = 1;
   try {
-    const res = await gasGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
+    const res = await apiGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
     startIndex = ((res && res.photos) || []).length + 1;
   } catch(_) {}
 
@@ -3847,7 +3847,7 @@ async function onPhotoFilesSelected(event) {
   // アップロードを全ファイル並列で実行
   await Promise.all(files.map(async (file, i) => {
     try {
-      await gasPost('uploadPhoto', {
+      await apiPost('uploadPhoto', {
         category: _photoMgmtCategory,
         year:     _photoMgmtYear,
         month:    _photoMgmtMonth,
@@ -3891,7 +3891,7 @@ async function deletePhoto(fileId) {
   if (!confirm('この写真を削除しますか？')) return;
   showProc('写真を削除しています...', '少々お待ちください');
   try {
-    await gasGet('deletePhoto', { fileId });
+    await apiGet('deletePhoto', { fileId });
     await loadPhotoMgmtList();
     hideProc();
     toast('削除しました', 's');
@@ -3913,7 +3913,7 @@ async function openMemberModal() {
   document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
   document.getElementById('m-member-add-btn').style.display = '';
   try {
-    const res = await gasGet('getMemberListAll');
+    const res = await apiGet('getMemberListAll');
     if (!res.ok) throw new Error(res.error || '取得失敗');
     _memberList = res.members || [];
     renderMemberList();
@@ -4066,7 +4066,7 @@ async function saveMemberForm(isEdit, isOwner) {
   try {
     let res;
     if (isEdit) {
-      res = await gasGet('updateMember', {
+      res = await apiGet('updateMember', {
         rowIndex: _memberEditRowIndex,
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
@@ -4076,7 +4076,7 @@ async function saveMemberForm(isEdit, isOwner) {
         adminUid, adminName
       });
     } else {
-      res = await gasGet('addMember', {
+      res = await apiGet('addMember', {
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
         isCart: isCart ? '1' : '',
@@ -4085,7 +4085,7 @@ async function saveMemberForm(isEdit, isOwner) {
     }
     if (!res.ok) throw new Error(res.error || '保存失敗');
     // 一覧を再取得して再描画
-    const listRes = await gasGet('getMemberListAll');
+    const listRes = await apiGet('getMemberListAll');
     if (listRes.ok) {
       _memberList = listRes.members || [];
       renderMemberList();
@@ -4112,9 +4112,9 @@ async function confirmDeleteMember(rowIndex) {
   const adminName = _currentUser?.name || '';
   showProc('メンバーを削除しています...', '少々お待ちください');
   try {
-    const res = await gasGet('deleteMember', { rowIndex, adminUid, adminName });
+    const res = await apiGet('deleteMember', { rowIndex, adminUid, adminName });
     if (!res.ok) throw new Error(res.error || '削除失敗');
-    const listRes = await gasGet('getMemberListAll');
+    const listRes = await apiGet('getMemberListAll');
     if (listRes.ok) {
       _memberList = listRes.members || [];
       renderMemberList();
@@ -4162,7 +4162,7 @@ function setProcStep(id, state, errMsg) {
   else if (state === 'err') { ic.textContent = '❌'; st.textContent = errMsg || 'エラー'; st.className = 'proc-step-st err'; }
 }
 async function refreshAdminData() {
-  const d = await gasGet('adminData');
+  const d = await apiGet('adminData');
   adminData = d;
   if (d.eventDates) {
     const toObj = str => { if (!str) return null; const p = str.split('/'); return p.length === 2 ? { y: curY, m: parseInt(p[0]), d: parseInt(p[1]) } : null; };
@@ -4186,7 +4186,7 @@ async function refreshAdminData() {
 // ============================================================
 async function loadAutoPublishSettings() {
   try {
-    const r = await gasGet('getAutoPublishSettings');
+    const r = await apiGet('getAutoPublishSettings');
     if (!r.ok) return;
     const calChk   = document.getElementById('auto-pub-cal-chk');
     const shiftChk = document.getElementById('auto-pub-shift-chk');
@@ -4199,7 +4199,7 @@ async function onAutoPublishChange() {
   const calAuto   = document.getElementById('auto-pub-cal-chk')?.checked   || false;
   const shiftAuto = document.getElementById('auto-pub-shift-chk')?.checked || false;
   try {
-    const r = await gasGet('setAutoPublishSettings', { calAuto, shiftAuto });
+    const r = await apiGet('setAutoPublishSettings', { calAuto, shiftAuto });
     if (!r.ok) throw new Error(r.error);
     toast('自動公開設定を保存しました', 's');
   } catch (e) {
