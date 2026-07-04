@@ -497,10 +497,9 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 
 <div class="ta" id="ta"></div>
 
+<script src="js/api.js?v=1"></script>
 <script>
-const API_URL   = 'https://nqtswiynoxawccldqcwi.supabase.co/functions/v1/api';
-const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xdHN3aXlub3hhd2NjbGRxY3dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MzQxNjIsImV4cCI6MjA5ODMxMDE2Mn0.M-AnCBnXBI1FIyouoa5ttF6mb8PF2YqHfv180PqQWQU';
-const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
+// API_URL / ANON_KEY / CLIENT_ID は js/api.js（共有通信層）で定義
 
 let currentPwType = (() => { try { return new URLSearchParams(location.search).get('type') || 'normal'; } catch(e) { return 'normal'; } })();
 let adminUser     = null;
@@ -529,31 +528,7 @@ let settingsLoaded = false;
 const bs = {};
 window._blockCols = {};
 
-// ============================================================
-// API通信
-// ============================================================
-function apiGet(action, params) {
-  const p = Object.assign({ type: currentPwType }, params || {});
-  let url  = API_URL + '?action=' + action;
-  url += '&params=' + encodeURIComponent(JSON.stringify(p));
-  const ctrl  = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 180000);
-  return fetch(url, { redirect: 'follow', signal: ctrl.signal, headers: { 'Authorization': 'Bearer ' + ANON_KEY } })
-    .then(r => { clearTimeout(timer); return r.json(); })
-    .then(d => {
-      if (d && d.error && !d.ok) throw new Error(d.error);
-      return d;
-    })
-    .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
-}
-function apiAuthGet(email, source) {
-  const url = API_URL + '?action=auth&source=' + encodeURIComponent(source) + '&email=' + encodeURIComponent(email);
-  const ctrl  = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30000);
-  return fetch(url, { redirect: 'follow', signal: ctrl.signal, headers: { 'Authorization': 'Bearer ' + ANON_KEY } })
-    .then(r => { clearTimeout(timer); return r.json(); })
-    .catch(err => { clearTimeout(timer); throw new Error(err.name === 'AbortError' ? '通信タイムアウト' : (err.message || '通信エラー')); });
-}
+// apiGet / apiAuthGet は js/api.js（共有通信層）で定義
 
 // ============================================================
 // 認証
