@@ -26,6 +26,9 @@ let createLoaded  = false;
 let settingsLoaded = false;
 const bs = {};
 window._blockCols = {};
+let _scKnownTs   = null; // シフト作成データのリアルタイム同期用（最終更新タイムスタンプ）
+let _scPollTimer = null;
+let _scPollListening = false;
 
 // apiGet / apiAuthGet は js/api.js（共有通信層）で定義
 
@@ -547,6 +550,7 @@ async function loadCreateData() {
     else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「🗂 シフト作成準備」を実行してください。</div>'; }
     createLoaded = true;
     setLoading(false);
+    startShiftCreateSync();
   } catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
 }
 
@@ -707,6 +711,10 @@ function buildBlock(block, bi) {
         <span class="tb-st" id="st-${bi}" style="display:none;">● 未保存</span>
         <button class="tb-btn" id="save-btn-${bi}" onclick="saveBlock(${bi})">この時間帯を保存</button>
       </div>
+    </div>
+    <div class="sc-sync-banner" id="sync-banner-${bi}" style="display:none;">
+      <span>⚠️ 他の管理者がこの時間帯を更新しました。保存すると上書きされます。</span>
+      <button class="tb-btn" onclick="acceptSyncUpdate(${bi})">最新を確認</button>
     </div>
     ${buildRespArea(bi, block.responsible || {}, respMembers)}
     ${buildCartArea(bi, block.cart || {}, cartMembers)}
@@ -1010,6 +1018,102 @@ function hasUnsavedChanges() {
 async function reloadCreateData() {
   if (hasUnsavedChanges() && !confirm('未保存の変更が失われます。続行しますか？')) return;
   await loadCreateData();
+}
+
+// ============================================================
+// リアルタイム同期（ポーリング）
+// 他の管理者が saveShiftBlock で保存すると touchShift() が settings テーブルの
+// shift_updated_at_<pw_type> を更新する。それを軽量エンドポイント getShiftLastUpdated で
+// 定期チェックし、変化があればブロック単位でマージする（表示中ブロックが未保存編集中の
+// 場合は上書きせず競合バナーを出す）。バックエンドは shift-form/js/app.js の
+// checkShiftUpdate と同じ仕組みを流用しており、追加のAPI・DB変更はない。
+// ============================================================
+async function checkShiftCreateUpdate() {
+  if (!createLoaded) return;
+  try {
+    const res = await apiGet('getShiftLastUpdated');
+    if (!res || !res.ok) return;
+    if (_scKnownTs === null) { _scKnownTs = res.lastUpdated; return; }
+    if (res.lastUpdated !== _scKnownTs) {
+      _scKnownTs = res.lastUpdated;
+      await syncShiftCreateData();
+    }
+  } catch (e) { console.warn('[checkShiftCreateUpdate]', e); }
+}
+
+function startShiftCreateSync() {
+  clearInterval(_scPollTimer);
+  _scKnownTs = null;
+  _scPollTimer = setInterval(checkShiftCreateUpdate, 10000);
+  if (!_scPollListening) {
+    _scPollListening = true;
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkShiftCreateUpdate(); });
+  }
+  checkShiftCreateUpdate();
+}
+
+// 変更があったブロックだけをマージする。日付タブ構成が変わるような構造的な変更
+// （シフト作成枠の新規作成・削除など）は対象外とし、既存の「🔄 再読み込み」に委ねる。
+async function syncShiftCreateData() {
+  let res;
+  try { res = await apiGet('getShiftCreateData', {}); } catch (e) { return; }
+  if (!res || !res.ok) return;
+
+  const activeTab   = (window._dateTabs || [])[activeDateIdx];
+  const activeBlock = activeTab ? shiftDates.filter(d => d.date === activeTab.date)[activeTimeIdx] : null;
+  const activeKey   = activeBlock ? bKey(activeBlock) : null;
+  let activeChanged  = false;
+  let activeConflict = false;
+
+  (res.dates || []).forEach(fresh => {
+    const key = bKey(fresh);
+    const idx = shiftDates.findIndex(d => bKey(d) === key);
+    if (idx === -1) return; // 新規追加された枠は対象外（🔄 再読み込みで反映）
+    if (key === activeKey) {
+      if (bs[key] === false) { activeConflict = true; return; } // 未保存編集中は上書きしない
+      shiftDates[idx] = fresh;
+      activeChanged = true;
+    } else if (bs[key] !== false) {
+      shiftDates[idx] = fresh;
+    }
+  });
+
+  conflictMap = res.conflictMap || conflictMap;
+  memoMap = {};
+  if (res.memoMap) Object.assign(memoMap, res.memoMap);
+  defaultSlot = res.defaultSlot || defaultSlot;
+  recalcCounts();
+  buildLeftPanel();
+
+  if (activeConflict) showSyncConflictBanner(activeTimeIdx);
+  else if (activeChanged) { renderBlock(); toast('他の管理者の変更を反映しました', 's'); }
+}
+
+function showSyncConflictBanner(bi) {
+  const el = document.getElementById('sync-banner-' + bi);
+  if (el) el.style.display = 'flex';
+}
+
+// 競合バナーの「最新を確認」：ユーザー起動の明示的な再取得なのでオーバーレイ表示する
+async function acceptSyncUpdate(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
+  if (!block) return;
+  setLoading(true, '最新のデータを読み込み中...');
+  try {
+    const res = await apiGet('getShiftCreateData', {});
+    const fresh = res && res.ok ? (res.dates || []).find(d => bKey(d) === bKey(block)) : null;
+    if (fresh) {
+      const idx = shiftDates.findIndex(d => bKey(d) === bKey(block));
+      shiftDates[idx] = fresh;
+      bs[bKey(fresh)] = true;
+      recalcCounts();
+      buildLeftPanel();
+      renderBlock();
+    }
+  } catch (e) { toast('読み込みエラー: ' + e.message, 'e'); }
+  finally { setLoading(false); }
 }
 
 function toggleNotApplied(el) {
