@@ -157,7 +157,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .lp-badge-col{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:28px;flex-shrink:0;}
 .sts{display:flex;gap:3px;flex-wrap:wrap;}
 .sc-badge{display:inline-block;box-sizing:border-box;width:100%;text-align:center;font-size:10px;padding:2px 0;border-radius:3px;font-weight:700;}
-.sc-a{background:#fef3c7;color:#92400e;}.sc-r{background:var(--green-l);color:var(--green);}.sc-k{background:var(--purple-l);color:var(--purple);}
+.sc-a{background:#fef3c7;color:#92400e;}.sc-r{background:var(--green-l);color:var(--green);}.sc-k{background:var(--purple-l);color:var(--purple);}.sc-w{background:var(--blue-l);color:var(--blue);}
 .lp-sec-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
 .lp-sec-toggle:hover{background:var(--border);}
 .lp-sec-arrow{font-size:9px;margin-right:4px;transition:transform .15s;}

@@ -17,6 +17,7 @@ let settingsCartPresets  = [];
 let memoMap       = {};
 let respCounts    = {}; // UID別：当月の責任者 配置回数（保存済みデータのみ反映）
 let cartCounts    = {}; // UID別：当月のカート担当 配置回数（保存済みデータのみ反映）
+let slotAssignCounts = {}; // UID別：当月のシフト割当回数（1コマにつき1回。同一コマ内の複数行への配置はまとめて1回）
 let defaultSlot   = 15;
 let shiftPublished = false;
 let activeDateIdx = 0;
@@ -644,11 +645,18 @@ function filterAppliedForSlot(date, blockTime) {
 function recalcCounts() {
   respCounts = {};
   cartCounts = {};
+  slotAssignCounts = {};
   shiftDates.forEach(block => {
     const resp = block.responsible || {};
     [resp.r1, resp.r2].filter(Boolean).forEach(uid => { respCounts[uid] = (respCounts[uid] || 0) + 1; });
     const cart = block.cart || {};
     [cart.ki1, cart.ki2, cart.ko1, cart.ko2].filter(Boolean).forEach(uid => { cartCounts[uid] = (cartCounts[uid] || 0) + 1; });
+    // シフト割当は1コマ内に複数行あるため、同一コマ内では重複排除して1回だけ数える
+    const blockUids = new Set();
+    (block.slots || []).forEach(slot => {
+      Object.values(slot.places || {}).forEach(uids => { (uids || []).forEach(uid => { if (uid) blockUids.add(uid); }); });
+    });
+    blockUids.forEach(uid => { slotAssignCounts[uid] = (slotAssignCounts[uid] || 0) + 1; });
   });
 }
 
@@ -693,6 +701,7 @@ function buildLeftPanel() {
     const badgeA = `<span class="sc-badge sc-a">申${a.appliedCount}</span>`;
     const badgeR = a.respFlag ? `<span class="sc-badge sc-r">責${respCounts[a.uid] || 0}</span>` : '';
     const badgeK = a.cartFlag ? `<span class="sc-badge sc-k">カ${cartCounts[a.uid] || 0}</span>` : '';
+    const badgeW = `<span class="sc-badge sc-w">割${slotAssignCounts[a.uid] || 0}</span>`;
     // 選択中時間帯のコメント・カート不可を取得
     const slotObj = blockTime ? (a.appliedSlots || []).find(s => {
       const sk = typeof s === 'object' ? s.slot : s;
@@ -706,7 +715,7 @@ function buildLeftPanel() {
     const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
     const bothBadge = a.sameDayBoth ? `<span class="badge-both" title="同日の通常PWにも申込があります。どちらか一方のシフトにしか入れません。">両方</span>` : '';
     const dotClass = assignedUids.has(a.uid) ? 'd-on' : 'd-off';
-    return `<div class="mr-wrap"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}</div><div class="lp-badge-col">${badgeR}</div><div class="lp-badge-col">${badgeK}</div></div></div>${commentHtml}</div>`;
+    return `<div class="mr-wrap"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}${badgeR}</div><div class="lp-badge-col">${badgeK}${badgeW}</div></div></div>${commentHtml}</div>`;
   }).join('');
   if (notApplied.length > 0) {
     html += `<div class="lp-sec lp-sec-toggle" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
