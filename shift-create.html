@@ -7,7 +7,7 @@
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" defer onload="renderGsiButton()"></script>
-<link rel="stylesheet" href="css/shift-create.css?v=3">
+<link rel="stylesheet" href="css/shift-create.css?v=4">
 </head>
 <body>
 
@@ -95,7 +95,6 @@
           <div class="dtabs-time" id="dtabs-time"></div>
           <div style="display:flex;gap:8px;flex-shrink:0;">
             <button class="tb-btn" id="cmp-toggle-btn" style="border-color:var(--teal);color:var(--teal);white-space:nowrap;" onclick="toggleCompareMode()">⬜ 比較</button>
-            <button class="tb-btn" style="border-color:var(--green);color:var(--green);" onclick="saveDayAll()">💾 この日付をすべて保存</button>
           </div>
         </div>
         <div class="rm" id="main-content">
@@ -242,6 +241,6 @@
 <div class="ta" id="ta"></div>
 
 <script src="js/api.js?v=1"></script>
-<script src="js/shift-create.js?v=3"></script>
+<script src="js/shift-create.js?v=4"></script>
 </body>
 </html>

@@ -30,6 +30,14 @@ let _scKnownTs   = null; // シフト作成データのリアルタイム同期�
 let _scPollTimer = null;
 let _scPollListening = false;
 
+// ===== オートセーブ =====
+const _saveTimers    = {}; // bKey -> setTimeoutのid（デバウンス待ち）
+const _saveInFlight   = {}; // bKey -> 保存中フラグ
+const _savePending    = {}; // bKey -> 保存中に追加の編集が入った場合に立てるフラグ
+const _saveRetried    = {}; // bKey -> 失敗時の自動リトライ（1回のみ）を予約済みか
+const AUTOSAVE_DEBOUNCE_MS = 500;
+const AUTOSAVE_RETRY_MS    = 5000;
+
 // apiGet / apiAuthGet は js/api.js（共有通信層）で定義
 
 // ============================================================
@@ -116,6 +124,7 @@ function renderPwTabsSc() {
 
 async function switchPwTypeSc(type) {
   if (currentPwType === type) return;
+  await flushPendingSave(activeTimeIdx);
   currentPwType = type;
   renderPwTabsSc();
 
@@ -127,6 +136,10 @@ async function switchPwTypeSc(type) {
   applicants = [];
   shiftDates = [];
   Object.keys(bs).forEach(k => delete bs[k]);
+  Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
+  Object.keys(_saveInFlight).forEach(k => delete _saveInFlight[k]);
+  Object.keys(_savePending).forEach(k => delete _savePending[k]);
+  Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
   window._blockCols = {};
 
   const label = type === 'normal' ? '通常PW' : (pwTypeList.find(s => s.id === type)?.name || '限定PW');
@@ -525,6 +538,10 @@ async function loadCreateData() {
   setLoading(true, 'シフトデータを読み込み中...');
   try {
     Object.keys(bs).forEach(k => delete bs[k]); // 再読み込み時は保存状態をクリア
+    Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
+    Object.keys(_saveInFlight).forEach(k => delete _saveInFlight[k]);
+    Object.keys(_savePending).forEach(k => delete _savePending[k]);
+    Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
     window._blockCols = {};
     const [flagsRes, appRes, shiftRes] = await Promise.all([
       apiGet('getMemberFlags'), apiGet('getApplicants', {}), apiGet('getShiftCreateData', {})
@@ -565,8 +582,9 @@ function buildCreateTabs() {
   if (compareMode) populateCmpDateSel();
 }
 
-function switchDateTab(i) {
+async function switchDateTab(i) {
   syncCurrentBlock();
+  await flushPendingSave(activeTimeIdx);
   document.querySelectorAll('.dtab').forEach((b, idx) => b.className = 'dtab' + (idx === i ? ' on' : ''));
   activeDateIdx = i;
   activeTimeIdx = 0;
@@ -586,8 +604,9 @@ function buildTimeTabs() {
   renderBlock();
 }
 
-function switchTimeTab(bi) {
+async function switchTimeTab(bi) {
   syncCurrentBlock();
+  await flushPendingSave(activeTimeIdx);
   document.querySelectorAll('.ttab').forEach((b, idx) => b.className = 'ttab' + (idx === bi ? ' on' : ''));
   activeTimeIdx = bi;
   buildLeftPanel();
@@ -709,7 +728,6 @@ function buildBlock(block, bi) {
       <span class="tb-time">${esc(block.date)}（${esc(block.weekday)}） ${esc(block.time)}</span>
       <div class="tb-acts">
         <span class="tb-st" id="st-${bi}" style="display:none;">● 未保存</span>
-        <button class="tb-btn" id="save-btn-${bi}" onclick="saveBlock(${bi})">この時間帯を保存</button>
       </div>
     </div>
     <div class="sc-sync-banner" id="sync-banner-${bi}" style="display:none;">
@@ -995,12 +1013,60 @@ function mu(bi) {
   if (!block) return;
   bs[bKey(block)] = false;
   const st = document.getElementById('st-' + bi);
-  if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; }
+  if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
   ug();
+  scheduleAutoSave(bi);
 }
+
+// ============================================================
+// オートセーブ（デバウンス）
+// mu(bi) からブロック単位でタイマーを(再)設定する。0.5秒操作が止まったら保存を実行する。
+// 保存中に追加の編集が入った場合は完了後にもう一度保存し直し、同一ブロックへの
+// 保存リクエストが重ならないようにする（saveShiftBlockはdelete→insertのため
+// 並行実行すると書き込み順序が入れ替わりデータ不整合を起こしうる）。
+// ============================================================
+function scheduleAutoSave(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
+  if (!block) return;
+  const key = bKey(block);
+  clearTimeout(_saveTimers[key]);
+  _saveTimers[key] = setTimeout(() => { delete _saveTimers[key]; runAutoSave(bi); }, AUTOSAVE_DEBOUNCE_MS);
+}
+
+async function runAutoSave(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
+  if (!block) return;
+  const key = bKey(block);
+  if (_saveInFlight[key]) { _savePending[key] = true; return; }
+  _saveInFlight[key] = true;
+  try {
+    await saveBlock(bi);
+  } finally {
+    _saveInFlight[key] = false;
+    if (_savePending[key]) { _savePending[key] = false; runAutoSave(bi); }
+  }
+}
+
+// 離脱前に保留中の保存を確定させる（デバウンス待ち中に別ブロックへ切り替える場合の安全弁）
+async function flushPendingSave(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
+  if (!block) return;
+  const key = bKey(block);
+  if (_saveTimers[key]) { clearTimeout(_saveTimers[key]); delete _saveTimers[key]; }
+  if (bs[key] === false) await runAutoSave(bi);
+}
+
+// 未送信の変更（デバウンス待ち・保存失敗）が残ったままタブを閉じようとしたら警告する
+window.addEventListener('beforeunload', (e) => {
+  if (hasUnsavedChanges()) { e.preventDefault(); e.returnValue = ''; }
+});
+
 function markSaved(bi) {
   const st = document.getElementById('st-' + bi);
-  if (st) { st.style.display = ''; st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; }
+  if (st) { st.style.display = ''; st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; st.onclick = null; st.style.cursor = ''; }
 }
 function ug() {
   const u = Object.values(bs).some(v => !v);
@@ -1105,9 +1171,11 @@ async function acceptSyncUpdate(bi) {
     const res = await apiGet('getShiftCreateData', {});
     const fresh = res && res.ok ? (res.dates || []).find(d => bKey(d) === bKey(block)) : null;
     if (fresh) {
-      const idx = shiftDates.findIndex(d => bKey(d) === bKey(block));
+      const key = bKey(block);
+      const idx = shiftDates.findIndex(d => bKey(d) === key);
       shiftDates[idx] = fresh;
-      bs[bKey(fresh)] = true;
+      bs[key] = true;
+      if (_saveTimers[key]) { clearTimeout(_saveTimers[key]); delete _saveTimers[key]; }
       recalcCounts();
       buildLeftPanel();
       renderBlock();
@@ -1196,10 +1264,9 @@ async function saveBlock(bi) {
   const tab   = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
+  const key = bKey(block);
   const st  = document.getElementById('st-' + bi);
-  const btn = document.getElementById('save-btn-' + bi);
-  if (btn) btn.disabled = true;
-  if (st) { st.style.display = ''; st.textContent = '保存中...'; }
+  if (st) { st.style.display = ''; st.textContent = '保存中...'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
   try {
     const data = collectBlock(bi);
     await apiGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots });
@@ -1210,29 +1277,23 @@ async function saveBlock(bi) {
     block.usedPlaces = data.usedPlaces || [];
     block.placeCart = data.placeCart || [];
     recalcCounts();
-    bs[bKey(block)] = true; markSaved(bi); ug(); toast('保存しました', 's');
+    bs[key] = true; _saveRetried[key] = false; markSaved(bi); ug();
     buildLeftPanel();
-  } catch (e) { if (st) st.textContent = '● 未保存'; toast('保存に失敗しました: ' + e.message, 'e'); }
-  finally { if (btn) btn.disabled = false; }
-}
-
-async function saveDayAll() {
-  const tab = (window._dateTabs || [])[activeDateIdx];
-  if (!tab) return;
-  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
-  const curIdx = activeTimeIdx;
-  // 現在表示中のブロックを最初に保存（DOM が正しい状態のうちに収集する）
-  // 他ブロックの buildTimeTabs() が main-content を上書きする前に実行することで
-  // ユーザーが入力した resp1/resp2 が失われるのを防ぐ
-  await saveBlock(curIdx);
-  for (let i = 0; i < dayBlocks.length; i++) {
-    if (i === curIdx) continue;
-    activeTimeIdx = i;
-    buildTimeTabs();
-    await saveBlock(i);
+  } catch (e) {
+    bs[key] = false;
+    if (st) {
+      st.style.display = '';
+      st.textContent = '⚠ 保存失敗（タップで再試行）';
+      st.className = 'tb-st err';
+      st.style.cursor = 'pointer';
+      st.onclick = () => { st.onclick = null; runAutoSave(bi); };
+    }
+    toast('保存に失敗しました: ' + e.message, 'e');
+    if (!_saveRetried[key]) {
+      _saveRetried[key] = true;
+      setTimeout(() => { _saveRetried[key] = false; runAutoSave(bi); }, AUTOSAVE_RETRY_MS);
+    }
   }
-  activeTimeIdx = curIdx;
-  buildTimeTabs();
 }
 
 async function saveAll() {
@@ -1254,6 +1315,7 @@ async function saveAll() {
   activeDateIdx = origDateIdx;
   activeTimeIdx = origTimeIdx;
   buildTimeTabs();
+  toast('すべて保存しました', 's');
 }
 
 function updatePublishBtn() {
