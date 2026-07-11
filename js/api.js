@@ -8,31 +8,11 @@ const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
 
 // ============================================================
-// テストアカウント専用：疑似日付シミュレーション
-// ============================================================
-const TEST_EMAIL = 'jw.utazu.test@gmail.com';
-
-function _isTestAccountSession() {
-  try {
-    const u = JSON.parse(localStorage.getItem('adminUser') || 'null');
-    return !!(u && u.email === TEST_EMAIL);
-  } catch (e) { return false; }
-}
-
-// テストアカウントでログイン中かつ疑似日付が設定されている場合のみ値を返す
-function getDebugFakeNow() {
-  if (!_isTestAccountSession()) return '';
-  return localStorage.getItem('debugFakeNow') || '';
-}
-
-// ============================================================
 // API通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
 // ============================================================
 function apiGet(action, params) {
   // type パラメータを自動付与（認証系・メンバー取得など type 不要なアクションはサーバー側で無視する）
   const p = Object.assign({ type: currentPwType }, params || {});
-  const fakeNow = getDebugFakeNow();
-  if (fakeNow) p.fakeNow = fakeNow;
   let url = API_URL+'?action='+action;
   url += '&params='+encodeURIComponent(JSON.stringify(p));
   const controller = new AbortController();
@@ -65,8 +45,6 @@ function apiPost(actionOrPayload, params) {
     payload.adminUid  = payload.adminUid  || _currentUser.uid;
     payload.adminName = payload.adminName || _currentUser.name;
   }
-  const fakeNow = getDebugFakeNow();
-  if (fakeNow) payload.fakeNow = payload.fakeNow || fakeNow;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
   return fetch(API_URL, {

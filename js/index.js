@@ -116,7 +116,6 @@ async function _processUserWithGasAuth(u, save) {
     if (!res.isAdmin) { showAuthErr('このアカウントには管理者権限がありません。'); return; }
     // ログインユーザー情報を保持（uid空＝オーナーアカウント）
     _currentUser = { uid: res.uid || '', name: u.name, email: u.email };
-    initDebugDatePanel();
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
   // ログイン情報をlocalStorageに保存（次回自動ログイン用）
   if (save) {
@@ -148,30 +147,6 @@ function signOut() {
   google.accounts.id.disableAutoSelect();
   document.getElementById('app').style.display  = 'none';
   document.getElementById('auth').style.display = 'flex';
-  const panel = document.getElementById('debugDatePanel');
-  if (panel) panel.style.display = 'none';
-}
-
-// ============================================================
-// テストアカウント専用：疑似日付デバッグパネル
-// ============================================================
-function initDebugDatePanel() {
-  const panel = document.getElementById('debugDatePanel');
-  if (!panel) return;
-  if (!_currentUser || _currentUser.email !== TEST_EMAIL) { panel.style.display = 'none'; return; }
-  panel.style.display = 'flex';
-  const input = document.getElementById('debugFakeNowInput');
-  const clearBtn = document.getElementById('debugFakeNowClearBtn');
-  input.value = localStorage.getItem('debugFakeNow') || '';
-  input.onchange = () => {
-    if (input.value) localStorage.setItem('debugFakeNow', input.value);
-    else localStorage.removeItem('debugFakeNow');
-    location.reload(); // 現在表示中のデータも新しい疑似日付で再取得させる
-  };
-  clearBtn.onclick = () => {
-    localStorage.removeItem('debugFakeNow');
-    location.reload();
-  };
 }
 function setLoadingStep(step, msg) {
   document.getElementById('ld-status').textContent = msg;
