@@ -7,7 +7,7 @@
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" defer onload="renderGsiButton()"></script>
-<link rel="stylesheet" href="css/shift-create.css?v=1">
+<link rel="stylesheet" href="css/shift-create.css?v=2">
 </head>
 <body>
 
@@ -199,12 +199,22 @@
   </div><!-- end content-wrapper -->
 </div>
 
-<!-- コメントポップアップ -->
-<div class="popup-overlay" id="popup-overlay" onclick="closePopup()">
+<!-- 参加希望 編集モーダル -->
+<div class="popup-overlay" id="wish-edit-modal" onclick="closeWishEditModal()">
   <div class="popup-box" onclick="event.stopPropagation()">
-    <div class="popup-title" id="popup-title"></div>
-    <div class="popup-body" id="popup-body"></div>
-    <button class="popup-close-btn" onclick="closePopup()">閉じる</button>
+    <div class="popup-title" id="we-title"></div>
+    <div class="add-form" style="background:none;border:none;padding:0;">
+      <div class="form-row">
+        <div class="form-col"><label>コメント</label><textarea id="we-comment" rows="3" placeholder="カート不可 等"></textarea></div>
+      </div>
+    </div>
+    <div class="add-form-actions" style="justify-content:space-between;">
+      <button class="s-btn" id="we-toggle-btn" onclick="toggleWishApplied()"></button>
+      <span style="display:flex;gap:6px;">
+        <button class="s-btn" onclick="closeWishEditModal()">キャンセル</button>
+        <button class="popup-close-btn" id="we-save-btn" style="width:auto;padding:8px 20px;" onclick="saveWishComment()">保存</button>
+      </span>
+    </div>
   </div>
 </div>
 
@@ -232,6 +242,6 @@
 <div class="ta" id="ta"></div>
 
 <script src="js/api.js?v=1"></script>
-<script src="js/shift-create.js?v=1"></script>
+<script src="js/shift-create.js?v=2"></script>
 </body>
 </html>

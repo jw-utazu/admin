@@ -231,8 +231,8 @@ select.cs.new-sel{border-style:dashed;color:var(--ink3);}
 .s-btn.green:hover{opacity:.9;}
 .add-form{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-top:8px;}
 .add-form label{font-size:11px;font-weight:700;color:var(--ink2);display:block;margin-bottom:4px;}
-.add-form input,.add-form select{width:100%;border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--surface);}
-.add-form input:focus{border-color:var(--purple);}
+.add-form input,.add-form select,.add-form textarea{width:100%;border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--surface);resize:vertical;}
+.add-form input:focus,.add-form textarea:focus{border-color:var(--purple);}
 .form-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
 .form-col{flex:1;min-width:100px;}
 .add-form-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:8px;}

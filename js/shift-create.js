@@ -429,10 +429,13 @@ function buildWishTable(data, shiftRes) {
       if (val) {
         const hc = typeof val === 'object' && val.comment;
         const tdClass = isAssigned ? 'cell-data cell-on' : 'cell-data';
-        html += `<td class="${tdClass}" style="cursor:pointer;" onclick="showNote('${esc(m.name)}','${esc(slot)}','${hc ? esc(val.comment) : ''}')"><span class="check-mark">〇</span>${hc ? '<span class="note-mark">📝</span>' : ''}</td>`;
+        const comment = hc ? val.comment : '';
+        html += `<td class="${tdClass}" style="cursor:pointer;" onclick="openWishEdit('${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',true,'${esc(comment)}',${isAssigned})"><span class="check-mark">〇</span>${hc ? '<span class="note-mark">📝</span>' : ''}</td>`;
       } else if (isAssigned) {
-        html += `<td class="cell-data cell-on"><span class="check-mark">〇</span></td>`;
-      } else { html += '<td class="cell-data cell-off"></td>'; }
+        html += `<td class="cell-data cell-on" style="cursor:pointer;" onclick="openWishEdit('${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',false,'',true)"><span class="check-mark">〇</span></td>`;
+      } else {
+        html += `<td class="cell-data cell-off" style="cursor:pointer;" onclick="openWishEdit('${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',false,'',false)"></td>`;
+      }
     });
     html += `<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${totalSlots[m.uid] || 0}</td>`;
     html += `<td class="cell-data" style="position:sticky;right:0;background:var(--purple-l);font-weight:700;color:var(--purple);z-index:2;">${totalAssigned[m.uid] || 0}</td>`;
@@ -459,8 +462,50 @@ function buildWishTable(data, shiftRes) {
 
   document.getElementById('wish-table-wrap').innerHTML = html;
 }
-function showNote(name, slot, comment) { if (!comment) return; document.getElementById('popup-title').textContent = name + '｜' + slot; document.getElementById('popup-body').textContent = comment; document.getElementById('popup-overlay').classList.add('on'); }
-function closePopup() { document.getElementById('popup-overlay').classList.remove('on'); }
+// 参加希望 編集モーダル（希望確認タブのセルクリックで開く）
+let wishEditCtx = null;
+function openWishEdit(uid, name, slot, applied, comment, isAssigned) {
+  wishEditCtx = { uid, name, slot, applied, isAssigned };
+  document.getElementById('we-title').textContent = name + '｜' + slot;
+  document.getElementById('we-comment').value = comment || '';
+  const toggleBtn = document.getElementById('we-toggle-btn');
+  const saveBtn   = document.getElementById('we-save-btn');
+  if (applied) {
+    toggleBtn.textContent = '不参加にする';
+    toggleBtn.className = 's-btn del';
+    saveBtn.style.display = '';
+  } else {
+    toggleBtn.textContent = '参加にする';
+    toggleBtn.className = 's-btn green';
+    saveBtn.style.display = 'none';
+  }
+  document.getElementById('wish-edit-modal').classList.add('on');
+}
+function closeWishEditModal() { document.getElementById('wish-edit-modal').classList.remove('on'); wishEditCtx = null; }
+async function submitWishChange(applied) {
+  if (!wishEditCtx) return;
+  const ctx = wishEditCtx;
+  if (!applied && ctx.isAssigned) {
+    if (!confirm(`${ctx.name} さんは既にこのスロットにシフト割当済みです。\n不参加に変更しますか？\n※シフト側の割当は自動では変更されません。`)) return;
+  }
+  const si   = ctx.slot.indexOf(' ');
+  const date = si >= 0 ? ctx.slot.slice(0, si) : ctx.slot;
+  const time = si >= 0 ? ctx.slot.slice(si + 1) : '';
+  const comment = document.getElementById('we-comment').value;
+  setLoading(true, '保存中...');
+  try {
+    const res = await apiGet('adminSetWish', {
+      uid: ctx.uid, name: ctx.name, date, time, applied, comment,
+      adminUid: adminUser?.uid || '', adminName: adminUser?.name || ''
+    });
+    if (!res.ok) throw new Error(res.error || '保存に失敗しました');
+    closeWishEditModal();
+    toast('更新しました', 's');
+    await loadWishDataInternal();
+  } catch (e) { toast('保存エラー: ' + e.message, 'e'); } finally { setLoading(false); }
+}
+function toggleWishApplied() { if (wishEditCtx) submitWishChange(!wishEditCtx.applied); }
+function saveWishComment()   { submitWishChange(true); }
 function toggleWishNotApplied(el) {
   el.classList.toggle('open');
   const body = el.nextElementSibling;
