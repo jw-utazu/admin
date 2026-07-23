@@ -2752,6 +2752,8 @@ function renderMemberList() {
           <span class="member-gender-badge ${m.gender === 'M' ? 'mgb-m' : 'mgb-f'}">${m.gender === 'M' ? '男' : '女'}</span>
           ${m.isResponsible ? '<span class="role-badge rb-resp">責任者</span>' : ''}
           ${m.isCart        ? '<span class="role-badge rb-cart">カート</span>' : ''}
+          ${m.isAdmin       ? '<span class="role-badge rb-admin">管理者</span>' : ''}
+          ${m.isAccountant  ? '<span class="role-badge rb-acct">会計者</span>' : ''}
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn-edit-member" onclick="openMemberEditForm(${m.rowIndex})">編集</button>
@@ -2829,6 +2831,20 @@ function buildMemberForm(m, isOwner) {
           </label>
         </div>
       </div>
+      <div class="mf-row">
+        <label class="mf-lbl">権限
+          ${!isOwner ? '<span style="font-size:10px;color:var(--ink3);font-weight:400;margin-left:4px;">（オーナーアカウントのみ変更可）</span>' : ''}
+        </label>
+        <div style="display:flex;gap:16px;padding:6px 0;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;${isOwner ? 'cursor:pointer;' : 'opacity:.6;'}">
+            <input type="checkbox" id="mf-admin" ${m?.isAdmin ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> 管理者
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;${isOwner ? 'cursor:pointer;' : 'opacity:.6;'}">
+            <input type="checkbox" id="mf-acct" ${m?.isAccountant ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> 会計者
+          </label>
+        </div>
+        ${isOwner ? '<div style="font-size:11px;color:var(--ink3);">※ メールアドレスが未登録の場合、権限を付けても本人はログインできません。</div>' : ''}
+      </div>
       ${isEdit ? `
       <div class="mf-row">
         <label class="mf-lbl">ステータス</label>
@@ -2840,7 +2856,7 @@ function buildMemberForm(m, isOwner) {
             <input type="radio" name="mf-valid" value="0" ${!m.valid ? 'checked' : ''}> 無効
           </label>
         </div>
-        ${m.valid ? '<div style="font-size:11px;color:var(--amber);line-height:1.6;">⚠️ 無効にすると、この方に関する代理送信設定は自動的に削除されます。</div>' : ''}
+        ${m.valid ? '<div style="font-size:11px;color:var(--amber);line-height:1.6;">⚠️ 無効にすると、この方に関する代理送信設定・管理者権限・会計者権限は自動的に削除されます。</div>' : ''}
       </div>` : ''}
       <div id="mf-err" style="display:none;color:var(--red);font-size:12px;padding:6px 10px;background:var(--red-l);border-radius:var(--r);"></div>
     </div>
@@ -2858,6 +2874,8 @@ async function saveMemberForm(isEdit, isOwner) {
   const email    = (document.getElementById('mf-email')?.value || '').trim();
   const isResp   = document.getElementById('mf-resp')?.checked || false;
   const isCart   = document.getElementById('mf-cart')?.checked || false;
+  const isAdmin  = document.getElementById('mf-admin')?.checked || false;
+  const isAcct   = document.getElementById('mf-acct')?.checked || false;
   const validVal = document.querySelector('input[name="mf-valid"]:checked')?.value;
   const valid    = validVal !== undefined ? validVal === '1' : true;
 
@@ -2881,6 +2899,8 @@ async function saveMemberForm(isEdit, isOwner) {
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
         isCart: isCart ? '1' : '',
+        isAdmin: isAdmin ? '1' : '',
+        isAccountant: isAcct ? '1' : '',
         valid: valid ? '1' : '0',
         isOwner: isOwner ? '1' : '',
         adminUid, adminName
@@ -2890,6 +2910,9 @@ async function saveMemberForm(isEdit, isOwner) {
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
         isCart: isCart ? '1' : '',
+        isAdmin: isAdmin ? '1' : '',
+        isAccountant: isAcct ? '1' : '',
+        isOwner: isOwner ? '1' : '',
         adminUid, adminName
       });
     }

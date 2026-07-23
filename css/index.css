@@ -438,6 +438,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .role-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;}
 .rb-resp{background:#fef9c3;color:#713f12;}
 .rb-cart{background:#f0fdf4;color:#15803d;}
+.rb-admin{background:#ede9fe;color:#5b21b6;}
+.rb-acct{background:#dbeafe;color:#1e40af;}
 .btn-edit-member{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);flex-shrink:0;}
 .btn-edit-member:hover{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
 .btn-delete-member{font-size:11px;padding:4px 8px;border:1px solid var(--red-l);border-radius:6px;background:var(--red-l);cursor:pointer;color:var(--red);font-family:var(--sans);flex-shrink:0;}
