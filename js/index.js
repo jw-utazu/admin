@@ -1578,7 +1578,7 @@ async function openFormModal(){
   document.getElementById('m-form-body').innerHTML='<div class="loading-row"><div class="spin"></div>データを読み込み中...</div>';
   document.getElementById('m-form-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-form\')">閉じる</button>';
   try {
-    const d = await apiGet('adminData');
+    const d = await apiGet('adminData', { year: curY, month: curM });
     fcAdminData = d;
     fcN=1;
     renderFormModal(d);
@@ -2379,7 +2379,7 @@ async function buildMstep3() {
   const body = document.getElementById('mstep3-body');
   body.innerHTML = '<div class="loading-row"><div class="spin"></div>前月データを読み込み中...</div>';
   try {
-    const d = await apiGet('adminData');
+    const d = await apiGet('adminData', { year: curY, month: curM });
     // 現在編集中のslots（ローカル）からcurSlotsを生成（カレンダーシートの保存済みデータは使わない）
     const _DOW = ['日','月','火','水','木','金','土'];
     function _weekNum(y, m, d) {
