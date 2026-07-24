@@ -2843,7 +2843,7 @@ function buildMemberForm(m, isOwner) {
             <input type="checkbox" id="mf-acct" ${m?.isAccountant ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> 会計者
           </label>
         </div>
-        ${isOwner ? '<div style="font-size:11px;color:var(--ink3);">※ メールアドレスが未登録の場合、権限を付けても本人はログインできません。</div>' : ''}
+        ${isOwner ? '<div style="font-size:11px;color:var(--ink3);">※ 権限は先に付与できますが、本人がログインできるのはメールアドレス登録後です。</div>' : ''}
       </div>
       ${isEdit ? `
       <div class="mf-row">
