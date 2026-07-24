@@ -2329,6 +2329,36 @@ async function resolveBugReport(rowIndex) {
   } catch (e) { hideProc(); toast('更新失敗: ' + e.message, 'e'); }
 }
 
+async function openDistributionReportModal() {
+  openM('m-distrib-report');
+  await refreshDistributionReportModal();
+}
+async function refreshDistributionReportModal() {
+  document.getElementById('m-distrib-report-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
+  try {
+    const d = await apiGet('getDistributionReports');
+    const reports = d.reports || [];
+    let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">${reports.length}件</div>`;
+    if (reports.length === 0) {
+      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">配布報告はありません</div>';
+    } else {
+      html += reports.map(r => `
+        <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:12px;font-weight:700;">${esc(r.reportDate||'')}${r.reportTime ? ' ' + esc(r.reportTime) : ''}</span>
+            <span style="font-size:10px;color:var(--ink3);">${esc(r.name||'')}</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink);white-space:pre-wrap;margin-bottom:4px;">${esc(r.items||'')}</div>
+          ${r.notes ? `<div style="font-size:12px;color:var(--ink2);white-space:pre-wrap;">${esc(r.notes)}</div>` : ''}
+          <div style="font-size:10px;color:var(--ink3);margin-top:6px;">送信: ${esc(r.createdAt||'')}</div>
+        </div>`).join('');
+    }
+    document.getElementById('m-distrib-report-body').innerHTML = html;
+  } catch (e) {
+    document.getElementById('m-distrib-report-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
+  }
+}
+
 // ============================================================
 // 権限リスト同期
 // ============================================================

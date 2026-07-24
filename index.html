@@ -228,6 +228,11 @@
             <div class="ab-tx"><span class="ab-n">バグ報告確認</span><span class="ab-d">ユーザーからのバグ報告を確認・対応</span></div>
             <span class="ab-ar">›</span>
           </button>
+          <button class="abtn normal-only" onclick="openDistributionReportModal()">
+            <div class="ab-ic" style="background:#e0f2fe;color:#0369a1;">📦</div>
+            <div class="ab-tx"><span class="ab-n">配布報告一覧</span><span class="ab-d">奉仕者からの配布報告を確認</span></div>
+            <span class="ab-ar">›</span>
+          </button>
           <button class="abtn" id="btn-limited-members" style="display:none;" onclick="openLimitedMembersModal()">
             <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔐</div>
             <div class="ab-tx"><span class="ab-n">対象メンバー管理</span><span class="ab-d">限定PW対象メンバーの追加・削除</span></div>
@@ -408,6 +413,14 @@
     <div class="mhd"><span class="mt">🐛 バグ報告確認</span><button class="mx" onclick="closeM('m-bug-report')">&#10005;</button></div>
     <div class="mbd" id="m-bug-report-body">読み込み中...</div>
     <div class="mft" id="m-bug-report-ft"><button class="btn btn-g" onclick="closeM('m-bug-report')">閉じる</button></div>
+  </div>
+</div>
+<!-- 配布報告一覧モーダル -->
+<div class="ov" id="m-distrib-report">
+  <div class="modal" style="max-width:520px;">
+    <div class="mhd"><span class="mt">📦 配布報告一覧</span><button class="mx" onclick="closeM('m-distrib-report')">&#10005;</button></div>
+    <div class="mbd" id="m-distrib-report-body">読み込み中...</div>
+    <div class="mft" id="m-distrib-report-ft"><button class="btn btn-g" onclick="closeM('m-distrib-report')">閉じる</button></div>
   </div>
 </div>
 <!-- マニュアル選択モーダル -->
@@ -639,6 +652,6 @@
 <!-- フェーズ追加・編集モーダル -->
 
 <script src="js/api.js?v=3"></script>
-<script src="js/index.js?v=9"></script>
+<script src="js/index.js?v=10"></script>
 </body>
 </html>
