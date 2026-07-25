@@ -778,9 +778,7 @@ function buildLeftPanel() {
     ['ki1','ki2','ko1','ko2'].forEach(k => { if (cart[k]) assignedUids.add(cart[k]); });
   }
 
-  let html = memoHtml
-    + '<div class="lp-legend"><span><i style="background:#2563eb;"></i>兄弟</span><span><i style="background:#be185d;"></i>姉妹</span></div>'
-    + '<div class="lp-sec">申込者</div>';
+  let html = memoHtml + '<div class="lp-sec">申込者</div>';
   html += applied.map(a => {
     const badgeA = `<span class="sc-badge sc-a">申${a.appliedCount}</span>`;
     const badgeR = a.respFlag ? `<span class="sc-badge sc-r">責${respCounts[a.uid] || 0}</span>` : '';
@@ -962,22 +960,11 @@ function openCartPicker(el) {
   const items = cartNumList().map(n => ({
     value: String(n), label: circledNum(n), html: `<span style="font-size:15px;">${circledNum(n)}</span>`,
   }));
-  // 設定タブで登録済みのプリセットはワンタップで選べるようにする
-  cartPresets.forEach(p => {
-    items.push({ value: '@' + p, label: p, group: 'プリセット',
-      html: `<span>${esc(String(p).split(',').map(circledNum).join(''))}</span>` });
-  });
   openPicker(el, {
     title: 'カート番号を選択（複数可）', multi: true, value: cur, items,
     onToggle: vals => {
-      // プリセットが押されたら、その組み合わせで置き換える
-      const preset = vals.find(v => String(v).startsWith('@'));
-      let next = preset
-        ? String(preset).slice(1).split(',').map(x => x.trim()).filter(Boolean)
-        : vals.filter(v => !String(v).startsWith('@'));
-      next = cartNumList().filter(n => next.includes(String(n)));  // 設定順に整える
+      const next = cartNumList().filter(n => vals.includes(String(n))); // 設定タブの並び順に整える
       setCartValue(el, next.join(','));
-      if (preset) closePicker();
     },
   });
 }
@@ -1177,7 +1164,7 @@ function buildPS(bi, ri, li, pi, val, sa, nm, watchOn, dateKey) {
   const cbId = `watch-${bi}-${ri}-${li}`;
   const isDisabled = !val;
   const isChecked = !!(watchOn && val);
-  const cb = `<label class="watch-label"><input type="checkbox" class="watch-cb" id="${cbId}" data-bi="${bi}" data-ri="${ri}" data-li="${li}"${isDisabled ? ' disabled' : ''}${isChecked ? ' checked' : ''} onchange="mu(${bi})"> 見守り</label>`;
+  const cb = `<label class="watch-label"><input type="checkbox" class="watch-cb" id="${cbId}" data-bi="${bi}" data-ri="${ri}" data-li="${li}"${isDisabled ? ' disabled' : ''}${isChecked ? ' checked' : ''} onchange="onWatchChange(this,${bi})"> 見守り</label>`;
   return `<div class="ps-watch-wrap">${sel}${cb}</div>`;
 }
 
@@ -1200,8 +1187,11 @@ function openMemberPicker(el) {
     cands.unshift({ uid: cur, name: (buildNameMap()[cur] || cur), state: 'ok', reason: '申込なし',
       group: VSTATE_GROUP.ok, count: slotAssignCounts[cur] || 0, gender: (memberFlags[cur] || {}).gender || '' });
   }
+  // 同一スロットに配置済みの人は選べないので一覧から外す。
+  // ただし「なぜ出てこないのか」が分からなくならないよう、件数だけ下に出す
+  const blocked = cands.filter(c => c.state === 'blocked');
   const items = [{ value: '', label: '—（未選択）', html: '<span class="pk-none">—（未選択）</span>', group: '' }];
-  cands.forEach(c => {
+  cands.filter(c => c.state !== 'blocked').forEach(c => {
     const badges = (c.respFlag ? '<span class="pk-b b-r">責</span>' : '')
                  + (c.cartFlag ? '<span class="pk-b b-k">カ</span>' : '')
                  + `<span class="pk-b b-w">割${c.count}</span>`
@@ -1220,6 +1210,7 @@ function openMemberPicker(el) {
   openPicker(el, {
     title: `${block.time}　${block.usedPlaces[li] || '（場所未設定）'}　${(block.slots[ri] || {}).time || ''}`,
     search: true, value: cur, items,
+    note: blocked.length ? `この時間に配置済みの ${blocked.length} 名は表示していません` : '',
     onPick: v => setPsValue(el, v),
   });
 }
@@ -1232,7 +1223,26 @@ function setPsValue(el, v) {
   const g = v ? vGenderCls(v).trim() : '';
   if (g) el.classList.add(g);
   const bi = +el.dataset.bi;
-  if (+el.dataset.pi === 0) onPs0Change(bi, +el.dataset.ri, +el.dataset.li);
+  const ri = +el.dataset.ri, li = +el.dataset.li;
+  if (+el.dataset.pi === 0) onPs0Change(bi, ri, li);
+  autoWatch(bi, ri, li);
+  mu(bi);
+}
+
+// 1つのセルに3名そろったら見守りを自動でONにする。
+// 手動で切り替えたセルには以後触らない（data-manual）
+function autoWatch(bi, ri, li) {
+  const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
+  const cb = document.getElementById(`watch-${bi}-${ri}-${li}`);
+  if (!cw || !cb || cb.dataset.manual === '1') return;
+  const n = [...cw.querySelectorAll('.cs')].filter(s => s.dataset.value).length;
+  if (n >= 3) { cb.disabled = false; cb.checked = true; }
+  else if (cb.checked) cb.checked = false;
+}
+
+// 手動で見守りを操作したことを記録する
+function onWatchChange(cb, bi) {
+  cb.dataset.manual = '1';
   mu(bi);
 }
 
@@ -1535,8 +1545,8 @@ function openPreflight() {
   shiftDates.forEach(b => { nAssign += Object.keys(typeof blockAssign === 'function' ? blockAssign(b) : {}).length; });
   const ruleNames = Object.keys(VRULES).filter(id => vRule(id).on).map(id => VRULES[id].label);
   document.getElementById('pf-footer').innerHTML =
-    `<div class="pf-scope">${ruleNames.length}ルールを ${nDates}日程・${nBlocks}ブロック・のべ${nAssign}名の配置に適用しました</div>`
-    + `<div class="pf-rules">検査項目：${esc(ruleNames.join('／'))}</div>`;
+    `<details class="pf-det"><summary class="pf-scope">${ruleNames.length}ルールを ${nDates}日程・${nBlocks}ブロック・のべ${nAssign}名の配置に適用しました</summary>`
+    + `<div class="pf-rules">${esc(ruleNames.join('／'))}</div></details>`;
 
   const pubBtn = document.getElementById('pf-publish-btn');
   pubBtn.style.display = shiftPublished ? 'none' : '';

@@ -346,15 +346,14 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 
 /* 公開前チェックのフッター */
 .pf-footer{border-top:1px solid var(--border);padding-top:8px;margin-bottom:10px;}
-.pf-scope{font-size:11px;font-weight:700;color:var(--ink2);}
-.pf-rules{font-size:10px;color:var(--ink3);line-height:1.5;margin-top:2px;}
+.pf-det summary{cursor:pointer;list-style:revert;}
+.pf-scope{font-size:11px;font-weight:700;color:var(--ink2);display:list-item;}
+.pf-rules{font-size:10px;color:var(--ink3);line-height:1.5;margin-top:4px;padding-left:14px;}
+.pk-note{font-size:10px;color:var(--ink3);padding:5px 6px 1px;border-top:1px solid var(--border);margin-top:4px;}
 
 /* 左パネルの名前にも性別の縦線を出す（凡例はシフト表と共通） */
 .m-name.g-m{border-left:3px solid #2563eb;padding-left:5px;}
 .m-name.g-f{border-left:3px solid #be185d;padding-left:5px;}
-.lp-legend{display:flex;gap:10px;padding:4px 12px 2px;font-size:10px;color:var(--ink3);}
-.lp-legend span{display:flex;align-items:center;gap:3px;}
-.lp-legend i{display:inline-block;width:3px;height:10px;border-radius:1px;}
 
 /* Undo で戻ったブロックを一瞬光らせて、どこが変わったか分かるようにする */
 @keyframes undoFlash{0%{box-shadow:0 0 0 3px rgba(124,58,237,.55);}100%{box-shadow:0 0 0 3px rgba(124,58,237,0);}}

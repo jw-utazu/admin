@@ -29,7 +29,8 @@ function _pkBuild() {
   d.className = 'pk';
   d.innerHTML = '<div class="pk-hd"><span class="pk-title"></span><button class="pk-x" type="button">✕</button></div>'
               + '<input class="pk-search" type="text" placeholder="名前で検索（ふりがな可）">'
-              + '<div class="pk-list"></div>';
+              + '<div class="pk-list"></div>'
+              + '<div class="pk-note"></div>';
   document.body.appendChild(d);
   d.querySelector('.pk-x').addEventListener('click', () => closePicker());
   d.addEventListener('mousedown', e => e.stopPropagation());
@@ -57,6 +58,9 @@ function openPicker(anchorEl, opts) {
   _pkValues = _pkOpts.multi ? (_pkOpts.value || []).slice() : [];
   _pkIdx = -1;
   el.querySelector('.pk-title').textContent = _pkOpts.title || '';
+  const note = el.querySelector('.pk-note');
+  note.textContent = _pkOpts.note || '';
+  note.style.display = _pkOpts.note ? '' : 'none';
   const s = el.querySelector('.pk-search');
   s.style.display = _pkOpts.search ? '' : 'none';
   s.value = '';

@@ -19,7 +19,8 @@ const VRULES = {
   crossPw:     { label: '通常PW／限定PWの二重配置',         level: 'error', scope: 'live',    on: true  },
   cartNg:      { label: 'カート不可の人がカート担当',       level: 'error', scope: 'live',    on: true  },
   noPlace:     { label: '場所未設定の列に配置',             level: 'error', scope: 'live',    on: true  },
-  consecBlock: { label: '前後ブロックの連続配置',           level: 'warn',  scope: 'live',    on: true  },
+  consecSlot:  { label: '上下のスロットに連続配置',         level: 'warn',  scope: 'live',    on: true  },
+  consecBlock: { label: '前後の時間帯に連続配置',           level: 'warn',  scope: 'live',    on: true  },
   bringFirst:  { label: '持ち込み担当が最初のスロットに配置', level: 'warn', scope: 'live',    on: true  },
   takeLast:    { label: '持ち帰り担当が最後のスロットに配置', level: 'warn', scope: 'live',    on: true  },
   respSlot:    { label: '責任者が開始スロットに未配置',     level: 'warn',  scope: 'live',    on: true  },
@@ -129,6 +130,32 @@ function blockAssign(block) {
 function respUids(block) { const r = block.responsible || {}; return [r.r1, r.r2].filter(Boolean); }
 function bringUids(block) { const c = block.cart || {}; return [c.ki1, c.ki2].filter(Boolean); }
 function takeUids(block)  { const c = block.cart || {}; return [c.ko1, c.ko2].filter(Boolean); }
+// uid -> そのブロック内で入っているスロット行番号の昇順配列
+// 通常は一つ飛ばし（0,2,4…）で入るので、隣り合う行に入っていたら注意対象になる
+function rowsByUid(block) {
+  const m = {};
+  (block.slots || []).forEach((s, ri) => {
+    (s.places || []).forEach(col => (col || []).forEach(u => {
+      if (!u) return;
+      (m[u] = m[u] || new Set()).add(ri);
+    }));
+  });
+  const out = {};
+  Object.keys(m).forEach(u => { out[u] = [...m[u]].sort((a, b) => a - b); });
+  return out;
+}
+
+// 連続している行の最大の長さと、その並び
+function longestRun(rows) {
+  let run = 1, best = 1, cur = [rows[0]], bestRows = [rows[0]];
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i] === rows[i - 1] + 1) { run++; cur.push(rows[i]); }
+    else { run = 1; cur = [rows[i]]; }
+    if (run > best) { best = run; bestRows = cur.slice(); }
+  }
+  return { len: best, rows: bestRows };
+}
+
 // 見守り担当（各セルの1人目かつ watch が立っている人）
 function watchUids(block) {
   const s = new Set();
@@ -178,7 +205,7 @@ function validateShift(shiftDates, ctx) {
 const VSTATE_ORDER = { ok: 0, consec: 1, crosspw: 2, blocked: 3 };
 const VSTATE_GROUP = {
   ok:      '候補',
-  consec:  '前後の時間帯にも配置 ⚠',
+  consec:  '連続配置になります ⚠',
   crosspw: '他のPWに配置済み ⚠',
   blocked: 'この時間に配置済み（選択不可）',
 };
@@ -198,7 +225,14 @@ function buildCandidates(base, block, ri, li, ctx, current) {
   if (current) rowCount[current] = (rowCount[current] || 0) - 1;
 
   // 連続判定。責任者・見守りは連続が正常な運用なので免除する
-  const inNeighbor = uid => {
+  // ①上下のスロット行（通常は一つ飛ばしで入るので隣接は注意）
+  const rows = rowsByUid(block);
+  const inAdjacentRow = uid => {
+    const rs = rows[uid];
+    return !!rs && (rs.includes(ri - 1) || rs.includes(ri + 1));
+  };
+  // ②前後の時間帯（別ブロック）
+  const inNeighborBlock = uid => {
     const check = b => {
       if (!b) return false;
       if (!assignOf(ctx, b)[uid]) return false;
@@ -217,7 +251,8 @@ function buildCandidates(base, block, ri, li, ctx, current) {
       const ci = (ctx.conflictMap || {})[uid];
       const pw = ci ? ((ci.slotDates || {})[block.date] || []) : [];
       if (pw.length) { state = 'crosspw'; reason = pw.join('・') + 'に配置済み'; }
-      else if (!exemptHere.has(uid) && inNeighbor(uid)) { state = 'consec'; reason = '前後の時間帯にも配置'; }
+      else if (!exemptHere.has(uid) && inAdjacentRow(uid)) { state = 'consec'; reason = '上下のスロットに配置'; }
+      else if (!exemptHere.has(uid) && inNeighborBlock(uid)) { state = 'consec'; reason = '前後の時間帯にも配置'; }
     }
     const w = wishOf(ctx, uid, block.date, block.time);
     return {
@@ -378,6 +413,19 @@ function validateBlock(block, ctx) {
     if (loc) return;
     const has = slots.some(s => (((s.places || [])[li]) || []).some(Boolean));
     if (has) push('noPlace', { li, msg: `${li + 1}列目の場所が未設定のまま奉仕者が配置されています` });
+  });
+
+  // --- 上下のスロットに連続配置（責任者・見守りは免除） ---
+  // 通常は一つ飛ばしで入る運用なので、隣り合う行に入っていたら知らせる
+  const exemptSlot = new Set(resp.concat([...watchUids(block)]));
+  const rows = rowsByUid(block);
+  Object.keys(rows).forEach(uid => {
+    if (exemptSlot.has(uid)) return;
+    const r = longestRun(rows[uid]);
+    if (r.len < 2) return;
+    const times = r.rows.map(i => (slots[i] || {}).time).filter(Boolean);
+    push('consecSlot', { uids: [uid], level: r.len >= 3 ? 'error' : 'warn', ri: r.rows[0],
+      msg: `${nm(uid)} が ${r.len} スロット連続で配置されています（${times.join(' → ')}）` });
   });
 
   // --- 前後ブロックの連続配置（責任者・見守りは免除） ---
