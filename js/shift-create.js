@@ -609,9 +609,11 @@ async function loadCreateData() {
     Object.keys(_savePending).forEach(k => delete _savePending[k]);
     Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
     window._blockCols = {};
-    const [flagsRes, appRes, shiftRes] = await Promise.all([
-      apiGet('getMemberFlags'), apiGet('getApplicants', {}), apiGet('getShiftCreateData', {})
+    const [flagsRes, appRes, shiftRes, ackRes] = await Promise.all([
+      apiGet('getMemberFlags'), apiGet('getApplicants', {}), apiGet('getShiftCreateData', {}),
+      apiGet('getValidationAcks', {}).catch(() => ({ ok: false }))
     ]);
+    setValidationAcks(ackRes.ok ? (ackRes.acks || []) : []);
     const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
     const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
     curYM = { year, month };
@@ -819,8 +821,8 @@ function buildBlock(block, bi) {
       <button class="tb-btn" onclick="acceptSyncUpdate(${bi})">最新を確認</button>
     </div>
     <div class="v-bar" id="v-bar-${bi}"></div>
-    ${buildRespArea(bi, block.responsible || {}, respMembers)}
-    ${buildCartArea(bi, block.cart || {}, cartMembers)}
+    ${buildRespArea(bi, block.responsible || {}, respMembers, block.date)}
+    ${buildCartArea(bi, block.cart || {}, cartMembers, block.date)}
     ${buildPlaceSelectUI(bi, block)}
     ${buildSlotTable(bi, block)}
   </div>`;
@@ -833,12 +835,13 @@ function buildNameMap() {
   return m;
 }
 
-function buildRespArea(bi, resp, respMembers) {
+function buildRespArea(bi, resp, respMembers, dateKey) {
   const nm = buildNameMap();
+  const cf = uid => (typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, dateKey) : '');
   function sel(id, val) {
     let o = '<option value="">—</option>';
-    respMembers.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
-    if (val && !respMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
+    respMembers.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}${cf(a.uid)}</option>`; });
+    if (val && !respMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}${cf(val)}</option>`;
     return `<select class="ra-sel" id="${id}" onchange="mu(${bi})">${o}</select>`;
   }
   return `<div class="resp-area"><div class="area-title">責任者（最大2名）</div><div class="ra-row">
@@ -847,8 +850,9 @@ function buildRespArea(bi, resp, respMembers) {
   </div></div>`;
 }
 
-function buildCartArea(bi, cart, cartMembers) {
+function buildCartArea(bi, cart, cartMembers, dateKey) {
   const nm = buildNameMap();
+  const cf = uid => (typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, dateKey) : '');
   const nums = cartNumbers.length > 0 ? cartNumbers : ['1','2','3','4'];
   const h1 = nums.slice(0, Math.ceil(nums.length / 2)).join(',');
   const h2 = nums.slice(Math.ceil(nums.length / 2)).join(',');
@@ -857,8 +861,8 @@ function buildCartArea(bi, cart, cartMembers) {
 
   function cSel(id, val) {
     let o = '<option value="">—</option>';
-    cartMembers.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}</option>`; });
-    if (val && !cartMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}</option>`;
+    cartMembers.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}${cf(a.uid)}</option>`; });
+    if (val && !cartMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}${cf(val)}</option>`;
     const nid = id.replace('ci', 'cn').replace('co', 'con');
     return `<select class="cart-sel" id="${id}" onchange="ucn('${id}','${nid}');mu(${bi})">${o}</select>`;
   }
@@ -1054,16 +1058,9 @@ function buildSlotTable(bi, block) {
 function buildPS(bi, ri, li, pi, val, sa, nm, watchOn, dateKey) {
   const id = `ps-${bi}-${ri}-${li}-${pi}`;
 
-  // conflictInfo のラベルを option text に付与
+  // 他PWでの申込・配置状況を option text に付与（判定は validation.js に集約）
   function conflictSuffix(uid) {
-    const ci = conflictMap[uid];
-    if (!ci || !dateKey) return '';
-    const parts = [];
-    if ((ci.hasLimitedApply || []).includes(dateKey)) parts.push('⚠限定申込');
-    if ((ci.hasNormalApply  || []).includes(dateKey)) parts.push('⚠通常申込');
-    if ((ci.hasLimitedSlot  || []).includes(dateKey)) parts.push('⚠限定割当');
-    if ((ci.hasNormalSlot   || []).includes(dateKey)) parts.push('⚠通常割当');
-    return parts.length ? ' [' + parts.join(' ') + ']' : '';
+    return typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, dateKey) : '';
   }
 
   let o = '<option value="">—</option>';
@@ -1118,19 +1115,62 @@ function mu(bi) {
 // select を作り直さずフラグ用の要素だけを差し替えるので、
 // 入力中のフォーカスは失われない。
 // ============================================================
-let _vResult = { issues: [], byBlock: {}, groups: {} };
+let _vResult = { issues: [], acked: [], byBlock: {}, groups: {} };
+// 「✓ 確認済み」ボタンから参照する。onclick には配列の添字だけを渡し、
+// キー文字列をHTML属性に埋め込まないようにする
+let _vAllIssues = [];
 
 function refreshValidationUI() {
   if (typeof validateShift !== 'function') return;
   _vResult = validateShift(shiftDates, {
     applicants, memberFlags, conflictMap, pwType: currentPwType
   });
+  _vAllIssues = _vResult.issues.concat(_vResult.acked || []);
+  _vAllIssues.forEach((x, i) => { x._i = i; });
   paintTabBadges();
   paintBlockValidation();
 }
 
 function vFlagHtml(x) {
-  return `<div class="v-flag v-${x.level}" title="${esc(x.label)}">${x.level === 'error' ? '⛔' : '⚠️'} ${esc(x.msg)}</div>`;
+  return `<div class="v-flag v-${x.level}" title="${esc(x.label)}">`
+       + `<span>${x.level === 'error' ? '⛔' : '⚠️'}</span>`
+       + `<span class="v-msg">${esc(x.msg)}</span>`
+       + `<button class="v-ack" onclick="ackIssue(${x._i})" title="意図的な配置として、この警告を出さないようにする">✓</button>`
+       + `</div>`;
+}
+
+// 「確認済み」の登録・解除。表示は即座に切り替え、保存は裏で行う
+// （失敗したら元に戻して知らせる）
+async function ackIssue(i) {
+  const x = _vAllIssues[i];
+  if (!x) return;
+  vAddAck(x.key, { by: (adminUser && adminUser.name) || '', at: new Date().toISOString() });
+  refreshValidationUI();
+  if (document.getElementById('preflight-modal').classList.contains('on')) openPreflight();
+  try {
+    await apiGet('ackValidationIssue', { issueKey: x.key, date: x.date, time: x.time, ruleId: x.rule,
+      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '' });
+  } catch (e) {
+    vRemoveAck(x.key);
+    refreshValidationUI();
+    toast('確認済みの保存に失敗しました: ' + e.message, 'e');
+  }
+}
+
+async function unackIssue(i) {
+  const x = _vAllIssues[i];
+  if (!x) return;
+  const info = vAckInfo(x.key);
+  vRemoveAck(x.key);
+  refreshValidationUI();
+  openPreflight();
+  try {
+    await apiGet('ackValidationIssue', { issueKey: x.key, unack: true });
+  } catch (e) {
+    vAddAck(x.key, info || {});
+    refreshValidationUI();
+    toast('解除に失敗しました: ' + e.message, 'e');
+  }
 }
 function vCount(list) {
   const err = list.filter(x => x.level === 'error').length;
@@ -1192,15 +1232,19 @@ function paintTabBadges() {
 // live / publish 両方の指摘をまとめて一覧する。ここからそのまま公開もできる
 function openPreflight() {
   syncCurrentBlock();
-  refreshValidationUI();
-  const issues = _vResult.issues.slice().sort((a, b) => {
+  if (!document.getElementById('preflight-modal').classList.contains('on')) refreshValidationUI();
+  const showAcked = document.getElementById('pf-show-acked').checked;
+  const issues = _vResult.issues.concat(showAcked ? (_vResult.acked || []) : []).sort((a, b) => {
+    if (a.acked !== b.acked) return a.acked ? 1 : -1;
     if (a.level !== b.level) return a.level === 'error' ? -1 : 1;
     return (a.blockKey || '￿').localeCompare(b.blockKey || '￿');
   });
-  const c = vCount(issues);
-  document.getElementById('pf-summary').innerHTML = issues.length === 0
+  const c = vCount(_vResult.issues);
+  const nAck = (_vResult.acked || []).length;
+  document.getElementById('pf-summary').innerHTML = (_vResult.issues.length === 0
     ? '<span style="color:var(--green);font-weight:700;">✅ 指摘はありません</span>'
-    : `⛔ エラー ${c.err} 件／⚠️ 警告 ${c.warn} 件`;
+    : `⛔ エラー ${c.err} 件／⚠️ 警告 ${c.warn} 件`)
+    + (nAck ? `<span style="color:var(--ink3);font-weight:500;">（確認済み ${nAck} 件）</span>` : '');
 
   const grouped = {};
   issues.forEach(x => { (grouped[x.blockKey] = grouped[x.blockKey] || []).push(x); });
@@ -1211,8 +1255,15 @@ function openPreflight() {
     const jump = k ? `<button class="pf-jump" onclick="vJump('${esc(first.date)}','${esc(first.time)}')">開く</button>` : '';
     html += `<div class="pf-grp"><span>${title}</span>${jump}</div>`;
     grouped[k].forEach(x => {
-      html += `<div class="pf-row"><span class="pf-ico">${x.level === 'error' ? '⛔' : '⚠️'}</span>`
-           +  `<span class="pf-msg">${esc(x.msg)}<span class="pf-rule">${esc(x.label)}</span></span></div>`;
+      const info = x.acked ? (vAckInfo(x.key) || {}) : null;
+      const meta = info
+        ? `<span class="pf-ack-meta">確認済み${info.by ? '：' + esc(info.by) : ''}${info.at ? '（' + esc(String(info.at).slice(0, 10)) + '）' : ''}</span>`
+        : '';
+      const btn = x.acked
+        ? `<button class="pf-jump" onclick="unackIssue(${x._i})">解除</button>`
+        : `<button class="pf-jump" onclick="ackIssue(${x._i})" title="意図的な配置として、この警告を出さないようにする">✓ 確認済み</button>`;
+      html += `<div class="pf-row${x.acked ? ' acked' : ''}"><span class="pf-ico">${x.level === 'error' ? '⛔' : '⚠️'}</span>`
+           +  `<span class="pf-msg">${esc(x.msg)}<span class="pf-rule">${esc(x.label)}${meta}</span></span>${btn}</div>`;
     });
   });
   document.getElementById('pf-list').innerHTML = html || '<div class="pf-ok">整合性の問題は見つかりませんでした</div>';

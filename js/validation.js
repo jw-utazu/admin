@@ -35,9 +35,20 @@ let _vCfg = {};
 function setValidationConfig(cfg) { _vCfg = cfg || {}; }
 function vRule(id) { return Object.assign({}, VRULES[id], _vCfg[id] || {}); }
 
-// 「確認済み」にされた警告のキー集合。該当する issue は結果から除外される
-let _vAcks = new Set();
-function setValidationAcks(keys) { _vAcks = new Set(keys || []); }
+// 「確認済み」にされた警告。key -> { by, at }
+// 意図的な配置だと確認されたものは通常の一覧から外れるが、
+// 公開前チェックの「確認済みも表示」で掘り起こして解除できる
+let _vAcks = new Map();
+function setValidationAcks(list) {
+  _vAcks = new Map();
+  (list || []).forEach(a => {
+    if (typeof a === 'string') _vAcks.set(a, {});
+    else if (a && a.key) _vAcks.set(a.key, { by: a.by || '', at: a.at || '' });
+  });
+}
+function vAddAck(key, info) { _vAcks.set(key, info || {}); }
+function vRemoveAck(key) { _vAcks.delete(key); }
+function vAckInfo(key) { return _vAcks.get(key) || null; }
 
 // ===== 時刻ユーティリティ =====
 function vT(hm) {
@@ -143,10 +154,25 @@ function validateShift(shiftDates, ctx) {
   (shiftDates || []).forEach(block => { issues = issues.concat(validateBlock(block, c)); });
   issues = issues.concat(validateGlobal(shiftDates, c));
 
-  issues = issues.filter(x => !_vAcks.has(x.key));
+  issues.forEach(x => { x.acked = _vAcks.has(x.key); });
+  const live  = issues.filter(x => !x.acked);
+  const acked = issues.filter(x => x.acked);
   const byBlock = {};
-  issues.forEach(x => { if (x.blockKey) (byBlock[x.blockKey] = byBlock[x.blockKey] || []).push(x); });
-  return { issues, byBlock, groups };
+  live.forEach(x => { if (x.blockKey) (byBlock[x.blockKey] = byBlock[x.blockKey] || []).push(x); });
+  return { issues: live, acked, byBlock, groups };
+}
+
+// 候補リスト表示用：他PWでの状況を短いラベルにする
+// 「申込」は同日に複数PWへ出すこと自体が正常なので注意喚起のみ。
+// 「配置済み」は同日1つまでなので警告として出す
+function conflictLabel(conflictMap, uid, date) {
+  const ci = (conflictMap || {})[uid];
+  if (!ci || !date) return '';
+  const s = (ci.slotDates  || {})[date] || [];
+  const a = (ci.applyDates || {})[date] || [];
+  if (s.length) return ` [⚠${s.join('・')}に配置済]`;
+  if (a.length) return ` [${a.join('・')}に申込]`;
+  return '';
 }
 
 function buildVNameMap(ctx) {
@@ -209,15 +235,16 @@ function validateBlock(block, ctx) {
     });
   });
 
-  // --- 通常PW／限定PWの二重配置 ---
-  const otherSlotKey = (ctx.pwType === 'limited') ? 'hasNormalSlot' : 'hasLimitedSlot';
-  const otherLabel   = (ctx.pwType === 'limited') ? '通常PW' : '限定PW';
-  Object.keys(assign).forEach(uid => {
+  // --- 他のPWタイプとの同日二重配置（責任者・カート担当も対象） ---
+  const involved = new Set(Object.keys(assign));
+  resp.concat(bringUids(block), takeUids(block)).forEach(uid => involved.add(uid));
+  involved.forEach(uid => {
     const ci = (ctx.conflictMap || {})[uid];
-    if (ci && (ci[otherSlotKey] || []).includes(block.date)) {
-      push('crossPw', { uids: [uid], ri: assign[uid][0].ri, li: assign[uid][0].li,
-        msg: `${nm(uid)} は同日の${otherLabel}にも配置されています` });
-    }
+    const names = ci ? ((ci.slotDates || {})[block.date] || []) : [];
+    if (!names.length) return;
+    const at = (assign[uid] || [])[0] || {};
+    push('crossPw', { uids: [uid], ri: at.ri, li: at.li,
+      msg: `${nm(uid)} は同日の ${names.join('・')} にも配置されています（同日は1つのPWのみ）` });
   });
 
   // --- カート不可の人がカート担当 ---

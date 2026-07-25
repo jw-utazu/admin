@@ -7,7 +7,7 @@
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" defer onload="renderGsiButton()"></script>
-<link rel="stylesheet" href="css/shift-create.css?v=6">
+<link rel="stylesheet" href="css/shift-create.css?v=7">
 </head>
 <body>
 
@@ -221,7 +221,10 @@
 <div class="popup-overlay" id="preflight-modal" onclick="closePreflight()">
   <div class="popup-box pf-box" onclick="event.stopPropagation()">
     <div class="popup-title">🔍 公開前チェック</div>
-    <div class="pf-summary" id="pf-summary"></div>
+    <div class="pf-bar">
+      <div class="pf-summary" id="pf-summary"></div>
+      <label class="pf-toggle"><input type="checkbox" id="pf-show-acked" onchange="openPreflight()"> 確認済みも表示</label>
+    </div>
     <div class="pf-list" id="pf-list"></div>
     <div class="add-form-actions" style="justify-content:space-between;">
       <button class="s-btn" onclick="closePreflight()">閉じる</button>
@@ -254,7 +257,7 @@
 <div class="ta" id="ta"></div>
 
 <script src="js/api.js?v=1"></script>
-<script src="js/validation.js?v=1"></script>
-<script src="js/shift-create.js?v=8"></script>
+<script src="js/validation.js?v=2"></script>
+<script src="js/shift-create.js?v=9"></script>
 </body>
 </html>
