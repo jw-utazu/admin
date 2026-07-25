@@ -645,7 +645,7 @@ function buildCreateTabs() {
   const tabs = dt.map((t, i) =>
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
-  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
+  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="openPreflight()">🔍 チェック</button><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
   if (compareMode) populateCmpDateSel();
 }
 
@@ -698,6 +698,7 @@ function renderBlock() {
     if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; }
   }
   ug();
+  refreshValidationUI();
 }
 
 // 指定した日付・時間帯に申込んでいる人だけを絞り込む共通ロジック
@@ -817,6 +818,7 @@ function buildBlock(block, bi) {
       <span>⚠️ 他の管理者がこの時間帯を更新しました。保存すると上書きされます。</span>
       <button class="tb-btn" onclick="acceptSyncUpdate(${bi})">最新を確認</button>
     </div>
+    <div class="v-bar" id="v-bar-${bi}"></div>
     ${buildRespArea(bi, block.responsible || {}, respMembers)}
     ${buildCartArea(bi, block.cart || {}, cartMembers)}
     ${buildPlaceSelectUI(bi, block)}
@@ -1106,7 +1108,130 @@ function mu(bi) {
     recalcCounts();
     buildLeftPanel();
     refreshWishAssign();
+    refreshValidationUI();
   }
+}
+
+// ============================================================
+// 整合性検証（js/validation.js）の実行と表示
+// 判定ロジックはすべて validation.js 側にあり、ここは描画だけを行う。
+// select を作り直さずフラグ用の要素だけを差し替えるので、
+// 入力中のフォーカスは失われない。
+// ============================================================
+let _vResult = { issues: [], byBlock: {}, groups: {} };
+
+function refreshValidationUI() {
+  if (typeof validateShift !== 'function') return;
+  _vResult = validateShift(shiftDates, {
+    applicants, memberFlags, conflictMap, pwType: currentPwType
+  });
+  paintTabBadges();
+  paintBlockValidation();
+}
+
+function vFlagHtml(x) {
+  return `<div class="v-flag v-${x.level}" title="${esc(x.label)}">${x.level === 'error' ? '⛔' : '⚠️'} ${esc(x.msg)}</div>`;
+}
+function vCount(list) {
+  const err = list.filter(x => x.level === 'error').length;
+  return { err, warn: list.length - err };
+}
+function vBadgeHtml(c) {
+  if (!c.err && !c.warn) return '';
+  const txt = (c.err ? '⛔' + c.err : '') + (c.err && c.warn ? ' ' : '') + (c.warn ? '⚠' + c.warn : '');
+  return `<span class="v-badge${c.err ? ' v-err' : ''}">${txt}</span>`;
+}
+function vLive(block) { return (_vResult.byBlock[bKey(block)] || []).filter(x => x.scope === 'live'); }
+
+// 表示中ブロックの警告を、該当セルの下とブロック上部のバーに出す
+function paintBlockValidation() {
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  main.querySelectorAll('.v-flag').forEach(el => el.remove());
+  const bar = document.getElementById('v-bar-' + activeTimeIdx);
+  if (bar) bar.innerHTML = '';
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const block = shiftDates.filter(d => d.date === tab.date)[activeTimeIdx];
+  if (!block) return;
+  const rest = [];
+  vLive(block).forEach(x => {
+    const cw = (x.ri !== null && x.li !== null)
+      ? document.getElementById(`cw-${activeTimeIdx}-${x.ri}-${x.li}`) : null;
+    if (cw && cw.parentElement) cw.parentElement.insertAdjacentHTML('beforeend', vFlagHtml(x));
+    else rest.push(x);
+  });
+  if (bar) bar.innerHTML = rest.map(vFlagHtml).join('');
+}
+
+// 日付タブ・時間帯タブに件数バッジを付ける
+function paintTabBadges() {
+  const dt = window._dateTabs || [];
+  document.querySelectorAll('#dtabs .dtab').forEach((btn, i) => {
+    const t = dt[i];
+    if (!t) return;
+    const old = btn.querySelector('.v-badge');
+    if (old) old.remove();
+    let list = [];
+    shiftDates.filter(d => d.date === t.date).forEach(b => { list = list.concat(vLive(b)); });
+    btn.insertAdjacentHTML('beforeend', vBadgeHtml(vCount(list)));
+  });
+  const tab = dt[activeDateIdx];
+  if (!tab) return;
+  const dayBlocks = shiftDates.filter(d => d.date === tab.date);
+  document.querySelectorAll('#dtabs-time .ttab').forEach((btn, bi) => {
+    const b = dayBlocks[bi];
+    if (!b) return;
+    const old = btn.querySelector('.v-badge');
+    if (old) old.remove();
+    btn.insertAdjacentHTML('beforeend', vBadgeHtml(vCount(vLive(b))));
+  });
+}
+
+// ===== 公開前チェックパネル =====
+// live / publish 両方の指摘をまとめて一覧する。ここからそのまま公開もできる
+function openPreflight() {
+  syncCurrentBlock();
+  refreshValidationUI();
+  const issues = _vResult.issues.slice().sort((a, b) => {
+    if (a.level !== b.level) return a.level === 'error' ? -1 : 1;
+    return (a.blockKey || '￿').localeCompare(b.blockKey || '￿');
+  });
+  const c = vCount(issues);
+  document.getElementById('pf-summary').innerHTML = issues.length === 0
+    ? '<span style="color:var(--green);font-weight:700;">✅ 指摘はありません</span>'
+    : `⛔ エラー ${c.err} 件／⚠️ 警告 ${c.warn} 件`;
+
+  const grouped = {};
+  issues.forEach(x => { (grouped[x.blockKey] = grouped[x.blockKey] || []).push(x); });
+  let html = '';
+  Object.keys(grouped).forEach(k => {
+    const first = grouped[k][0];
+    const title = k ? `${esc(first.date)} ${esc(first.time)}` : '全体';
+    const jump = k ? `<button class="pf-jump" onclick="vJump('${esc(first.date)}','${esc(first.time)}')">開く</button>` : '';
+    html += `<div class="pf-grp"><span>${title}</span>${jump}</div>`;
+    grouped[k].forEach(x => {
+      html += `<div class="pf-row"><span class="pf-ico">${x.level === 'error' ? '⛔' : '⚠️'}</span>`
+           +  `<span class="pf-msg">${esc(x.msg)}<span class="pf-rule">${esc(x.label)}</span></span></div>`;
+    });
+  });
+  document.getElementById('pf-list').innerHTML = html || '<div class="pf-ok">整合性の問題は見つかりませんでした</div>';
+
+  const pubBtn = document.getElementById('pf-publish-btn');
+  pubBtn.style.display = shiftPublished ? 'none' : '';
+  pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま公開する' : '📣 シフトを公開する';
+  pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
+  document.getElementById('preflight-modal').classList.add('on');
+}
+function closePreflight() { document.getElementById('preflight-modal').classList.remove('on'); }
+
+async function vJump(date, time) {
+  closePreflight();
+  const di = (window._dateTabs || []).findIndex(t => t.date === date);
+  if (di < 0) return;
+  if (di !== activeDateIdx) await switchDateTab(di);
+  const bi = shiftDates.filter(d => d.date === date).findIndex(b => b.time === time);
+  if (bi >= 0) await switchTimeTab(bi);
 }
 
 // ============================================================
@@ -1457,14 +1582,24 @@ async function togglePublish() {
       toast('シフトを非公開にしました', 's');
     } catch (e) { toast('非公開化に失敗しました: ' + e.message, 'e'); }
   } else {
+    // 公開前に整合性チェックを通す。エラーが残っていればパネルを開いて
+    // 内容を確認させ、そのうえで公開するかを選ばせる
+    syncCurrentBlock();
+    refreshValidationUI();
+    if (_vResult.issues.some(x => x.level === 'error')) { openPreflight(); return; }
     if (!confirm('シフトを公開しますか？\n公開後は全メンバーがシフトを確認できます。')) return;
-    try {
-      await apiGet('publishShift', {});
-      shiftPublished = true;
-      updatePublishBtn();
-      toast('シフトを公開しました', 's');
-    } catch (e) { toast('公開に失敗しました: ' + e.message, 'e'); }
+    await doPublish();
   }
+}
+
+async function doPublish() {
+  closePreflight();
+  try {
+    await apiGet('publishShift', {});
+    shiftPublished = true;
+    updatePublishBtn();
+    toast('シフトを公開しました', 's');
+  } catch (e) { toast('公開に失敗しました: ' + e.message, 'e'); }
 }
 
 // 左パネルリサイズ
