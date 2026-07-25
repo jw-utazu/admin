@@ -162,6 +162,126 @@ function validateShift(shiftDates, ctx) {
   return { issues: live, acked, byBlock, groups };
 }
 
+// ============================================================
+// 配置候補の分類（コンボボックスの並び順・除外・注意表示に使う）
+//
+// base    : その時間帯に申込んでいる人の配列 [{uid, name, ...}]
+// current : いまその欄に入っている uid（自分自身は重複扱いにしない）
+// ctx     : { groups, shiftDates, memberFlags, conflictMap, assignCounts }
+//
+// state:
+//   'ok'      … 通常の候補
+//   'consec'  … 前後のブロックにも入っている（責任者・見守りは免除）
+//   'crosspw' … 同日に他のPWで配置済み
+//   'blocked' … 同一スロット行に既にいる（物理的に不可能なので選ばせない）
+// ============================================================
+const VSTATE_ORDER = { ok: 0, consec: 1, crosspw: 2, blocked: 3 };
+const VSTATE_GROUP = {
+  ok:      '候補',
+  consec:  '前後の時間帯にも配置 ⚠',
+  crosspw: '他のPWに配置済み ⚠',
+  blocked: 'この時間に配置済み（選択不可）',
+};
+
+function buildCandidates(base, block, ri, li, ctx, current) {
+  const groups = ctx.groups || buildBlockGroups(ctx.shiftDates || [block]);
+  const gi = groups[vKey(block)];
+  const slot = (block.slots || [])[ri] || {};
+  const flags = ctx.memberFlags || {};
+  const counts = ctx.assignCounts || {};
+
+  // 同一スロット行にいる人を数える。自分自身の1件分は差し引く
+  const rowCount = {};
+  (slot.places || []).forEach(uids => {
+    (uids || []).forEach(u => { if (u) rowCount[u] = (rowCount[u] || 0) + 1; });
+  });
+  if (current) rowCount[current] = (rowCount[current] || 0) - 1;
+
+  // 連続判定。責任者・見守りは連続が正常な運用なので免除する
+  const inNeighbor = uid => {
+    const check = b => {
+      if (!b) return false;
+      if (!assignOf(ctx, b)[uid]) return false;
+      if (respUids(b).includes(uid) || watchUids(b).has(uid)) return false;
+      return true;
+    };
+    return check(gi && gi.prev) || check(gi && gi.next);
+  };
+  const exemptHere = new Set(respUids(block).concat([...watchUids(block)]));
+
+  const out = (base || []).map(a => {
+    const uid = a.uid;
+    let state = 'ok', reason = '';
+    if ((rowCount[uid] || 0) > 0) { state = 'blocked'; reason = '同じ時間に配置済み'; }
+    else {
+      const ci = (ctx.conflictMap || {})[uid];
+      const pw = ci ? ((ci.slotDates || {})[block.date] || []) : [];
+      if (pw.length) { state = 'crosspw'; reason = pw.join('・') + 'に配置済み'; }
+      else if (!exemptHere.has(uid) && inNeighbor(uid)) { state = 'consec'; reason = '前後の時間帯にも配置'; }
+    }
+    const w = wishOf(ctx, uid, block.date, block.time);
+    return {
+      uid, name: a.name, state, reason,
+      furigana: (flags[uid] || {}).furigana || '',
+      gender:   (flags[uid] || {}).gender   || '',
+      respFlag: !!a.respFlag, cartFlag: !!a.cartFlag,
+      count:    counts[uid] || 0,
+      cartNg:   !!(w && w.cartNg),
+      note:     (w && w.note) || '',
+      group:    VSTATE_GROUP[state],
+    };
+  });
+
+  // 未配置の人・割当が少ない人を上に出して、偏りを自然に是正できるようにする
+  out.sort((a, b) => {
+    if (VSTATE_ORDER[a.state] !== VSTATE_ORDER[b.state]) return VSTATE_ORDER[a.state] - VSTATE_ORDER[b.state];
+    if (a.count !== b.count) return a.count - b.count;
+    if (a.furigana !== b.furigana) return a.furigana < b.furigana ? -1 : 1;
+    return (a.name || '') < (b.name || '') ? -1 : 1;
+  });
+  return out;
+}
+
+// 責任者・カート担当のゴースト提案
+// 「先にスロット表へ入れる → その中から役割の候補を出す」という運用に合わせ、
+// 該当スロットに入っている人だけを候補にする。月内回数の少ない順。
+function suggestRole(block, role, ctx) {
+  const gi = (ctx.groups || {})[vKey(block)];
+  const need = cartNeeded(gi);
+  if (role === 'bring' && !need.bring) return [];
+  if (role === 'take'  && !need.take)  return [];
+  const slots = block.slots || [];
+  if (!slots.length) return [];
+  // 単独（非連続）ブロックでは持ち帰り担当は責任者が兼任する
+  if (role === 'take' && gi && gi.isHead && gi.isTail) {
+    const r1 = (block.responsible || {}).r1;
+    if (r1) return [{ uid: r1, name: ((ctx.memberFlags || {})[r1] || {}).name || r1, count: 0, reason: '責任者との兼任' }];
+  }
+  const ri = role === 'resp' ? Math.min(respSlotIdx(gi), slots.length - 1)
+           : role === 'bring' ? Math.min(BRING_SLOT_IDX, slots.length - 1)
+           : Math.min(TAKE_SLOT_IDX, slots.length - 1);
+  const uids = [];
+  ((slots[ri] || {}).places || []).forEach(col => (col || []).forEach(u => { if (u && !uids.includes(u)) uids.push(u); }));
+
+  const flags = ctx.memberFlags || {};
+  const taken = new Set(respUids(block).concat(bringUids(block), takeUids(block)));
+  const counts = role === 'resp' ? (ctx.respCounts || {}) : (ctx.cartCounts || {});
+  return uids
+    .filter(uid => {
+      const f = flags[uid] || {};
+      if (role === 'resp' && !f.respFlag) return false;
+      if (role !== 'resp' && !f.cartFlag) return false;
+      if (taken.has(uid)) return false;                          // 既に別の役に就いている
+      if (role !== 'resp') {                                     // カート不可の人は出さない
+        const w = wishOf(ctx, uid, block.date, block.time);
+        if (w && w.cartNg) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => (counts[a] || 0) - (counts[b] || 0))
+    .map(uid => ({ uid, name: (flags[uid] || {}).name || uid, count: counts[uid] || 0 }));
+}
+
 // 候補リスト表示用：他PWでの状況を短いラベルにする
 // 「申込」は同日に複数PWへ出すこと自体が正常なので注意喚起のみ。
 // 「配置済み」は同日1つまでなので警告として出す

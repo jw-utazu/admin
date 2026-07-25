@@ -14,6 +14,7 @@ let conflictMap   = {}; // uid -> { hasLimitedApply|hasNormalApply: dates[], has
 let settingsLocations    = [];
 let settingsCartNumbers  = [];
 let settingsCartPresets  = [];
+let settingsVRules       = {};  // 検証ルールの上書き設定 { ruleId: {on, level} }
 let memoMap       = {};
 let respCounts    = {}; // UID別：当月の責任者 配置回数（保存済みデータのみ反映）
 let cartCounts    = {}; // UID別：当月のカート担当 配置回数（保存済みデータのみ反映）
@@ -609,11 +610,15 @@ async function loadCreateData() {
     Object.keys(_savePending).forEach(k => delete _savePending[k]);
     Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
     window._blockCols = {};
-    const [flagsRes, appRes, shiftRes, ackRes] = await Promise.all([
+    window._cartUnlock = {};
+    clearUndo();
+    const [flagsRes, appRes, shiftRes, ackRes, ruleRes] = await Promise.all([
       apiGet('getMemberFlags'), apiGet('getApplicants', {}), apiGet('getShiftCreateData', {}),
-      apiGet('getValidationAcks', {}).catch(() => ({ ok: false }))
+      apiGet('getValidationAcks', {}).catch(() => ({ ok: false })),
+      apiGet('getValidationRules', {}).catch(() => ({ ok: false }))
     ]);
     setValidationAcks(ackRes.ok ? (ackRes.acks || []) : []);
+    setValidationConfig(ruleRes.ok ? (ruleRes.rules || {}) : {});
     const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
     const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
     curYM = { year, month };
@@ -647,7 +652,7 @@ function buildCreateTabs() {
   const tabs = dt.map((t, i) =>
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
-  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="openPreflight()">🔍 チェック</button><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
+  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="openPreflight()">🔍 チェック</button><button class="tb-btn" id="undo-btn" style="margin-right:4px;white-space:nowrap;" title="元に戻す（Ctrl+Z）／やり直す（Ctrl+Shift+Z）" onclick="doUndo()" disabled>↶ 元に戻す</button><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
   if (compareMode) populateCmpDateSel();
 }
 
@@ -773,7 +778,9 @@ function buildLeftPanel() {
     ['ki1','ki2','ko1','ko2'].forEach(k => { if (cart[k]) assignedUids.add(cart[k]); });
   }
 
-  let html = memoHtml + '<div class="lp-sec">申込者</div>';
+  let html = memoHtml
+    + '<div class="lp-legend"><span><i style="background:#2563eb;"></i>兄弟</span><span><i style="background:#be185d;"></i>姉妹</span></div>'
+    + '<div class="lp-sec">申込者</div>';
   html += applied.map(a => {
     const badgeA = `<span class="sc-badge sc-a">申${a.appliedCount}</span>`;
     const badgeR = a.respFlag ? `<span class="sc-badge sc-r">責${respCounts[a.uid] || 0}</span>` : '';
@@ -792,12 +799,12 @@ function buildLeftPanel() {
     const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
     const bothBadge = a.sameDayBoth ? `<span class="badge-both" title="同日の通常PWにも申込があります。どちらか一方のシフトにしか入れません。">両方</span>` : '';
     const dotClass = assignedUids.has(a.uid) ? 'd-on' : 'd-off';
-    return `<div class="mr-wrap"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}${badgeR}</div><div class="lp-badge-col">${badgeK}${badgeW}</div></div></div>${commentHtml}</div>`;
+    return `<div class="mr-wrap"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name${vGenderCls(a.uid)}">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}${badgeR}</div><div class="lp-badge-col">${badgeK}${badgeW}</div></div></div>${commentHtml}</div>`;
   }).join('');
   if (notApplied.length > 0) {
     html += `<div class="lp-sec lp-sec-toggle${naOpen ? ' open' : ''}" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
     html += `<div class="lp-not-applied" style="display:${naOpen ? '' : 'none'};">`;
-    html += notApplied.map(a => `<div class="mr-wrap"><div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div></div>`).join('');
+    html += notApplied.map(a => `<div class="mr-wrap"><div class="mr"><div class="m-dot d-off"></div><div class="m-name off${vGenderCls(a.uid)}">${esc(a.name)}</div></div></div>`).join('');
     html += `</div>`;
   }
   document.getElementById('lp-members').innerHTML = html;
@@ -845,20 +852,46 @@ function buildRespArea(bi, resp, respMembers, dateKey) {
     return `<select class="ra-sel" id="${id}" onchange="mu(${bi})">${o}</select>`;
   }
   return `<div class="resp-area"><div class="area-title">責任者（最大2名）</div><div class="ra-row">
-    <div class="ra-item"><span class="ra-label">担当①</span>${sel('resp1-'+bi, resp.r1||'')}</div>
+    <div class="ra-item"><span class="ra-label">担当①</span><span class="ra-col">${sel('resp1-'+bi, resp.r1||'')}${ghostHtml(bi, 'resp', 'resp1-'+bi, resp.r1||'')}</span></div>
     <div class="ra-item"><span class="ra-label">担当②</span>${sel('resp2-'+bi, resp.r2||'')}</div>
   </div></div>`;
+}
+
+// ===== ゴースト提案 =====
+// 該当スロットに入っている人から候補を出し、確定はワンクリックに委ねる。
+// 自動で値を入れてしまうと確認されないまま通過するので、あえて値は入れない
+function ghostHtml(bi, role, targetId, cur) {
+  if (cur || typeof suggestRole !== 'function') return '';
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return '';
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
+  if (!block) return '';
+  const list = suggestRole(block, role, {
+    groups: buildBlockGroups(shiftDates), memberFlags, applicants,
+    respCounts, cartCounts,
+  });
+  if (!list.length) return '';
+  const c = list[0];
+  const why = c.reason ? c.reason : `月${c.count}回`;
+  return `<span class="ghost">候補：<span class="ghost-name">${esc(c.name)}</span><span>（${esc(why)}）</span>`
+       + `<button type="button" class="ghost-btn" onclick="applyGhost('${esc(targetId)}','${esc(c.uid)}',${bi})">✓ 採用</button></span>`;
+}
+
+function applyGhost(targetId, uid, bi) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  if (!Array.from(el.options).some(o => o.value === uid)) {
+    el.insertAdjacentHTML('beforeend', `<option value="${esc(uid)}">${esc(buildNameMap()[uid] || uid)}</option>`);
+  }
+  el.value = uid;
+  if (el.id.startsWith('ci') || el.id.startsWith('co')) ucn(el.id, el.id.replace('ci', 'cn').replace('co', 'con'));
+  mu(bi);
+  renderBlock();
 }
 
 function buildCartArea(bi, cart, cartMembers, dateKey) {
   const nm = buildNameMap();
   const cf = uid => (typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, dateKey) : '');
-  const nums = cartNumbers.length > 0 ? cartNumbers : ['1','2','3','4'];
-  const h1 = nums.slice(0, Math.ceil(nums.length / 2)).join(',');
-  const h2 = nums.slice(Math.ceil(nums.length / 2)).join(',');
-  const al = nums.join(',');
-  const numOpts = [['—',''],['①②', h1],['③④', h2],['①②③④', al]].map(([l, v]) => `<option value="${esc(v)}">${l}</option>`).join('');
-
   function cSel(id, val) {
     let o = '<option value="">—</option>';
     cartMembers.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}${cf(a.uid)}</option>`; });
@@ -866,22 +899,94 @@ function buildCartArea(bi, cart, cartMembers, dateKey) {
     const nid = id.replace('ci', 'cn').replace('co', 'con');
     return `<select class="cart-sel" id="${id}" onchange="ucn('${id}','${nid}');mu(${bi})">${o}</select>`;
   }
-  function nSel(id, val, dis) {
-    const opts = numOpts.replace(`value="${esc(val)}"`, `value="${esc(val)}" selected`);
-    return `<select class="cart-num" id="${id}"${dis ? ' disabled' : ''} onchange="mu(${bi})">${opts}</select>`;
-  }
   const { ki1='', kc1='', ki2='', kc2='', ko1='', oc1='', ko2='', oc2='' } = cart;
+
+  // この時間帯に持ち込み／持ち帰りが必要かを連続グループから判定し、
+  // 不要な側は入力できないようにしておく（例外運用のため解除ボタンを添える）
+  const tab   = (window._dateTabs || [])[activeDateIdx];
+  const block = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
+  const gi    = block && typeof buildBlockGroups === 'function'
+    ? buildBlockGroups(shiftDates)[bKey(block)] : null;
+  const need  = typeof cartNeeded === 'function' ? cartNeeded(gi) : { bring: true, take: true };
+  const unlocked = window._cartUnlock || {};
+  const bringOff = !need.bring && !unlocked[bi + '-bring'];
+  const takeOff  = !need.take  && !unlocked[bi + '-take'];
+  const naCell = (side, span) => `<td class="na-col" colspan="${span}"><div class="na-note">`
+    + `<span>${side === 'bring' ? '連続する前の時間帯から引き継ぐため不要' : '連続する次の時間帯へ引き継ぐため不要'}</span>`
+    + `<button type="button" class="na-unlock" onclick="unlockCart(${bi},'${side}')">例外的に入力</button></div></td>`;
+
+  const bringRow1 = bringOff ? naCell('bring', 2) : `<td>${cSel('ci1-'+bi,ki1)}${ghostHtml(bi,'bring','ci1-'+bi,ki1)}</td><td>${cSel('ci2-'+bi,ki2)}</td>`;
+  const takeRow1  = takeOff  ? naCell('take', 2)  : `<td>${cSel('co1-'+bi,ko1)}${ghostHtml(bi,'take','co1-'+bi,ko1)}</td><td>${cSel('co2-'+bi,ko2)}</td>`;
+  const bringRow2 = bringOff ? '<td class="na-col" colspan="2"></td>' : `<td>${cartChip('cn1-'+bi,kc1,!ki1,bi)}</td><td>${cartChip('cn2-'+bi,kc2,!ki2,bi)}</td>`;
+  const takeRow2  = takeOff  ? '<td class="na-col" colspan="2"></td>' : `<td>${cartChip('con1-'+bi,oc1,!ko1,bi)}</td><td>${cartChip('con2-'+bi,oc2,!ko2,bi)}</td>`;
+
   return `<div class="cart-area"><div class="area-title cart-title">カート担当者（最大各2名・空白可）</div>
     <div class="tbl-wrap">
     <table class="cart-tbl">
       <thead><tr><th style="width:90px;"></th><th colspan="2">持ち込み</th><th colspan="2">持ち帰り</th></tr></thead>
       <tbody>
-        <tr><td class="row-lbl">担当者</td><td>${cSel('ci1-'+bi,ki1)}</td><td>${cSel('ci2-'+bi,ki2)}</td><td>${cSel('co1-'+bi,ko1)}</td><td>${cSel('co2-'+bi,ko2)}</td></tr>
-        <tr><td class="row-lbl">カート番号</td><td>${nSel('cn1-'+bi,kc1,!ki1)}</td><td>${nSel('cn2-'+bi,kc2,!ki2)}</td><td>${nSel('con1-'+bi,oc1,!ko1)}</td><td>${nSel('con2-'+bi,oc2,!ko2)}</td></tr>
+        <tr><td class="row-lbl">担当者</td>${bringRow1}${takeRow1}</tr>
+        <tr><td class="row-lbl">カート番号</td>${bringRow2}${takeRow2}</tr>
       </tbody>
     </table>
     </div>
   </div>`;
+}
+
+// 不要としてグレー化した欄を、その場限りで入力可能に戻す
+function unlockCart(bi, side) {
+  window._cartUnlock = window._cartUnlock || {};
+  window._cartUnlock[bi + '-' + side] = true;
+  renderBlock();
+}
+
+// ===== カート番号チップ（クリックでトグル式ポップオーバー） =====
+function cartNumList() { return cartNumbers.length > 0 ? cartNumbers : ['1','2','3','4']; }
+function circledNum(n) {
+  const M = { '1':'①','2':'②','3':'③','4':'④','5':'⑤','6':'⑥','7':'⑦','8':'⑧','9':'⑨' };
+  return M[String(n).trim()] || String(n);
+}
+function cartLabel(v) {
+  const arr = String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+  return arr.length ? arr.map(circledNum).join('') : '—';
+}
+
+function cartChip(id, val, dis, bi) {
+  const lbl = cartLabel(val);
+  return `<button type="button" class="cart-chip${val ? '' : ' empty'}" id="${id}" data-value="${esc(val || '')}"`
+       + ` data-bi="${bi}"${dis ? ' disabled' : ''} onclick="openCartPicker(this)">${esc(lbl)}</button>`;
+}
+
+function openCartPicker(el) {
+  const cur = (el.dataset.value || '').split(',').map(x => x.trim()).filter(Boolean);
+  const items = cartNumList().map(n => ({
+    value: String(n), label: circledNum(n), html: `<span style="font-size:15px;">${circledNum(n)}</span>`,
+  }));
+  // 設定タブで登録済みのプリセットはワンタップで選べるようにする
+  cartPresets.forEach(p => {
+    items.push({ value: '@' + p, label: p, group: 'プリセット',
+      html: `<span>${esc(String(p).split(',').map(circledNum).join(''))}</span>` });
+  });
+  openPicker(el, {
+    title: 'カート番号を選択（複数可）', multi: true, value: cur, items,
+    onToggle: vals => {
+      // プリセットが押されたら、その組み合わせで置き換える
+      const preset = vals.find(v => String(v).startsWith('@'));
+      let next = preset
+        ? String(preset).slice(1).split(',').map(x => x.trim()).filter(Boolean)
+        : vals.filter(v => !String(v).startsWith('@'));
+      next = cartNumList().filter(n => next.includes(String(n)));  // 設定順に整える
+      setCartValue(el, next.join(','));
+      if (preset) closePicker();
+    },
+  });
+}
+
+function setCartValue(el, v) {
+  el.dataset.value = v;
+  el.textContent = cartLabel(v);
+  el.classList.toggle('empty', !v);
+  mu(+el.dataset.bi);
 }
 
 function initBlockCols(bi, block) {
@@ -1020,10 +1125,7 @@ function buildSlotTable(bi, block) {
   // カート番号選択行（列番号で紐づけ）
   html += '<tr class="th-cart-row"><td class="td-slot-time" style="font-size:10px;color:var(--ink3);font-weight:700;padding:3px 8px;">カート番号</td>';
   colPlaces.forEach((loc, li) => {
-    const savedVal = placeCart[li] || '';
-    let opts0 = '<option value="">—</option>';
-    cartPresets.forEach(p => { opts0 += `<option value="${esc(p)}"${p === savedVal ? ' selected' : ''}>${esc(p)}</option>`; });
-    html += `<td class="cart-cell" style="background:${pc[li % pc.length]}20;"><select class="cart-sel-place" id="pc-${bi}-${li}-0" onchange="mu(${bi})" style="width:100%;">${opts0}</select></td>`;
+    html += `<td class="cart-cell" style="background:${pc[li % pc.length]}20;">${cartChip(`pc-${bi}-${li}-0`, placeCart[li] || '', false, bi)}</td>`;
   });
   html += '</tr></thead><tbody>';
 
@@ -1055,19 +1157,21 @@ function buildSlotTable(bi, block) {
   return html;
 }
 
+// 性別を表す左の縦線。メンバー管理画面と同じ色（青＝兄弟／赤＝姉妹）を使い、
+// 凡例を覚え直さなくて済むようにしている
+function vGenderCls(uid) {
+  const g = ((memberFlags || {})[uid] || {}).gender || '';
+  return g === 'M' ? ' g-m' : (g ? ' g-f' : '');
+}
+
 function buildPS(bi, ri, li, pi, val, sa, nm, watchOn, dateKey) {
   const id = `ps-${bi}-${ri}-${li}-${pi}`;
-
-  // 他PWでの申込・配置状況を option text に付与（判定は validation.js に集約）
-  function conflictSuffix(uid) {
-    return typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, dateKey) : '';
-  }
-
-  let o = '<option value="">—</option>';
-  sa.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}${conflictSuffix(a.uid)}</option>`; });
-  if (val && !sa.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}${conflictSuffix(val)}</option>`;
-  const onchangeAttr = pi === 0 ? `mu(${bi});onPs0Change(${bi},${ri},${li});` : `mu(${bi})`;
-  const sel = `<select class="cs" id="${id}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}" onchange="${onchangeAttr}">${o}</select>`;
+  // <select> ではなくボタン＋ポップオーバー（js/picker.js）。
+  // option のスタイル制約から外れるので、性別・警告・月内回数を候補に出せる
+  const label = val ? (nm[val] || val) : '—';
+  const sel = `<button type="button" class="cs${val ? '' : ' empty'}${val ? vGenderCls(val) : ''}" id="${id}"`
+            + ` data-value="${esc(val)}" data-bi="${bi}" data-ri="${ri}" data-li="${li}" data-pi="${pi}"`
+            + ` onclick="openMemberPicker(this)">${esc(label)}</button>`;
   if (pi !== 0) return sel;
   // 一番左（1人目）の選択欄にのみ見守りチェックボックスを付与
   const cbId = `watch-${bi}-${ri}-${li}`;
@@ -1077,11 +1181,66 @@ function buildPS(bi, ri, li, pi, val, sa, nm, watchOn, dateKey) {
   return `<div class="ps-watch-wrap">${sel}${cb}</div>`;
 }
 
+// ===== 奉仕者コンボボックス（js/picker.js のポップオーバーを使う） =====
+function openMemberPicker(el) {
+  const bi = +el.dataset.bi, ri = +el.dataset.ri, li = +el.dataset.li;
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
+  if (!block) return;
+  syncCurrentBlock(); // 未保存の編集も候補の判定に反映させる
+  const cur  = el.dataset.value || '';
+  const base = filterAppliedForSlot(block.date, block.time);
+  const cands = buildCandidates(base, block, ri, li, {
+    groups: buildBlockGroups(shiftDates), shiftDates, memberFlags, conflictMap,
+    assignCounts: slotAssignCounts, applicants,
+  }, cur);
+  // 保存済みだが今月は申込していない人（希望を取り下げた等）も、現在値なら候補に残す
+  if (cur && !cands.find(c => c.uid === cur)) {
+    cands.unshift({ uid: cur, name: (buildNameMap()[cur] || cur), state: 'ok', reason: '申込なし',
+      group: VSTATE_GROUP.ok, count: slotAssignCounts[cur] || 0, gender: (memberFlags[cur] || {}).gender || '' });
+  }
+  const items = [{ value: '', label: '—（未選択）', html: '<span class="pk-none">—（未選択）</span>', group: '' }];
+  cands.forEach(c => {
+    const badges = (c.respFlag ? '<span class="pk-b b-r">責</span>' : '')
+                 + (c.cartFlag ? '<span class="pk-b b-k">カ</span>' : '')
+                 + `<span class="pk-b b-w">割${c.count}</span>`
+                 + (c.count === 0 ? '<span class="pk-b b-p">優先</span>' : '')
+                 + (c.cartNg ? '<span class="pk-b b-n">🚫カート不可</span>' : '');
+    items.push({
+      value: c.uid,
+      label: c.name,
+      search: (c.name || '') + ' ' + (c.furigana || ''),
+      group: c.group,
+      disabled: c.state === 'blocked',
+      html: `<span class="pk-nm${c.gender === 'M' ? ' g-m' : (c.gender ? ' g-f' : '')}">${esc(c.name)}</span>${badges}`,
+      sub: (c.reason ? esc(c.reason) : '') + (c.note ? ' 📝' + esc(c.note) : ''),
+    });
+  });
+  openPicker(el, {
+    title: `${block.time}　${block.usedPlaces[li] || '（場所未設定）'}　${(block.slots[ri] || {}).time || ''}`,
+    search: true, value: cur, items,
+    onPick: v => setPsValue(el, v),
+  });
+}
+
+function setPsValue(el, v) {
+  el.dataset.value = v;
+  el.textContent = v ? (buildNameMap()[v] || v) : '—';
+  el.classList.toggle('empty', !v);
+  el.classList.remove('g-m', 'g-f');
+  const g = v ? vGenderCls(v).trim() : '';
+  if (g) el.classList.add(g);
+  const bi = +el.dataset.bi;
+  if (+el.dataset.pi === 0) onPs0Change(bi, +el.dataset.ri, +el.dataset.li);
+  mu(bi);
+}
+
 function onPs0Change(bi, ri, li) {
   const sel = document.getElementById(`ps-${bi}-${ri}-${li}-0`);
   const cb  = document.getElementById(`watch-${bi}-${ri}-${li}`);
   if (!sel || !cb) return;
-  if (sel.value) {
+  if (sel.dataset.value) {
     cb.disabled = false;
   } else {
     cb.disabled = true;
@@ -1093,6 +1252,9 @@ function mu(bi) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
+  // この時点の block はまだ変更前の状態（syncCurrentBlock はこのあと）なので、
+  // ここで積めば「1操作ぶん戻す」履歴になる
+  pushUndo(bi, block);
   bs[bKey(block)] = false;
   const st = document.getElementById('st-' + bi);
   if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
@@ -1108,6 +1270,103 @@ function mu(bi) {
     refreshValidationUI();
   }
 }
+
+// ============================================================
+// 元に戻す（Ctrl+Z / Ctrl+Shift+Z）
+//
+// mu() が呼ばれるたびに「変更前」のブロック内容をスナップショットとして積む。
+// メモリ上だけなのでリロードで消える。他管理者の同期マージが入ったら
+// 巻き戻しで相手の変更まで消してしまうためスタックを捨てる。
+// 戻す対象が別のブロックなら自動でタブを切り替え、どこが戻ったかを示す。
+// ============================================================
+const _undoStack = [];
+const _redoStack = [];
+let _undoBusy = false;   // undo適用中に mu() が新しい履歴を積まないようにする
+
+function pushUndo(bi, block) {
+  if (_undoBusy || !block) return;
+  const snap = {
+    key: bKey(block), date: block.date, time: block.time,
+    data: JSON.stringify({
+      responsible: block.responsible, cart: block.cart,
+      slots: block.slots, placeCart: block.placeCart, usedPlaces: block.usedPlaces,
+    }),
+  };
+  const top = _undoStack[_undoStack.length - 1];
+  if (top && top.key === snap.key && top.data === snap.data) return; // 変化なし
+  _undoStack.push(snap);
+  _redoStack.length = 0;
+  updateUndoBtn();
+}
+
+function clearUndo() { _undoStack.length = 0; _redoStack.length = 0; updateUndoBtn(); }
+
+function updateUndoBtn() {
+  const b = document.getElementById('undo-btn');
+  if (b) b.disabled = _undoStack.length === 0;
+}
+
+function snapshotOf(block) {
+  return JSON.stringify({
+    responsible: block.responsible, cart: block.cart,
+    slots: block.slots, placeCart: block.placeCart, usedPlaces: block.usedPlaces,
+  });
+}
+
+async function applySnapshot(snap) {
+  const di = (window._dateTabs || []).findIndex(t => t.date === snap.date);
+  if (di < 0) { toast('戻し先の日付が見つかりません', 'e'); return false; }
+  if (di !== activeDateIdx) await switchDateTab(di);
+  const bi = shiftDates.filter(d => d.date === snap.date).findIndex(b => b.time === snap.time);
+  if (bi < 0) { toast('戻し先の時間帯が見つかりません', 'e'); return false; }
+  if (bi !== activeTimeIdx) await switchTimeTab(bi);
+  const block = shiftDates.filter(d => d.date === snap.date)[bi];
+  const d = JSON.parse(snap.data);
+  block.responsible = d.responsible; block.cart = d.cart; block.slots = d.slots;
+  block.placeCart = d.placeCart; block.usedPlaces = d.usedPlaces;
+  window._blockCols[bKey(block)] = [...(d.usedPlaces || [])];
+  renderBlock();
+  mu(bi);
+  const tb = document.getElementById('tb-' + bi);
+  if (tb) { tb.classList.add('undo-flash'); setTimeout(() => tb.classList.remove('undo-flash'), 900); }
+  return true;
+}
+
+async function doUndo() {
+  if (_undoStack.length === 0) { toast('元に戻す操作がありません'); return; }
+  const snap = _undoStack.pop();
+  syncCurrentBlock();
+  const cur = shiftDates.filter(d => d.date === snap.date).find(b => b.time === snap.time);
+  if (cur) _redoStack.push({ key: snap.key, date: snap.date, time: snap.time, data: snapshotOf(cur) });
+  _undoBusy = true;
+  const ok = await applySnapshot(snap);
+  _undoBusy = false;
+  updateUndoBtn();
+  if (ok) toast(`元に戻しました：${snap.date} ${snap.time}`, 's');
+}
+
+async function doRedo() {
+  if (_redoStack.length === 0) { toast('やり直す操作がありません'); return; }
+  const snap = _redoStack.pop();
+  syncCurrentBlock();
+  const cur = shiftDates.filter(d => d.date === snap.date).find(b => b.time === snap.time);
+  if (cur) _undoStack.push({ key: snap.key, date: snap.date, time: snap.time, data: snapshotOf(cur) });
+  _undoBusy = true;
+  const ok = await applySnapshot(snap);
+  _undoBusy = false;
+  updateUndoBtn();
+  if (ok) toast(`やり直しました：${snap.date} ${snap.time}`, 's');
+}
+
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = (e.key || '').toLowerCase();
+  if (k !== 'z' && k !== 'y') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return; // 文字入力中は邪魔しない
+  e.preventDefault();
+  if (k === 'y' || e.shiftKey) doRedo(); else doUndo();
+});
 
 // ============================================================
 // 整合性検証（js/validation.js）の実行と表示
@@ -1267,6 +1526,17 @@ function openPreflight() {
     });
   });
   document.getElementById('pf-list').innerHTML = html || '<div class="pf-ok">整合性の問題は見つかりませんでした</div>';
+
+  // 「何も出ない」が「壊れている」ではなく「調べたうえで問題なし」と読めるように、
+  // 何をどれだけ検査したのかを必ず表示する
+  const nDates  = new Set(shiftDates.map(b => b.date)).size;
+  const nBlocks = shiftDates.length;
+  let nAssign = 0;
+  shiftDates.forEach(b => { nAssign += Object.keys(typeof blockAssign === 'function' ? blockAssign(b) : {}).length; });
+  const ruleNames = Object.keys(VRULES).filter(id => vRule(id).on).map(id => VRULES[id].label);
+  document.getElementById('pf-footer').innerHTML =
+    `<div class="pf-scope">${ruleNames.length}ルールを ${nDates}日程・${nBlocks}ブロック・のべ${nAssign}名の配置に適用しました</div>`
+    + `<div class="pf-rules">検査項目：${esc(ruleNames.join('／'))}</div>`;
 
   const pubBtn = document.getElementById('pf-publish-btn');
   pubBtn.style.display = shiftPublished ? 'none' : '';
@@ -1443,7 +1713,12 @@ async function syncShiftCreateData() {
   refreshWishAssign();
 
   if (activeConflict) showSyncConflictBanner(activeTimeIdx);
-  else if (activeChanged) { renderBlock(); toast('他の管理者の変更を反映しました', 's'); }
+  else if (activeChanged) {
+    // 他管理者の変更が入った以上、過去へ巻き戻すと相手の編集まで消してしまう
+    clearUndo();
+    renderBlock();
+    toast('他の管理者の変更を反映しました', 's');
+  }
 }
 
 function showSyncConflictBanner(bi) {
@@ -1497,7 +1772,13 @@ function applyCellWrapLayout(el) {
   }
 }
 
-function ucn(si, ni) { const s = document.getElementById(si), n = document.getElementById(ni); if (!s || !n) return; n.disabled = !s.value; if (!s.value) n.value = ''; }
+// 担当者が空ならカート番号チップを無効化して値も消す
+function ucn(si, ni) {
+  const s = document.getElementById(si), n = document.getElementById(ni);
+  if (!s || !n) return;
+  n.disabled = !s.value;
+  if (!s.value) { n.dataset.value = ''; n.textContent = '—'; n.classList.add('empty'); }
+}
 
 // タブ切り替え前に現在のDOM入力をshiftDatesに書き戻す（未保存データを保持）
 function syncCurrentBlock() {
@@ -1523,14 +1804,26 @@ function collectBlock(bi) {
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return null;
   const responsible = { r1: (document.getElementById('resp1-'+bi)||{}).value||'', r2: (document.getElementById('resp2-'+bi)||{}).value||'' };
-  const cart = { ki1:(document.getElementById('ci1-'+bi)||{}).value||'', kc1:(document.getElementById('cn1-'+bi)||{}).value||'', ki2:(document.getElementById('ci2-'+bi)||{}).value||'', kc2:(document.getElementById('cn2-'+bi)||{}).value||'', ko1:(document.getElementById('co1-'+bi)||{}).value||'', oc1:(document.getElementById('con1-'+bi)||{}).value||'', ko2:(document.getElementById('co2-'+bi)||{}).value||'', oc2:(document.getElementById('con2-'+bi)||{}).value||'' };
+  // 担当者は <select>、カート番号はチップ（値は data-value）
+  const selV  = id => ((document.getElementById(id) || {}).value) || '';
+  const chipV = id => { const e = document.getElementById(id); return (e && e.dataset.value) || ''; };
+  const keep  = (dom, saved) => (document.getElementById(dom) ? chipV(dom) : (saved || ''));
+  const oc = block.cart || {};
+  const cart = {
+    ki1: document.getElementById('ci1-'+bi) ? selV('ci1-'+bi) : (oc.ki1 || ''),
+    ki2: document.getElementById('ci2-'+bi) ? selV('ci2-'+bi) : (oc.ki2 || ''),
+    ko1: document.getElementById('co1-'+bi) ? selV('co1-'+bi) : (oc.ko1 || ''),
+    ko2: document.getElementById('co2-'+bi) ? selV('co2-'+bi) : (oc.ko2 || ''),
+    kc1: keep('cn1-'+bi,  oc.kc1), kc2: keep('cn2-'+bi,  oc.kc2),
+    oc1: keep('con1-'+bi, oc.oc1), oc2: keep('con2-'+bi, oc.oc2),
+  };
   // 現在の列状態を同期して収集（colPlacesは空欄含む固定列、インデックスはDOMと一致）
   // 中身は列番号（インデックス）で紐づけて収集する
   const colPlaces = getColPlaces(bi, block);
   const usedPlaces = [...colPlaces];
   const placeCart = colPlaces.map((loc, li) => {
-    const sel = document.getElementById(`pc-${bi}-${li}-0`);
-    return sel ? sel.value : ((block.placeCart || [])[li] || '');
+    const el = document.getElementById(`pc-${bi}-${li}-0`);
+    return el ? (el.dataset.value || '') : ((block.placeCart || [])[li] || '');
   });
   const slots = (block.slots || []).map((slot, ri) => {
     const places = [];
@@ -1539,7 +1832,7 @@ function collectBlock(bi) {
       const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
       const uids = [];
       if (cw) {
-        cw.querySelectorAll('select.cs').forEach(s => { if (s.value) uids.push(s.value); });
+        cw.querySelectorAll('.cs').forEach(s => { if (s.dataset.value) uids.push(s.dataset.value); });
       } else {
         ((slot.places || [])[li] || []).forEach(u => { if (u) uids.push(u); });
       }
@@ -1705,12 +1998,14 @@ document.getElementById('lpResize').addEventListener('mousedown', e => {
 async function loadSettingsData() {
   setLoading(true, '設定を読み込み中...');
   try {
-    const [lr, cr, pr, sr] = await Promise.all([apiGet('getLocations', {}), apiGet('getCartNumbers'), apiGet('getCartPresets'), apiGet('getDefaultSlot')]);
+    const [lr, cr, pr, sr, vr] = await Promise.all([apiGet('getLocations', {}), apiGet('getCartNumbers'), apiGet('getCartPresets'), apiGet('getDefaultSlot'), apiGet('getValidationRules', {}).catch(() => ({ ok: false }))]);
+    settingsVRules = vr.ok ? (vr.rules || {}) : {};
+    setValidationConfig(settingsVRules);
     settingsLocations    = lr.ok ? lr.locations    : [];
     settingsCartNumbers  = cr.ok ? cr.cartNumbers  : [];
     settingsCartPresets  = pr.ok ? pr.cartPresets  : [];
     defaultSlot  = sr.ok ? sr.defaultSlot  : 15;
-    renderLocationList(); renderCartTags(); renderCartPresets();
+    renderLocationList(); renderCartTags(); renderCartPresets(); renderValidationRules();
     const sel = document.getElementById('default-slot-sel'); if (sel) sel.value = String(defaultSlot);
     settingsLoaded = true; setLoading(false);
   } catch (e) { setLoading(false); toast('設定読み込みエラー: ' + e.message, 'e'); }
@@ -1751,6 +2046,55 @@ function saveEditLocation() {
 async function saveLocations() {
   try { await apiGet('saveLocations', { locations: settingsLocations }); toast('場所設定を保存しました', 's'); createLoaded = false; }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
+}
+
+// ===== 検証ルール設定 =====
+// VRULES の既定値を土台に、変更したぶんだけ settings へ保存する
+function renderValidationRules() {
+  const box = document.getElementById('vrule-list');
+  if (!box || typeof VRULES !== 'object') return;
+  box.innerHTML = Object.keys(VRULES).map(id => {
+    const def = VRULES[id];
+    const cur = Object.assign({}, def, settingsVRules[id] || {});
+    const scope = def.scope === 'publish' ? '公開前のみ' : '編集中';
+    return `<div class="vr-row">
+      <label class="vr-on"><input type="checkbox" data-rule="${id}" data-f="on"${cur.on ? ' checked' : ''} onchange="onVRuleChange(this)"></label>
+      <div class="vr-main"><div class="vr-label">${esc(def.label)}</div><div class="vr-meta">${scope}</div></div>
+      <select class="vr-level" data-rule="${id}" data-f="level" onchange="onVRuleChange(this)">
+        <option value="error"${cur.level === 'error' ? ' selected' : ''}>⛔ エラー</option>
+        <option value="warn"${cur.level === 'warn' ? ' selected' : ''}>⚠️ 警告</option>
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function onVRuleChange(el) {
+  const id = el.dataset.rule, f = el.dataset.f;
+  const v = f === 'on' ? el.checked : el.value;
+  settingsVRules[id] = settingsVRules[id] || {};
+  settingsVRules[id][f] = v;
+  // 既定値と同じに戻したら上書きを消しておく（保存内容を最小限に保つ）
+  if (VRULES[id][f] === v) {
+    delete settingsVRules[id][f];
+    if (Object.keys(settingsVRules[id]).length === 0) delete settingsVRules[id];
+  }
+}
+
+async function saveValidationRules() {
+  try {
+    await apiGet('saveValidationRules', { rules: settingsVRules,
+      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '' });
+    setValidationConfig(settingsVRules);
+    if (createLoaded) refreshValidationUI();
+    toast('検証ルールを保存しました', 's');
+  } catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
+}
+
+function resetValidationRules() {
+  if (!confirm('検証ルールを既定値に戻しますか？')) return;
+  settingsVRules = {};
+  renderValidationRules();
+  saveValidationRules();
 }
 
 function renderCartTags() {
