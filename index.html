@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client"></script>
-<link rel="stylesheet" href="css/index.css?v=4">
+<link rel="stylesheet" href="css/index.css?v=5">
 </head>
 <body>
 
@@ -109,6 +109,8 @@
             <span id="cal-pub-badge-text">確認中...</span>
           </button>
         </div>
+        <!-- 対象年月と公開中の月がズレているときの注意書き -->
+        <div class="cal-pub-note" id="cal-pub-note" style="display:none;"></div>
         <!-- カレンダー表示月ナビ（限定PWのみ表示） -->
         <div class="cal-view-nav" id="cal-view-nav-bar">
           <span class="cal-view-nav-label">カレンダー</span>
@@ -648,6 +650,6 @@
 <!-- フェーズ追加・編集モーダル -->
 
 <script src="js/api.js?v=3"></script>
-<script src="js/index.js?v=11"></script>
+<script src="js/index.js?v=12"></script>
 </body>
 </html>

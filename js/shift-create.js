@@ -22,7 +22,10 @@ let shiftPublished = false;
 let shiftOpenDate  = ''; // 公開予定日（M/D形式）。作成完了していても、この日を迎えるまで奉仕者には見えない
 let activeDateIdx = 0;
 let activeTimeIdx = 0;
-let curYM         = null;
+let curYM         = null;  // 編集中の年月（ヘッダーの対象年月セレクタで切り替える）
+let ymList        = [];    // カレンダーが存在する年月 [{year,month,calPublished,shiftPublished}]
+let ymLoaded      = false; // ymList / publishedYM を取得済みか（未取得のうちは公開ボタンを制限しない）
+let publishedYM   = null;  // 奉仕者に公開中のカレンダーの年月 {year,month}（通常PWでは常に最大1ヶ月）
 let createLoaded  = false;
 let settingsLoaded = false;
 const bs = {};
@@ -42,6 +45,13 @@ const AUTOSAVE_DEBOUNCE_MS = 500;
 const AUTOSAVE_RETRY_MS    = 5000;
 
 // apiGet / apiAuthGet は js/api.js（共有通信層）で定義
+
+// 年月依存のAPI（getWishData / getApplicants / getShiftCreateData / createShiftSheet）には
+// 必ず編集中の年月を渡す。curYM が未確定な初回読み込み時だけ付けず、サーバー既定
+// （＝公開中カレンダーの年月）に従う
+function ymP(extra) {
+  return Object.assign({}, extra || {}, curYM ? { year: curYM.year, month: curYM.month } : {});
+}
 
 // ============================================================
 // 認証
@@ -94,7 +104,8 @@ async function loadInitData() {
     const [, statusRes, slotsRes] = await Promise.all([
       loadWishDataInternal(),
       apiGet('getShiftPublishStatus'),
-      apiGet('getLimitedSlots', {})
+      apiGet('getLimitedSlots', {}),
+      loadYmList()
     ]);
     shiftPublished = statusRes.ok && statusRes.published;
     shiftOpenDate  = statusRes.ok ? (statusRes.openDate || '') : '';
@@ -104,6 +115,123 @@ async function loadInitData() {
     setLoading(false);
   }
   catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
+}
+
+// ============================================================
+// 対象年月セレクタ
+// ============================================================
+// カレンダーが存在する年月の一覧と、公開中カレンダーの年月を取得する。
+// 限定PWはフェーズが複数月にまたがるため対象外（セレクタを出さない）
+async function loadYmList() {
+  if (currentPwType !== 'normal') { ymList = []; publishedYM = null; ymLoaded = false; renderYmSelect(); return; }
+  try {
+    const r = await apiGet('getCalendarSheetList', {});
+    ymList = r && r.ok ? (r.list || []) : [];
+    ymLoaded = true;
+  } catch (e) { ymList = []; ymLoaded = false; }
+  // 通常PWの公開中カレンダーは常に最大1件だが、念のため最新の月を採用する
+  // （サーバー側 getCurrentCal と同じ「年月の降順で先頭」の解釈に合わせる）
+  const pubs = ymList.filter(c => c.calPublished);
+  publishedYM = pubs.length > 0 ? { year: pubs[pubs.length - 1].year, month: pubs[pubs.length - 1].month } : null;
+  renderYmSelect();
+  updatePublishBtn();
+}
+
+function ymKey(o) { return o ? o.year + '.' + o.month : ''; }
+function isPublishedYM(o) { return !!(o && publishedYM && publishedYM.year === o.year && publishedYM.month === o.month); }
+
+function renderYmSelect() {
+  const wrap = document.getElementById('sc-ym-wrap');
+  const sel  = document.getElementById('sc-ym-sel');
+  if (!wrap || !sel) return;
+  if (currentPwType !== 'normal' || ymList.length === 0) { wrap.style.display = 'none'; return; }
+  const cur = ymKey(curYM);
+  let html = ymList.map(c => {
+    const v = c.year + '.' + c.month;
+    return `<option value="${v}"${v === cur ? ' selected' : ''}>${c.year}年${c.month}月${c.calPublished ? '（公開中）' : ''}</option>`;
+  }).join('');
+  // 一覧に無い年月（カレンダー未作成の月）を表示している場合も選択肢として残す
+  if (cur && !ymList.some(c => c.year + '.' + c.month === cur)) {
+    html += `<option value="${cur}" selected>${curYM.year}年${curYM.month}月</option>`;
+  }
+  sel.innerHTML = html;
+  wrap.style.display = 'flex';
+  renderYmNote();
+}
+
+// 「いま奉仕者に公開されているのはどの月か」を常に明示する
+function renderYmNote() {
+  const note = document.getElementById('sc-ym-note');
+  if (!note) return;
+  if (currentPwType !== 'normal' || !curYM || !ymLoaded) { note.textContent = ''; note.className = 'ym-note'; return; }
+  if (isPublishedYM(curYM)) {
+    note.textContent = 'この月が公開中';
+    note.className = 'ym-note ok';
+  } else if (publishedYM) {
+    note.textContent = '公開中は ' + publishedYM.year + '年' + publishedYM.month + '月（表示中の月は未公開）';
+    note.className = 'ym-note warn';
+  } else {
+    note.textContent = '公開中の月はありません';
+    note.className = 'ym-note warn';
+  }
+}
+
+function setYmSwitching(on) {
+  const sel = document.getElementById('sc-ym-sel');
+  if (sel) sel.disabled = !!on;
+  document.querySelectorAll('.main-tabs .mtab').forEach(b => { b.disabled = !!on; });
+  document.querySelectorAll('#pw-tabs .pw-tab-sc').forEach(b => { b.disabled = !!on; });
+}
+
+async function onYmChange(val) {
+  const parts = (val || '').split('.');
+  const y = parseInt(parts[0]), m = parseInt(parts[1]);
+  if (!y || !m) return;
+  if (curYM && curYM.year === y && curYM.month === m) return;
+  await flushPendingSave(activeTimeIdx);
+  curYM = { year: y, month: m };
+  resetMonthState();
+  renderYmNote();
+  updatePublishBtn();
+
+  setYmSwitching(true);
+  setLoading(true, y + '年' + m + '月 のデータを読み込み中...');
+  try {
+    const wishOn   = splitMode || document.getElementById('tab-wish').classList.contains('on');
+    const createOn = splitMode || document.getElementById('tab-create').classList.contains('on');
+    if (wishOn) await loadWishDataInternal();
+    setLoading(false);
+    // loadCreateData は自前でオーバーレイを表示する
+    if (createOn) await loadCreateData();
+  } catch (e) {
+    toast('読み込みエラー: ' + e.message, 'e');
+  } finally {
+    setLoading(false);
+    setYmSwitching(false);
+    renderYmSelect();
+  }
+}
+
+// 月を切り替えるとシフト・申込は全て別データになるため、キャッシュと編集状態を捨てる
+function resetMonthState() {
+  createLoaded = false;
+  wishLoaded   = false;
+  applicants   = [];
+  shiftDates   = [];
+  Object.keys(bs).forEach(k => delete bs[k]);
+  Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
+  Object.keys(_saveInFlight).forEach(k => delete _saveInFlight[k]);
+  Object.keys(_savePending).forEach(k => delete _savePending[k]);
+  Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
+  Object.keys(_srvSig).forEach(k => delete _srvSig[k]);
+  window._blockCols  = {};
+  window._cartUnlock = {};
+  clearUndo();
+  activeDateIdx = 0;
+  activeTimeIdx = 0;
+  // 更新監視の基準は月ごとに取り直す
+  _scKnownTs = null;
+  _scKnownWishTs = null;
 }
 
 // ============================================================
@@ -152,8 +280,8 @@ async function switchPwTypeSc(type) {
   const label = type === 'normal' ? '通常PW' : (pwTypeList.find(s => s.id === type)?.name || '限定PW');
   setLoading(true, label + ' のデータを読み込み中...');
   try {
-    // 公開状態は常に更新
-    const statusRes = await apiGet('getShiftPublishStatus');
+    // 公開状態・対象年月の候補は常に更新
+    const [statusRes] = await Promise.all([apiGet('getShiftPublishStatus'), loadYmList()]);
     shiftPublished = statusRes.ok && statusRes.published;
     shiftOpenDate  = statusRes.ok ? (statusRes.openDate || '') : '';
     updatePublishBtn();
@@ -185,6 +313,9 @@ function switchMainTab(name, btn) {
   btn.classList.add('on');
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('on'));
   document.getElementById('tab-' + name).classList.add('on');
+  // 年月を切り替えると各タブのデータは無効になる（resetMonthState でフラグを落とす）ため、
+  // 未読み込みのタブを開いたときに読み直す
+  if (name === 'wish' && !wishLoaded) loadWishData();
   if (name === 'create' && !createLoaded) loadCreateData();
   if (name === 'settings' && !settingsLoaded) loadSettingsData();
 }
@@ -349,13 +480,13 @@ async function loadWishData() {
 async function loadWishDataInternal() {
   // getWishData と getMemberFlags と getShiftCreateData を並行取得
   const [res, flagsRes, shiftRes] = await Promise.all([
-    apiGet('getWishData', {}),
+    apiGet('getWishData', ymP()),
     Object.keys(memberFlags).length > 0 ? Promise.resolve({ ok: true, flags: memberFlags }) : apiGet('getMemberFlags'),
-    apiGet('getShiftCreateData', {})
+    apiGet('getShiftCreateData', ymP())
   ]);
   const year  = res.year  || new Date().getFullYear();
   const month = res.month || new Date().getMonth() + 1;
-  if (!curYM) curYM = { year, month };
+  if (!curYM) { curYM = { year, month }; renderYmSelect(); }
   document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
   document.getElementById('ws-ym').textContent     = year + '年' + month + '月';
   if (!res.ok) throw new Error(res.error || '取得失敗');
@@ -575,7 +706,7 @@ async function submitWishChange(applied) {
 async function refreshApplicantsForCreate() {
   if (!createLoaded) return;
   try {
-    const res = await apiGet('getApplicants', {});
+    const res = await apiGet('getApplicants', ymP());
     if (!res || !res.ok) return;
     applicants = res.applicants || [];
     syncCurrentBlock();
@@ -614,7 +745,7 @@ async function loadCreateData() {
     window._cartUnlock = {};
     clearUndo();
     const [flagsRes, appRes, shiftRes, ackRes, ruleRes] = await Promise.all([
-      apiGet('getMemberFlags'), apiGet('getApplicants', {}), apiGet('getShiftCreateData', {}),
+      apiGet('getMemberFlags'), apiGet('getApplicants', ymP()), apiGet('getShiftCreateData', ymP()),
       apiGet('getValidationAcks', {}).catch(() => ({ ok: false })),
       apiGet('getValidationRules', {}).catch(() => ({ ok: false }))
     ]);
@@ -622,7 +753,9 @@ async function loadCreateData() {
     setValidationConfig(ruleRes.ok ? (ruleRes.rules || {}) : {});
     const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
     const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
+    const ymChanged = ymKey(curYM) !== (year + '.' + month);
     curYM = { year, month };
+    if (ymChanged) renderYmSelect();
     document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
     memberFlags  = flagsRes.ok ? flagsRes.flags    : {};
     applicants   = appRes.ok  ? appRes.applicants  : [];
@@ -1759,7 +1892,7 @@ function startShiftCreateSync() {
 // （シフト作成枠の新規作成・削除など）は対象外とし、既存の「🔄 再読み込み」に委ねる。
 async function syncShiftCreateData() {
   let res;
-  try { res = await apiGet('getShiftCreateData', {}); } catch (e) { return; }
+  try { res = await apiGet('getShiftCreateData', ymP()); } catch (e) { return; }
   if (!res || !res.ok) return;
 
   const activeTab   = (window._dateTabs || [])[activeDateIdx];
@@ -1816,7 +1949,7 @@ async function acceptSyncUpdate(bi) {
   if (!block) return;
   setLoading(true, '最新のデータを読み込み中...');
   try {
-    const res = await apiGet('getShiftCreateData', {});
+    const res = await apiGet('getShiftCreateData', ymP());
     const fresh = res && res.ok ? (res.dates || []).find(d => bKey(d) === bKey(block)) : null;
     if (fresh) {
       const key = bKey(block);
@@ -1996,6 +2129,21 @@ async function saveAll() {
 function updatePublishBtn() {
   const btn = document.getElementById('publish-btn');
   if (!btn) return;
+  // 公開（作成完了）は「公開中カレンダーの月」に対してのみ行える。別の月を表示している
+  // ときに押せてしまうと、表示中でない月のフラグを立ててしまうため操作させない
+  if (isOffPublishedMonth()) {
+    btn.textContent = '✅ シフト作成完了';
+    btn.className = 'hbtn pub';
+    btn.disabled = true;
+    btn.title = publishedYM
+      ? ('公開中カレンダーは ' + publishedYM.year + '年' + publishedYM.month + '月 です。表示中の月は公開操作できません（管理アプリで対象月の予定表を公開してください）')
+      : '公開中のカレンダーがありません。管理アプリで予定表を公開してください';
+    const openLabel0 = document.getElementById('publish-open-date');
+    if (openLabel0) { openLabel0.textContent = ''; openLabel0.style.display = 'none'; }
+    return;
+  }
+  btn.disabled = false;
+  btn.title = '';
   if (shiftPublished) {
     btn.textContent = '↩️ 作成完了を取り消す';
     btn.className = 'hbtn pub-off';
@@ -2010,7 +2158,14 @@ function updatePublishBtn() {
   }
 }
 
+// 表示中の月が「公開中カレンダーの月」と違うか（限定PW・未取得のうちは制限しない）
+function isOffPublishedMonth() {
+  if (currentPwType !== 'normal' || !ymLoaded || !curYM) return false;
+  return !isPublishedYM(curYM);
+}
+
 async function togglePublish() {
+  if (isOffPublishedMonth()) return;
   if (shiftPublished) {
     if (!confirm('シフト作成完了を取り消しますか？\n公開予定日を迎えていた場合、奉仕者はシフトを確認できなくなります。')) return;
     try {
@@ -2212,7 +2367,7 @@ async function execCreateShiftSheet() {
   if (!confirm('現在のシフトデータをバックアップし、3シートをクリアします。\n実行してもよいですか？')) return;
   setLoading(true, 'シフト作成枠を作成中...');
   try {
-    const res = await apiGet('createShiftSheet', curYM ? { year: curYM.year, month: curYM.month } : {});
+    const res = await apiGet('createShiftSheet', ymP());
     if (!res.ok) throw new Error(res.error || '失敗');
     toast('シフト作成枠を作成しました（' + (res.yearMonth || '') + '）', 's');
     createLoaded = false;

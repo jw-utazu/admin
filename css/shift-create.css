@@ -55,6 +55,16 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hbtn.pub:hover{opacity:.9;}
 .hbtn.pub-off{background:var(--amber);color:#fff;border-color:var(--amber);}
 .hbtn.pub-off:hover{opacity:.9;}
+.hbtn:disabled{opacity:.45;cursor:not-allowed;}
+.hbtn:disabled:hover{opacity:.45;}
+/* ヘッダーの対象年月セレクタ。どの月を編集中か・どの月が公開中かを常時明示する */
+.ym-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.ym-lbl{font-size:11px;font-weight:700;color:var(--ink3);white-space:nowrap;}
+.ym-sel{font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:5px 8px;cursor:pointer;}
+.ym-sel:disabled{opacity:.5;cursor:not-allowed;}
+.ym-note{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+.ym-note.ok{background:var(--green-l);color:var(--green);}
+.ym-note.warn{background:#fffbeb;color:#92400e;}
 .acc-wrap{position:relative;}
 .acc-icon{width:28px;height:28px;border-radius:50%;background:var(--purple-l);border:1px solid #ddd6fe;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;}
 .acc-icon:hover{background:#ede9fe;}

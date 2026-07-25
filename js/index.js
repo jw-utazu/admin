@@ -258,6 +258,8 @@ function updYmTitle() {
   if(el1) el1.textContent = t+' PW';
   const el2 = document.getElementById('cal-ym-label');
   if(el2) el2.textContent = t;
+  // 対象年月を動かしたら、公開中の月とのズレ表示も即座に追従させる
+  updCalPubBadge();
 }
 function updCalViewLabel() {
   const el = document.getElementById('cal-view-label');
@@ -1743,6 +1745,7 @@ async function execFormCreate(){
 // 予定表公開ステータスバッジ
 // ============================================================
 let calPubStatus = null;
+let calPubYM     = null;  // 実際に公開中のカレンダーの年月 {y,m}（公開できるのは常に1ヶ月だけ）
 
 async function loadCalPubStatus() {
   const badge = document.getElementById('cal-pub-badge');
@@ -1751,22 +1754,61 @@ async function loadCalPubStatus() {
   try {
     const r = await apiGet('getCalPubStatus');
     calPubStatus = r.published;
-    badge.className = 'cal-pub-badge ' + (r.published ? 'published' : 'unpublished');
+    calPubYM = null;
     if (r.published && r.publishedYM) {
       const [py, pm] = r.publishedYM.split('.').map(Number);
-      text.textContent = '📅 ' + py + '年' + pm + '月 公開中';
-    } else {
-      text.textContent = r.published ? '📅 公開中' : '🔒 非公開';
+      if (py && pm) calPubYM = { y: py, m: pm };
     }
+    updCalPubBadge();
   } catch(e) {
+    calPubStatus = null; calPubYM = null;
     badge.className = 'cal-pub-badge loading';
     text.textContent = '確認中...';
   }
 }
 
+// 表示中の「対象年月」と「実際に公開中の月」がズレていることが一目で分かるようにする。
+// 公開できる月は常に1つだけで、別の月を公開すると前の月は自動的に非公開になる
+function isCurMonthPublished() { return !!(calPubStatus && calPubYM && calPubYM.y === curY && calPubYM.m === curM); }
+
+function updCalPubBadge() {
+  const badge = document.getElementById('cal-pub-badge');
+  const text  = document.getElementById('cal-pub-badge-text');
+  const note  = document.getElementById('cal-pub-note');
+  if (!badge || !text) return;
+  if (calPubStatus === null) {
+    badge.className = 'cal-pub-badge loading';
+    text.textContent = '確認中...';
+    if (note) note.style.display = 'none';
+    return;
+  }
+  if (!calPubStatus || !calPubYM) {
+    badge.className = 'cal-pub-badge unpublished';
+    text.textContent = '🔒 公開中の月はありません';
+  } else if (isCurMonthPublished()) {
+    badge.className = 'cal-pub-badge published';
+    text.textContent = '📅 ' + calPubYM.y + '年' + calPubYM.m + '月 公開中';
+  } else {
+    badge.className = 'cal-pub-badge mismatch';
+    text.textContent = '⚠️ 公開中は ' + calPubYM.y + '年' + calPubYM.m + '月';
+  }
+  if (note) {
+    if (calPubStatus && calPubYM && !isCurMonthPublished()) {
+      note.innerHTML = '表示中の <b>' + curY + '年' + curM + '月</b> は未公開です。奉仕者とシフト作成アプリに出ているのは <b>'
+        + calPubYM.y + '年' + calPubYM.m + '月</b> です（公開できる月は1つだけ。この月を公開すると '
+        + calPubYM.y + '年' + calPubYM.m + '月 は自動的に非公開になります）';
+      note.style.display = '';
+    } else {
+      note.style.display = 'none';
+    }
+  }
+}
+
 async function toggleCalPub() {
   if (calPubStatus === null) return;
-  if (calPubStatus) {
+  // 表示中の月が公開中のときだけ「非公開」操作。別の月が公開中なら、
+  // 表示中の月を公開する導線（＝公開月の切り替え）にする
+  if (isCurMonthPublished()) {
     if (!confirm('予定表を非公開にしますか？\n奉仕者はカレンダー情報（日程・実施日）を確認できなくなります。')) return;
     const badge = document.getElementById('cal-pub-badge');
     const text  = document.getElementById('cal-pub-badge-text');
@@ -1774,9 +1816,8 @@ async function toggleCalPub() {
     text.textContent = '処理中...';
     try {
       await apiGet('unpublishCalendar');
-      calPubStatus = false;
-      badge.className = 'cal-pub-badge unpublished';
-      text.textContent = '🔒 非公開';
+      calPubStatus = false; calPubYM = null;
+      updCalPubBadge();
       toast('予定表を非公開にしました', 's');
     } catch(e) {
       toast('エラー: ' + e.message, 'e');
@@ -1803,6 +1844,9 @@ async function openCalPubModal(){
     <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px;">
       <span style="background:var(--blue-l);color:var(--blue);padding:3px 10px;border-radius:20px;">${curY}年${curM}月</span> のカレンダーを公開します
     </div>
+    ${calPubYM && !(calPubYM.y===curY && calPubYM.m===curM) ? `<div style="font-size:12px;line-height:1.6;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r);padding:8px 10px;margin-bottom:12px;">
+      現在は <b>${calPubYM.y}年${calPubYM.m}月</b> が公開中です。公開できる月は1つだけなので、実行すると ${calPubYM.y}年${calPubYM.m}月 は自動的に非公開になります。
+    </div>` : ''}
     <div class="fg">
       <label class="fl">受付日程・実施日</label>
       <div class="sumbox">
