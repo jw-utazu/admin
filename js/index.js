@@ -1740,38 +1740,6 @@ async function execFormCreate(){
 }
 
 // ============================================================
-// シフト公開（SHIFT_PUBLISHED フラグセットのみ）
-// ============================================================
-async function openShiftPubModal(){
-  openM('m-shift-pub');
-  document.getElementById('m-sp-body').innerHTML=`
-    <p style="font-size:13px;color:var(--ink2);line-height:1.8;">
-      シフト公開フラグ（<code>SHIFT_PUBLISHED=true</code>）をセットします。<br>
-      フォームアプリからシフト表が閲覧可能になります。
-    </p>
-    <div class="exec-st" id="sp-st"><div class="spin"></div>公開中...</div>
-    <div class="done-box" id="sp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div><div class="done-sub" id="sp-done-sub">シフト公開フラグをセットしました。</div></div>`;
-  document.getElementById('m-sp-ft').innerHTML=`
-    <button class="btn btn-g" onclick="closeM('m-shift-pub')">キャンセル</button>
-    <button class="btn btn-s" id="sp-exec-btn" onclick="execShiftPub()">公開する</button>`;
-}
-async function execShiftPub(){
-  document.getElementById('sp-exec-btn').disabled=true;
-  document.getElementById('sp-st').classList.add('show');
-  try{
-    await apiGet('publishShift',{});
-    document.getElementById('sp-st').classList.remove('show');
-    document.getElementById('sp-done').style.display='block';
-    document.getElementById('m-sp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-shift-pub')">閉じる</button>`;
-    toast('シフトを公開しました','s');
-  }catch(e){
-    document.getElementById('sp-st').classList.remove('show');
-    document.getElementById('sp-exec-btn').disabled=false;
-    toast('公開に失敗しました: '+e.message,'e');
-  }
-}
-
-// ============================================================
 // 予定表公開ステータスバッジ
 // ============================================================
 let calPubStatus = null;
@@ -3051,18 +3019,15 @@ async function loadAutoPublishSettings() {
   try {
     const r = await apiGet('getAutoPublishSettings');
     if (!r.ok) return;
-    const calChk   = document.getElementById('auto-pub-cal-chk');
-    const shiftChk = document.getElementById('auto-pub-shift-chk');
-    if (calChk)   calChk.checked   = r.calAuto;
-    if (shiftChk) shiftChk.checked = r.shiftAuto;
+    const calChk = document.getElementById('auto-pub-cal-chk');
+    if (calChk) calChk.checked = r.calAuto;
   } catch (e) { console.warn('[loadAutoPublishSettings]', e); }
 }
 
 async function onAutoPublishChange() {
-  const calAuto   = document.getElementById('auto-pub-cal-chk')?.checked   || false;
-  const shiftAuto = document.getElementById('auto-pub-shift-chk')?.checked || false;
+  const calAuto = document.getElementById('auto-pub-cal-chk')?.checked || false;
   try {
-    const r = await apiGet('setAutoPublishSettings', { calAuto, shiftAuto });
+    const r = await apiGet('setAutoPublishSettings', { calAuto });
     if (!r.ok) throw new Error(r.error);
     toast('自動公開設定を保存しました', 's');
   } catch (e) {

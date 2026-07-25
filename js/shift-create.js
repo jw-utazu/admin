@@ -19,6 +19,7 @@ let cartCounts    = {}; // UID別：当月のカート担当 配置回数（保�
 let slotAssignCounts = {}; // UID別：当月のシフト割当回数（1コマにつき1回。同一コマ内の複数行への配置はまとめて1回）
 let defaultSlot   = 15;
 let shiftPublished = false;
+let shiftOpenDate  = ''; // 公開予定日（M/D形式）。作成完了していても、この日を迎えるまで奉仕者には見えない
 let activeDateIdx = 0;
 let activeTimeIdx = 0;
 let curYM         = null;
@@ -96,6 +97,7 @@ async function loadInitData() {
       apiGet('getLimitedSlots', {})
     ]);
     shiftPublished = statusRes.ok && statusRes.published;
+    shiftOpenDate  = statusRes.ok ? (statusRes.openDate || '') : '';
     updatePublishBtn();
     pwTypeList = slotsRes.ok ? (slotsRes.slots || []) : [];
     renderPwTabsSc();
@@ -153,6 +155,7 @@ async function switchPwTypeSc(type) {
     // 公開状態は常に更新
     const statusRes = await apiGet('getShiftPublishStatus');
     shiftPublished = statusRes.ok && statusRes.published;
+    shiftOpenDate  = statusRes.ok ? (statusRes.openDate || '') : '';
     updatePublishBtn();
 
     // 表示中のタブ（分割表示なら両方）を再読み込み
@@ -1994,30 +1997,35 @@ function updatePublishBtn() {
   const btn = document.getElementById('publish-btn');
   if (!btn) return;
   if (shiftPublished) {
-    btn.textContent = '🔒 シフト非公開にする';
+    btn.textContent = '↩️ 作成完了を取り消す';
     btn.className = 'hbtn pub-off';
   } else {
-    btn.textContent = '📣 シフト公開';
+    btn.textContent = '✅ シフト作成完了';
     btn.className = 'hbtn pub';
+  }
+  const openLabel = document.getElementById('publish-open-date');
+  if (openLabel) {
+    openLabel.textContent = shiftOpenDate ? ('公開予定日: ' + shiftOpenDate) : '';
+    openLabel.style.display = shiftOpenDate ? '' : 'none';
   }
 }
 
 async function togglePublish() {
   if (shiftPublished) {
-    if (!confirm('シフトを非公開にしますか？\n非公開後はメンバーがシフトを確認できなくなります。')) return;
+    if (!confirm('シフト作成完了を取り消しますか？\n公開予定日を迎えていた場合、奉仕者はシフトを確認できなくなります。')) return;
     try {
       await apiGet('unpublishShift', {});
       shiftPublished = false;
       updatePublishBtn();
-      toast('シフトを非公開にしました', 's');
-    } catch (e) { toast('非公開化に失敗しました: ' + e.message, 'e'); }
+      toast('作成完了を取り消しました', 's');
+    } catch (e) { toast('取り消しに失敗しました: ' + e.message, 'e'); }
   } else {
     // 公開前に整合性チェックを通す。エラーが残っていればパネルを開いて
     // 内容を確認させ、そのうえで公開するかを選ばせる
     syncCurrentBlock();
     refreshValidationUI();
     if (_vResult.issues.some(x => x.level === 'error')) { openPreflight(); return; }
-    if (!confirm('シフトを公開しますか？\n公開後は全メンバーがシフトを確認できます。')) return;
+    if (!confirm('シフト作成完了にしますか？\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます（予定日を過ぎている場合は即座に公開・通知されます）。')) return;
     await doPublish();
   }
 }
@@ -2028,8 +2036,8 @@ async function doPublish() {
     await apiGet('publishShift', {});
     shiftPublished = true;
     updatePublishBtn();
-    toast('シフトを公開しました', 's');
-  } catch (e) { toast('公開に失敗しました: ' + e.message, 'e'); }
+    toast('シフト作成完了にしました', 's');
+  } catch (e) { toast('処理に失敗しました: ' + e.message, 'e'); }
 }
 
 // 左パネルリサイズ

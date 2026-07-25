@@ -44,7 +44,8 @@
       <div id="pw-tabs" style="display:none;gap:6px;align-items:center;"></div>
       <div style="flex:1;"></div>
       <a class="hbtn" href="./manual/manual-admin-shift.html" target="_blank">📖 マニュアル</a>
-      <button class="hbtn pub" id="publish-btn" onclick="togglePublish()">📣 シフト公開</button>
+      <span id="publish-open-date" style="display:none;font-size:11px;color:var(--ink3);margin-right:6px;white-space:nowrap;"></span>
+      <button class="hbtn pub" id="publish-btn" onclick="togglePublish()">✅ シフト作成完了</button>
     </div>
   </div>
 
@@ -228,7 +229,7 @@
     <div class="pf-footer" id="pf-footer"></div>
     <div class="add-form-actions" style="justify-content:space-between;">
       <button class="s-btn" onclick="closePreflight()">閉じる</button>
-      <button class="s-btn green" id="pf-publish-btn" onclick="doPublish()">📣 シフトを公開する</button>
+      <button class="s-btn green" id="pf-publish-btn" onclick="doPublish()">✅ シフト作成完了にする</button>
     </div>
   </div>
 </div>
@@ -259,6 +260,6 @@
 <script src="js/api.js?v=1"></script>
 <script src="js/validation.js?v=6"></script>
 <script src="js/picker.js?v=3"></script>
-<script src="js/shift-create.js?v=14"></script>
+<script src="js/shift-create.js?v=15"></script>
 </body>
 </html>
