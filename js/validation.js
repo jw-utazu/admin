@@ -25,6 +25,7 @@ const VRULES = {
   takeLast:    { label: '持ち帰り担当が最後のスロットに配置', level: 'warn', scope: 'live',    on: true  },
   respSlot:    { label: '責任者が開始スロットに未配置',     level: 'warn',  scope: 'live',    on: true  },
   samePlace:   { label: '同一ブロック内で場所が偏っている',  level: 'warn',  scope: 'live',    on: false },
+  sisterFixed: { label: '固定枠（一番左）に姉妹が入っている', level: 'warn', scope: 'live',    on: true  },
   respEmpty:   { label: '責任者が未設定',                   level: 'error', scope: 'publish', on: true  },
   cartNumDup:  { label: '同じカート番号の重複割当',         level: 'error', scope: 'publish', on: true  },
   notApplied:  { label: '申込のない人が配置されている',     level: 'warn',  scope: 'publish', on: true  },
@@ -117,12 +118,14 @@ function assignOf(ctx, block) {
   return ctx._ac.get(block);
 }
 
-// uid -> [{ri, li}]（同じ人が複数スロットに入るのは通常の運用）
+// uid -> [{ri, li, pi}]（同じ人が複数スロットに入るのは通常の運用）
+// pi は セル内の並び順。pi===0（一番左）は責任者・カート担当など
+// 固定的に同じ場所へ立つ人の位置として運用されている
 function blockAssign(block) {
   const map = {};
   (block.slots || []).forEach((slot, ri) => {
     (slot.places || []).forEach((uids, li) => {
-      (uids || []).forEach(uid => { if (uid) (map[uid] = map[uid] || []).push({ ri, li }); });
+      (uids || []).forEach((uid, pi) => { if (uid) (map[uid] = map[uid] || []).push({ ri, li, pi }); });
     });
   });
   return map;
@@ -202,15 +205,16 @@ function validateShift(shiftDates, ctx) {
 //   'crosspw' … 同日に他のPWで配置済み
 //   'blocked' … 同一スロット行に既にいる（物理的に不可能なので選ばせない）
 // ============================================================
-const VSTATE_ORDER = { ok: 0, consec: 1, crosspw: 2, blocked: 3 };
+const VSTATE_ORDER = { ok: 0, consec: 1, crosspw: 2, move: 3, blocked: 4 };
 const VSTATE_GROUP = {
   ok:      '候補',
   consec:  '連続配置になります ⚠',
   crosspw: '他のPWに配置済み ⚠',
+  move:    '別の場所から移動（入れ替え）',
   blocked: 'この時間に配置済み（選択不可）',
 };
 
-function buildCandidates(base, block, ri, li, ctx, current) {
+function buildCandidates(base, block, ri, li, ctx, current, pi) {
   const groups = ctx.groups || buildBlockGroups(ctx.shiftDates || [block]);
   const gi = groups[vKey(block)];
   const slot = (block.slots || [])[ri] || {};
@@ -218,9 +222,14 @@ function buildCandidates(base, block, ri, li, ctx, current) {
   const counts = ctx.assignCounts || {};
 
   // 同一スロット行にいる人を数える。自分自身の1件分は差し引く
-  const rowCount = {};
-  (slot.places || []).forEach(uids => {
-    (uids || []).forEach(u => { if (u) rowCount[u] = (rowCount[u] || 0) + 1; });
+  // あわせて「その行のどこにいるか」を控えておく（移動・入れ替えに使う）
+  const rowCount = {}, rowPos = {};
+  (slot.places || []).forEach((uids, ci) => {
+    (uids || []).forEach((u, pi) => {
+      if (!u) return;
+      rowCount[u] = (rowCount[u] || 0) + 1;
+      if (rowPos[u] === undefined) rowPos[u] = { li: ci, pi };
+    });
   });
   if (current) rowCount[current] = (rowCount[current] || 0) - 1;
 
@@ -245,9 +254,15 @@ function buildCandidates(base, block, ri, li, ctx, current) {
 
   const out = (base || []).map(a => {
     const uid = a.uid;
-    let state = 'ok', reason = '';
-    if ((rowCount[uid] || 0) > 0) { state = 'blocked'; reason = '同じ時間に配置済み'; }
-    else {
+    let state = 'ok', reason = '', at = null;
+    if ((rowCount[uid] || 0) > 0) {
+      // 同じ時間に既にいる人。重複はできないが、ここへ「移動」することはできる
+      at = rowPos[uid] || null;
+      state = (at && at.li !== li) ? 'move' : 'blocked';
+      reason = state === 'move'
+        ? `${(block.usedPlaces || [])[at.li] || '別の場所'} から移動`
+        : '同じ時間に配置済み';
+    } else {
       const ci = (ctx.conflictMap || {})[uid];
       const pw = ci ? ((ci.slotDates || {})[block.date] || []) : [];
       if (pw.length) { state = 'crosspw'; reason = pw.join('・') + 'に配置済み'; }
@@ -256,7 +271,7 @@ function buildCandidates(base, block, ri, li, ctx, current) {
     }
     const w = wishOf(ctx, uid, block.date, block.time);
     return {
-      uid, name: a.name, state, reason,
+      uid, name: a.name, state, reason, at,
       furigana: (flags[uid] || {}).furigana || '',
       gender:   (flags[uid] || {}).gender   || '',
       respFlag: !!a.respFlag, cartFlag: !!a.cartFlag,
@@ -264,12 +279,19 @@ function buildCandidates(base, block, ri, li, ctx, current) {
       cartNg:   !!(w && w.cartNg),
       note:     (w && w.note) || '',
       group:    VSTATE_GROUP[state],
+      fixedNg:  pi === 0 && (flags[uid] || {}).gender && (flags[uid] || {}).gender !== 'M',
     };
   });
 
-  // 未配置の人・割当が少ない人を上に出して、偏りを自然に是正できるようにする
+  // 未配置の人・割当が少ない人を上に出して、偏りを自然に是正できるようにする。
+  // 一番左（固定枠）の欄では兄弟を先に並べる
+  const fixedSlot = pi === 0;
   out.sort((a, b) => {
     if (VSTATE_ORDER[a.state] !== VSTATE_ORDER[b.state]) return VSTATE_ORDER[a.state] - VSTATE_ORDER[b.state];
+    if (fixedSlot) {
+      const ma = a.gender === 'M' ? 0 : 1, mb = b.gender === 'M' ? 0 : 1;
+      if (ma !== mb) return ma - mb;
+    }
     if (a.count !== b.count) return a.count - b.count;
     if (a.furigana !== b.furigana) return a.furigana < b.furigana ? -1 : 1;
     return (a.name || '') < (b.name || '') ? -1 : 1;
@@ -480,17 +502,37 @@ function validateBlock(block, ctx) {
   }
 
   // --- 同一ブロック内の場所の偏り（既定OFF） ---
-  // 責任者は同じ場所に留まる運用なので除外する。列数より入るスロット数が
-  // 多い場合は同じ場所の重複が避けられないため、その分は許容する
+  // 同じ場所に留まるのが前提の人は対象外にする：
+  //   ・セルの一番左（pi===0）に入っている人＝固定枠。責任者・カート担当は
+  //     役職の登録有無にかかわらずここに入る運用なので、位置で判定する
+  //   ・責任者・カート担当として登録されている人
+  // 列数より入るスロット数が多い場合は同じ場所の重複が避けられないため許容する
+  const fixedUids = new Set(resp.concat(bringUids(block), takeUids(block)));
   const colCount = cols.length;
   Object.entries(assign).forEach(([uid, pos]) => {
-    if (resp.includes(uid)) return;
+    if (fixedUids.has(uid)) return;
+    if (pos.some(x => x.pi === 0)) return;
     const distinct = new Set(pos.map(x => x.li)).size;
     const ideal = Math.min(pos.length, colCount);
     if (distinct < ideal) {
       push('samePlace', { uids: [uid], ri: pos[0].ri, li: pos[0].li,
         msg: `${nm(uid)} が ${pos.length} スロット入っていますが場所が ${distinct} か所です（${ideal} か所に分散できます）` });
     }
+  });
+
+  // --- 固定枠（各セルの一番左）は兄弟が入る運用 ---
+  // 見守り担当の保存先でもあり、責任者・カート担当もここに入る位置なので、
+  // 姉妹が入っている場合は知らせる（例外はありうるので警告にとどめる）
+  slots.forEach((slot, ri) => {
+    (slot.places || []).forEach((uids, li) => {
+      const uid = (uids || [])[0];
+      if (!uid) return;
+      const g = ((ctx.memberFlags || {})[uid] || {}).gender || '';
+      if (g && g !== 'M') {
+        push('sisterFixed', { uids: [uid], ri, li,
+          msg: `${nm(uid)} が固定枠（一番左）に入っています（${slot.time}／通常は兄弟）` });
+      }
+    });
   });
 
   // --- 公開前チェック：責任者未設定 ---

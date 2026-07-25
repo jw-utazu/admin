@@ -630,6 +630,8 @@ async function loadCreateData() {
     memoMap = {};
     if (shiftRes.memoMap) Object.assign(memoMap, shiftRes.memoMap);
     defaultSlot  = shiftRes.defaultSlot  || 15;
+    Object.keys(_srvSig).forEach(k => delete _srvSig[k]);
+    shiftDates.forEach(b => { _srvSig[bKey(b)] = blockSig(b); });
     recalcCounts();
     buildCreateTabs();
     buildLeftPanel();
@@ -806,6 +808,19 @@ function buildLeftPanel() {
 }
 
 function bKey(b) { return b.date + '_' + b.time; }
+
+// サーバー上の内容を表す署名。これを比較して「実際に変わったか」を判定する。
+// 時刻や場所名など表示だけの差分では警告を出さないよう、保存対象だけを対象にする
+const _srvSig = {};
+function blockSig(b) {
+  return JSON.stringify({
+    responsible: b.responsible || {},
+    cart: b.cart || {},
+    placeCart: b.placeCart || [],
+    usedPlaces: b.usedPlaces || [],
+    slots: (b.slots || []).map(s => ({ t: s.time, p: s.places || [], w: s.watch || [] })),
+  });
+}
 
 function buildBlock(block, bi) {
   const applied     = filterAppliedForSlot(block.date, block.time);
@@ -1175,17 +1190,18 @@ function openMemberPicker(el) {
   syncCurrentBlock(); // 未保存の編集も候補の判定に反映させる
   const cur  = el.dataset.value || '';
   const base = filterAppliedForSlot(block.date, block.time);
+  const pi = +el.dataset.pi;
   const cands = buildCandidates(base, block, ri, li, {
     groups: buildBlockGroups(shiftDates), shiftDates, memberFlags, conflictMap,
     assignCounts: slotAssignCounts, applicants,
-  }, cur);
+  }, cur, pi);
   // 保存済みだが今月は申込していない人（希望を取り下げた等）も、現在値なら候補に残す
   if (cur && !cands.find(c => c.uid === cur)) {
     cands.unshift({ uid: cur, name: (buildNameMap()[cur] || cur), state: 'ok', reason: '申込なし',
       group: VSTATE_GROUP.ok, count: slotAssignCounts[cur] || 0, gender: (memberFlags[cur] || {}).gender || '' });
   }
-  // 同一スロットに配置済みの人は選べないので一覧から外す。
-  // ただし「なぜ出てこないのか」が分からなくならないよう、件数だけ下に出す
+  // 同一スロットの同じ場所にいる人は選べないので一覧から外す（件数だけ下に注記）。
+  // 別の場所にいる人は「移動・入れ替え」として選べるようにする
   const blocked = cands.filter(c => c.state === 'blocked');
   const items = [{ value: '', label: '—（未選択）', html: '<span class="pk-none">—（未選択）</span>', group: '' }];
   cands.filter(c => c.state !== 'blocked').forEach(c => {
@@ -1193,9 +1209,11 @@ function openMemberPicker(el) {
                  + (c.cartFlag ? '<span class="pk-b b-k">カ</span>' : '')
                  + `<span class="pk-b b-w">割${c.count}</span>`
                  + (c.count === 0 ? '<span class="pk-b b-p">優先</span>' : '')
-                 + (c.cartNg ? '<span class="pk-b b-n">🚫カート不可</span>' : '');
+                 + (c.cartNg ? '<span class="pk-b b-n">🚫カート不可</span>' : '')
+                 + (c.fixedNg ? '<span class="pk-b b-n">⚠固定枠は通常兄弟</span>' : '');
     items.push({
       value: c.uid,
+      move: c.state === 'move',
       label: c.name,
       search: (c.name || '') + ' ' + (c.furigana || ''),
       group: c.group,
@@ -1205,25 +1223,73 @@ function openMemberPicker(el) {
     });
   });
   openPicker(el, {
-    title: `${block.time}　${block.usedPlaces[li] || '（場所未設定）'}　${(block.slots[ri] || {}).time || ''}`,
+    title: `${block.time}　${block.usedPlaces[li] || '（場所未設定）'}　${(block.slots[ri] || {}).time || ''}`
+         + (pi === 0 ? '　［固定枠］' : ''),
     search: true, value: cur, items,
-    note: blocked.length ? `この時間に配置済みの ${blocked.length} 名は表示していません` : '',
-    onPick: v => setPsValue(el, v),
+    note: blocked.length ? `同じ場所に配置済みの ${blocked.length} 名は表示していません` : '',
+    onPick: (v, it) => { if (it && it.move) movePsValue(el, v); else setPsValue(el, v); },
   });
 }
 
-function setPsValue(el, v) {
+// 見た目の差し替えだけを行う
+function setPsDom(el, v) {
   el.dataset.value = v;
   el.textContent = v ? (buildNameMap()[v] || v) : '—';
   el.classList.toggle('empty', !v);
   el.classList.remove('g-m', 'g-f');
   const g = v ? vGenderCls(v).trim() : '';
   if (g) el.classList.add(g);
-  const bi = +el.dataset.bi;
-  const ri = +el.dataset.ri, li = +el.dataset.li;
-  if (+el.dataset.pi === 0) onPs0Change(bi, ri, li);
+}
+
+// セルの途中が空いたら左へ詰める。
+// 保存時（collectBlock）は空欄を飛ばして詰めて保存するため、画面でも同じ形に
+// そろえておかないと「2番目が空白なのに3番目に人がいる」状態が見えてしまう
+function compactCell(bi, ri, li) {
+  const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
+  if (!cw) return;
+  const els = [...cw.querySelectorAll('.cs')];
+  // 1番目は固定枠。空いても2番目を繰り上げない
+  const rest = els.slice(1).map(e => e.dataset.value || '').filter(Boolean);
+  rest.sort(vByFurigana);
+  els.slice(1).forEach((e, i) => setPsDom(e, rest[i] || ''));
+  onPs0Change(bi, ri, li);
   autoWatch(bi, ri, li);
+}
+
+// 2・3番目はふりがな順にそろえる（1番目＝固定枠は対象外）
+function vByFurigana(a, b) {
+  const fa = (memberFlags[a] || {}).furigana || '', fb = (memberFlags[b] || {}).furigana || '';
+  if (fa !== fb) return fa < fb ? -1 : 1;
+  const na = (memberFlags[a] || {}).name || a, nb = (memberFlags[b] || {}).name || b;
+  return na < nb ? -1 : (na > nb ? 1 : 0);
+}
+
+// 値の差し替え（未保存フラグは呼び出し側でまとめて立てる）
+function assignPs(el, v) {
+  setPsDom(el, v);
+  compactCell(+el.dataset.bi, +el.dataset.ri, +el.dataset.li);
+}
+
+function setPsValue(el, v) {
+  assignPs(el, v);
+  mu(+el.dataset.bi);
+}
+
+// 同じ時間に既にいる人を選んだときは、重複させずに「移動」する。
+// 移動先に誰かいれば、その人が元の位置に入る（＝入れ替え）。
+// 1操作として扱うので、元に戻す（Ctrl+Z）も1回で戻る
+function movePsValue(el, uid) {
+  const bi = +el.dataset.bi, ri = +el.dataset.ri;
+  const src = [...document.querySelectorAll(`#tb-${bi} .cs`)]
+    .find(s => s !== el && +s.dataset.ri === ri && s.dataset.value === uid);
+  const prev = el.dataset.value || '';
+  // 先に移動元を空けてから入れる。移動元のセルは詰めて空白を残さない
+  if (src) { setPsDom(src, prev); compactCell(bi, ri, +src.dataset.li); }
+  assignPs(el, uid);
   mu(bi);
+  const nm = buildNameMap();
+  toast(prev && src ? `${nm[uid] || uid} と ${nm[prev] || prev} を入れ替えました`
+                    : `${nm[uid] || uid} を移動しました`, 's');
 }
 
 // 1つのセルに3名そろったら見守りを自動でONにする。
@@ -1232,8 +1298,9 @@ function autoWatch(bi, ri, li) {
   const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
   const cb = document.getElementById(`watch-${bi}-${ri}-${li}`);
   if (!cw || !cb || cb.dataset.manual === '1') return;
-  const n = [...cw.querySelectorAll('.cs')].filter(s => s.dataset.value).length;
-  if (n >= 3) { cb.disabled = false; cb.checked = true; }
+  const els = [...cw.querySelectorAll('.cs')];
+  const n = els.filter(s => s.dataset.value).length;
+  if (n >= 3 && els[0] && els[0].dataset.value) { cb.disabled = false; cb.checked = true; }
   else if (cb.checked) cb.checked = false;
 }
 
@@ -1702,11 +1769,16 @@ async function syncShiftCreateData() {
     const key = bKey(fresh);
     const idx = shiftDates.findIndex(d => bKey(d) === key);
     if (idx === -1) return; // 新規追加された枠は対象外（🔄 再読み込みで反映）
+    const sig = blockSig(fresh);
+    const changed = _srvSig[key] !== undefined && _srvSig[key] !== sig;
+    _srvSig[key] = sig;
     if (key === activeKey) {
-      if (bs[key] === false) { activeConflict = true; return; } // 未保存編集中は上書きしない
+      // 未保存の編集中でも、サーバー側の中身が変わっていなければ警告しない
+      if (bs[key] === false) { if (changed) activeConflict = true; return; }
+      if (!changed) return;
       shiftDates[idx] = fresh;
       activeChanged = true;
-    } else if (bs[key] !== false) {
+    } else if (bs[key] !== false && changed) {
       shiftDates[idx] = fresh;
     }
   });
@@ -1839,7 +1911,10 @@ function collectBlock(bi) {
       const cw = document.getElementById(`cw-${bi}-${ri}-${li}`);
       const uids = [];
       if (cw) {
-        cw.querySelectorAll('.cs').forEach(s => { if (s.dataset.value) uids.push(s.dataset.value); });
+        // 1番目（固定枠）が空のときもその位置を保つため、空欄を捨てずに集める。
+        // 末尾の空欄だけ落とす（保存側は sort に位置を書き込む）
+        cw.querySelectorAll('.cs').forEach(s => uids.push(s.dataset.value || ''));
+        while (uids.length && !uids[uids.length - 1]) uids.pop();
       } else {
         ((slot.places || [])[li] || []).forEach(u => { if (u) uids.push(u); });
       }
@@ -1861,7 +1936,11 @@ async function saveBlock(bi) {
   if (st) { st.style.display = ''; st.textContent = '保存中...'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
   try {
     const data = collectBlock(bi);
-    await apiGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots });
+    const res = await apiGet('saveShiftBlock', { date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots });
+    // 自分の保存でタイムスタンプが動くため、基準値を取り直して
+    // 自分の変更が「他の管理者の更新」として跳ね返らないようにする
+    if (res && res.lastUpdated) _scKnownTs = res.lastUpdated;
+    _srvSig[key] = blockSig(data);
     block.responsible = data.responsible;
     block.cart = data.cart;
     block.slots = data.slots;

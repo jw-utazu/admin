@@ -10,7 +10,7 @@
 //   opts.multi    複数選択（トグル）にするか
 //   opts.items    [{ value, label, html, sub, disabled, group, selected }]
 //   opts.value    単一選択時の現在値／複数選択時は配列
-//   opts.onPick   (value) => void   単一選択で確定したとき
+//   opts.onPick   (value, item) => void  単一選択で確定したとき
 //   opts.onToggle (values[]) => void 複数選択で変わったとき（都度呼ぶ）
 //   opts.onClose  () => void
 //
@@ -130,7 +130,7 @@ function _pkChoose(it) {
     const cb = _pkOpts.onPick;
     const v = it.value;
     closePicker();
-    if (cb) cb(v);
+    if (cb) cb(v, it);
   }
 }
 
