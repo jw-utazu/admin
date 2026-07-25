@@ -7,13 +7,11 @@ let applicants    = [];
 let shiftDates    = [];
 let locations     = [];
 let cartNumbers   = [];
-let cartPresets   = [];
 let conflictMap   = {}; // uid -> { hasLimitedApply|hasNormalApply: dates[], hasLimitedSlot|hasNormalSlot: dates[] }
-// 設定タブ（タブ3）専用：タブ2「シフト作成」のlocations/cartNumbers/cartPresets（年月で絞り込まれた値）とは
+// 設定タブ（タブ3）専用：タブ2「シフト作成」の locations / cartNumbers（年月で絞り込まれた値）とは
 // 完全に分離し、設定タブを開いている間はタブ2側の再読み込みに影響されないようにする
 let settingsLocations    = [];
 let settingsCartNumbers  = [];
-let settingsCartPresets  = [];
 let settingsVRules       = {};  // 検証ルールの上書き設定 { ruleId: {on, level} }
 let memoMap       = {};
 let respCounts    = {}; // UID別：当月の責任者 配置回数（保存済みデータのみ反映）
@@ -628,7 +626,6 @@ async function loadCreateData() {
     shiftDates   = shiftRes.ok ? shiftRes.dates    : [];
     locations    = shiftRes.locations    || [];
     cartNumbers  = shiftRes.cartNumbers  || [];
-    cartPresets  = shiftRes.cartPresets  || [];
     conflictMap  = shiftRes.conflictMap  || {};
     memoMap = {};
     if (shiftRes.memoMap) Object.assign(memoMap, shiftRes.memoMap);
@@ -2008,14 +2005,13 @@ document.getElementById('lpResize').addEventListener('mousedown', e => {
 async function loadSettingsData() {
   setLoading(true, '設定を読み込み中...');
   try {
-    const [lr, cr, pr, sr, vr] = await Promise.all([apiGet('getLocations', {}), apiGet('getCartNumbers'), apiGet('getCartPresets'), apiGet('getDefaultSlot'), apiGet('getValidationRules', {}).catch(() => ({ ok: false }))]);
+    const [lr, cr, sr, vr] = await Promise.all([apiGet('getLocations', {}), apiGet('getCartNumbers'), apiGet('getDefaultSlot'), apiGet('getValidationRules', {}).catch(() => ({ ok: false }))]);
     settingsVRules = vr.ok ? (vr.rules || {}) : {};
     setValidationConfig(settingsVRules);
     settingsLocations    = lr.ok ? lr.locations    : [];
     settingsCartNumbers  = cr.ok ? cr.cartNumbers  : [];
-    settingsCartPresets  = pr.ok ? pr.cartPresets  : [];
     defaultSlot  = sr.ok ? sr.defaultSlot  : 15;
-    renderLocationList(); renderCartTags(); renderCartPresets(); renderValidationRules();
+    renderLocationList(); renderCartTags(); renderValidationRules();
     const sel = document.getElementById('default-slot-sel'); if (sel) sel.value = String(defaultSlot);
     settingsLoaded = true; setLoading(false);
   } catch (e) { setLoading(false); toast('設定読み込みエラー: ' + e.message, 'e'); }
@@ -2118,24 +2114,6 @@ async function saveCartNumbers() {
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
-function renderCartPresets() {
-  const el = document.getElementById('cart-preset-list');
-  if (!el) return;
-  el.innerHTML = settingsCartPresets.map((p, i) =>
-    `<span class="tag">${esc(p)}<button class="del-t" onclick="deleteCartPreset(${i})">×</button></span>`).join('');
-}
-function addCartPreset() {
-  const v = document.getElementById('new-cart-preset').value.trim();
-  if (!v) return;
-  if (settingsCartPresets.includes(v)) { toast('すでに追加されています', 'e'); return; }
-  settingsCartPresets.push(v); renderCartPresets();
-  document.getElementById('new-cart-preset').value = '';
-}
-function deleteCartPreset(i) { settingsCartPresets.splice(i, 1); renderCartPresets(); }
-async function saveCartPresets() {
-  try { await apiGet('saveCartPresets', { cartPresets: settingsCartPresets }); toast('カートプリセットを保存しました', 's'); createLoaded = false; }
-  catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
-}
 
 async function saveDefaultSlot() {
   const v = parseInt(document.getElementById('default-slot-sel').value);
