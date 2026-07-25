@@ -862,7 +862,7 @@ function buildCartArea(bi, cart, cartMembers) {
   }
   function nSel(id, val, dis) {
     const opts = numOpts.replace(`value="${esc(val)}"`, `value="${esc(val)}" selected`);
-    return `<select class="cart-num" id="${id}"${dis ? ' disabled' : ''}>${opts}</select>`;
+    return `<select class="cart-num" id="${id}"${dis ? ' disabled' : ''} onchange="mu(${bi})">${opts}</select>`;
   }
   const { ki1='', kc1='', ki2='', kc2='', ko1='', oc1='', ko2='', oc2='' } = cart;
   return `<div class="cart-area"><div class="area-title cart-title">カート担当者（最大各2名・空白可）</div>
