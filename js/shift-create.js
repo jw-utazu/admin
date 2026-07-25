@@ -28,8 +28,10 @@ let settingsLoaded = false;
 const bs = {};
 window._blockCols = {};
 let _scKnownTs   = null; // シフト作成データのリアルタイム同期用（最終更新タイムスタンプ）
+let _scKnownWishTs = null; // シフト希望データのリアルタイム同期用（最終更新タイムスタンプ）
 let _scPollTimer = null;
 let _scPollListening = false;
+let wishLoaded   = false;
 
 // ===== オートセーブ =====
 const _saveTimers    = {}; // bKey -> setTimeoutのid（デバウンス待ち）
@@ -142,6 +144,9 @@ async function switchPwTypeSc(type) {
   Object.keys(_savePending).forEach(k => delete _savePending[k]);
   Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
   window._blockCols = {};
+  // 更新監視のタイムスタンプは pw_type ごとに別キーなので基準を取り直す
+  _scKnownTs = null;
+  _scKnownWishTs = null;
 
   const label = type === 'normal' ? '通常PW' : (pwTypeList.find(s => s.id === type)?.name || '限定PW');
   setLoading(true, label + ' のデータを読み込み中...');
@@ -359,6 +364,12 @@ async function loadWishDataInternal() {
   if (!res.members || res.members.length === 0 || !res.slots || res.slots.length === 0) {
     document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">データがありません。<br>シフト希望シートが作成されているか確認してください。</div>';
   } else { buildWishTable(res, shiftRes.ok ? shiftRes : null); }
+  wishLoaded = true;
+  // 取得直後にローカルの shiftDates（未保存の編集を含む）で割当表示を上書きする
+  if (createLoaded) refreshWishAssign();
+  // 直前に自分で再読み込みした内容を「他者の変更」として再検知しないよう基準を取り直す
+  _scKnownWishTs = null;
+  if (!_scPollTimer) startShiftCreateSync();
 }
 function buildAssignmentMap(shiftRes) {
   const map = {};
@@ -377,6 +388,42 @@ function buildAssignmentMap(shiftRes) {
   });
   return map;
 }
+function wishCellClass(applied, isAssigned) {
+  if (applied) return isAssigned ? 'cell-data cell-on' : 'cell-data';
+  return isAssigned ? 'cell-data cell-on' : 'cell-data cell-off';
+}
+function wishCellInner(applied, isAssigned, hasComment) {
+  if (!applied && !isAssigned) return '';
+  return `<span class="check-mark">〇</span>${applied && hasComment ? '<span class="note-mark">📝</span>' : ''}`;
+}
+
+// シフト作成側の割当が変わったときに、希望確認テーブルの「割当」列と紫セル（cell-on）だけを
+// 差分更新する。テーブル全体を作り直さないのでスクロール位置が保たれ、分割表示中でも軽い。
+// 参照するのはローカルの shiftDates なので、未保存の編集もそのまま反映される。
+function refreshWishAssign() {
+  const tbl = document.querySelector('#wish-table-wrap table.wish-tbl');
+  if (!tbl) return;
+  const assignMap = buildAssignmentMap({ dates: shiftDates });
+  const counts = {};
+  tbl.querySelectorAll('td[data-slot]').forEach(td => {
+    const uid = td.dataset.uid, slot = td.dataset.slot;
+    const isAssigned = !!(assignMap[uid] && assignMap[uid].has(slot));
+    if (isAssigned) counts[uid] = (counts[uid] || 0) + 1;
+    const applied = td.dataset.applied === '1';
+    const cls = wishCellClass(applied, isAssigned);
+    if (td.className !== cls) td.className = cls;
+    // 申込ありのセルは〇と📝が常に出ているため中身の書き換えは不要
+    if (!applied) {
+      const inner = wishCellInner(false, isAssigned, false);
+      if (td.innerHTML !== inner) td.innerHTML = inner;
+    }
+  });
+  tbl.querySelectorAll('td[data-assign-total]').forEach(td => {
+    const n = String(counts[td.dataset.assignTotal] || 0);
+    if (td.textContent !== n) td.textContent = n;
+  });
+}
+
 function buildWishTable(data, shiftRes) {
   const { members, slots, matrix } = data;
   const assignMap = buildAssignmentMap(shiftRes);
@@ -443,19 +490,14 @@ function buildWishTable(data, shiftRes) {
     sortedSlots.forEach(slot => {
       const val = row[slot];
       const isAssigned = !!(assignMap[m.uid] && assignMap[m.uid].has(slot));
-      if (val) {
-        const hc = typeof val === 'object' && val.comment;
-        const tdClass = isAssigned ? 'cell-data cell-on' : 'cell-data';
-        const comment = hc ? val.comment : '';
-        html += `<td class="${tdClass}" style="cursor:pointer;" onclick="openWishEdit('${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',true,'${esc(comment)}',${isAssigned})"><span class="check-mark">〇</span>${hc ? '<span class="note-mark">📝</span>' : ''}</td>`;
-      } else if (isAssigned) {
-        html += `<td class="cell-data cell-on" style="cursor:pointer;" onclick="openWishEdit('${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',false,'',true)"><span class="check-mark">〇</span></td>`;
-      } else {
-        html += `<td class="cell-data cell-off" style="cursor:pointer;" onclick="openWishEdit('${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',false,'',false)"></td>`;
-      }
+      const hc = typeof val === 'object' && val.comment;
+      const comment = hc ? val.comment : '';
+      // data-uid / data-slot / data-applied は refreshWishAssign() の差分更新用
+      const dataAttr = `data-uid="${esc(m.uid)}" data-slot="${esc(slot)}" data-applied="${val ? 1 : 0}"`;
+      html += `<td class="${wishCellClass(!!val, isAssigned)}" style="cursor:pointer;" ${dataAttr} onclick="openWishEdit(this,'${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',${val ? 'true' : 'false'},'${esc(comment)}')">${wishCellInner(!!val, isAssigned, !!hc)}</td>`;
     });
     html += `<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${totalSlots[m.uid] || 0}</td>`;
-    html += `<td class="cell-data" style="position:sticky;right:0;background:var(--purple-l);font-weight:700;color:var(--purple);z-index:2;">${totalAssigned[m.uid] || 0}</td>`;
+    html += `<td class="cell-data" data-assign-total="${esc(m.uid)}" style="position:sticky;right:0;background:var(--purple-l);font-weight:700;color:var(--purple);z-index:2;">${totalAssigned[m.uid] || 0}</td>`;
     html += '</tr>';
   });
 
@@ -481,7 +523,10 @@ function buildWishTable(data, shiftRes) {
 }
 // 参加希望 編集モーダル（希望確認タブのセルクリックで開く）
 let wishEditCtx = null;
-function openWishEdit(uid, name, slot, applied, comment, isAssigned) {
+// 割当状態（isAssigned）はセルの class から読み取る。refreshWishAssign() が
+// onclick 属性を書き換えずに済むようにするため
+function openWishEdit(el, uid, name, slot, applied, comment) {
+  const isAssigned = !!(el && el.classList.contains('cell-on'));
   wishEditCtx = { uid, name, slot, applied, isAssigned };
   document.getElementById('we-title').textContent = name + '｜' + slot;
   document.getElementById('we-comment').value = comment || '';
@@ -519,7 +564,27 @@ async function submitWishChange(applied) {
     closeWishEditModal();
     toast('更新しました', 's');
     await loadWishDataInternal();
+    await refreshApplicantsForCreate();
   } catch (e) { toast('保存エラー: ' + e.message, 'e'); } finally { setLoading(false); }
+}
+
+// 希望（申込）が変わったら、シフト作成側の申込者リスト・バッジ・セレクトの候補者を作り直す。
+// 編集中のDOMは syncCurrentBlock() で shiftDates に書き戻してから再描画するので失われない。
+async function refreshApplicantsForCreate() {
+  if (!createLoaded) return;
+  try {
+    const res = await apiGet('getApplicants', {});
+    if (!res || !res.ok) return;
+    applicants = res.applicants || [];
+    syncCurrentBlock();
+    recalcCounts();
+    buildLeftPanel();
+    // 未保存の編集がある間は作り直さない（入力中のフォーカスが飛ぶため）。
+    // セレクトの候補者は次のブロック切り替え時に更新される
+    const tab = (window._dateTabs || [])[activeDateIdx];
+    const block = tab ? shiftDates.filter(d => d.date === tab.date)[activeTimeIdx] : null;
+    if (!block || bs[bKey(block)] !== false) renderBlock();
+  } catch (e) { console.warn('[refreshApplicantsForCreate]', e); }
 }
 function toggleWishApplied() { if (wishEditCtx) submitWishChange(!wishEditCtx.applied); }
 function saveWishComment()   { submitWishChange(true); }
@@ -564,6 +629,7 @@ async function loadCreateData() {
     recalcCounts();
     buildCreateTabs();
     buildLeftPanel();
+    refreshWishAssign();
     if (shiftDates.length > 0) { activeDateIdx = 0; activeTimeIdx = 0; buildTimeTabs(); }
     else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「🗂 シフト作成準備」を実行してください。</div>'; }
     createLoaded = true;
@@ -624,7 +690,13 @@ function renderBlock() {
     return;
   }
   document.getElementById('main-content').innerHTML = buildBlock(block, activeTimeIdx);
-  if (bs[bKey(block)]) markSaved(activeTimeIdx);
+  const key = bKey(block);
+  if (bs[key]) markSaved(activeTimeIdx);
+  else if (bs[key] === false) {
+    // 未保存のまま作り直した場合はステータス表示も復元する
+    const st = document.getElementById('st-' + activeTimeIdx);
+    if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; }
+  }
   ug();
 }
 
@@ -670,6 +742,8 @@ function buildLeftPanel() {
   // その時間帯に申込がある人のみ
   const applied = filterAppliedForSlot(tab.date, blockTime);
   const notApplied = applicants.filter(a => !applied.find(b => b.uid === a.uid));
+  // mu() から毎回呼ばれるため、「未申込」セクションの開閉状態を再描画で失わないようにする
+  const naOpen = !!document.querySelector('#lp-members .lp-sec-toggle.open');
 
   document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）' + (blockTime ? ' ' + blockTime : '');
   document.getElementById('lp-count').textContent = applied.length;
@@ -718,8 +792,8 @@ function buildLeftPanel() {
     return `<div class="mr-wrap"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}${badgeR}</div><div class="lp-badge-col">${badgeK}${badgeW}</div></div></div>${commentHtml}</div>`;
   }).join('');
   if (notApplied.length > 0) {
-    html += `<div class="lp-sec lp-sec-toggle" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
-    html += `<div class="lp-not-applied" style="display:none;">`;
+    html += `<div class="lp-sec lp-sec-toggle${naOpen ? ' open' : ''}" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
+    html += `<div class="lp-not-applied" style="display:${naOpen ? '' : 'none'};">`;
     html += notApplied.map(a => `<div class="mr-wrap"><div class="mr"><div class="m-dot d-off"></div><div class="m-name off">${esc(a.name)}</div></div></div>`).join('');
     html += `</div>`;
   }
@@ -1025,6 +1099,14 @@ function mu(bi) {
   if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
   ug();
   scheduleAutoSave(bi);
+  // 左メニューのバッジ・割当ドットと希望タブの割当表示を、保存完了を待たずに即時反映する。
+  // buildLeftPanel / refreshWishAssign は main-content を触らないので入力中のフォーカスは失われない
+  if (bi === activeTimeIdx) {
+    syncCurrentBlock();
+    recalcCounts();
+    buildLeftPanel();
+    refreshWishAssign();
+  }
 }
 
 // ============================================================
@@ -1101,24 +1183,47 @@ async function reloadCreateData() {
 // shift_updated_at_<pw_type> を更新する。それを軽量エンドポイント getShiftLastUpdated で
 // 定期チェックし、変化があればブロック単位でマージする（表示中ブロックが未保存編集中の
 // 場合は上書きせず競合バナーを出す）。バックエンドは shift-form/js/app.js の
-// checkShiftUpdate と同じ仕組みを流用しており、追加のAPI・DB変更はない。
+// checkShiftUpdate と同じ仕組みを流用している。
+// 希望（shift_wishes）側は touchWish() が wish_updated_at_<pw_type> を更新し、
+// 同じエンドポイントの wishUpdated で返ってくる。変化があれば希望確認タブと
+// 申込者リストだけを再取得する（シフト作成側のブロックには触れない）。
 // ============================================================
 async function checkShiftCreateUpdate() {
-  if (!createLoaded) return;
+  if (!createLoaded && !wishLoaded) return;
   try {
     const res = await apiGet('getShiftLastUpdated');
     if (!res || !res.ok) return;
-    if (_scKnownTs === null) { _scKnownTs = res.lastUpdated; return; }
-    if (res.lastUpdated !== _scKnownTs) {
+    const wishTs = res.wishUpdated || '';
+    // 初回（または再読み込み直後）は基準値を控えるだけで同期処理は走らせない
+    if (_scKnownTs === null) _scKnownTs = res.lastUpdated;
+    else if (createLoaded && res.lastUpdated !== _scKnownTs) {
       _scKnownTs = res.lastUpdated;
       await syncShiftCreateData();
     }
+    if (_scKnownWishTs === null) _scKnownWishTs = wishTs;
+    else if (wishLoaded && wishTs !== _scKnownWishTs) {
+      _scKnownWishTs = wishTs;
+      await syncWishData();
+    }
   } catch (e) { console.warn('[checkShiftCreateUpdate]', e); }
+}
+
+// 他の管理者の希望編集・奉仕者のシフト希望提出を反映する。
+// シフト作成側で編集中の内容は syncCurrentBlock() 経由で保持される
+async function syncWishData() {
+  const outer = document.querySelector('#wish-table-wrap .wish-snap-outer');
+  const sx = outer ? outer.scrollLeft : 0, sy = outer ? outer.scrollTop : 0;
+  try { await loadWishDataInternal(); } catch (e) { console.warn('[syncWishData]', e); return; }
+  const o2 = document.querySelector('#wish-table-wrap .wish-snap-outer');
+  if (o2) { o2.scrollLeft = sx; o2.scrollTop = sy; }
+  await refreshApplicantsForCreate();
+  toast('シフト希望の変更を反映しました', 's');
 }
 
 function startShiftCreateSync() {
   clearInterval(_scPollTimer);
   _scKnownTs = null;
+  _scKnownWishTs = null;
   _scPollTimer = setInterval(checkShiftCreateUpdate, 10000);
   if (!_scPollListening) {
     _scPollListening = true;
@@ -1159,6 +1264,7 @@ async function syncShiftCreateData() {
   defaultSlot = res.defaultSlot || defaultSlot;
   recalcCounts();
   buildLeftPanel();
+  refreshWishAssign();
 
   if (activeConflict) showSyncConflictBanner(activeTimeIdx);
   else if (activeChanged) { renderBlock(); toast('他の管理者の変更を反映しました', 's'); }
@@ -1187,6 +1293,7 @@ async function acceptSyncUpdate(bi) {
       if (_saveTimers[key]) { clearTimeout(_saveTimers[key]); delete _saveTimers[key]; }
       recalcCounts();
       buildLeftPanel();
+      refreshWishAssign();
       renderBlock();
     }
   } catch (e) { toast('読み込みエラー: ' + e.message, 'e'); }
@@ -1288,6 +1395,7 @@ async function saveBlock(bi) {
     recalcCounts();
     bs[key] = true; _saveRetried[key] = false; markSaved(bi); ug();
     buildLeftPanel();
+    refreshWishAssign();
   } catch (e) {
     bs[key] = false;
     if (st) {
