@@ -32,9 +32,11 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .lo-msg{font-size:13px;color:var(--ink2);}
 
 /* HEADER */
-/* タブ下の線を出さないため border-bottom も box-shadow も持たせない
-   （影が1pxの下線に見えるため）。下の .main-tabs との境目は背景色の差で示す */
-.hdr{background:var(--surface);flex-shrink:0;z-index:100;}
+/* 下線はアクティブタブの下端が乗る基準線。タブは margin-bottom:-1px と
+   白い下辺、両脇のカーブでこの線を覆い隠すので、タブの下だけ線が途切れて
+   「タブが線の上に乗っている」形になる。
+   box-shadow は持たせない（線の下にぼけた帯が出てタブとの接合が濁るため） */
+.hdr{background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:100;}
 .hdr-row1{height:44px;display:flex;align-items:center;padding:0 14px;gap:10px;}
 .hdr-row2{height:36px;display:flex;align-items:center;padding:0 14px;gap:8px;border-top:1px solid var(--border);background:var(--surface2);}
 .hdr-logo{width:28px;height:28px;border-radius:7px;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;}
