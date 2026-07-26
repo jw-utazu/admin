@@ -490,3 +490,18 @@ body.dnd-on *{cursor:grabbing !important;}
   font-size:11px;font-weight:700;white-space:nowrap;background:var(--red);color:#fff;
   box-shadow:0 4px 14px rgba(0,0,0,.25);}
 .dnd-msg.warn{background:var(--amber);}
+
+/* 希望編集モーダルの備考（選択式）。奉仕者フォームと同じ文言を組み立てる */
+.we-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);cursor:pointer;}
+.we-check input{margin:0;}
+.we-chips{display:flex;flex-wrap:wrap;gap:5px;}
+.we-chip{font-size:11px;font-weight:700;font-family:var(--sans);padding:5px 9px;border:1px solid var(--border2);border-radius:999px;background:var(--surface);color:var(--ink2);cursor:pointer;}
+.we-chip.on{border-color:var(--green);background:var(--green-l);color:var(--green);}
+.we-detail{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;}
+.we-sel-item{display:flex;align-items:center;gap:4px;}
+.we-sel{font-size:12px;font-family:var(--sans);padding:5px 6px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--ink);}
+.we-sel:focus{outline:none;border-color:var(--green);}
+.we-sel-suffix{font-size:11px;color:var(--ink3);}
+.we-warn{font-size:11px;font-weight:700;color:var(--red);margin-top:6px;}
+.we-other{width:100%;margin-top:8px;font-size:12px;font-family:var(--sans);padding:6px;border:1px solid var(--border2);border-radius:var(--r);resize:vertical;min-height:48px;}
+.we-other:focus{outline:none;border-color:var(--green);}

@@ -632,7 +632,8 @@ function buildWishTable(data, shiftRes) {
       const val = row[slot];
       const isAssigned = !!(assignMap[uid] && assignMap[uid].has(slot));
       const hc = typeof val === 'object' && val.comment;
-      const comment = hc ? val.comment : '';
+      // onclick に埋めるので改行は \n のままでは JS 文字列が切れる。エスケープしてから渡す
+      const comment = hc ? String(val.comment).replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n') : '';
       // data-uid / data-slot / data-applied は refreshWishAssign() の差分更新用
       const dataAttr = `data-uid="${esc(uid)}" data-slot="${esc(slot)}" data-applied="${val ? 1 : 0}"`;
       r += `<td class="${wishCellClass(!!val, isAssigned)}" style="cursor:pointer;" ${dataAttr} onclick="openWishEdit(this,'${esc(uid)}','${esc(name)}','${esc(slot)}',${val ? 'true' : 'false'},'${esc(comment)}')">${wishCellInner(!!val, isAssigned, !!hc)}</td>`;
@@ -674,11 +675,126 @@ function buildWishTable(data, shiftRes) {
 let wishEditCtx = null;
 // 割当状態（isAssigned）はセルの class から読み取る。refreshWishAssign() が
 // onclick 属性を書き換えずに済むようにするため
+// ===== 希望編集モーダルの備考（選択式） =====
+// 奉仕者フォーム（shift-form/js/app.js）と同じ文言を作る。
+// ここで自由入力を許すと表記がずれ、validation.js の判定から漏れるため、
+// 時刻の入る備考はすべて選択で組み立てる。
+const WE_NOTE_TYPES = [
+  { key: 'none',    label: 'なし' },
+  { key: 'late',    label: '遅れて参加' },
+  { key: 'early',   label: '早めに退出' },
+  { key: 'partial', label: '一部のみ' },
+  { key: 'other',   label: 'その他' }
+];
+function weMin(s) { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s)); return m ? (+m[1]) * 60 + (+m[2]) : -1; }
+function weParseNote(s) {
+  s = (s || '').trim();
+  if (!s) return { type: 'none', from: '', to: '', text: '' };
+  let m = s.match(/^(\d{1,2}:\d{2})\s*[〜~]\s*(\d{1,2}:\d{2})のみ参加$/);
+  if (m && weMin(m[1]) < weMin(m[2])) return { type: 'partial', from: m[1], to: m[2], text: '' };
+  m = s.match(/^(\d{1,2}:\d{2})から参加$/);
+  if (m) return { type: 'late', from: m[1], to: '', text: '' };
+  m = s.match(/^(\d{1,2}:\d{2})まで参加$/);
+  if (m) return { type: 'early', from: '', to: m[1], text: '' };
+  return { type: 'other', from: '', to: '', text: s };   // 旧・自由入力はここに入る
+}
+function weBuildNote(st) {
+  if (st.type === 'late')    return st.from ? st.from + 'から参加' : '';
+  if (st.type === 'early')   return st.to   ? st.to   + 'まで参加' : '';
+  if (st.type === 'partial') return (st.from && st.to && weMin(st.from) < weMin(st.to))
+    ? st.from + '〜' + st.to + 'のみ参加' : '';
+  if (st.type === 'other')   return (st.text || '').trim();
+  return '';
+}
+// スロットの区切り時間はシフト作成データから引く（未読込なら15分）
+function weInterval(slot) {
+  const si = slot.indexOf(' ');
+  const dk = si >= 0 ? slot.slice(0, si) : slot;
+  const pp = dk.indexOf('(');
+  const date = pp >= 0 ? dk.slice(0, pp) : dk;
+  const time = si >= 0 ? slot.slice(si + 1) : '';
+  const b = (shiftDates || []).find(d => d.date === date && d.time === time);
+  return (b && b.interval) || 15;
+}
+function weTimeOptions(slot) {
+  const si = slot.indexOf(' ');
+  const m = String(si >= 0 ? slot.slice(si + 1) : '').match(/(\d{1,2}):(\d{2})\s*[~〜]\s*(\d{1,2}):(\d{2})/);
+  if (!m) return [];
+  const step = weInterval(slot);
+  const st = (+m[1]) * 60 + (+m[2]), en = (+m[3]) * 60 + (+m[4]);
+  const out = [];
+  for (let t = st + step; t < en; t += step) out.push(Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'));
+  return out;
+}
+function weNormalize(st, opts) {
+  if (st.type !== 'partial') return st;
+  if (st.from && (opts.indexOf(st.from) < 0 || st.from === opts[opts.length - 1])) st.from = '';
+  if (st.to && (opts.indexOf(st.to) < 0 || (st.from && weMin(st.to) <= weMin(st.from)))) st.to = '';
+  return st;
+}
+function weRenderNote(st) {
+  const box  = document.getElementById('we-note');
+  const opts = weTimeOptions(wishEditCtx ? wishEditCtx.slot : '');
+  weNormalize(st, opts);
+  const types = WE_NOTE_TYPES.filter(t =>
+    t.key === 'none' || t.key === 'other' || (t.key === 'partial' ? opts.length >= 2 : opts.length >= 1));
+  const sel = (which, cur, suffix, list) =>
+    '<span class="we-sel-item"><select class="we-sel" data-which="' + which + '" onchange="weOnInput(this)">'
+    + '<option value="">--:--</option>'
+    + list.map(o => '<option value="' + o + '"' + (o === cur ? ' selected' : '') + '>' + o + '</option>').join('')
+    + '</select><span class="we-sel-suffix">' + suffix + '</span></span>';
+  const showFrom = st.type === 'late'  || st.type === 'partial';
+  const showTo   = st.type === 'early' || st.type === 'partial';
+  const fromList = st.type === 'partial' ? opts.slice(0, -1) : opts;
+  const toList   = st.type !== 'partial' ? opts
+                 : (st.from ? opts.filter(o => weMin(o) > weMin(st.from)) : opts.slice(1));
+  box.dataset.ntype = st.type; box.dataset.nfrom = st.from || ''; box.dataset.nto = st.to || '';
+  box.innerHTML =
+      '<div class="we-chips">' + types.map(t =>
+        '<button type="button" class="we-chip' + (st.type === t.key ? ' on' : '') + '"'
+        + ' data-type="' + t.key + '" onclick="weSetType(this)">' + t.label + '</button>').join('') + '</div>'
+    + (showFrom || showTo
+        ? '<div class="we-detail">'
+          + (showFrom ? sel('from', st.from, st.type === 'partial' ? '〜' : 'から参加', fromList) : '')
+          + (showTo   ? sel('to',   st.to,   st.type === 'partial' ? 'のみ参加' : 'まで参加', toList) : '')
+          + '</div>'
+        : '')
+    + (st.type === 'partial' && st.from && !st.to
+        ? '<div class="we-warn">終了時刻も選んでください（未選択だと備考は保存されません）</div>' : '')
+    + (st.type === 'other'
+        ? '<textarea class="we-other" maxlength="50" placeholder="その他の連絡事項（50字まで）">' + esc(st.text || '') + '</textarea>'
+        : '');
+}
+function weReadState() {
+  const box = document.getElementById('we-note');
+  const ta  = box.querySelector('.we-other');
+  return { type: box.dataset.ntype || 'none', from: box.dataset.nfrom || '',
+           to: box.dataset.nto || '', text: ta ? ta.value : '' };
+}
+function weSetType(el) {
+  const st = weReadState();
+  st.type = el.dataset.type;
+  if (st.type === 'late')  st.to   = '';
+  if (st.type === 'early') st.from = '';
+  if (st.type === 'none')  { st.from = ''; st.to = ''; }
+  if (st.type !== 'other') st.text = '';
+  weRenderNote(st);
+  if (st.type === 'other') { const ta = document.querySelector('#we-note .we-other'); if (ta) ta.focus(); }
+}
+function weOnInput(el) {
+  const box = document.getElementById('we-note');
+  box.dataset[el.dataset.which === 'from' ? 'nfrom' : 'nto'] = el.value;
+  if (box.dataset.ntype === 'partial') weRenderNote(weReadState());
+}
+
 function openWishEdit(el, uid, name, slot, applied, comment) {
   const isAssigned = !!(el && el.classList.contains('cell-on'));
   wishEditCtx = { uid, name, slot, applied, isAssigned };
   document.getElementById('we-title').textContent = name + '｜' + slot;
-  document.getElementById('we-comment').value = comment || '';
+  // comment は「カート不可」と備考が改行で連結された文字列（保存側と同じ規則）
+  const raw = comment || '';
+  document.getElementById('we-cartng').checked = raw.includes('カート不可');
+  weRenderNote(weParseNote(raw.replace('カート不可', '').trim()));
   const toggleBtn = document.getElementById('we-toggle-btn');
   const saveBtn   = document.getElementById('we-save-btn');
   if (applied) {
@@ -702,7 +818,10 @@ async function submitWishChange(applied) {
   const si   = ctx.slot.indexOf(' ');
   const date = si >= 0 ? ctx.slot.slice(0, si) : ctx.slot;
   const time = si >= 0 ? ctx.slot.slice(si + 1) : '';
-  const comment = document.getElementById('we-comment').value;
+  // 保存形式は奉仕者フォームと同じ（1行目にカート不可、2行目に備考）
+  const note = weBuildNote(weReadState());
+  let comment = document.getElementById('we-cartng').checked ? 'カート不可' : '';
+  if (note) comment += (comment ? '\n' : '') + note;
   setLoading(true, '保存中...');
   try {
     const res = await apiGet('adminSetWish', ymP({
