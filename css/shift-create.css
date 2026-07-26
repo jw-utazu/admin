@@ -237,8 +237,11 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .ra-label{font-size:11px;font-weight:700;color:#c2410c;white-space:nowrap;}
 .cart-area{padding:8px 12px;border-bottom:1px solid var(--border);background:var(--green-l);}
 .cart-title{color:var(--green-d);}
-.cart-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.cart-tbl th,.cart-tbl td{border:1px solid var(--green3);padding:5px 7px;text-align:center;vertical-align:middle;}
+/* table-layout:fixed で「持ち込み」「持ち帰り」の4列を必ず等幅にする
+   （auto だと氏名の長さで左右の入力欄の幅がずれる）。狭い画面では
+   .tbl-wrap の横スクロールに任せるため min-width を持たせる */
+.cart-tbl{width:100%;min-width:430px;table-layout:fixed;border-collapse:collapse;font-size:12px;}
+.cart-tbl th,.cart-tbl td{border:1px solid var(--green3);padding:5px 7px;text-align:center;vertical-align:middle;overflow:hidden;}
 .cart-tbl thead th{background:var(--green4);color:var(--green-d);font-weight:700;}
 .cart-tbl .row-lbl{background:var(--green-l);font-weight:700;color:var(--green-d);text-align:left;font-size:11px;white-space:nowrap;width:90px;}
 .tbl-wrap{overflow-x:auto;}
