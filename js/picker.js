@@ -33,23 +33,41 @@ function _pkBuild() {
               + '<div class="pk-note"></div>';
   document.body.appendChild(d);
   d.querySelector('.pk-x').addEventListener('click', () => closePicker());
-  d.addEventListener('mousedown', e => e.stopPropagation());
+  d.addEventListener('pointerdown', e => e.stopPropagation());
   d.querySelector('.pk-search').addEventListener('input', () => _pkRender());
   d.querySelector('.pk-search').addEventListener('keydown', _pkKey);
   _pkEl = d;
   return d;
 }
 
-// 外側クリック・ESC・スクロールで閉じる
-document.addEventListener('mousedown', e => {
+// タブレット（指操作）かどうか。検索欄の自動フォーカスの可否に使う
+const _pkCoarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
+// 外側をタップ／クリック・ESC で閉じる
+// mousedown ではなく pointerdown を見る。Android では mousedown が
+// 指を離したあとに遅れて合成されるため、閉じる判定が実際の操作とずれる
+document.addEventListener('pointerdown', e => {
   if (!_pkEl || !_pkEl.classList.contains('on')) return;
+  if (_pkEl.contains(e.target)) return;
   if (_pkAnchor && _pkAnchor.contains(e.target)) return;
   closePicker();
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && _pkEl && _pkEl.classList.contains('on')) { e.stopPropagation(); closePicker(); }
 });
-window.addEventListener('resize', () => closePicker());
+
+// Android でソフトキーボードが開くと resize が起きる。
+// ここで閉じてしまうと「開いた瞬間に消える」ように見えるので、閉じずに位置だけ直す。
+// 画面の向きを変えたときだけは、位置の前提が崩れるので閉じる
+let _pkRT = null;
+function _pkReposition() {
+  if (!_pkEl || !_pkEl.classList.contains('on') || !_pkAnchor) return;
+  clearTimeout(_pkRT);
+  _pkRT = setTimeout(() => { if (_pkAnchor) _pkPosition(_pkAnchor); }, 60);
+}
+window.addEventListener('resize', _pkReposition);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', _pkReposition);
+window.addEventListener('orientationchange', () => closePicker());
 
 function openPicker(anchorEl, opts) {
   const el = _pkBuild();
@@ -67,7 +85,10 @@ function openPicker(anchorEl, opts) {
   el.classList.add('on');
   _pkRender();
   _pkPosition(anchorEl);
-  if (_pkOpts.search) setTimeout(() => s.focus(), 0);
+  // 指操作の端末では自動フォーカスしない。
+  // 開いた直後にソフトキーボードが立ち上がって候補一覧が隠れてしまうため、
+  // 検索したいときだけ利用者に検索欄を触ってもらう
+  if (_pkOpts.search && !_pkCoarse) setTimeout(() => s.focus(), 0);
 }
 
 function closePicker() {
@@ -80,14 +101,20 @@ function closePicker() {
 }
 
 // アンカーの下に出す。画面からはみ出すときは上・左にずらす
+// はみ出しの判定には visualViewport を使う。ソフトキーボードが出ている間は
+// innerHeight が変わらないため、それだけを見るとキーボードの下に隠れてしまう
 function _pkPosition(anchorEl) {
   const el = _pkEl, r = anchorEl.getBoundingClientRect();
+  const vv = window.visualViewport;
+  const vw = vv ? vv.width : window.innerWidth;
+  const vh = vv ? vv.height : window.innerHeight;
+  const ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
   el.style.visibility = 'hidden';
   el.style.left = '0px'; el.style.top = '0px';
   const w = el.offsetWidth, h = el.offsetHeight;
   let left = r.left, top = r.bottom + 4;
-  if (left + w > window.innerWidth - 8)  left = Math.max(8, window.innerWidth - w - 8);
-  if (top + h > window.innerHeight - 8)  top = Math.max(8, r.top - h - 4);
+  if (left + w > ox + vw - 8)  left = Math.max(ox + 8, ox + vw - w - 8);
+  if (top + h > oy + vh - 8)   top = Math.max(oy + 8, r.top - h - 4);
   el.style.left = left + 'px';
   el.style.top  = top + 'px';
   el.style.visibility = '';
