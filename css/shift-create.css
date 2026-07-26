@@ -32,7 +32,9 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .lo-msg{font-size:13px;color:var(--ink2);}
 
 /* HEADER */
-.hdr{background:var(--surface);flex-shrink:0;box-shadow:var(--sh);z-index:100;}
+/* タブ下の線を出さないため border-bottom も box-shadow も持たせない
+   （影が1pxの下線に見えるため）。下の .main-tabs との境目は背景色の差で示す */
+.hdr{background:var(--surface);flex-shrink:0;z-index:100;}
 .hdr-row1{height:44px;display:flex;align-items:center;padding:0 14px;gap:10px;}
 .hdr-row2{height:36px;display:flex;align-items:center;padding:0 14px;gap:8px;border-top:1px solid var(--border);background:var(--surface2);}
 .hdr-logo{width:28px;height:28px;border-radius:7px;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;}
@@ -40,13 +42,20 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .hbtn:hover{background:var(--bg);}
 /* PW 切替タブ（フォルダタブ風） */
-#pw-tabs{align-self:stretch;align-items:flex-end;gap:6px;}
+#pw-tabs{align-self:stretch;align-items:flex-end;gap:8px;}
 .pw-tab-sc{position:relative;margin-bottom:4px;padding:4px 14px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;transition:background .15s,color .15s;}
 .pw-tab-sc:hover:not(.on):not(:disabled){background:var(--bg);color:var(--ink);}
 /* アクティブ：上だけ角丸（非アクティブと同じ var(--r)）、下辺を消して下のコンテンツとつなげる。
    上端のカラーラインは border-top で引く（細い擬似要素だと border-radius が
    帯の高さまで縮められて角が丸く見えない。border ならタブの角丸に沿う） */
 .pw-tab-sc.on{margin-bottom:-1px;padding:4px 15px 6px;border-radius:var(--r) var(--r) 0 0;background:var(--surface);color:var(--purple);border:1px solid var(--border2);border-top:3px solid var(--purple);border-bottom-color:var(--surface);z-index:1;}
+/* アクティブタブ下端の外向きカーブ（ブラウザのタブ形）。両脇に 8px の擬似要素を置き、
+   放射グラデーションで「四角から左上（右は右上）の 1/4 円をくり抜いた形」を描く。
+   ※ 幅は #pw-tabs の gap 以下にすること。超えると隣のタブに乗る */
+.pw-tab-sc.on::before,
+.pw-tab-sc.on::after{content:'';position:absolute;bottom:0;width:5px;height:5px;pointer-events:none;}
+.pw-tab-sc.on::before{left:-5px;background:radial-gradient(circle at 0 0,transparent 4.2px,var(--border2) 4.4px,var(--border2) 4.9px,var(--surface) 5.1px);}
+.pw-tab-sc.on::after{right:-5px;background:radial-gradient(circle at 100% 0,transparent 4.2px,var(--border2) 4.4px,var(--border2) 4.9px,var(--surface) 5.1px);}
 /* 場所列の追加・削除 */
 .tbl-wrap{position:relative;}
 .col-del-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--ink3);padding:2px 3px;border-radius:3px;flex-shrink:0;line-height:1.2;font-family:var(--sans);}
