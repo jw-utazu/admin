@@ -29,23 +29,41 @@ let _dndClickBlock = 0;  // この時刻まではクリックを無視する（�
 
 function dndActive() { return !!(_dnd && _dnd.started); }
 
+// 左メニューで、押した点がどの奉仕者の行かを決める。
+// 名前の文字だけでなく行のどこを押しても掴めるように、要素の親子関係だけに頼らず
+// 押した Y 座標がどの行の範囲に入るかでも判定する（丸印・バッジ・行の余白・
+// 行間の境界線のように、名前と別の要素の上を押しても同じ行として扱う）
+function dndMemberRow(e) {
+  const direct = e.target.closest && e.target.closest('#lp-members .mr-wrap[data-uid]');
+  if (direct) return direct;
+  const lp = document.getElementById('lp-members');
+  if (!lp || !lp.contains(e.target)) return null;
+  return [...lp.querySelectorAll('.mr-wrap[data-uid]')].find(r => {
+    const b = r.getBoundingClientRect();
+    return e.clientY >= b.top && e.clientY <= b.bottom;
+  }) || null;
+}
+
 // ===== 開始 =====
 document.addEventListener('pointerdown', e => {
   if (e.button !== undefined && e.button !== 0) return;
   const cs = e.target.closest && e.target.closest('.cs');
-  const mr = e.target.closest && e.target.closest('#lp-members .mr-wrap');
-  let uid = '', name = '', fromEl = null;
+  const mr = dndMemberRow(e);
+  let uid = '', name = '', fromEl = null, srcEl = null;
 
   if (cs && cs.dataset.value) {
-    uid = cs.dataset.value; name = cs.textContent; fromEl = cs;
-  } else if (mr && mr.dataset.uid) {
-    uid = mr.dataset.uid; name = mr.dataset.name || '';
+    uid = cs.dataset.value; name = cs.textContent; fromEl = cs; srcEl = cs;
+  } else if (mr) {
+    uid = mr.dataset.uid; name = mr.dataset.name || ''; srcEl = mr;
   } else return;
 
-  _dnd = { uid, name, fromEl, ghost: null, started: false, x: e.clientX, y: e.clientY,
+  _dnd = { uid, name, fromEl, srcEl, ghost: null, started: false, x: e.clientX, y: e.clientY,
            holdTimer: null, scrollTimer: null, pointerType: e.pointerType, pointerId: e.pointerId };
   // タッチは長押しで開始（すぐ始めるとスクロールできなくなる）
   if (e.pointerType === 'touch') {
+    // 押したことが指で分かるように、掴む対象をすぐ薄く光らせる。
+    // 「長押ししたのに無反応」なのか「掴む対象を外している」のかを見分けられる
+    srcEl.classList.add('dnd-press');
     _dnd.holdTimer = setTimeout(() => { if (_dnd) dndStart(_dnd.lx ?? e.clientX, _dnd.ly ?? e.clientY); }, DND_HOLD_MS);
   }
 }, true);
@@ -288,8 +306,8 @@ function dndCancel() {
   if (_dnd.ghost) _dnd.ghost.remove();
   if (_dnd.msgEl) _dnd.msgEl.remove();
   document.body.classList.remove('dnd-on');
-  document.querySelectorAll('.dnd-over,.dnd-swap,.dnd-ng,.dnd-warn').forEach(el =>
-    el.classList.remove('dnd-over', 'dnd-swap', 'dnd-ng', 'dnd-warn'));
+  document.querySelectorAll('.dnd-over,.dnd-swap,.dnd-ng,.dnd-warn,.dnd-press').forEach(el =>
+    el.classList.remove('dnd-over', 'dnd-swap', 'dnd-ng', 'dnd-warn', 'dnd-press'));
   _dnd = null;
 }
 

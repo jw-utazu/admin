@@ -392,6 +392,8 @@ body.dnd-on *{cursor:grabbing !important;}
 #lp-members .mr-wrap{cursor:grab;}
 .cs{cursor:grab;}
 .cs:active{cursor:grabbing;}
+/* 指で押している間の反応。長押しが効いていないのか、掴む対象を外しているのかが分かる */
+#lp-members .mr-wrap.dnd-press,.cs.dnd-press{background:var(--purple-l);}
 /* 移動＝セル全体、入れ替え＝相手だけ を光らせて、どちらになるか指を離す前に分かるようにする */
 .cell-w.dnd-over{outline:2px solid var(--green);outline-offset:-2px;background:var(--green-l) !important;}
 .cs.dnd-swap{outline:2px solid var(--purple);outline-offset:1px;background:var(--purple-l);}
