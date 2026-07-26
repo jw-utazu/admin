@@ -175,16 +175,30 @@ function dndHitTest(x, y) {
 
   const cs = el.closest('.cs');
   if (cs === _dnd.fromEl) return null;   // つかんだ場所に戻しただけ
-  if (cs) return cs.dataset.value ? { kind: 'swap', el: cs } : { kind: 'move', el: cs };
+  if (cs) {
+    if (!cs.dataset.value) return { kind: 'move', el: cs };
+    // 左メニューからの配置には「元の位置」が無く、入れ替えが成立しない。
+    // そのまま置くと元からいた人が消えるので、同じセルの空き位置へ回す
+    if (!_dnd.fromEl) return dndFreeInCell(cs.closest('.cell-w'), _dnd.uid);
+    return { kind: 'swap', el: cs };
+  }
 
   const cell = el.closest('.cell-w');
   if (cell) {
     // 同じセルの中で位置を変えても意味がないので何もしない
     if (_dnd.fromEl && cell.contains(_dnd.fromEl)) return null;
-    const free = [...cell.querySelectorAll('.cs')].find(s => !s.dataset.value);
-    return free ? { kind: 'move', el: free } : { kind: 'full', el: cell };
+    return dndFreeInCell(cell, _dnd.uid);
   }
   return null;
+}
+
+// セル内の空き位置を返す。姉妹は1番目（固定枠）に入れないので後ろの空きを優先する
+function dndFreeInCell(cell, uid) {
+  if (!cell) return null;
+  const frees = [...cell.querySelectorAll('.cs')].filter(s => !s.dataset.value);
+  if (frees.length === 0) return { kind: 'full', el: cell };
+  const free = frees.find(s => !(+s.dataset.pi === 0 && dndIsSister(uid))) || frees[0];
+  return { kind: 'move', el: free };
 }
 
 function dndHighlight(hit) {
