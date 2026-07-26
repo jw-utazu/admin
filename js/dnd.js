@@ -76,6 +76,10 @@ function dndStart(x, y) {
   // 表が描き直されたりした瞬間に move/up が届かなくなる
   try { document.documentElement.setPointerCapture(_dnd.pointerId); } catch (_) {}
   if (_dnd.pointerType === 'touch' && navigator.vibrate) navigator.vibrate(15);
+  // 掴んでいる本人を光らせたまま運ぶ。どの人を持っているかがゴーストだけでなく
+  // 元の位置でも分かる。マウスはここで初めて付ける（pointerdown で付けると
+  // ピッカーを開くだけのクリックでも一瞬光ってしまう）
+  _dnd.srcEl.classList.add('dnd-press');
   document.body.classList.add('dnd-on');
   const g = document.createElement('div');
   g.className = 'dnd-ghost';
