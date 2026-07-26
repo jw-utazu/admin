@@ -470,7 +470,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
    border-radius が帯の高さまで縮められて角が丸く見えないが、border なら
    タブ自身の角丸に沿って左右の枠へつながる */
 .pw-type-tab.active{
-  margin-bottom:-1px;padding:6px 17px 9px;border-radius:18px 18px 0 0;
+  margin-bottom:-1px;padding:6px 15px 9px;border-radius:14px 14px 0 0;
   background:var(--surface);color:var(--purple);
   border:1px solid var(--border2);border-top:3px solid var(--purple);
   border-bottom-color:var(--surface);z-index:1;

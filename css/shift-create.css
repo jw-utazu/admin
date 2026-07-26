@@ -46,7 +46,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 /* アクティブ：上だけ大きく角丸、下辺を消して下のコンテンツとつなげる。
    上端のカラーラインは border-top で引く（細い擬似要素だと border-radius が
    帯の高さまで縮められて角が丸く見えない。border ならタブの角丸に沿う） */
-.pw-tab-sc.on{margin-bottom:-1px;padding:4px 17px 6px;border-radius:18px 18px 0 0;background:var(--surface);color:var(--purple);border:1px solid var(--border2);border-top:3px solid var(--purple);border-bottom-color:var(--surface);z-index:1;}
+.pw-tab-sc.on{margin-bottom:-1px;padding:4px 15px 6px;border-radius:14px 14px 0 0;background:var(--surface);color:var(--purple);border:1px solid var(--border2);border-top:3px solid var(--purple);border-bottom-color:var(--surface);z-index:1;}
 /* 場所列の追加・削除 */
 .tbl-wrap{position:relative;}
 .col-del-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--ink3);padding:2px 3px;border-radius:3px;flex-shrink:0;line-height:1.2;font-family:var(--sans);}
