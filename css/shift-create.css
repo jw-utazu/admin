@@ -55,6 +55,11 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hbtn.pub:hover{opacity:.9;}
 .hbtn.pub-off{background:var(--amber);color:#fff;border-color:var(--amber);}
 .hbtn.pub-off:hover{opacity:.9;}
+/* 確認者用：確認完了（青）と差し戻し（赤） */
+.hbtn.appr{background:var(--blue);color:#fff;border-color:var(--blue);}
+.hbtn.appr:hover{opacity:.9;}
+.hbtn.rej{background:var(--red-l);color:var(--red);border-color:var(--red);}
+.hbtn.rej:hover{opacity:.85;}
 .hbtn:disabled{opacity:.45;cursor:not-allowed;}
 .hbtn:disabled:hover{opacity:.45;}
 /* ヘッダーの対象年月セレクタ。どの月を編集中か・どの月が公開中かを常時明示する */

@@ -2795,6 +2795,7 @@ function renderMemberList() {
           ${m.isResponsible ? '<span class="role-badge rb-resp">責任者</span>' : ''}
           ${m.isCart        ? '<span class="role-badge rb-cart">カート</span>' : ''}
           ${m.isAdmin       ? '<span class="role-badge rb-admin">管理者</span>' : ''}
+          ${m.isShiftApprover ? '<span class="role-badge rb-appr">確認者</span>' : ''}
           ${m.isAccountant  ? '<span class="role-badge rb-acct">会計者</span>' : ''}
         </div>
         <div style="display:flex;gap:6px;">
@@ -2884,8 +2885,11 @@ function buildMemberForm(m, isOwner) {
           <label style="display:flex;align-items:center;gap:5px;font-size:13px;${isOwner ? 'cursor:pointer;' : 'opacity:.6;'}">
             <input type="checkbox" id="mf-acct" ${m?.isAccountant ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> 会計者
           </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;${isOwner ? 'cursor:pointer;' : 'opacity:.6;'}">
+            <input type="checkbox" id="mf-approver" ${m?.isShiftApprover ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> シフト確認者
+          </label>
         </div>
-        ${isOwner ? '<div style="font-size:11px;color:var(--ink3);">※ 権限は先に付与できますが、本人がログインできるのはメールアドレス登録後です。</div>' : ''}
+        ${isOwner ? '<div style="font-size:11px;color:var(--ink3);line-height:1.6;">※ 権限は先に付与できますが、本人がログインできるのはメールアドレス登録後です。<br>※ 「シフト確認者」は管理者権限が前提です。作成担当者が「シフト作成完了」にした後、確認者全員が「確認完了」にするまで奉仕者へ公開されません。</div>' : ''}
       </div>
       ${isEdit ? `
       <div class="mf-row">
@@ -2918,6 +2922,7 @@ async function saveMemberForm(isEdit, isOwner) {
   const isCart   = document.getElementById('mf-cart')?.checked || false;
   const isAdmin  = document.getElementById('mf-admin')?.checked || false;
   const isAcct   = document.getElementById('mf-acct')?.checked || false;
+  const isAppr   = document.getElementById('mf-approver')?.checked || false;
   const validVal = document.querySelector('input[name="mf-valid"]:checked')?.value;
   const valid    = validVal !== undefined ? validVal === '1' : true;
 
@@ -2943,6 +2948,7 @@ async function saveMemberForm(isEdit, isOwner) {
         isCart: isCart ? '1' : '',
         isAdmin: isAdmin ? '1' : '',
         isAccountant: isAcct ? '1' : '',
+        isShiftApprover: isAppr ? '1' : '',
         valid: valid ? '1' : '0',
         isOwner: isOwner ? '1' : '',
         adminUid, adminName
@@ -2954,6 +2960,7 @@ async function saveMemberForm(isEdit, isOwner) {
         isCart: isCart ? '1' : '',
         isAdmin: isAdmin ? '1' : '',
         isAccountant: isAcct ? '1' : '',
+        isShiftApprover: isAppr ? '1' : '',
         isOwner: isOwner ? '1' : '',
         adminUid, adminName
       });

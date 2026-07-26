@@ -20,6 +20,13 @@ let slotAssignCounts = {}; // UID別：当月のシフト割当回数（1コマ�
 let defaultSlot   = 15;
 let shiftPublished = false;
 let shiftOpenDate  = ''; // 公開予定日（M/D形式）。作成完了していても、この日を迎えるまで奉仕者には見えない
+// シフトの確認（承認）状況。確認者（メンバー管理で「確認者」に指定された管理者）全員が
+// 確認完了にするまで奉仕者へは公開されない。required=0 なら確認者未登録＝確認不要
+let shiftApproval = {
+  approvers: [], required: 0, approvedCount: 0,
+  isApprover: false, approvedByMe: false, approvedAll: false, notified: false,
+  doneByName: '', rejected: null
+};
 let activeDateIdx = 0;
 let activeTimeIdx = 0;
 let curYM         = null;  // 編集中の年月（ヘッダーの対象年月セレクタで切り替える）
@@ -103,13 +110,11 @@ async function loadInitData() {
   try {
     const [, statusRes, slotsRes] = await Promise.all([
       loadWishDataInternal(),
-      apiGet('getShiftPublishStatus'),
+      fetchPublishStatus(),
       apiGet('getLimitedSlots', {}),
       loadYmList()
     ]);
-    shiftPublished = statusRes.ok && statusRes.published;
-    shiftOpenDate  = statusRes.ok ? (statusRes.openDate || '') : '';
-    updatePublishBtn();
+    applyPublishStatus(statusRes);
     pwTypeList = slotsRes.ok ? (slotsRes.slots || []) : [];
     renderPwTabsSc();
     setLoading(false);
@@ -281,10 +286,8 @@ async function switchPwTypeSc(type) {
   setLoading(true, label + ' のデータを読み込み中...');
   try {
     // 公開状態・対象年月の候補は常に更新
-    const [statusRes] = await Promise.all([apiGet('getShiftPublishStatus'), loadYmList()]);
-    shiftPublished = statusRes.ok && statusRes.published;
-    shiftOpenDate  = statusRes.ok ? (statusRes.openDate || '') : '';
-    updatePublishBtn();
+    const [statusRes] = await Promise.all([fetchPublishStatus(), loadYmList()]);
+    applyPublishStatus(statusRes);
 
     // 表示中のタブ（分割表示なら両方）を再読み込み
     const wishOn     = splitMode || document.getElementById('tab-wish').classList.contains('on');
@@ -1849,9 +1852,18 @@ function openPreflight() {
     + `<div class="pf-rules">${esc(ruleNames.join('／'))}</div></details>`;
 
   const pubBtn = document.getElementById('pf-publish-btn');
-  pubBtn.style.display = shiftPublished ? 'none' : '';
-  pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま公開する' : '📣 シフトを公開する';
-  pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
+  // 確認者は「確認完了」、作成担当者は「作成完了」をこのパネルからも実行できる
+  if (shiftApproval.isApprover) {
+    pubBtn.style.display = (shiftPublished && !shiftApproval.approvedByMe) ? '' : 'none';
+    pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま確認完了にする' : '☑️ 確認完了にする';
+    pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
+    pubBtn.onclick = () => { closePreflight(); approveShift(true); };
+  } else {
+    pubBtn.style.display = shiftPublished ? 'none' : '';
+    pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま公開する' : '📣 シフトを公開する';
+    pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
+    pubBtn.onclick = () => doPublish();
+  }
   document.getElementById('preflight-modal').classList.add('on');
 }
 function closePreflight() { document.getElementById('preflight-modal').classList.remove('on'); }
@@ -1952,9 +1964,12 @@ async function checkShiftCreateUpdate() {
     const wishTs = res.wishUpdated || '';
     // 初回（または再読み込み直後）は基準値を控えるだけで同期処理は走らせない
     if (_scKnownTs === null) _scKnownTs = res.lastUpdated;
-    else if (createLoaded && res.lastUpdated !== _scKnownTs) {
+    else if (res.lastUpdated !== _scKnownTs) {
       _scKnownTs = res.lastUpdated;
-      await syncShiftCreateData();
+      // 作成完了・確認完了・差し戻しも touchShift でタイムスタンプを動かすため、
+      // 他の係の操作を待たずにヘッダーの確認状況を追随させる
+      applyPublishStatus(await fetchPublishStatus());
+      if (createLoaded) await syncShiftCreateData();
     }
     if (_scKnownWishTs === null) _scKnownWishTs = wishTs;
     else if (wishLoaded && wishTs !== _scKnownWishTs) {
@@ -2224,9 +2239,39 @@ async function saveAll() {
   toast('すべて保存しました', 's');
 }
 
+// 公開状態＋確認状況を取得する（確認者かどうかの判定にログイン中の管理者UIDが必要）
+function fetchPublishStatus() {
+  return apiGet('getShiftPublishStatus', {
+    adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
+  });
+}
+
+function applyPublishStatus(res) {
+  if (!res || !res.ok) return;
+  shiftPublished = !!res.published;
+  shiftOpenDate  = res.openDate || '';
+  shiftApproval = {
+    approvers:   res.approvers || [],
+    required:    res.required || 0,
+    approvedCount: res.approvedCount || 0,
+    isApprover:  !!res.isApprover,
+    approvedByMe: !!res.approvedByMe,
+    approvedAll: !!res.approvedAll,
+    notified:    !!res.notified,
+    doneByName:  res.doneByName || '',
+    rejected:    res.rejected || null
+  };
+  updatePublishBtn();
+}
+
 function updatePublishBtn() {
   const btn = document.getElementById('publish-btn');
   if (!btn) return;
+  const rejBtn    = document.getElementById('reject-btn');
+  const apprLabel = document.getElementById('publish-approval');
+  const openLabel = document.getElementById('publish-open-date');
+  const hide = el => { if (el) { el.textContent = ''; el.style.display = 'none'; } };
+
   // 公開（作成完了）は「公開中カレンダーの月」に対してのみ行える。別の月を表示している
   // ときに押せてしまうと、表示中でない月のフラグを立ててしまうため操作させない
   if (isOffPublishedMonth()) {
@@ -2236,20 +2281,69 @@ function updatePublishBtn() {
     btn.title = publishedYM
       ? ('公開中カレンダーは ' + publishedYM.year + '年' + publishedYM.month + '月 です。表示中の月は公開操作できません（管理アプリで対象月の予定表を公開してください）')
       : '公開中のカレンダーがありません。管理アプリで予定表を公開してください';
-    const openLabel0 = document.getElementById('publish-open-date');
-    if (openLabel0) { openLabel0.textContent = ''; openLabel0.style.display = 'none'; }
+    hide(openLabel);
+    hide(apprLabel);
+    if (rejBtn) rejBtn.style.display = 'none';
     return;
   }
+
+  const a = shiftApproval;
   btn.disabled = false;
   btn.title = '';
-  if (shiftPublished) {
-    btn.textContent = '↩️ 作成完了を取り消す';
-    btn.className = 'hbtn pub-off';
+
+  if (a.isApprover) {
+    // 確認者：作成完了を押すのは作成担当者。確認者は「確認完了」と「差し戻し」だけを行う
+    if (!shiftPublished) {
+      btn.textContent = '☑️ 確認完了にする';
+      btn.className = 'hbtn appr';
+      btn.disabled = true;
+      btn.title = '作成担当者が「シフト作成完了」にすると確認できます';
+    } else if (a.approvedByMe) {
+      btn.textContent = '✅ 確認済み';
+      btn.className = 'hbtn appr';
+      btn.disabled = true;
+      btn.title = 'あなたの確認は完了しています';
+    } else {
+      btn.textContent = '☑️ 確認完了にする';
+      btn.className = 'hbtn appr';
+      btn.title = 'シフト内容を確認し、公開を承認します';
+    }
+    if (rejBtn) {
+      rejBtn.style.display = shiftPublished ? '' : 'none';
+      rejBtn.className = 'hbtn rej';
+      rejBtn.title = '作成完了を取り消して作成担当者に修正を依頼します';
+    }
   } else {
-    btn.textContent = '✅ シフト作成完了';
-    btn.className = 'hbtn pub';
+    // 作成担当者（およびオーナー）
+    if (rejBtn) rejBtn.style.display = 'none';
+    if (shiftPublished) {
+      btn.textContent = '↩️ 作成完了を取り消す';
+      btn.className = 'hbtn pub-off';
+    } else {
+      btn.textContent = '✅ シフト作成完了';
+      btn.className = 'hbtn pub';
+    }
   }
-  const openLabel = document.getElementById('publish-open-date');
+
+  // 確認状況・差し戻し状況の表示
+  if (apprLabel) {
+    if (a.rejected && !shiftPublished) {
+      apprLabel.textContent = '⚠️ 差し戻し（' + (a.rejected.by || '確認者') + ' ' + (a.rejected.at || '') + '）';
+      apprLabel.style.color = 'var(--red)';
+      apprLabel.title = a.rejected.note ? '理由: ' + a.rejected.note : '理由の記入はありません';
+      apprLabel.style.display = '';
+    } else if (a.required > 0 && shiftPublished) {
+      const detail = a.approvers.map(x => (x.approved ? '✅ ' : '⬜ ') + x.name + (x.at ? '（' + x.at + '）' : '')).join('\n');
+      apprLabel.textContent = a.approvedAll
+        ? ('✅ 確認完了 ' + a.approvedCount + '/' + a.required + (a.notified ? '・公開済み' : ''))
+        : ('⏳ 確認 ' + a.approvedCount + '/' + a.required);
+      apprLabel.style.color = a.approvedAll ? 'var(--green)' : 'var(--amber)';
+      apprLabel.title = '確認状況\n' + detail;
+      apprLabel.style.display = '';
+    } else {
+      hide(apprLabel);
+    }
+  }
   if (openLabel) {
     openLabel.textContent = shiftOpenDate ? ('公開予定日: ' + shiftOpenDate) : '';
     openLabel.style.display = shiftOpenDate ? '' : 'none';
@@ -2262,14 +2356,23 @@ function isOffPublishedMonth() {
   return !isPublishedYM(curYM);
 }
 
+// ヘッダーの1つのボタンが、押した人の役割で意味を変える：
+//   確認者（メンバー管理で「確認者」に指定された管理者） … 確認完了
+//   それ以外の管理者（作成担当者）                       … 作成完了 / 取り消し
 async function togglePublish() {
   if (isOffPublishedMonth()) return;
+  if (shiftApproval.isApprover) { await approveShift(); return; }
+
   if (shiftPublished) {
-    if (!confirm('シフト作成完了を取り消しますか？\n公開予定日を迎えていた場合、奉仕者はシフトを確認できなくなります。')) return;
+    const msg = shiftApproval.required > 0
+      ? 'シフト作成完了を取り消しますか？\n確認者の確認記録もリセットされ、次に作成完了にしたとき改めて確認が必要になります。'
+      : 'シフト作成完了を取り消しますか？\n公開予定日を迎えていた場合、奉仕者はシフトを確認できなくなります。';
+    if (!confirm(msg)) return;
     try {
-      await apiGet('unpublishShift', {});
-      shiftPublished = false;
-      updatePublishBtn();
+      await apiGet('unpublishShift', {
+        adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
+      });
+      applyPublishStatus(await fetchPublishStatus());
       toast('作成完了を取り消しました', 's');
     } catch (e) { toast('取り消しに失敗しました: ' + e.message, 'e'); }
   } else {
@@ -2278,19 +2381,82 @@ async function togglePublish() {
     syncCurrentBlock();
     refreshValidationUI();
     if (_vResult.issues.some(x => x.level === 'error')) { openPreflight(); return; }
-    if (!confirm('シフト作成完了にしますか？\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます（予定日を過ぎている場合は即座に公開・通知されます）。')) return;
+    const names = shiftApproval.approvers.map(x => x.name).join('・');
+    const msg = shiftApproval.required > 0
+      ? ('シフト作成完了にしますか？\n確認者（' + names + '）に確認依頼の通知が送られます。\n全員の確認が完了し、公開予定日を迎えると奉仕者へ自動的に公開・通知されます。')
+      : 'シフト作成完了にしますか？\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます（予定日を過ぎている場合は即座に公開・通知されます）。';
+    if (!confirm(msg)) return;
     await doPublish();
   }
 }
 
 async function doPublish() {
   closePreflight();
+  setLoading(true, 'シフトを作成完了にしています...');
   try {
-    await apiGet('publishShift', {});
-    shiftPublished = true;
-    updatePublishBtn();
-    toast('シフト作成完了にしました', 's');
+    const res = await apiGet('publishShift', {
+      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
+    });
+    applyPublishStatus(await fetchPublishStatus());
+    toast(res && res.approvalRequired
+      ? 'シフト作成完了にしました。確認者へ確認依頼を送信しました'
+      : 'シフト作成完了にしました', 's');
   } catch (e) { toast('処理に失敗しました: ' + e.message, 'e'); }
+  finally { setLoading(false); }
+}
+
+// 確認者が押す「確認完了」。force=true は公開前チェックパネルから承認する場合
+// （既にエラー内容を一覧で確認済みなのでチェックで止めない）
+async function approveShift(force) {
+  if (!shiftPublished) return;
+  if (shiftApproval.approvedByMe) return;
+  // 確認者にも整合性チェックの結果を見せてから承認させる
+  if (!force) {
+    syncCurrentBlock();
+    refreshValidationUI();
+    if (_vResult.issues.some(x => x.level === 'error')) {
+      toast('エラーの指摘が残っています。内容を確認してください', 'e');
+      openPreflight();
+      return;
+    }
+  }
+  const rest = Math.max(0, shiftApproval.required - shiftApproval.approvedCount - 1);
+  if (!confirm('シフト内容を確認しました（確認完了）にしますか？\n' + (rest > 0
+    ? '残り ' + rest + ' 名の確認が完了すると公開できる状態になります。'
+    : 'あなたの確認で全員そろいます。公開予定日を迎えると奉仕者へ自動的に公開・通知されます。'))) return;
+  setLoading(true, '確認完了として登録しています...');
+  try {
+    const res = await apiGet('approveShift', {
+      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
+    });
+    if (!res.ok) throw new Error(res.error || '登録に失敗しました');
+    applyPublishStatus(await fetchPublishStatus());
+    toast(res.allApproved
+      ? (res.published ? '確認が揃い、奉仕者へ公開しました' : '確認が揃いました。公開予定日に自動公開されます')
+      : '確認完了にしました（あと ' + Math.max(0, (res.approval?.required || 0) - (res.approval?.approvedCount || 0)) + ' 名）', 's');
+  } catch (e) { toast('確認完了にできませんでした: ' + e.message, 'e'); }
+  finally { setLoading(false); }
+}
+
+// 確認者が押す「差し戻す」。作成完了を取り消して作成担当者へ通知する
+async function rejectShift() {
+  if (isOffPublishedMonth() || !shiftApproval.isApprover || !shiftPublished) return;
+  const note = prompt('差し戻す理由を入力してください（作成担当者に通知されます）', '');
+  if (note === null) return;
+  const extra = shiftApproval.notified
+    ? '\n\n※ このシフトは既に奉仕者へ公開されています。差し戻すと奉仕者から見えなくなります。'
+    : '';
+  if (!confirm('シフトを差し戻しますか？\n作成完了が取り消され、確認記録もリセットされます。' + extra)) return;
+  setLoading(true, '差し戻しています...');
+  try {
+    const res = await apiGet('rejectShift', {
+      note, adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
+    });
+    if (!res.ok) throw new Error(res.error || '差し戻しに失敗しました');
+    applyPublishStatus(await fetchPublishStatus());
+    toast('差し戻しました。作成担当者へ通知しました', 's');
+  } catch (e) { toast('差し戻しに失敗しました: ' + e.message, 'e'); }
+  finally { setLoading(false); }
 }
 
 // 左パネルリサイズ
