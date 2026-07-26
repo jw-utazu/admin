@@ -256,30 +256,44 @@ function dndReject(hit, uid, fromEl) {
   return '';
 }
 
-// 落とせるが注意が必要な理由（連続配置・他PW重複）。無ければ空文字
+// その位置にその人を置いた場合の候補分類を1件返す（buildCandidates と同じ基準）
+function dndCandAt(el, uid) {
+  if (!el || !uid || typeof buildCandidates !== 'function') return null;
+  const bi = +el.dataset.bi, ri = +el.dataset.ri, li = +el.dataset.li, pi = +el.dataset.pi;
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = tab ? (shiftDates || []).filter(d => d.date === tab.date)[bi] : null;
+  if (!block) return null;
+  if (typeof syncCurrentBlock === 'function') syncCurrentBlock();
+  const base = filterAppliedForSlot(block.date, block.time);
+  const cands = buildCandidates(base, block, ri, li, {
+    groups: buildBlockGroups(shiftDates), shiftDates, memberFlags, conflictMap,
+    assignCounts: slotAssignCounts, applicants,
+  }, '', pi);
+  return cands.find(x => x.uid === uid) || null;
+}
+
+// 落とせるが注意が必要な理由（備考の時間外・連続配置・他PW重複）。無ければ空文字
 // コンボボックスの候補分類（buildCandidates／validation.js）と同じ基準を使う
 function dndWarnMsg(hit, uid) {
   if (!hit || !hit.el || hit.kind === 'remove' || hit.kind === 'full') return '';
   if (typeof buildCandidates !== 'function') return '';
-  const key = hit.el.id + '|' + uid;
+  const fromEl = _dnd ? _dnd.fromEl : null;
+  const partner = hit.kind === 'swap' ? (hit.el.dataset.value || '') : '';
+  const key = hit.el.id + '|' + uid + '|' + partner;
   if (_dnd.warnCache && _dnd.warnCache.key === key) return _dnd.warnCache.msg;
   let msg = '';
-  const bi = +hit.el.dataset.bi, ri = +hit.el.dataset.ri, li = +hit.el.dataset.li, pi = +hit.el.dataset.pi;
-  const tab = (window._dateTabs || [])[activeDateIdx];
-  const block = tab ? (shiftDates || []).filter(d => d.date === tab.date)[bi] : null;
-  if (block) {
-    if (typeof syncCurrentBlock === 'function') syncCurrentBlock();
-    const base = filterAppliedForSlot(block.date, block.time);
-    const cands = buildCandidates(base, block, ri, li, {
-      groups: buildBlockGroups(shiftDates), shiftDates, memberFlags, conflictMap,
-      assignCounts: slotAssignCounts, applicants,
-    }, '', pi);
-    const c = cands.find(x => x.uid === uid);
-    if (c) {
-      // 固定枠に姉妹を入れる操作は dndReject で拒否しているので、ここでは扱わない
-      if (c.state === 'notetime') msg = c.reason || '備考の参加時間外です';
-      else if (c.state === 'consec') msg = '連続配置になります';
-      else if (c.state === 'crosspw') msg = '他のPWに配置済みです';
+  const c = dndCandAt(hit.el, uid);
+  if (c) {
+    // 固定枠に姉妹を入れる操作は dndReject で拒否しているので、ここでは扱わない
+    if (c.state === 'notetime') msg = c.reason || '備考の参加時間外です';
+    else if (c.state === 'consec') msg = '連続配置になります';
+    else if (c.state === 'crosspw') msg = '他のPWに配置済みです';
+  }
+  // 入れ替えでは相手が掴んだ側の位置へ移る。相手にとっての時間外も見落とさない
+  if (!msg && partner && fromEl) {
+    const pc = dndCandAt(fromEl, partner);
+    if (pc && pc.state === 'notetime') {
+      msg = '入れ替え相手の ' + (pc.name || partner) + ' が' + (pc.reason || '備考の参加時間外');
     }
   }
   _dnd.warnCache = { key, msg };
