@@ -889,8 +889,6 @@ function buildLeftPanel() {
   const naOpen = !!document.querySelector('#lp-members .lp-sec-toggle.open');
 
   document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）' + (blockTime ? ' ' + blockTime : '');
-  document.getElementById('lp-count').textContent = applied.length;
-  document.getElementById('lp-total').textContent = '名申込 / 全' + applicants.length + '名';
 
   const memoKey = block ? (tab.date + '_' + block.time) : '';
   const memo = memoKey ? (memoMap[memoKey] || '') : '';
