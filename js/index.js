@@ -500,8 +500,7 @@ function renderPwTypeTabs() {
 
   limitedSlots.forEach((slot, idx) => {
     const isActive = currentPwType === slot.id;
-    const borderL  = 'border-left:none;';
-    html += `<button class="pw-type-tab${isActive ? ' active' : ''}" style="${borderL}" onclick="switchPwType('${escHtml(slot.id)}')">${escHtml(slot.name)}<span class="lt-edit-ic" onclick="openEditLimitedSlotModal('${escHtml(slot.id)}');event.stopPropagation()">✏</span></button>`;
+    html += `<button class="pw-type-tab${isActive ? ' active' : ''}" onclick="switchPwType('${escHtml(slot.id)}')">${escHtml(slot.name)}<span class="lt-edit-ic" onclick="openEditLimitedSlotModal('${escHtml(slot.id)}');event.stopPropagation()">✏</span></button>`;
   });
 
   html += `<button class="pw-type-tab pw-tab-add" onclick="openAddLimitedSlotModal()">＋</button>`;
