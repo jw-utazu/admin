@@ -465,12 +465,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   font-weight:700;color:var(--ink2);transition:background .15s,color .15s;white-space:nowrap;
 }
 .pw-type-tab:hover:not(.active):not(:disabled){background:var(--surface);color:var(--ink);}
-/* アクティブ：上だけ大きく角丸、下辺を消して下のコンテンツとつなげる（フォルダタブ）。
+/* アクティブ：上だけ角丸（非アクティブと同じ var(--r)）、下辺を消して
+   下のコンテンツとつなげる（フォルダタブ）。
    上端のカラーラインは擬似要素ではなく border-top で引く。擬似要素の細い帯だと
    border-radius が帯の高さまで縮められて角が丸く見えないが、border なら
    タブ自身の角丸に沿って左右の枠へつながる */
 .pw-type-tab.active{
-  margin-bottom:-1px;padding:6px 15px 9px;border-radius:14px 14px 0 0;
+  margin-bottom:-1px;padding:6px 15px 9px;border-radius:var(--r) var(--r) 0 0;
   background:var(--surface);color:var(--purple);
   border:1px solid var(--border2);border-top:3px solid var(--purple);
   border-bottom-color:var(--surface);z-index:1;
