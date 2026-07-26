@@ -61,6 +61,10 @@
     <button class="mtab"     id="mtab-create"   onclick="switchMainTab('create',this)">✏️ シフト作成</button>
     <button class="mtab"     id="mtab-settings" onclick="switchMainTab('settings',this)">⚙️ 設定</button>
     <div style="flex:1;"></div>
+    <div id="create-tools" style="display:none;align-items:center;gap:6px;margin-right:8px;">
+      <button class="tb-btn" id="undo-btn" style="white-space:nowrap;" title="元に戻す（Ctrl+Z）／やり直す（Ctrl+Shift+Z）" onclick="doUndo()" disabled>↶ 元に戻す</button>
+      <button class="tb-btn" style="white-space:nowrap;" onclick="openPreflight()">🔍 チェック</button>
+    </div>
     <button class="split-btn" id="split-btn" onclick="toggleSplitView()">⬛ 分割表示</button>
   </div>
 
@@ -267,6 +271,6 @@
 <script src="js/validation.js?v=7"></script>
 <script src="js/picker.js?v=4"></script>
 <script src="js/dnd.js?v=7"></script>
-<script src="js/shift-create.js?v=22"></script>
+<script src="js/shift-create.js?v=23"></script>
 </body>
 </html>

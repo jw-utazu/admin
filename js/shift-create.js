@@ -319,9 +319,18 @@ function switchMainTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('on');
   // 年月を切り替えると各タブのデータは無効になる（resetMonthState でフラグを落とす）ため、
   // 未読み込みのタブを開いたときに読み直す
+  updateCreateToolsVis();
   if (name === 'wish' && !wishLoaded) loadWishData();
   if (name === 'create' && !createLoaded) loadCreateData();
   if (name === 'settings' && !settingsLoaded) loadSettingsData();
+}
+
+// 「元に戻す」「チェック」はシフト作成タブ専用。作成タブ表示中（分割表示中も含む）だけ出す
+function updateCreateToolsVis() {
+  const el = document.getElementById('create-tools');
+  if (!el) return;
+  const on = splitMode || document.getElementById('tab-create').classList.contains('on');
+  el.style.display = on ? 'flex' : 'none';
 }
 // ===== 分割表示 =====
 let splitMode = false;
@@ -337,6 +346,7 @@ function toggleSplitView() {
     btn.classList.add('on');
     btn.textContent = '⊡ 分割解除';
     if (rsz) rsz.style.display = 'block';
+    updateCreateToolsVis();
     if (!createLoaded) loadCreateData();
   } else {
     wrapper.classList.remove('split');
@@ -793,7 +803,8 @@ function buildCreateTabs() {
   const tabs = dt.map((t, i) =>
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
-  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="openPreflight()">🔍 チェック</button><button class="tb-btn" id="undo-btn" style="margin-right:4px;white-space:nowrap;" title="元に戻す（Ctrl+Z）／やり直す（Ctrl+Shift+Z）" onclick="doUndo()" disabled>↶ 元に戻す</button><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
+  // 「元に戻す」「チェック」はメインタブ行（分割表示ボタンの隣）に常設してあるのでここには置かない
+  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
   if (compareMode) populateCmpDateSel();
 }
 
