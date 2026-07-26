@@ -22,10 +22,11 @@ let shiftPublished = false;
 let shiftOpenDate  = ''; // 公開予定日（M/D形式）。作成完了していても、この日を迎えるまで奉仕者には見えない
 // シフトの確認（承認）状況。確認者（メンバー管理で「確認者」に指定された管理者）全員が
 // 確認完了にするまで奉仕者へは公開されない。required=0 なら確認者未登録＝確認不要
+// オーナーアカウントは確認を省略して公開できる（approvalSkipped でその旨を表示する）
 let shiftApproval = {
   approvers: [], required: 0, approvedCount: 0,
   isApprover: false, approvedByMe: false, approvedAll: false, notified: false,
-  doneByName: '', rejected: null
+  isOwner: false, approvalSkipped: false, doneByName: '', rejected: null
 };
 let activeDateIdx = 0;
 let activeTimeIdx = 0;
@@ -2239,10 +2240,12 @@ async function saveAll() {
   toast('すべて保存しました', 's');
 }
 
-// 公開状態＋確認状況を取得する（確認者かどうかの判定にログイン中の管理者UIDが必要）
+// 公開状態＋確認状況を取得する。確認者かどうかの判定にログイン中の管理者UID、
+// オーナー（確認省略可）かどうかの判定にメールアドレスが必要
 function fetchPublishStatus() {
   return apiGet('getShiftPublishStatus', {
-    adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
+    adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '',
+    adminEmail: (adminUser && adminUser.email) || ''
   });
 }
 
@@ -2257,6 +2260,8 @@ function applyPublishStatus(res) {
     isApprover:  !!res.isApprover,
     approvedByMe: !!res.approvedByMe,
     approvedAll: !!res.approvedAll,
+    approvalSkipped: !!res.approvalSkipped,
+    isOwner:     !!res.isOwner,
     notified:    !!res.notified,
     doneByName:  res.doneByName || '',
     rejected:    res.rejected || null
@@ -2332,6 +2337,12 @@ function updatePublishBtn() {
       apprLabel.style.color = 'var(--red)';
       apprLabel.title = a.rejected.note ? '理由: ' + a.rejected.note : '理由の記入はありません';
       apprLabel.style.display = '';
+    } else if (a.approvalSkipped && shiftPublished) {
+      apprLabel.textContent = '⚠️ 確認省略（オーナー）';
+      apprLabel.style.color = 'var(--amber)';
+      apprLabel.title = 'オーナーアカウントが確認者の確認を省略して公開しました\n確認者: '
+        + (a.approvers.map(x => x.name).join('・') || 'なし');
+      apprLabel.style.display = '';
     } else if (a.required > 0 && shiftPublished) {
       const detail = a.approvers.map(x => (x.approved ? '✅ ' : '⬜ ') + x.name + (x.at ? '（' + x.at + '）' : '')).join('\n');
       apprLabel.textContent = a.approvedAll
@@ -2382,7 +2393,10 @@ async function togglePublish() {
     refreshValidationUI();
     if (_vResult.issues.some(x => x.level === 'error')) { openPreflight(); return; }
     const names = shiftApproval.approvers.map(x => x.name).join('・');
-    const msg = shiftApproval.required > 0
+    const msg = (shiftApproval.required > 0 && shiftApproval.isOwner)
+      // オーナーは確認を省略して公開できる。黙って抜けないよう明示する
+      ? ('オーナー権限で確認者の確認を省略して公開します。\n確認者（' + names + '）への確認依頼は送られません。\n\nシフト作成完了にしますか？\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます。')
+      : shiftApproval.required > 0
       ? ('シフト作成完了にしますか？\n確認者（' + names + '）に確認依頼の通知が送られます。\n全員の確認が完了し、公開予定日を迎えると奉仕者へ自動的に公開・通知されます。')
       : 'シフト作成完了にしますか？\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます（予定日を過ぎている場合は即座に公開・通知されます）。';
     if (!confirm(msg)) return;
@@ -2395,12 +2409,13 @@ async function doPublish() {
   setLoading(true, 'シフトを作成完了にしています...');
   try {
     const res = await apiGet('publishShift', {
-      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
+      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '',
+      adminEmail: (adminUser && adminUser.email) || ''
     });
     applyPublishStatus(await fetchPublishStatus());
-    toast(res && res.approvalRequired
-      ? 'シフト作成完了にしました。確認者へ確認依頼を送信しました'
-      : 'シフト作成完了にしました', 's');
+    toast(res && res.approvalRequired ? 'シフト作成完了にしました。確認者へ確認依頼を送信しました'
+        : res && res.approvalSkipped  ? 'シフト作成完了にしました（オーナー権限で確認を省略）'
+        : 'シフト作成完了にしました', 's');
   } catch (e) { toast('処理に失敗しました: ' + e.message, 'e'); }
   finally { setLoading(false); }
 }
