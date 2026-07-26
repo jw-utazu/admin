@@ -207,6 +207,13 @@ function dndHighlight(hit) {
   else if (cell) cell.classList.add('dnd-over');
 }
 
+// 姉妹かどうか。性別が未設定の人は判定できないので姉妹とはみなさない
+// （コンボボックスの候補判定 buildCandidates／validation.js と同じ基準）
+function dndIsSister(uid) {
+  const g = ((typeof memberFlags !== 'undefined' ? memberFlags : {})[uid] || {}).gender || '';
+  return !!g && g !== 'M';
+}
+
 // 落とせない理由（エラー・落とせない）。落とせるなら空文字
 // uid・fromEl は引数で受け取る（確定処理では _dnd を破棄したあとに呼ぶため）
 function dndReject(hit, uid, fromEl) {
@@ -216,6 +223,11 @@ function dndReject(hit, uid, fromEl) {
   if (!cell) return '';
   const inCell = [...cell.querySelectorAll('.cs')].some(s => s !== hit.el && s.dataset.value === uid);
   if (inCell) return 'すでにこの場所に入っています';
+
+  // 固定枠（セルの1番目）は兄弟だけ。入れ替えの結果、相手が固定枠に入る場合も拒否する
+  if (+hit.el.dataset.pi === 0 && dndIsSister(uid)) return '1番目（固定枠）には兄弟しか入れられません';
+  if (hit.kind === 'swap' && fromEl && +fromEl.dataset.pi === 0 && dndIsSister(hit.el.dataset.value))
+    return '入れ替えると1番目（固定枠）に姉妹が入ります';
 
   // 同一スロット行の重複は物理的に不可能なので、どこであれ落とせない
   // （コンボボックスは「移動」として自動処理するが、DnDでは元位置を空にする
@@ -238,7 +250,7 @@ function dndReject(hit, uid, fromEl) {
   return '';
 }
 
-// 落とせるが注意が必要な理由（連続配置・他PW重複・固定枠は基本兄弟）。無ければ空文字
+// 落とせるが注意が必要な理由（連続配置・他PW重複）。無ければ空文字
 // コンボボックスの候補分類（buildCandidates／validation.js）と同じ基準を使う
 function dndWarnMsg(hit, uid) {
   if (!hit || !hit.el || hit.kind === 'remove' || hit.kind === 'full') return '';
@@ -258,9 +270,9 @@ function dndWarnMsg(hit, uid) {
     }, '', pi);
     const c = cands.find(x => x.uid === uid);
     if (c) {
+      // 固定枠に姉妹を入れる操作は dndReject で拒否しているので、ここでは扱わない
       if (c.state === 'consec') msg = '連続配置になります';
       else if (c.state === 'crosspw') msg = '他のPWに配置済みです';
-      else if (c.fixedNg) msg = '固定枠は通常兄弟です';
     }
   }
   _dnd.warnCache = { key, msg };
