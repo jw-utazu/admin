@@ -793,7 +793,12 @@ function openWishEdit(el, uid, name, slot, applied, comment) {
   document.getElementById('we-title').textContent = name + '｜' + slot;
   // comment は「カート不可」と備考が改行で連結された文字列（保存側と同じ規則）
   const raw = comment || '';
-  document.getElementById('we-cartng').checked = raw.includes('カート不可');
+  const hasCartNg = raw.includes('カート不可');
+  // カート担当に登録されていない人には出さない。ただし既に「カート不可」が
+  // 入っているデータでは、隠して黙って消してしまわないよう表示する
+  const isCartUser = !!(memberFlags[uid] || {}).cartFlag;
+  document.getElementById('we-cart-row').style.display = (isCartUser || hasCartNg) ? '' : 'none';
+  document.getElementById('we-cartng').checked = hasCartNg;
   weRenderNote(weParseNote(raw.replace('カート不可', '').trim()));
   const toggleBtn = document.getElementById('we-toggle-btn');
   const saveBtn   = document.getElementById('we-save-btn');
