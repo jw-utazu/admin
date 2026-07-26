@@ -294,6 +294,43 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .form-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
 .form-col{flex:1;min-width:100px;}
 .add-form-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:8px;}
+
+/* ===== 場所管理：有効範囲セレクタ＋年月ピッカー =====
+   有効範囲は「常時有効／期間指定／限定PWに紐づけ」の3択。期間指定のときだけ
+   年月ピッカー（.ymp）を開き、開始〜終了の範囲を月グリッド上でハイライトする */
+.popup-box.wide{max-width:380px;}
+.seg{display:flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;background:var(--surface2);}
+.seg button{flex:1;padding:8px 4px;font-size:11px;font-weight:700;font-family:var(--sans);border:none;background:none;color:var(--ink2);cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;}
+.seg button+button{border-left:1px solid var(--border);}
+.seg button.on{background:var(--purple);color:#fff;}
+.seg button:not(.on):hover{background:var(--bg);}
+.loc-pane{display:none;margin-top:12px;}
+.loc-pane.on{display:block;animation:t-up .18s ease;}
+.loc-note{font-size:11px;color:var(--ink3);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;}
+.ym-field{display:flex;gap:8px;}
+.ym-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);font-size:12px;font-family:var(--sans);font-weight:700;color:var(--ink);cursor:pointer;text-align:left;}
+.ym-btn:hover{border-color:var(--purple);}
+.ym-btn.on{border-color:var(--purple);box-shadow:0 0 0 2px var(--purple-l);}
+.ym-btn .ph{color:var(--ink3);font-weight:400;}
+.ym-btn .ar{color:var(--ink3);font-size:9px;flex-shrink:0;}
+.ymp{display:none;margin-top:10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);box-shadow:var(--sh);padding:9px;}
+.ymp.on{display:block;animation:t-up .18s ease;}
+.ymp-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;}
+.ymp-hd b{font-size:12px;}
+.ymp-nav{width:26px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--ink2);cursor:pointer;font-size:12px;line-height:1;font-family:var(--sans);flex-shrink:0;}
+.ymp-nav:hover{background:var(--bg);border-color:var(--purple);color:var(--purple);}
+.ymp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+.ymp-grid button{padding:7px 0;font-size:11px;font-weight:700;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink2);cursor:pointer;}
+.ymp-grid button:hover{border-color:var(--purple);color:var(--purple);}
+.ymp-grid button.in{background:var(--purple-l);border-color:#ddd6fe;color:var(--purple);}
+.ymp-grid button.sel{background:var(--purple);border-color:var(--purple);color:#fff;}
+.ymp-grid button.now{box-shadow:inset 0 0 0 1px var(--amber);}
+.ymp-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);}
+.ymp-ft .hint{font-size:10px;color:var(--ink3);}
+.loc-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;}
+.loc-badge.always{background:var(--bg);color:var(--ink3);}
+.loc-badge.period{background:var(--blue-l);color:var(--blue);}
+.loc-badge.pw{background:var(--purple-l);color:var(--purple);}
 .tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
 .tag{display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--purple-l);border:1px solid #ddd6fe;border-radius:20px;font-size:12px;color:var(--purple);}
 .tag .del-t{background:none;border:none;color:var(--ink3);cursor:pointer;padding:0;font-size:14px;line-height:1;}

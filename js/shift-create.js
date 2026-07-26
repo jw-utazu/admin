@@ -2597,37 +2597,171 @@ async function loadSettingsData() {
   } catch (e) { setLoading(false); toast('設定読み込みエラー: ' + e.message, 'e'); }
 }
 
+// ------------------------------------------------------------
+// 場所管理
+// 有効範囲は3択：
+//   always … 常時有効（開始・終了なし）
+//   period … 期間指定（startYM 〜 endYM。年月は選択式ピッカーで入力する）
+//   pw     … 限定PW に紐づけ（linkPwType。期間は使わず、その限定PWの
+//            シフト作成でのみ表示される）
+// ------------------------------------------------------------
+function locMode(loc) { return loc.linkPwType ? 'pw' : ((loc.startYM || loc.endYM) ? 'period' : 'always'); }
+function pwTypeName(id) { const s = pwTypeList.find(p => p.id === id); return s ? s.name : id; }
+function ymLabel(ym) { const m = /^(\d{4})[.\-/](\d{1,2})$/.exec(String(ym || '').trim()); return m ? `${m[1]}年${parseInt(m[2], 10)}月` : ''; }
+
+function locScopeHtml(loc) {
+  const mode = locMode(loc);
+  if (mode === 'pw')     return `<span class="loc-badge pw">🎯 ${esc(pwTypeName(loc.linkPwType))} 専用</span>`;
+  if (mode === 'period') return `<span class="loc-badge period">📅 ${ymLabel(loc.startYM) || '開始未指定'} 〜 ${ymLabel(loc.endYM) || 'ずっと'}</span>`;
+  return '<span class="loc-badge always">🔁 常時有効</span>';
+}
+
 function renderLocationList() {
   const list = document.getElementById('location-list');
   if (!list) return;
   if (settingsLocations.length === 0) { list.innerHTML = '<div style="font-size:12px;color:var(--ink3);padding:8px 0;">場所が登録されていません</div>'; return; }
   list.innerHTML = settingsLocations.map((loc, i) => `
     <div class="setting-row">
-      <div><div class="setting-name">${esc(loc.name)}</div>
-      <div class="setting-detail">${loc.startYM || loc.endYM ? `期間: ${loc.startYM || '〜'} 〜 ${loc.endYM || '〜'}` : '常時有効'}</div></div>
+      <div style="flex:1;min-width:0;"><div class="setting-name">${esc(loc.name)}</div>
+      <div class="setting-detail" style="margin-top:2px;">${locScopeHtml(loc)}</div></div>
       <div class="setting-actions">
-        <button class="s-btn" onclick="openEditLocModal(${i})">編集</button>
+        <button class="s-btn" onclick="openLocModal(${i})">編集</button>
         <button class="s-btn del" onclick="deleteLocation(${i})">削除</button>
       </div>
     </div>`).join('');
 }
-function showAddLocationForm() { document.getElementById('new-loc-name').value = ''; document.getElementById('new-loc-start').value = ''; document.getElementById('new-loc-end').value = ''; document.getElementById('add-location-form').style.display = ''; }
-function hideAddLocationForm() { document.getElementById('add-location-form').style.display = 'none'; }
-function addLocation() {
-  const name = document.getElementById('new-loc-name').value.trim();
-  if (!name) { toast('場所名を入力してください', 'e'); return; }
-  settingsLocations.push({ name, startYM: document.getElementById('new-loc-start').value.trim(), endYM: document.getElementById('new-loc-end').value.trim() });
-  renderLocationList(); hideAddLocationForm();
-}
 function deleteLocation(i) { if (!confirm(`「${settingsLocations[i].name}」を削除しますか？`)) return; settingsLocations.splice(i, 1); renderLocationList(); }
-function openEditLocModal(i) { document.getElementById('edit-loc-idx').value = i; document.getElementById('edit-loc-name').value = settingsLocations[i].name; document.getElementById('edit-loc-start').value = settingsLocations[i].startYM||''; document.getElementById('edit-loc-end').value = settingsLocations[i].endYM||''; document.getElementById('edit-loc-modal').classList.add('on'); }
-function closeEditLocModal() { document.getElementById('edit-loc-modal').classList.remove('on'); }
-function saveEditLocation() {
-  const i = parseInt(document.getElementById('edit-loc-idx').value);
-  const name = document.getElementById('edit-loc-name').value.trim();
+
+// ===== 追加・編集モーダル（追加と編集で同じモーダルを使う） =====
+let locForm    = { idx: -1, name: '', mode: 'always', startYM: '', endYM: '', linkPwType: '' };
+let _ympTarget = null;  // 年月ピッカーの編集対象 'start' | 'end' | null（閉じている）
+let _ympYear   = 0;     // 年月ピッカーが表示している年
+
+function openLocModal(i) {
+  const src = i >= 0 ? settingsLocations[i] : { name: '', startYM: '', endYM: '', linkPwType: '' };
+  locForm = { idx: i, name: src.name || '', mode: locMode(src), startYM: src.startYM || '', endYM: src.endYM || '', linkPwType: src.linkPwType || '' };
+  document.getElementById('loc-modal-title').textContent = i >= 0 ? '📍 場所を編集' : '📍 場所を追加';
+  document.getElementById('loc-save-btn').textContent    = i >= 0 ? '保存' : '追加';
+  document.getElementById('loc-name').value = locForm.name;
+  // 限定PWタブで編集中の場所は、既にその限定PW専用。さらに別の限定PWへ
+  // 紐づける意味がないので「限定PW」の選択肢は通常PWタブでのみ出す
+  const segPw = document.getElementById('loc-seg-pw');
+  segPw.style.display = (currentPwType === 'normal' || locForm.linkPwType) ? '' : 'none';
+  _ympTarget = null;
+  applyLocMode(locForm.mode);
+  document.getElementById('loc-modal').classList.add('on');
+  setTimeout(() => { const n = document.getElementById('loc-name'); if (n) n.focus(); }, 50);
+}
+function closeLocModal() { closeYmp(); document.getElementById('loc-modal').classList.remove('on'); }
+
+function applyLocMode(mode) {
+  locForm.mode = mode;
+  document.querySelectorAll('#loc-scope-seg button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  document.getElementById('loc-pane-always').classList.toggle('on', mode === 'always');
+  document.getElementById('loc-pane-period').classList.toggle('on', mode === 'period');
+  document.getElementById('loc-pane-pw').classList.toggle('on', mode === 'pw');
+  if (mode !== 'period') closeYmp();
+  if (mode === 'pw') renderLocPwSelect();
+  renderYmFields();
+}
+
+function renderLocPwSelect() {
+  const box = document.getElementById('loc-pw-wrap');
+  if (!box) return;
+  if (pwTypeList.length === 0) {
+    box.innerHTML = '<div class="loc-note">限定PWが登録されていません。先に限定PWを追加してから紐づけてください。</div>';
+    return;
+  }
+  if (!locForm.linkPwType || !pwTypeList.some(p => p.id === locForm.linkPwType)) locForm.linkPwType = pwTypeList[0].id;
+  box.innerHTML = `<label>紐づける限定PW</label>
+    <select id="loc-pw-sel" onchange="locForm.linkPwType=this.value">
+      ${pwTypeList.map(p => `<option value="${esc(p.id)}"${locForm.linkPwType === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}
+    </select>
+    <div class="loc-note" style="margin-top:8px;">この場所は選んだ限定PWのシフト作成でのみ表示されます（年月の指定は不要）。設定の編集はこのタブから行えます。</div>`;
+}
+
+function renderYmFields() {
+  const set = (id, ym, ph, on) => {
+    const el = document.getElementById(id); if (!el) return;
+    el.innerHTML = (ym ? `<span>${ymLabel(ym) || esc(ym)}</span>` : `<span class="ph">${ph}</span>`) + '<span class="ar">▼</span>';
+    el.classList.toggle('on', on);
+  };
+  set('loc-start-btn', locForm.startYM, '指定なし', _ympTarget === 'start');
+  set('loc-end-btn',   locForm.endYM,   '指定なし', _ympTarget === 'end');
+}
+
+function toggleYmp(target) {
+  if (_ympTarget === target) { closeYmp(); return; }
+  _ympTarget = target;
+  const cur = target === 'start' ? locForm.startYM : locForm.endYM;
+  const m = /^(\d{4})/.exec(cur || '');
+  _ympYear = m ? parseInt(m[1], 10) : new Date().getFullYear();
+  document.getElementById('ymp').classList.add('on');
+  renderYmp(); renderYmFields();
+}
+function closeYmp() {
+  _ympTarget = null;
+  const p = document.getElementById('ymp'); if (p) p.classList.remove('on');
+  renderYmFields();
+}
+function ympYear(d) { _ympYear += d; renderYmp(); }
+
+function renderYmp() {
+  const box = document.getElementById('ymp');
+  if (!box || !_ympTarget) return;
+  const s = locForm.startYM, e = locForm.endYM;
+  const d = new Date();
+  const nowYM = d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0');
+  let g = '';
+  for (let mo = 1; mo <= 12; mo++) {
+    const ym = _ympYear + '.' + String(mo).padStart(2, '0');
+    const cls = [];
+    if (ym === s || ym === e) cls.push('sel');
+    else if (s && e && ym > s && ym < e) cls.push('in');
+    if (ym === nowYM) cls.push('now');
+    g += `<button type="button" class="${cls.join(' ')}" onclick="pickYm('${ym}')">${mo}月</button>`;
+  }
+  box.innerHTML = `
+    <div class="ymp-hd">
+      <button type="button" class="ymp-nav" onclick="ympYear(-1)">‹</button>
+      <b>${_ympYear}年 <span style="font-weight:400;color:var(--ink3);font-size:10px;">${_ympTarget === 'start' ? '開始' : '終了'}を選択</span></b>
+      <button type="button" class="ymp-nav" onclick="ympYear(1)">›</button>
+    </div>
+    <div class="ymp-grid">${g}</div>
+    <div class="ymp-ft">
+      <span class="hint">${s || e ? `${ymLabel(s) || '指定なし'} 〜 ${ymLabel(e) || 'ずっと'}` : '未設定（どちらか一方だけでも可）'}</span>
+      <button type="button" class="s-btn" onclick="pickYm('')">指定なし</button>
+    </div>`;
+}
+
+function pickYm(ym) {
+  const isStart = _ympTarget === 'start';
+  if (isStart) locForm.startYM = ym; else locForm.endYM = ym;
+  // 開始＞終了の逆転を防ぐ（今選んだ側に合わせる）
+  if (locForm.startYM && locForm.endYM && locForm.startYM > locForm.endYM) {
+    if (isStart) locForm.endYM = locForm.startYM; else locForm.startYM = locForm.endYM;
+  }
+  // 開始を選んだ直後で終了が未設定なら、そのまま終了の選択へ進む
+  if (ym && isStart && !locForm.endYM) { _ympTarget = 'end'; renderYmp(); renderYmFields(); return; }
+  closeYmp();
+}
+
+function saveLocForm() {
+  const name = document.getElementById('loc-name').value.trim();
   if (!name) { toast('場所名を入力してください', 'e'); return; }
-  settingsLocations[i] = { name, startYM: document.getElementById('edit-loc-start').value.trim(), endYM: document.getElementById('edit-loc-end').value.trim() };
-  renderLocationList(); closeEditLocModal();
+  if (locForm.mode === 'pw') {
+    if (pwTypeList.length === 0) { toast('紐づけられる限定PWがありません', 'e'); return; }
+    if (!locForm.linkPwType)     { toast('紐づける限定PWを選んでください', 'e'); return; }
+  }
+  if (locForm.mode === 'period' && !locForm.startYM && !locForm.endYM) { toast('開始または終了の年月を選択してください', 'e'); return; }
+  const rec = {
+    name,
+    startYM:    locForm.mode === 'period' ? locForm.startYM    : '',
+    endYM:      locForm.mode === 'period' ? locForm.endYM      : '',
+    linkPwType: locForm.mode === 'pw'     ? locForm.linkPwType : ''
+  };
+  if (locForm.idx >= 0) settingsLocations[locForm.idx] = rec; else settingsLocations.push(rec);
+  renderLocationList(); closeLocModal();
 }
 async function saveLocations() {
   try { await apiGet('saveLocations', { locations: settingsLocations }); toast('場所設定を保存しました', 's'); createLoaded = false; }

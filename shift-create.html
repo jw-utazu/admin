@@ -7,7 +7,7 @@
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" defer onload="renderGsiButton()"></script>
-<link rel="stylesheet" href="css/shift-create.css?v=22">
+<link rel="stylesheet" href="css/shift-create.css?v=23">
 </head>
 <body>
 
@@ -132,29 +132,7 @@
         <div class="sec-hd">📍 場所管理</div>
         <div class="sec-body">
           <div id="location-list"></div>
-          <button class="s-btn primary" onclick="showAddLocationForm()" style="margin-top:8px;">＋ 場所を追加</button>
-          <div class="add-form" id="add-location-form" style="display:none;">
-            <div class="form-row">
-              <div class="form-col">
-                <label>場所名</label>
-                <input type="text" id="new-loc-name" placeholder="例：北口">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-col">
-                <label>開始年月（空白=常時） 例：2026.08</label>
-                <input type="text" id="new-loc-start" placeholder="2026.08">
-              </div>
-              <div class="form-col">
-                <label>終了年月（空白=無期限） 例：2026.10</label>
-                <input type="text" id="new-loc-end" placeholder="2026.10">
-              </div>
-            </div>
-            <div class="add-form-actions">
-              <button class="s-btn" onclick="hideAddLocationForm()">キャンセル</button>
-              <button class="s-btn primary" onclick="addLocation()">追加</button>
-            </div>
-          </div>
+          <button class="s-btn primary" onclick="openLocModal(-1)" style="margin-top:8px;">＋ 場所を追加</button>
           <div style="text-align:right;margin-top:10px;">
             <button class="s-btn green" onclick="saveLocations()">💾 場所設定を保存</button>
           </div>
@@ -245,22 +223,46 @@
 </div>
 
 <!-- 場所編集モーダル -->
-<div class="popup-overlay" id="edit-loc-modal" onclick="closeEditLocModal()">
-  <div class="popup-box" onclick="event.stopPropagation()">
-    <div class="popup-title">場所を編集</div>
-    <input type="hidden" id="edit-loc-idx">
+<div class="popup-overlay" id="loc-modal" onclick="closeLocModal()">
+  <div class="popup-box wide" onclick="event.stopPropagation()">
+    <div class="popup-title" id="loc-modal-title">場所を追加</div>
     <div class="add-form" style="background:none;border:none;padding:0;">
-      <div class="form-row">
-        <div class="form-col"><label>場所名</label><input type="text" id="edit-loc-name"></div>
+      <label>場所名</label>
+      <input type="text" id="loc-name" placeholder="例：北口" autocomplete="off">
+
+      <label style="margin-top:12px;">有効範囲</label>
+      <div class="seg" id="loc-scope-seg">
+        <button type="button" data-mode="always" onclick="applyLocMode('always')">🔁 常時有効</button>
+        <button type="button" data-mode="period" onclick="applyLocMode('period')">📅 期間指定</button>
+        <button type="button" data-mode="pw"     onclick="applyLocMode('pw')" id="loc-seg-pw">🎯 限定PW</button>
       </div>
-      <div class="form-row">
-        <div class="form-col"><label>開始年月（空白=常時）</label><input type="text" id="edit-loc-start" placeholder="2026.08"></div>
-        <div class="form-col"><label>終了年月（空白=無期限）</label><input type="text" id="edit-loc-end" placeholder="2026.10"></div>
+
+      <!-- 常時有効 -->
+      <div class="loc-pane" id="loc-pane-always">
+        <div class="loc-note">いつでもこの場所をシフトに使えます。シフト作成時は既定の列として並びます。</div>
       </div>
+
+      <!-- 期間指定（年月ピッカー） -->
+      <div class="loc-pane" id="loc-pane-period">
+        <div class="ym-field">
+          <div style="flex:1;">
+            <label>開始年月</label>
+            <button type="button" class="ym-btn" id="loc-start-btn" onclick="toggleYmp('start')"></button>
+          </div>
+          <div style="flex:1;">
+            <label>終了年月</label>
+            <button type="button" class="ym-btn" id="loc-end-btn" onclick="toggleYmp('end')"></button>
+          </div>
+        </div>
+        <div class="ymp" id="ymp"></div>
+      </div>
+
+      <!-- 限定PW に紐づけ -->
+      <div class="loc-pane" id="loc-pane-pw"><div id="loc-pw-wrap"></div></div>
     </div>
-    <div class="add-form-actions" style="margin-top:14px;">
-      <button class="s-btn" onclick="closeEditLocModal()">キャンセル</button>
-      <button class="popup-close-btn" style="width:auto;padding:8px 20px;" onclick="saveEditLocation()">保存</button>
+    <div class="add-form-actions" style="margin-top:16px;">
+      <button class="s-btn" onclick="closeLocModal()">キャンセル</button>
+      <button class="popup-close-btn" style="width:auto;padding:8px 20px;" id="loc-save-btn" onclick="saveLocForm()">追加</button>
     </div>
   </div>
 </div>
@@ -283,6 +285,6 @@
 <script src="js/validation.js?v=7"></script>
 <script src="js/picker.js?v=4"></script>
 <script src="js/dnd.js?v=7"></script>
-<script src="js/shift-create.js?v=24"></script>
+<script src="js/shift-create.js?v=25"></script>
 </body>
 </html>
