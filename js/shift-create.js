@@ -534,11 +534,12 @@ function wishCellInner(applied, isAssigned, hasComment) {
 // 差分更新する。テーブル全体を作り直さないのでスクロール位置が保たれ、分割表示中でも軽い。
 // 参照するのはローカルの shiftDates なので、未保存の編集もそのまま反映される。
 function refreshWishAssign() {
-  const tbl = document.querySelector('#wish-table-wrap table.wish-tbl');
-  if (!tbl) return;
+  // 未申込者テーブルも含め、希望確認タブ内の全テーブルを対象にする
+  const wrap = document.getElementById('wish-table-wrap');
+  if (!wrap || !wrap.querySelector('table.wish-tbl')) return;
   const assignMap = buildAssignmentMap({ dates: shiftDates });
   const counts = {};
-  tbl.querySelectorAll('td[data-slot]').forEach(td => {
+  wrap.querySelectorAll('td[data-slot]').forEach(td => {
     const uid = td.dataset.uid, slot = td.dataset.slot;
     const isAssigned = !!(assignMap[uid] && assignMap[uid].has(slot));
     if (isAssigned) counts[uid] = (counts[uid] || 0) + 1;
@@ -551,7 +552,7 @@ function refreshWishAssign() {
       if (td.innerHTML !== inner) td.innerHTML = inner;
     }
   });
-  tbl.querySelectorAll('td[data-assign-total]').forEach(td => {
+  wrap.querySelectorAll('td[data-assign-total]').forEach(td => {
     const n = String(counts[td.dataset.assignTotal] || 0);
     if (td.textContent !== n) td.textContent = n;
   });
@@ -588,51 +589,49 @@ function buildWishTable(data, shiftRes) {
     dg.find(g => g.date === dk).times.push(slot);
   });
 
-  // 総申込スロット数を計算
-  const totalSlots = {};
-  members.forEach(m => {
-    totalSlots[m.uid] = sortedSlots.filter(slot => matrix[m.uid] && matrix[m.uid][slot]).length;
-  });
-
-  // 割当済みスロット数を計算
-  const totalAssigned = {};
-  members.forEach(m => {
-    totalAssigned[m.uid] = sortedSlots.filter(slot => assignMap[m.uid] && assignMap[m.uid].has(slot)).length;
-  });
+  // 申込スロット数・割当済みスロット数（matrixに無いuid＝未申込は0になる）
+  const slotCountFor   = uid => sortedSlots.filter(slot => matrix[uid] && matrix[uid][slot]).length;
+  const assignCountFor = uid => sortedSlots.filter(slot => assignMap[uid] && assignMap[uid].has(slot)).length;
 
   // 未申込者を抽出（memberFlagsの全メンバーのうち、matrixにいない人）
+  // 受付終了後に個別連絡で希望を追加できるよう、セルをクリック編集可能にする
   const appliedUids = new Set(members.map(m => m.uid));
   const notAppliedMembers = Object.entries(memberFlags)
     .filter(([uid]) => !appliedUids.has(uid))
     .map(([uid, f]) => ({ uid, name: f.name, furigana: f.furigana || '' }))
     .sort((a, b) => a.furigana.localeCompare(b.furigana) || a.name.localeCompare(b.name));
 
-  let html = '<div class="wish-snap-outer"><table class="wish-tbl">';
-  html += '<thead>';
-  html += '<tr><th class="col-name th-date" rowspan="2" style="position:sticky;top:0;left:0;z-index:11;">氏名</th>';
-  dg.forEach(g => { html += `<th class="th-date" colspan="${g.times.length}" style="position:sticky;top:0;z-index:3;">${esc(g.date)}</th>`; });
-  html += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:50px;z-index:11;min-width:50px;">合計</th>';
-  html += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:0;z-index:11;min-width:50px;background:var(--purple-l);color:var(--purple);">割当</th></tr>';
-  html += '<tr>';
-  sortedSlots.forEach(slot => { const si = slot.indexOf(' '); html += `<th class="th-time" style="position:sticky;top:28px;z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
-  html += '</tr></thead><tbody>';
+  const buildHeadRows = () => {
+    let h = '<tr><th class="col-name th-date" rowspan="2" style="position:sticky;top:0;left:0;z-index:11;">氏名</th>';
+    dg.forEach(g => { h += `<th class="th-date" colspan="${g.times.length}" style="position:sticky;top:0;z-index:3;">${esc(g.date)}</th>`; });
+    h += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:50px;z-index:11;min-width:50px;">合計</th>';
+    h += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:0;z-index:11;min-width:50px;background:var(--purple-l);color:var(--purple);">割当</th></tr><tr>';
+    sortedSlots.forEach(slot => { const si = slot.indexOf(' '); h += `<th class="th-time" style="position:sticky;top:28px;z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
+    h += '</tr>';
+    return h;
+  };
 
-  members.forEach(m => {
-    const row = matrix[m.uid] || {};
-    html += '<tr><td class="col-name" style="position:sticky;left:0;z-index:2;">' + esc(m.name) + '</td>';
+  const buildRow = (uid, name) => {
+    const row = matrix[uid] || {};
+    let r = '<tr><td class="col-name" style="position:sticky;left:0;z-index:2;">' + esc(name) + '</td>';
     sortedSlots.forEach(slot => {
       const val = row[slot];
-      const isAssigned = !!(assignMap[m.uid] && assignMap[m.uid].has(slot));
+      const isAssigned = !!(assignMap[uid] && assignMap[uid].has(slot));
       const hc = typeof val === 'object' && val.comment;
       const comment = hc ? val.comment : '';
       // data-uid / data-slot / data-applied は refreshWishAssign() の差分更新用
-      const dataAttr = `data-uid="${esc(m.uid)}" data-slot="${esc(slot)}" data-applied="${val ? 1 : 0}"`;
-      html += `<td class="${wishCellClass(!!val, isAssigned)}" style="cursor:pointer;" ${dataAttr} onclick="openWishEdit(this,'${esc(m.uid)}','${esc(m.name)}','${esc(slot)}',${val ? 'true' : 'false'},'${esc(comment)}')">${wishCellInner(!!val, isAssigned, !!hc)}</td>`;
+      const dataAttr = `data-uid="${esc(uid)}" data-slot="${esc(slot)}" data-applied="${val ? 1 : 0}"`;
+      r += `<td class="${wishCellClass(!!val, isAssigned)}" style="cursor:pointer;" ${dataAttr} onclick="openWishEdit(this,'${esc(uid)}','${esc(name)}','${esc(slot)}',${val ? 'true' : 'false'},'${esc(comment)}')">${wishCellInner(!!val, isAssigned, !!hc)}</td>`;
     });
-    html += `<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${totalSlots[m.uid] || 0}</td>`;
-    html += `<td class="cell-data" data-assign-total="${esc(m.uid)}" style="position:sticky;right:0;background:var(--purple-l);font-weight:700;color:var(--purple);z-index:2;">${totalAssigned[m.uid] || 0}</td>`;
-    html += '</tr>';
-  });
+    r += `<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${slotCountFor(uid)}</td>`;
+    r += `<td class="cell-data" data-assign-total="${esc(uid)}" style="position:sticky;right:0;background:var(--purple-l);font-weight:700;color:var(--purple);z-index:2;">${assignCountFor(uid)}</td>`;
+    r += '</tr>';
+    return r;
+  };
+
+  let html = '<div class="wish-snap-outer"><table class="wish-tbl">';
+  html += '<thead>' + buildHeadRows() + '</thead><tbody>';
+  members.forEach(m => { html += buildRow(m.uid, m.name); });
 
   // 申込数集計行
   html += '<tr style="background:var(--green4);"><td class="col-name" style="font-weight:700;color:var(--green-d);position:sticky;left:0;z-index:2;">申込数</td>';
@@ -641,14 +640,17 @@ function buildWishTable(data, shiftRes) {
   html += '<td class="cell-data" style="position:sticky;right:0;background:var(--purple-l);z-index:2;"></td></tr>';
   html += '</tbody></table></div>';
 
-  // 未申込一覧（折りたたみ）
+  // 未申込一覧（折りたたみ）：セルをクリックすると希望を追加できる
   if (notAppliedMembers.length > 0) {
     html += `<div class="wish-not-applied-toggle" onclick="toggleWishNotApplied(this)">
-      <span>未申込（${notAppliedMembers.length}名）</span>
+      <span>未申込（${notAppliedMembers.length}名）／クリックして希望を追加できます</span>
       <span class="wish-not-applied-arrow">▶</span>
     </div>`;
     html += `<div class="wish-not-applied-body">`;
-    html += notAppliedMembers.map(m => `<div class="wna-item">・${esc(m.name)}</div>`).join('');
+    html += '<div class="wish-snap-outer-na"><table class="wish-tbl">';
+    html += '<thead>' + buildHeadRows() + '</thead><tbody>';
+    notAppliedMembers.forEach(m => { html += buildRow(m.uid, m.name); });
+    html += '</tbody></table></div>';
     html += `</div>`;
   }
 
