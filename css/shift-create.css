@@ -147,6 +147,20 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .popup-body{font-size:12px;color:var(--ink2);white-space:pre-wrap;margin-bottom:14px;line-height:1.7;}
 .popup-close-btn{width:100%;padding:8px;border-radius:var(--r);background:var(--green);color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);}
 
+/* ヘッダーの確認状況ラベル（クリックで確認者一覧モーダルを開く） */
+#publish-approval{cursor:pointer;border-bottom:1px dotted currentColor;}
+#publish-approval:hover{opacity:.75;}
+/* 確認状況モーダル：確認者1人＝1行 */
+.apv-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;font-size:12px;background:var(--surface2);}
+.apv-row.done{background:var(--green-l);border-color:var(--green);}
+.apv-ico{font-size:13px;flex-shrink:0;}
+.apv-name{font-weight:700;color:var(--ink);}
+.apv-at{margin-left:auto;font-size:10px;color:var(--ink3);white-space:nowrap;}
+.apv-at.wait{color:var(--amber);font-weight:700;}
+.apv-note{font-size:11px;line-height:1.7;padding:8px 10px;border-radius:var(--r);margin-bottom:8px;}
+.apv-note.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a;}
+.apv-note.rej{background:var(--red-l);color:var(--red);border:1px solid #fca5a5;}
+
 /* ===== TAB2: シフト作成 ===== */
 .dtabs-time{display:flex;overflow-x:auto;gap:0;flex:1;}
 .ttab{padding:6px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}

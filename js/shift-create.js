@@ -2360,7 +2360,7 @@ function updatePublishBtn() {
         ? ('✅ 確認完了 ' + a.approvedCount + '/' + a.required + (a.notified ? '・公開済み' : ''))
         : ('⏳ 確認 ' + a.approvedCount + '/' + a.required);
       apprLabel.style.color = a.approvedAll ? 'var(--green)' : 'var(--amber)';
-      apprLabel.title = '確認状況\n' + detail;
+      apprLabel.title = '確認状況\n' + detail + '\n\nクリックで詳細を表示';
       apprLabel.style.display = '';
     } else {
       hide(apprLabel);
@@ -2370,6 +2370,54 @@ function updatePublishBtn() {
     openLabel.textContent = shiftOpenDate ? ('公開予定日: ' + shiftOpenDate) : '';
     openLabel.style.display = shiftOpenDate ? '' : 'none';
   }
+}
+
+// ヘッダーの確認状況ラベルをクリックしたときに開く一覧。
+// 誰が確認済みで誰が未確認かを（tooltip ではなく）画面上で確認できるようにする
+function openApprovalModal() {
+  const a = shiftApproval;
+  const box = document.getElementById('approval-modal');
+  if (!box) return;
+  const sub  = document.getElementById('apv-sub');
+  const list = document.getElementById('apv-list');
+
+  const ym = curYM ? (curYM.year + '年' + curYM.month + '月') : '';
+  sub.textContent = (ym ? ym + 'のシフト　' : '')
+    + (shiftPublished
+        ? '作成完了' + (a.doneByName ? '（' + a.doneByName + '）' : '')
+        : '作成完了になっていません');
+
+  let html = '';
+  if (a.rejected && !shiftPublished) {
+    html += '<div class="apv-note rej">⚠️ ' + esc(a.rejected.by || '確認者') + ' さんが差し戻しました'
+         + (a.rejected.at ? '（' + esc(a.rejected.at) + '）' : '')
+         + '<br>理由: ' + esc(a.rejected.note || '（記入なし）') + '</div>';
+  }
+  if (a.approvalSkipped && shiftPublished) {
+    html += '<div class="apv-note warn">⚠️ オーナーアカウントが確認者の確認を省略して作成完了にしました。'
+         + '下記の確認者には確認依頼が送られていません。</div>';
+  }
+  if (a.required === 0) {
+    html += '<div class="apv-note warn">確認者が登録されていません（確認なしで公開されます）。'
+         + '確認者は管理アプリのメンバー管理で「シフト確認者」に指定します。</div>';
+  } else {
+    html += a.approvers.map(x => {
+      const at = x.approved ? esc(x.at || '') : (shiftPublished ? '確認待ち' : '—');
+      return '<div class="apv-row' + (x.approved ? ' done' : '') + '">'
+        + '<span class="apv-ico">' + (x.approved ? '✅' : '⬜') + '</span>'
+        + '<span class="apv-name">' + esc(x.name) + '</span>'
+        + '<span class="apv-at' + (x.approved ? '' : ' wait') + '">' + at + '</span></div>';
+    }).join('');
+    html += '<div style="font-size:11px;color:var(--ink3);margin-top:8px;">確認済み '
+         + a.approvedCount + ' / ' + a.required + ' 名</div>';
+  }
+  list.innerHTML = html;
+  box.classList.add('on');
+}
+
+function closeApprovalModal() {
+  const box = document.getElementById('approval-modal');
+  if (box) box.classList.remove('on');
 }
 
 // 表示中の月が「公開中カレンダーの月」と違うか（限定PW・未取得のうちは制限しない）

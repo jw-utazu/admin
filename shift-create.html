@@ -7,7 +7,7 @@
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" defer onload="renderGsiButton()"></script>
-<link rel="stylesheet" href="css/shift-create.css?v=21">
+<link rel="stylesheet" href="css/shift-create.css?v=22">
 </head>
 <body>
 
@@ -49,7 +49,7 @@
       </div>
       <div style="flex:1;"></div>
       <a class="hbtn" href="./manual/manual-admin-shift.html" target="_blank">📖 マニュアル</a>
-      <span id="publish-approval" style="display:none;font-size:11px;margin-right:6px;white-space:nowrap;"></span>
+      <span id="publish-approval" style="display:none;font-size:11px;margin-right:6px;white-space:nowrap;" onclick="openApprovalModal()"></span>
       <span id="publish-open-date" style="display:none;font-size:11px;color:var(--ink3);margin-right:6px;white-space:nowrap;"></span>
       <button class="hbtn" id="reject-btn" style="display:none;" onclick="rejectShift()">⚠️ 差し戻す</button>
       <button class="hbtn pub" id="publish-btn" onclick="togglePublish()">✅ シフト作成完了</button>
@@ -265,12 +265,24 @@
   </div>
 </div>
 
+<!-- 確認状況モーダル（誰が確認済みかを一覧表示） -->
+<div class="popup-overlay" id="approval-modal" onclick="closeApprovalModal()">
+  <div class="popup-box" onclick="event.stopPropagation()">
+    <div class="popup-title">☑️ シフトの確認状況</div>
+    <div id="apv-sub" style="font-size:11px;color:var(--ink3);line-height:1.6;margin-bottom:10px;"></div>
+    <div id="apv-list"></div>
+    <div class="add-form-actions" style="margin-top:14px;justify-content:flex-end;">
+      <button class="s-btn" onclick="closeApprovalModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div class="ta" id="ta"></div>
 
 <script src="js/api.js?v=1"></script>
 <script src="js/validation.js?v=7"></script>
 <script src="js/picker.js?v=4"></script>
 <script src="js/dnd.js?v=7"></script>
-<script src="js/shift-create.js?v=23"></script>
+<script src="js/shift-create.js?v=24"></script>
 </body>
 </html>
