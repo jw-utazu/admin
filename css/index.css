@@ -457,17 +457,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .req{color:var(--red);}
 /* PW モード切り替えタブ（フォルダタブ風） */
 .pw-type-bar{display:flex;gap:4px;align-items:flex-end;padding:8px 12px 0;background:var(--bg);border-bottom:1px solid var(--border2);flex-wrap:wrap;row-gap:4px;}
+/* 非アクティブ：角丸の長方形（従来どおり）／下線から少し浮かせる */
 .pw-type-tab{
-  position:relative;margin-bottom:-1px;padding:7px 15px 8px;
-  border:1px solid var(--border2);border-radius:9px 9px 0 0;
+  position:relative;margin-bottom:4px;padding:6px 14px;
+  border:1px solid var(--border);border-radius:var(--r);
   background:var(--surface2);cursor:pointer;font-family:var(--sans);font-size:12px;
   font-weight:700;color:var(--ink2);transition:background .15s,color .15s;white-space:nowrap;
 }
 .pw-type-tab:hover:not(.active):not(:disabled){background:var(--surface);color:var(--ink);}
-/* アクティブタブ：下辺を消して下線とつなげる（フォルダタブ） */
+/* アクティブ：上だけ角丸、下辺を消して下線とつなげる（フォルダタブ） */
 .pw-type-tab.active{
+  margin-bottom:-1px;padding:8px 15px 9px;border-radius:9px 9px 0 0;
   background:var(--surface);color:var(--purple);
-  border-bottom-color:var(--surface);padding-top:9px;z-index:1;
+  border-color:var(--border2);border-bottom-color:var(--surface);z-index:1;
 }
 /* アクティブタブ上端のカラーライン */
 .pw-type-tab.active::before{
