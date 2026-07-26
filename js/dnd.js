@@ -221,7 +221,9 @@ function dndReject(hit, uid, fromEl) {
   if (hit.kind === 'full') return 'この場所は3名までです';
   const cell = hit.el.closest('.cell-w');
   if (!cell) return '';
-  const inCell = [...cell.querySelectorAll('.cs')].some(s => s !== hit.el && s.dataset.value === uid);
+  // 掴んだ本人は除く。除かないと、同じセルの中での入れ替え（1番目と2・3番目の
+  // 並べ直し）が「すでにこの場所に入っています」で弾かれてしまう
+  const inCell = [...cell.querySelectorAll('.cs')].some(s => s !== hit.el && s !== fromEl && s.dataset.value === uid);
   if (inCell) return 'すでにこの場所に入っています';
 
   // 固定枠（セルの1番目）は兄弟だけ。入れ替えの結果、相手が固定枠に入る場合も拒否する
