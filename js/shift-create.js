@@ -947,7 +947,7 @@ function buildLeftPanel() {
     const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
     const bothBadge = a.sameDayBoth ? `<span class="badge-both" title="同日の通常PWにも申込があります。どちらか一方のシフトにしか入れません。">両方</span>` : '';
     const dotClass = assignedUids.has(a.uid) ? 'd-on' : 'd-off';
-    return `<div class="mr-wrap" data-uid="${esc(a.uid)}" data-name="${esc(a.name)}" title="ドラッグしてシフト表に配置できます"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name${vGenderCls(a.uid)}">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}${badgeR}</div><div class="lp-badge-col">${badgeK}${badgeW}</div></div></div>${commentHtml}</div>`;
+    return `<div class="mr-wrap" data-uid="${esc(a.uid)}" data-name="${esc(a.name)}" title="ドラッグしてシフト表に配置できます"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name${vGenderCls(a.uid)}">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}${badgeR}</div><div class="lp-badge-col">${badgeW}${badgeK}</div></div></div>${commentHtml}</div>`;
   }).join('');
   if (notApplied.length > 0) {
     html += `<div class="lp-sec lp-sec-toggle${naOpen ? ' open' : ''}" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
@@ -1450,6 +1450,7 @@ function openMemberPicker(el) {
                  + `<span class="pk-b b-w">割${c.count}</span>`
                  + (c.count === 0 ? '<span class="pk-b b-p">優先</span>' : '')
                  + (c.cartNg ? '<span class="pk-b b-n">🚫カート不可</span>' : '')
+                 + (c.noteNg ? '<span class="pk-b b-n">📝時間外</span>' : '')
                  + (c.fixedNg ? '<span class="pk-b b-n">固定枠は兄弟のみ</span>' : '');
     items.push({
       value: c.uid,

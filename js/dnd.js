@@ -277,7 +277,8 @@ function dndWarnMsg(hit, uid) {
     const c = cands.find(x => x.uid === uid);
     if (c) {
       // 固定枠に姉妹を入れる操作は dndReject で拒否しているので、ここでは扱わない
-      if (c.state === 'consec') msg = '連続配置になります';
+      if (c.state === 'notetime') msg = c.reason || '備考の参加時間外です';
+      else if (c.state === 'consec') msg = '連続配置になります';
       else if (c.state === 'crosspw') msg = '他のPWに配置済みです';
     }
   }

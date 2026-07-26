@@ -18,6 +18,9 @@ const VRULES = {
   dupSlot:     { label: '同一スロットの重複配置',           level: 'error', scope: 'live',    on: true  },
   crossPw:     { label: '通常PW／限定PWの二重配置',         level: 'error', scope: 'live',    on: true  },
   cartNg:      { label: 'カート不可の人がカート担当',       level: 'error', scope: 'live',    on: true  },
+  noteTime:    { label: '備考の参加時間外に配置',           level: 'error', scope: 'live',    on: true  },
+  noteCart:    { label: '備考の時間と合わないカート担当',    level: 'error', scope: 'live',    on: true  },
+  noteResp:    { label: '責任者に途中参加・早退の備考',     level: 'warn',  scope: 'live',    on: true  },
   noPlace:     { label: '場所未設定の列に配置',             level: 'error', scope: 'live',    on: true  },
   consecSlot:  { label: '上下のスロットに連続配置',         level: 'warn',  scope: 'live',    on: true  },
   consecBlock: { label: '前後の時間帯に連続配置',           level: 'warn',  scope: 'live',    on: true  },
@@ -62,6 +65,29 @@ function vRange(tr) {
   return { s: vT(p[0]), e: vT(p[1]) };
 }
 function vKey(b) { return b.date + '_' + b.time; }
+
+// ===== 備考（選択式）の解釈 =====
+// shift-form の buildNote() が作る3形式だけを解釈して参加できる時間帯を返す。
+// 「その他」の自由入力・旧データの自由記述は解釈しない（null）。
+// 読み違えて勝手に人を外すより、判定しないほうが安全なため。
+function vNoteWindow(note) {
+  const s = String(note || '').trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{1,2}:\d{2})\s*[〜~]\s*(\d{1,2}:\d{2})のみ参加$/);
+  if (m && vT(m[1]) < vT(m[2])) return { s: vT(m[1]), e: vT(m[2]) };
+  m = s.match(/^(\d{1,2}:\d{2})から参加$/);
+  if (m) return { s: vT(m[1]), e: Infinity };
+  m = s.match(/^(\d{1,2}:\d{2})まで参加$/);
+  if (m) return { s: -Infinity, e: vT(m[1]) };
+  return null;
+}
+// スロット行（"9:00~9:15"）が参加できる時間帯から外れているか
+function vRowOutside(win, rowTime) {
+  if (!win) return false;
+  const r = vRange(rowTime);
+  if (isNaN(r.s) || isNaN(r.e)) return false;
+  return r.s < win.s || r.e > win.e;
+}
 
 // ============================================================
 // 連続グループの判定
@@ -207,15 +233,17 @@ function validateShift(shiftDates, ctx) {
 //   'ok'      … 通常の候補
 //   'consec'  … 前後のブロックにも入っている（責任者・見守りは免除）
 //   'crosspw' … 同日に他のPWで配置済み
+//   'notetime'… 備考（〜から参加／〜まで参加／〜のみ参加）の時間外の行
 //   'blocked' … 同一スロット行に既にいる（物理的に不可能なので選ばせない）
 // ============================================================
-const VSTATE_ORDER = { ok: 0, consec: 1, crosspw: 2, move: 3, blocked: 4 };
+const VSTATE_ORDER = { ok: 0, consec: 1, crosspw: 2, notetime: 3, move: 4, blocked: 5 };
 const VSTATE_GROUP = {
-  ok:      '候補',
-  consec:  '連続配置になります ⚠',
-  crosspw: '他のPWに配置済み ⚠',
-  move:    '別の場所から移動（入れ替え）',
-  blocked: 'この時間に配置済み（選択不可）',
+  ok:       '候補',
+  consec:   '連続配置になります ⚠',
+  crosspw:  '他のPWに配置済み ⚠',
+  notetime: '備考の参加時間外 ⚠',
+  move:     '別の場所から移動（入れ替え）',
+  blocked:  'この時間に配置済み（選択不可）',
 };
 
 function buildCandidates(base, block, ri, li, ctx, current, pi) {
@@ -258,6 +286,9 @@ function buildCandidates(base, block, ri, li, ctx, current, pi) {
 
   const out = (base || []).map(a => {
     const uid = a.uid;
+    const w = wishOf(ctx, uid, block.date, block.time);
+    // 備考で参加できない行かどうか。判定できない備考（その他）は false
+    const noteNg = vRowOutside(vNoteWindow(w && w.note), slot.time);
     let state = 'ok', reason = '', at = null;
     if ((rowCount[uid] || 0) > 0) {
       // 同じ時間に既にいる人。重複はできないが、ここへ「移動」することはできる
@@ -266,6 +297,9 @@ function buildCandidates(base, block, ri, li, ctx, current, pi) {
       reason = state === 'move'
         ? `${(block.usedPlaces || [])[at.li] || '別の場所'} から移動`
         : '同じ時間に配置済み';
+    } else if (noteNg) {
+      // 本人が出せない時間帯。責任者判断で入れられるよう、選択自体は妨げない
+      state = 'notetime'; reason = `備考「${w.note}」の時間外`;
     } else {
       const ci = (ctx.conflictMap || {})[uid];
       const pw = ci ? ((ci.slotDates || {})[block.date] || []) : [];
@@ -273,7 +307,6 @@ function buildCandidates(base, block, ri, li, ctx, current, pi) {
       else if (!exemptHere.has(uid) && inAdjacentRow(uid)) { state = 'consec'; reason = '上下のスロットに配置'; }
       else if (!exemptHere.has(uid) && inNeighborBlock(uid)) { state = 'consec'; reason = '前後の時間帯にも配置'; }
     }
-    const w = wishOf(ctx, uid, block.date, block.time);
     return {
       uid, name: a.name, state, reason, at,
       furigana: (flags[uid] || {}).furigana || '',
@@ -282,6 +315,7 @@ function buildCandidates(base, block, ri, li, ctx, current, pi) {
       count:    counts[uid] || 0,
       cartNg:   !!(w && w.cartNg),
       note:     (w && w.note) || '',
+      noteNg,
       group:    VSTATE_GROUP[state],
       fixedNg:  pi === 0 && (flags[uid] || {}).gender && (flags[uid] || {}).gender !== 'M',
     };
@@ -345,9 +379,14 @@ function suggestRole(block, role, ctx) {
       if (role === 'resp' && !f.respFlag) return false;
       if (role !== 'resp' && !f.cartFlag) return false;
       if (taken.has(uid)) return false;                          // 既に別の役に就いている
-      if (role !== 'resp') {                                     // カート不可の人は出さない
-        const w = wishOf(ctx, uid, block.date, block.time);
-        if (w && w.cartNg) return false;
+      const w = wishOf(ctx, uid, block.date, block.time);
+      if (role !== 'resp') {
+        if (w && w.cartNg) return false;                         // カート不可の人は出さない
+        // 持ち込みは開始時刻に、持ち帰りは終了時刻にいないと務まらない
+        const win = vNoteWindow(w && w.note);
+        const br  = vRange(block.time);
+        if (win && role === 'bring' && win.s > br.s) return false;
+        if (win && role === 'take'  && win.e < br.e) return false;
       }
       return true;
     })
@@ -453,6 +492,19 @@ function validateBlock(block, ctx) {
     if (w && w.cartNg) push('cartNg', { uids: [uid], msg: `${nm(uid)} は「カート不可」で希望を出しています` });
   });
 
+  // --- 備考（〜から参加／〜まで参加／〜のみ参加）の時間外に配置 ---
+  Object.entries(assign).forEach(([uid, pos]) => {
+    const w = wishOf(ctx, uid, block.date, block.time);
+    const win = vNoteWindow(w && w.note);
+    if (!win) return;
+    pos.forEach(p => {
+      const st = slots[p.ri];
+      if (!st || !vRowOutside(win, st.time)) return;
+      push('noteTime', { uids: [uid], ri: p.ri, li: p.li,
+        msg: `${nm(uid)} は「${w.note}」の希望です（${st.time} には参加できません）` });
+    });
+  });
+
   // --- 場所未設定の列に人が入っている ---
   cols.forEach((loc, li) => {
     if (loc) return;
@@ -515,6 +567,38 @@ function validateBlock(block, ctx) {
       }
     });
   }
+  // --- 備考の時間とカート担当・責任者の役割が合わない ---
+  const bRange = vRange(block.time);
+  const noteOf = uid => {
+    const w = wishOf(ctx, uid, block.date, block.time);
+    return { note: (w && w.note) || '', win: vNoteWindow(w && w.note) };
+  };
+  if (need.bring) {
+    bringUids(block).forEach(uid => {
+      const { note, win } = noteOf(uid);
+      if (win && win.s > bRange.s) {
+        push('noteCart', { uids: [uid],
+          msg: `持ち込み担当の ${nm(uid)} は「${note}」の希望です（開始時刻にカートを持ち込めません）` });
+      }
+    });
+  }
+  if (need.take) {
+    takeUids(block).forEach(uid => {
+      const { note, win } = noteOf(uid);
+      if (win && win.e < bRange.e) {
+        push('noteCart', { uids: [uid],
+          msg: `持ち帰り担当の ${nm(uid)} は「${note}」の希望です（終了時刻までカートを持ち帰れません）` });
+      }
+    });
+  }
+  resp.forEach(uid => {
+    const { note, win } = noteOf(uid);
+    if (win) {
+      push('noteResp', { uids: [uid],
+        msg: `責任者の ${nm(uid)} は「${note}」の希望です（時間帯の全体は担当できません）` });
+    }
+  });
+
   if (resp.length > 0 && slots.length > 0) {
     const ri = Math.min(respSlotIdx(gi), lastRi);
     const ok = resp.some(uid => (assign[uid] || []).some(x => x.ri === ri));
