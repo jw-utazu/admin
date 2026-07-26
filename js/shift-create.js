@@ -959,9 +959,6 @@ function blockSig(b) {
 }
 
 function buildBlock(block, bi) {
-  const applied     = filterAppliedForSlot(block.date, block.time);
-  const respMembers = applied.filter(a => a.respFlag);
-  const cartMembers = applied.filter(a => a.cartFlag);
   return `<div class="tb" id="tb-${bi}">
     <div class="tb-hd">
       <span class="tb-time">${esc(block.date)}（${esc(block.weekday)}） ${esc(block.time)}</span>
@@ -974,8 +971,8 @@ function buildBlock(block, bi) {
       <button class="tb-btn" onclick="acceptSyncUpdate(${bi})">最新を確認</button>
     </div>
     <div class="v-bar" id="v-bar-${bi}"></div>
-    ${buildRespArea(bi, block.responsible || {}, respMembers, block.date)}
-    ${buildCartArea(bi, block.cart || {}, cartMembers, block.date)}
+    ${buildRespArea(bi, block.responsible || {})}
+    ${buildCartArea(bi, block.cart || {})}
     ${buildPlaceSelectUI(bi, block)}
     ${buildSlotTable(bi, block)}
   </div>`;
@@ -988,25 +985,58 @@ function buildNameMap() {
   return m;
 }
 
-function buildRespArea(bi, resp, respMembers, dateKey) {
+// 責任者・カート担当も、シフト表内の奉仕者欄（js/picker.js）と同じ
+// ボタン＋ポップオーバーにする。候補は開いたときに毎回組み立て直すので、
+// 未保存の編集（syncCurrentBlock）も反映される
+function buildRespArea(bi, resp) {
   const nm = buildNameMap();
-  const cf = uid => (typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, dateKey) : '');
-  // シフト表内の候補ピッカーと同じく、月内の担当回数が少ない人を上に出す
-  const sortedResp = [...respMembers].sort((a, b) => {
-    const ca = respCounts[a.uid] || 0, cb = respCounts[b.uid] || 0;
-    if (ca !== cb) return ca - cb;
-    return vByFurigana(a.uid, b.uid);
-  });
   function sel(id, val) {
-    let o = '<option value="">—</option>';
-    sortedResp.forEach(a => { o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}${cf(a.uid)}</option>`; });
-    if (val && !respMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}${cf(val)}</option>`;
-    return `<select class="ra-sel" id="${id}" onchange="mu(${bi})">${o}</select>`;
+    return `<button type="button" class="role-sel${val ? '' : ' empty'}${val ? vGenderCls(val) : ''}" id="${id}"`
+         + ` data-value="${esc(val)}" data-bi="${bi}" onclick="openRespPicker(this)">${esc(val ? (nm[val] || val) : '—')}</button>`;
   }
   return `<div class="resp-area"><div class="area-title">責任者（最大2名）</div><div class="ra-row">
     <div class="ra-item"><span class="ra-label">担当①</span><span class="ra-col">${sel('resp1-'+bi, resp.r1||'')}${ghostHtml(bi, 'resp', 'resp1-'+bi, resp.r1||'')}</span></div>
     <div class="ra-item"><span class="ra-label">担当②</span>${sel('resp2-'+bi, resp.r2||'')}</div>
   </div></div>`;
+}
+
+// シフト表内の奉仕者ピッカー（openMemberPicker）と同じ組み立て方。
+// 「月内の担当回数が少ない人を上に」＋「優先」バッジも揃える
+function openRespPicker(el) {
+  const bi = +el.dataset.bi;
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
+  if (!block) return;
+  syncCurrentBlock(); // 未保存の編集も候補の判定に反映させる
+  const cur = el.dataset.value || '';
+  const nm  = buildNameMap();
+  const cf  = uid => (typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, block.date) : '');
+  const respMembers = filterAppliedForSlot(block.date, block.time).filter(a => a.respFlag);
+  const sorted = [...respMembers].sort((a, b) => {
+    const ca = respCounts[a.uid] || 0, cb = respCounts[b.uid] || 0;
+    if (ca !== cb) return ca - cb;
+    return vByFurigana(a.uid, b.uid);
+  });
+  const items = [{ value: '', label: '—（未選択）', html: '<span class="pk-none">—（未選択）</span>' }];
+  sorted.forEach(a => {
+    const n = respCounts[a.uid] || 0;
+    const badges = `<span class="pk-b b-w">責${n}</span>` + (n === 0 ? '<span class="pk-b b-p">優先</span>' : '');
+    items.push({
+      value: a.uid, label: a.name, search: a.name,
+      html: `<span class="pk-nm${vGenderCls(a.uid)}">${esc(a.name)}</span>${badges}`,
+      sub: cf(a.uid) ? esc(cf(a.uid).trim()) : '',
+    });
+  });
+  // 保存済みだが今月は申込していない人（希望を取り下げた等）も、現在値なら候補に残す
+  if (cur && !respMembers.find(a => a.uid === cur)) {
+    items.splice(1, 0, { value: cur, label: nm[cur] || cur, html: `<span class="pk-nm${vGenderCls(cur)}">${esc(nm[cur] || cur)}</span>` });
+  }
+  openPicker(el, {
+    title: `責任者　${block.time}`,
+    search: true, value: cur, items,
+    onPick: v => { setPsDom(el, v); mu(bi); },
+  });
 }
 
 // ===== ゴースト提案 =====
@@ -1032,19 +1062,13 @@ function ghostHtml(bi, role, targetId, cur) {
 function applyGhost(targetId, uid, bi) {
   const el = document.getElementById(targetId);
   if (!el) return;
-  if (!Array.from(el.options).some(o => o.value === uid)) {
-    el.insertAdjacentHTML('beforeend', `<option value="${esc(uid)}">${esc(buildNameMap()[uid] || uid)}</option>`);
-  }
-  el.value = uid;
+  setPsDom(el, uid);
   if (el.id.startsWith('ci') || el.id.startsWith('co')) ucn(el.id, el.id.replace('ci', 'cn').replace('co', 'con'));
   mu(bi);
   renderBlock();
 }
 
-function buildCartArea(bi, cart, cartMembers, dateKey) {
-  const nm = buildNameMap();
-  const cf = uid => (typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, dateKey) : '');
-
+function buildCartArea(bi, cart) {
   // この時間帯に持ち込み／持ち帰りが必要かを連続グループから判定し、
   // 不要な側は入力できないようにしておく（例外運用のため解除ボタンを添える）
   const tab   = (window._dateTabs || [])[activeDateIdx];
@@ -1053,35 +1077,10 @@ function buildCartArea(bi, cart, cartMembers, dateKey) {
     ? buildBlockGroups(shiftDates)[bKey(block)] : null;
   const need  = typeof cartNeeded === 'function' ? cartNeeded(gi) : { bring: true, take: true };
 
-  // 同日の前後にある別の連続グループで持ち帰り／持ち込みをした人と同一人物なら、
-  // 既に車でカートを運んでいて引き継ぎの手間がないので候補の最上位に出す
-  const bringPriority = new Set();
-  if (gi && gi.prevGroupTail) {
-    const c = gi.prevGroupTail.cart || {};
-    [c.ko1, c.ko2].filter(Boolean).forEach(u => bringPriority.add(u));
-  }
-  const takePriority = new Set();
-  if (gi && gi.nextGroupHead) {
-    const c = gi.nextGroupHead.cart || {};
-    [c.ki1, c.ki2].filter(Boolean).forEach(u => takePriority.add(u));
-  }
-
-  function cSel(id, val, priority) {
-    const sorted = [...cartMembers].sort((a, b) => {
-      const pa = priority && priority.has(a.uid) ? 0 : 1, pb = priority && priority.has(b.uid) ? 0 : 1;
-      if (pa !== pb) return pa - pb;
-      const ca = cartCounts[a.uid] || 0, cb = cartCounts[b.uid] || 0;
-      if (ca !== cb) return ca - cb;
-      return vByFurigana(a.uid, b.uid);
-    });
-    let o = '<option value="">—</option>';
-    sorted.forEach(a => {
-      const tag = priority && priority.has(a.uid) ? ' 🔗前後グループと同一' : '';
-      o += `<option value="${esc(a.uid)}"${a.uid === val ? ' selected' : ''}>${esc(a.name)}${tag}${cf(a.uid)}</option>`;
-    });
-    if (val && !cartMembers.find(a => a.uid === val)) o += `<option value="${esc(val)}" selected>${esc(nm[val] || val)}${cf(val)}</option>`;
-    const nid = id.replace('ci', 'cn').replace('co', 'con');
-    return `<select class="cart-sel" id="${id}" onchange="ucn('${id}','${nid}');mu(${bi})">${o}</select>`;
+  function cSel(id, val, role) {
+    const nm = buildNameMap();
+    return `<button type="button" class="role-sel${val ? '' : ' empty'}${val ? vGenderCls(val) : ''}" id="${id}"`
+         + ` data-value="${esc(val)}" data-bi="${bi}" data-role="${role}" onclick="openCartRolePicker(this)">${esc(val ? (nm[val] || val) : '—')}</button>`;
   }
   const { ki1='', kc1='', ki2='', kc2='', ko1='', oc1='', ko2='', oc2='' } = cart;
   const unlocked = window._cartUnlock || {};
@@ -1091,8 +1090,8 @@ function buildCartArea(bi, cart, cartMembers, dateKey) {
     + `<span>${side === 'bring' ? '連続する前の時間帯から引き継ぐため不要' : '連続する次の時間帯へ引き継ぐため不要'}</span>`
     + `<button type="button" class="na-unlock" onclick="unlockCart(${bi},'${side}')">例外的に入力</button></div></td>`;
 
-  const bringRow1 = bringOff ? naCell('bring', 2) : `<td>${cSel('ci1-'+bi,ki1,bringPriority)}${ghostHtml(bi,'bring','ci1-'+bi,ki1)}</td><td>${cSel('ci2-'+bi,ki2,bringPriority)}</td>`;
-  const takeRow1  = takeOff  ? naCell('take', 2)  : `<td>${cSel('co1-'+bi,ko1,takePriority)}${ghostHtml(bi,'take','co1-'+bi,ko1)}</td><td>${cSel('co2-'+bi,ko2,takePriority)}</td>`;
+  const bringRow1 = bringOff ? naCell('bring', 2) : `<td>${cSel('ci1-'+bi,ki1,'bring')}${ghostHtml(bi,'bring','ci1-'+bi,ki1)}</td><td>${cSel('ci2-'+bi,ki2,'bring')}</td>`;
+  const takeRow1  = takeOff  ? naCell('take', 2)  : `<td>${cSel('co1-'+bi,ko1,'take')}${ghostHtml(bi,'take','co1-'+bi,ko1)}</td><td>${cSel('co2-'+bi,ko2,'take')}</td>`;
   const bringRow2 = bringOff ? '<td class="na-col" colspan="2"></td>' : `<td>${cartChip('cn1-'+bi,kc1,!ki1,bi)}</td><td>${cartChip('cn2-'+bi,kc2,!ki2,bi)}</td>`;
   const takeRow2  = takeOff  ? '<td class="na-col" colspan="2"></td>' : `<td>${cartChip('con1-'+bi,oc1,!ko1,bi)}</td><td>${cartChip('con2-'+bi,oc2,!ko2,bi)}</td>`;
 
@@ -1107,6 +1106,64 @@ function buildCartArea(bi, cart, cartMembers, dateKey) {
     </table>
     </div>
   </div>`;
+}
+
+// カート担当（持ち込み／持ち帰り）のピッカー。openRespPicker と同じ組み立て方に、
+// 同日の前後の連続グループで持ち帰り／持ち込みを担当した人と同一人物なら
+// 最優先で出す判定を加える（車でカートを運んだままにできるため）
+function openCartRolePicker(el) {
+  const bi   = +el.dataset.bi;
+  const role = el.dataset.role; // 'bring' | 'take'
+  const tab  = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return;
+  const block = shiftDates.filter(d => d.date === tab.date)[bi];
+  if (!block) return;
+  syncCurrentBlock(); // 未保存の編集も候補の判定に反映させる
+  const cur = el.dataset.value || '';
+  const nm  = buildNameMap();
+  const cf  = uid => (typeof conflictLabel === 'function' ? conflictLabel(conflictMap, uid, block.date) : '');
+  const cartMembers = filterAppliedForSlot(block.date, block.time).filter(a => a.cartFlag);
+
+  const gi = typeof buildBlockGroups === 'function' ? buildBlockGroups(shiftDates)[bKey(block)] : null;
+  const priority = new Set();
+  if (role === 'bring' && gi && gi.prevGroupTail) {
+    const c = gi.prevGroupTail.cart || {};
+    [c.ko1, c.ko2].filter(Boolean).forEach(u => priority.add(u));
+  } else if (role === 'take' && gi && gi.nextGroupHead) {
+    const c = gi.nextGroupHead.cart || {};
+    [c.ki1, c.ki2].filter(Boolean).forEach(u => priority.add(u));
+  }
+
+  const sorted = [...cartMembers].sort((a, b) => {
+    const pa = priority.has(a.uid) ? 0 : 1, pb = priority.has(b.uid) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    const ca = cartCounts[a.uid] || 0, cb = cartCounts[b.uid] || 0;
+    if (ca !== cb) return ca - cb;
+    return vByFurigana(a.uid, b.uid);
+  });
+  const items = [{ value: '', label: '—（未選択）', html: '<span class="pk-none">—（未選択）</span>' }];
+  sorted.forEach(a => {
+    const n = cartCounts[a.uid] || 0;
+    const badges = `<span class="pk-b b-w">カ${n}</span>`
+                 + (priority.has(a.uid) ? '<span class="pk-b b-p">🔗前後グループと同一</span>' : (n === 0 ? '<span class="pk-b b-p">優先</span>' : ''));
+    items.push({
+      value: a.uid, label: a.name, search: a.name,
+      html: `<span class="pk-nm${vGenderCls(a.uid)}">${esc(a.name)}</span>${badges}`,
+      sub: cf(a.uid) ? esc(cf(a.uid).trim()) : '',
+    });
+  });
+  if (cur && !cartMembers.find(a => a.uid === cur)) {
+    items.splice(1, 0, { value: cur, label: nm[cur] || cur, html: `<span class="pk-nm${vGenderCls(cur)}">${esc(nm[cur] || cur)}</span>` });
+  }
+  openPicker(el, {
+    title: `カート担当（${role === 'bring' ? '持ち込み' : '持ち帰り'}）　${block.time}`,
+    search: true, value: cur, items,
+    onPick: v => {
+      setPsDom(el, v);
+      ucn(el.id, el.id.replace('ci', 'cn').replace('co', 'con'));
+      mu(bi);
+    },
+  });
 }
 
 // 不要としてグレー化した欄を、その場限りで入力可能に戻す
@@ -2034,8 +2091,9 @@ function applyCellWrapLayout(el) {
 function ucn(si, ni) {
   const s = document.getElementById(si), n = document.getElementById(ni);
   if (!s || !n) return;
-  n.disabled = !s.value;
-  if (!s.value) { n.dataset.value = ''; n.textContent = '—'; n.classList.add('empty'); }
+  const v = s.dataset.value || '';
+  n.disabled = !v;
+  if (!v) { n.dataset.value = ''; n.textContent = '—'; n.classList.add('empty'); }
 }
 
 // タブ切り替え前に現在のDOM入力をshiftDatesに書き戻す（未保存データを保持）
@@ -2061,17 +2119,14 @@ function collectBlock(bi) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return null;
-  const responsible = { r1: (document.getElementById('resp1-'+bi)||{}).value||'', r2: (document.getElementById('resp2-'+bi)||{}).value||'' };
-  // 担当者は <select>、カート番号はチップ（値は data-value）
-  const selV  = id => ((document.getElementById(id) || {}).value) || '';
+  // 責任者・カート担当者・カート番号は、いずれもボタン＋ポップオーバーで値は data-value
   const chipV = id => { const e = document.getElementById(id); return (e && e.dataset.value) || ''; };
   const keep  = (dom, saved) => (document.getElementById(dom) ? chipV(dom) : (saved || ''));
+  const responsible = { r1: keep('resp1-'+bi, ''), r2: keep('resp2-'+bi, '') };
   const oc = block.cart || {};
   const cart = {
-    ki1: document.getElementById('ci1-'+bi) ? selV('ci1-'+bi) : (oc.ki1 || ''),
-    ki2: document.getElementById('ci2-'+bi) ? selV('ci2-'+bi) : (oc.ki2 || ''),
-    ko1: document.getElementById('co1-'+bi) ? selV('co1-'+bi) : (oc.ko1 || ''),
-    ko2: document.getElementById('co2-'+bi) ? selV('co2-'+bi) : (oc.ko2 || ''),
+    ki1: keep('ci1-'+bi, oc.ki1), ki2: keep('ci2-'+bi, oc.ki2),
+    ko1: keep('co1-'+bi, oc.ko1), ko2: keep('co2-'+bi, oc.ko2),
     kc1: keep('cn1-'+bi,  oc.kc1), kc2: keep('cn2-'+bi,  oc.kc2),
     oc1: keep('con1-'+bi, oc.oc1), oc2: keep('con2-'+bi, oc.oc2),
   };

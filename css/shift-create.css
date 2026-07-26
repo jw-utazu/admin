@@ -199,14 +199,12 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .ra-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .ra-item{display:flex;align-items:center;gap:6px;flex:1;min-width:140px;}
 .ra-label{font-size:11px;font-weight:700;color:#c2410c;white-space:nowrap;}
-.ra-sel{flex:1;border:1px solid #fed7aa;border-radius:var(--r);padding:5px 7px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
 .cart-area{padding:8px 12px;border-bottom:1px solid var(--border);background:var(--green-l);}
 .cart-title{color:var(--green-d);}
 .cart-tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .cart-tbl th,.cart-tbl td{border:1px solid var(--green3);padding:5px 7px;text-align:center;vertical-align:middle;}
 .cart-tbl thead th{background:var(--green4);color:var(--green-d);font-weight:700;}
 .cart-tbl .row-lbl{background:var(--green-l);font-weight:700;color:var(--green-d);text-align:left;font-size:11px;white-space:nowrap;width:90px;}
-.cart-sel{width:100%;min-width:100px;border:1px solid var(--green3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--sans);background:var(--surface);color:var(--ink);outline:none;}
 .tbl-wrap{overflow-x:auto;}
 .shift-tbl{border-collapse:collapse;font-size:12px;width:100%;}
 .shift-tbl th,.shift-tbl td{border:1px solid var(--border2);text-align:center;vertical-align:middle;}
@@ -225,6 +223,15 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cs.g-f{border-left-color:#be185d;}
 .cs:focus{border-color:var(--blue);outline:2px solid var(--purple-l);}
 .cs.new-sel{border-style:dashed;color:var(--ink3);}
+
+/* 責任者・カート担当ボタン。.cs と見た目は揃えつつ、DnD（dnd.js のグローバル
+   pointerdown 監視）が .cs を掴む対象にしているため巻き込まれないよう別クラスにする */
+.role-sel{flex:1;width:100%;border:1px solid var(--border2);border-radius:5px;padding:4px 6px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);text-align:left;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left-width:3px;border-left-color:var(--border2);}
+.role-sel:hover{background:var(--surface2);border-color:var(--purple);}
+.role-sel.empty{color:var(--ink3);}
+.role-sel.g-m{border-left-color:#2563eb;}
+.role-sel.g-f{border-left-color:#be185d;}
+.role-sel:focus{border-color:var(--blue);outline:2px solid var(--purple-l);}
 
 /* ===== TAB3: 設定 ===== */
 .settings-scroll{flex:1;overflow-y:auto;padding:14px;}
