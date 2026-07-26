@@ -80,12 +80,16 @@ function buildBlockGroups(shiftDates) {
       if (i > 0 && vRange(list[i - 1].time).e !== vRange(b.time).s) groups.push([]);
       groups[groups.length - 1].push(b);
     });
-    groups.forEach(g => g.forEach((b, i) => {
+    // 同日内で1つ前／1つ後ろの連続グループ（間が空いていても対象）。
+    // カート担当を持ち帰り→持ち込みで同一人物に引き継がせたいときの参照用
+    groups.forEach((g, gi) => g.forEach((b, i) => {
       info[vKey(b)] = {
         date, time: b.time, group: g, posInGroup: i,
         isHead: i === 0, isTail: i === g.length - 1,
         prev: i > 0 ? g[i - 1] : null,
         next: i < g.length - 1 ? g[i + 1] : null,
+        prevGroupTail: gi > 0 ? groups[gi - 1][groups[gi - 1].length - 1] : null,
+        nextGroupHead: gi < groups.length - 1 ? groups[gi + 1][0] : null,
       };
     }));
   });
@@ -323,6 +327,18 @@ function suggestRole(block, role, ctx) {
   const flags = ctx.memberFlags || {};
   const taken = new Set(respUids(block).concat(bringUids(block), takeUids(block)));
   const counts = role === 'resp' ? (ctx.respCounts || {}) : (ctx.cartCounts || {});
+
+  // カート担当は、同日の前後にある別の連続グループで持ち帰り／持ち込みをした人と
+  // 同一人物なら、既に車でカートを運んでいるため引き継ぎの手間がなく最優先にする
+  const handover = new Set();
+  if (role === 'bring' && gi && gi.prevGroupTail) {
+    const c = gi.prevGroupTail.cart || {};
+    [c.ko1, c.ko2].filter(Boolean).forEach(u => handover.add(u));
+  } else if (role === 'take' && gi && gi.nextGroupHead) {
+    const c = gi.nextGroupHead.cart || {};
+    [c.ki1, c.ki2].filter(Boolean).forEach(u => handover.add(u));
+  }
+
   return uids
     .filter(uid => {
       const f = flags[uid] || {};
@@ -335,8 +351,15 @@ function suggestRole(block, role, ctx) {
       }
       return true;
     })
-    .sort((a, b) => (counts[a] || 0) - (counts[b] || 0))
-    .map(uid => ({ uid, name: (flags[uid] || {}).name || uid, count: counts[uid] || 0 }));
+    .sort((a, b) => {
+      const ha = handover.has(a) ? 0 : 1, hb = handover.has(b) ? 0 : 1;
+      if (ha !== hb) return ha - hb;
+      return (counts[a] || 0) - (counts[b] || 0);
+    })
+    .map(uid => ({
+      uid, name: (flags[uid] || {}).name || uid, count: counts[uid] || 0,
+      reason: handover.has(uid) ? '前後グループの担当と同一人物' : undefined,
+    }));
 }
 
 // 候補リスト表示用：他PWでの状況を短いラベルにする
