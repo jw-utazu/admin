@@ -1,16 +1,27 @@
 // ============================================================
 // シフト表のドラッグ＆ドロップ
 //
-// 設計の要：「上書き」という動作を作らない。
-// ドロップは指を離した瞬間に確定するため、上書きにすると狙いを外したときに
-// 人が黙って消える。どのドロップでも移動か入れ替えにしかならないようにして、
-// 「上書きか入れ替えか」を利用者が意識しなくて済むようにしている。
-// 人を外すのは、左メニューへ戻したときだけ。
+// 設計の要：人の上に落としたら「置き換え」。
+// 当初は入れ替えにしていたが、実際に使うと置き換えたい場面のほうが多かった。
+// 危ないのは上書きそのものではなく「誰が消えたのか分からないこと」なので、
+// 誰が誰に変わったかを必ず見せることを条件に置き換えを許している：
+//   落とす前  … 消える人に取り消し線を引き、「〇〇 を置き換え」と指の下に出す
+//   落とした後 … 「〇〇 を △△ に置き換えました」と両方の名前で知らせる
+//   やり直し   … 1操作ぶんの履歴を積むので 元に戻す（Ctrl+Z）で戻せる
 //
-//   セルの空き位置へ … 移動
-//   人の上へ         … 入れ替え
-//   満杯のセルへ     … 受け付けない
-//   左メニューへ     … 配置から外す
+//   セルの空き位置へ   … 移動
+//   人の上へ           … 置き換え（元いた人は外れる）
+//   満杯のセルの余白へ … 受け付けない（誰の上でもないので置き換え先が無い）
+//   左メニューへ       … 配置から外す
+//
+// 責任者・カート担当欄（.role-sel）も同じ操作で編集できる。ただし役割は
+// スロット表の配置とは別の層で、同じ人が両方に入るのが通常の運用なので、
+// 層をまたぐドロップでは元の位置が残る（表の人を責任者欄へ落とす＝その人を
+// 責任者にする。表の配置はそのまま）。
+//   役割欄どうし             … 移動・置き換え
+//   表・左メニュー → 役割欄  … その役に就ける（元の配置はそのまま）
+//   役割欄 → 表              … その場所に配置する（役割はそのまま）
+//   役割欄 → 左メニュー      … その役から外す
 //
 // マウスとタッチの両方で動かすため Pointer Events を使う
 // （HTML5 の drag&drop API はタッチで動かない）。
@@ -28,6 +39,26 @@ let _dnd = null;   // { uid, name, fromEl, ghost, started, x, y, holdTimer, scro
 let _dndClickBlock = 0;  // この時刻まではクリックを無視する（下の「後始末」参照）
 
 function dndActive() { return !!(_dnd && _dnd.started); }
+
+// 責任者・カート担当欄かどうか。スロット表（.cs）とは別の層として扱う
+function dndIsRole(el) { return !!el && el.classList && el.classList.contains('role-sel'); }
+function dndRoleName(role) {
+  return role === 'resp' ? '責任者' : role === 'bring' ? '持ち込み担当' : '持ち帰り担当';
+}
+// 同じ役の欄（担当①②）をまとめて返す
+function dndRoleGroup(el) {
+  return [...document.querySelectorAll(`#tb-${el.dataset.bi} .role-sel[data-role="${el.dataset.role}"]`)];
+}
+function dndBlock(bi) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  if (!tab) return null;
+  return (shiftDates || []).filter(d => d.date === tab.date)[bi] || null;
+}
+// 横に長いスロット表の外枠（カート担当表の .tbl-wrap と区別する）
+function dndSlotWrap() {
+  const t = document.querySelector('#main-content .shift-tbl');
+  return t ? t.closest('.tbl-wrap') : null;
+}
 
 // 左メニューで、押した点がどの奉仕者の行かを決める。
 // 名前の文字だけでなく行のどこを押しても掴めるように、要素の親子関係だけに頼らず
@@ -48,11 +79,14 @@ function dndMemberRow(e) {
 document.addEventListener('pointerdown', e => {
   if (e.button !== undefined && e.button !== 0) return;
   const cs = e.target.closest && e.target.closest('.cs');
+  const rs = e.target.closest && e.target.closest('.role-sel');
   const mr = dndMemberRow(e);
   let uid = '', name = '', fromEl = null, srcEl = null;
 
   if (cs && cs.dataset.value) {
     uid = cs.dataset.value; name = cs.textContent; fromEl = cs; srcEl = cs;
+  } else if (rs && rs.dataset.value) {
+    uid = rs.dataset.value; name = rs.textContent; fromEl = rs; srcEl = rs;
   } else if (mr) {
     uid = mr.dataset.uid; name = mr.dataset.name || ''; srcEl = mr;
   } else return;
@@ -130,7 +164,7 @@ function dndMoveGhost(x, y) {
   dndMoveMsg(x, y);
 }
 
-// ドラッグ中、指の下に理由付きのラベルを出す（エラーは赤／注意は黄）
+// ドラッグ中、指の下に理由付きのラベルを出す（エラーは赤／注意は黄／案内は紫）
 function dndSetMsg(text, kind) {
   if (!_dnd) return;
   if (!text) { if (_dnd.msgEl) { _dnd.msgEl.remove(); _dnd.msgEl = null; } return; }
@@ -142,6 +176,7 @@ function dndSetMsg(text, kind) {
   }
   _dnd.msgEl.textContent = text;
   _dnd.msgEl.classList.toggle('warn', kind === 'warn');
+  _dnd.msgEl.classList.toggle('info', kind === 'info');
   dndMoveMsg(_dnd.lx, _dnd.ly);
 }
 
@@ -151,16 +186,37 @@ function dndMoveMsg(x, y) {
   _dnd.msgEl.style.top  = (y + 34) + 'px';
 }
 
-// 表が横に長いので、端に寄せたら自動でスクロールする
+// 表が横に長いので、端に寄せたら自動でスクロールする。
+// 横に動くのはスロット表の外枠、縦に動くのは本文全体（#main-content）で別物。
+// 責任者・カート担当欄は表の上にあるので、縦が動かないと下の行から掴んだ人を
+// 役割欄まで運べない
 function dndAutoScroll() {
   if (!_dnd || !_dnd.started || _dnd.lx === undefined) return;
-  const wrap = document.querySelector('#main-content .tbl-wrap');
-  if (!wrap) return;
-  const r = wrap.getBoundingClientRect();
-  if (_dnd.lx > r.right - DND_EDGE) wrap.scrollLeft += 12;
-  else if (_dnd.lx < r.left + DND_EDGE) wrap.scrollLeft -= 12;
-  if (_dnd.ly > r.bottom - DND_EDGE) wrap.scrollTop += 8;
-  else if (_dnd.ly < r.top + DND_EDGE) wrap.scrollTop -= 8;
+  const wrap = dndSlotWrap();
+  if (wrap) {
+    const r = wrap.getBoundingClientRect();
+    if (_dnd.lx > r.right - DND_EDGE) wrap.scrollLeft += 12;
+    else if (_dnd.lx < r.left + DND_EDGE) wrap.scrollLeft -= 12;
+  }
+  const box = document.getElementById('main-content');
+  if (box) {
+    const b = box.getBoundingClientRect();
+    if (_dnd.ly > b.bottom - DND_EDGE) box.scrollTop += 8;
+    else if (_dnd.ly < b.top + DND_EDGE) box.scrollTop -= 8;
+  }
+}
+
+// 表を作り直しても横スクロール位置を保つ。ドラッグ直後に表が左端へ飛ぶと
+// いま落とした場所を見失う
+function dndRerenderBlock() {
+  const box = document.getElementById('main-content');
+  const top = box ? box.scrollTop : 0;
+  const before = dndSlotWrap();
+  const left = before ? before.scrollLeft : 0;
+  renderBlock();
+  if (box) box.scrollTop = top;
+  const after = dndSlotWrap();
+  if (after) after.scrollLeft = left;
 }
 
 // ===== 落とし先の判定 =====
@@ -173,15 +229,17 @@ function dndHitTest(x, y) {
 
   if (el.closest('#lp')) return _dnd.fromEl ? { kind: 'remove' } : null;
 
-  const cs = el.closest('.cs');
-  if (cs === _dnd.fromEl) return null;   // つかんだ場所に戻しただけ
-  if (cs) {
-    if (!cs.dataset.value) return { kind: 'move', el: cs };
-    // 左メニューからの配置には「元の位置」が無く、入れ替えが成立しない。
-    // そのまま置くと元からいた人が消えるので、同じセルの空き位置へ回す
-    if (!_dnd.fromEl) return dndFreeInCell(cs.closest('.cell-w'), _dnd.uid);
-    return { kind: 'swap', el: cs };
+  const role = dndRoleTarget(el);
+  if (role) {
+    if (role === _dnd.fromEl) return null;   // つかんだ場所に戻しただけ
+    return { kind: role.dataset.value ? 'over' : 'move', el: role, role: true };
   }
+
+  const cs = el.closest('.cs');
+  // つかんだ場所に戻しただけ。cs が null のときに素通りさせないと、左メニューから
+  // （fromEl も null）セルの余白へ落とす操作が無反応になる
+  if (cs && cs === _dnd.fromEl) return null;
+  if (cs) return { kind: cs.dataset.value ? 'over' : 'move', el: cs };
 
   const cell = el.closest('.cell-w');
   if (cell) {
@@ -190,6 +248,15 @@ function dndHitTest(x, y) {
     return dndFreeInCell(cell, _dnd.uid);
   }
   return null;
+}
+
+// 責任者・カート担当欄を返す。欄そのものは小さいので、ラベルや枡の余白を
+// 押しても同じ欄として扱う（カート番号の枡には .role-sel が無いので null）
+function dndRoleTarget(el) {
+  const direct = el.closest('.role-sel');
+  if (direct) return direct;
+  const box = el.closest('.ra-item, .cart-tbl td');
+  return box ? box.querySelector('.role-sel') : null;
 }
 
 // セル内の空き位置を返す。姉妹は1番目（固定枠）に入れないので後ろの空きを優先する
@@ -202,27 +269,45 @@ function dndFreeInCell(cell, uid) {
 }
 
 function dndHighlight(hit) {
-  document.querySelectorAll('.dnd-over,.dnd-swap,.dnd-ng,.dnd-warn').forEach(el =>
-    el.classList.remove('dnd-over', 'dnd-swap', 'dnd-ng', 'dnd-warn'));
+  document.querySelectorAll('.dnd-over,.dnd-replace,.dnd-ng,.dnd-warn').forEach(el =>
+    el.classList.remove('dnd-over', 'dnd-replace', 'dnd-ng', 'dnd-warn'));
   if (!hit) { dndSetMsg(''); return; }
   if (hit.kind === 'remove') {
     const lp = document.getElementById('lp'); if (lp) lp.classList.add('dnd-over');
     dndSetMsg(''); return;
   }
-  if (hit.kind === 'full') { hit.el.classList.add('dnd-ng'); dndSetMsg('この場所は3名までです', 'ng'); return; }
+  // 光らせる範囲。表はセル全体、役割欄は欄そのもの
+  const box = hit.role ? hit.el : (hit.el.closest('.cell-w') || hit.el);
   const bad = dndReject(hit, _dnd.uid, _dnd.fromEl);
-  const cell = hit.el.closest('.cell-w');
-  if (bad) { if (cell) cell.classList.add('dnd-ng'); dndSetMsg(bad, 'ng'); return; }
+  if (bad) { box.classList.add('dnd-ng'); dndSetMsg(bad, 'ng'); return; }
+  // 置き換えは消える人だけに取り消し線、移動はセル全体を光らせて、
+  // どちらになるか・誰が消えるかを指を離す前に見せる
+  if (hit.kind === 'over') hit.el.classList.add('dnd-replace');
+  else box.classList.add('dnd-over');
   const warn = dndWarnMsg(hit, _dnd.uid);
+  const note = dndDropNote(hit);
   if (warn) {
-    if (hit.kind === 'swap') hit.el.classList.add('dnd-warn'); else if (cell) cell.classList.add('dnd-warn');
-    dndSetMsg(warn, 'warn');
+    (hit.kind === 'over' ? hit.el : box).classList.add('dnd-warn');
+    dndSetMsg(note ? `${warn}／${note}` : warn, 'warn');
     return;
   }
-  dndSetMsg('');
-  // 入れ替えは相手だけ、移動はセル全体を光らせて、どちらになるか分かるようにする
-  if (hit.kind === 'swap') hit.el.classList.add('dnd-swap');
-  else if (cell) cell.classList.add('dnd-over');
+  dndSetMsg(note, 'info');
+}
+
+// 落とす前に伝えること。消える人の名前と、層をまたぐと元の位置が残ること。
+// 役割とスロット表は別の層なので、またぐドロップを移動だと思って落とすと
+// 二重に入ったように見える
+function dndDropNote(hit) {
+  if (!_dnd || !hit || !hit.el) return '';
+  const parts = [];
+  if (hit.kind === 'over') {
+    const p = hit.el.dataset.value;
+    parts.push(`${buildNameMap()[p] || p} を置き換え`);
+  }
+  const from = _dnd.fromEl;
+  if (from && hit.role && !dndIsRole(from)) parts.push(`${dndRoleName(hit.el.dataset.role)}にする（配置はそのまま）`);
+  else if (from && !hit.role && dndIsRole(from)) parts.push(`${dndRoleName(from.dataset.role)}のまま配置`);
+  return parts.join('／');
 }
 
 // 姉妹かどうか。性別が未設定の人は判定できないので姉妹とはみなさない
@@ -236,6 +321,7 @@ function dndIsSister(uid) {
 // uid・fromEl は引数で受け取る（確定処理では _dnd を破棄したあとに呼ぶため）
 function dndReject(hit, uid, fromEl) {
   if (!hit || !hit.el || hit.kind === 'remove') return '';
+  if (hit.role) return dndRoleReject(hit, uid, fromEl);
   if (hit.kind === 'full') return 'この場所は3名までです';
   const cell = hit.el.closest('.cell-w');
   if (!cell) return '';
@@ -244,38 +330,54 @@ function dndReject(hit, uid, fromEl) {
   const inCell = [...cell.querySelectorAll('.cs')].some(s => s !== hit.el && s !== fromEl && s.dataset.value === uid);
   if (inCell) return 'すでにこの場所に入っています';
 
-  // 固定枠（セルの1番目）は兄弟だけ。入れ替えの結果、相手が固定枠に入る場合も拒否する
+  // 固定枠（セルの1番目）は兄弟だけ
   if (+hit.el.dataset.pi === 0 && dndIsSister(uid)) return '1番目（固定枠）には兄弟しか入れられません';
-  if (hit.kind === 'swap' && fromEl && +fromEl.dataset.pi === 0 && dndIsSister(hit.el.dataset.value))
-    return '入れ替えると1番目（固定枠）に姉妹が入ります';
 
   // 同一スロット行の重複は物理的に不可能なので、どこであれ落とせない
-  // （コンボボックスは「移動」として自動処理するが、DnDでは元位置を空にする
-  //   保証がない＝ドロップ先から動かした本人以外に既にいる場合は拒否する）
+  // （置き換えで消える人と、移動元として空く欄は数に入れない）
   const bi = hit.el.dataset.bi, ri = +hit.el.dataset.ri;
   const rowDup = [...document.querySelectorAll(`#tb-${bi} .cs`)]
     .some(s => +s.dataset.ri === ri && s !== hit.el && s !== fromEl && s.dataset.value === uid);
   if (rowDup) return 'この時間はすでに別の場所に配置されています';
-
-  // 入れ替え：相手が移動元の行で別の場所にも重複してしまう場合も拒否
-  if (hit.kind === 'swap' && fromEl) {
-    const tgtVal = hit.el.dataset.value;
-    if (tgtVal) {
-      const fbi = fromEl.dataset.bi, fri = +fromEl.dataset.ri;
-      const tgtDup = [...document.querySelectorAll(`#tb-${fbi} .cs`)]
-        .some(s => +s.dataset.ri === fri && s !== fromEl && s !== hit.el && s.dataset.value === tgtVal);
-      if (tgtDup) return '入れ替え先の人がこの時間の別の場所に配置済みです';
-    }
-  }
   return '';
+}
+
+// 責任者・カート担当欄に落とせない理由。落とせるなら空文字。
+// ピッカーで選べないもの（役の登録が無い・同じ役の重複）はドロップでも入れられない。
+// 移動元の欄はこの操作で空くので、重複の数に入れない
+function dndRoleReject(hit, uid, fromEl) {
+  const role = hit.el.dataset.role;
+  const f = (typeof memberFlags !== 'undefined' ? memberFlags : {})[uid] || {};
+  if (role === 'resp' && !f.respFlag) return '責任者に登録されていません';
+  if (role !== 'resp' && !f.cartFlag) return 'カート担当に登録されていません';
+  const dup = dndRoleGroup(hit.el).some(s => s !== hit.el && s !== fromEl && s.dataset.value === uid);
+  if (dup) return `すでに${dndRoleName(role)}に入っています`;
+  return '';
+}
+
+// 落とせるが注意が必要な理由（カート不可・備考の時間と合わない・申込が無い）。
+// 判定の基準は公開前チェック（validation.js の cartNg／noteCart／noteResp）と同じ
+function dndRoleWarn(el, uid) {
+  const block = dndBlock(+el.dataset.bi);
+  if (!block || typeof wishOf !== 'function') return '';
+  const w = wishOf({ applicants }, uid, block.date, block.time);
+  if (!w) return 'この時間帯に申込がありません';
+  const o = typeof w === 'object' ? w : {};
+  const role = el.dataset.role;
+  if (role !== 'resp' && o.cartNg) return '「カート不可」で希望を出しています';
+  const win = typeof vNoteWindow === 'function' ? vNoteWindow(o.note) : null;
+  if (!win) return '';
+  const br = vRange(block.time);
+  if (role === 'bring') return win.s > br.s ? `「${o.note}」の希望です（開始時刻にカートを持ち込めません）` : '';
+  if (role === 'take')  return win.e < br.e ? `「${o.note}」の希望です（終了時刻までカートを持ち帰れません）` : '';
+  return `「${o.note}」の希望です（時間帯の全体は担当できません）`;
 }
 
 // その位置にその人を置いた場合の候補分類を1件返す（buildCandidates と同じ基準）
 function dndCandAt(el, uid) {
   if (!el || !uid || typeof buildCandidates !== 'function') return null;
-  const bi = +el.dataset.bi, ri = +el.dataset.ri, li = +el.dataset.li, pi = +el.dataset.pi;
-  const tab = (window._dateTabs || [])[activeDateIdx];
-  const block = tab ? (shiftDates || []).filter(d => d.date === tab.date)[bi] : null;
+  const ri = +el.dataset.ri, li = +el.dataset.li, pi = +el.dataset.pi;
+  const block = dndBlock(+el.dataset.bi);
   if (!block) return null;
   if (typeof syncCurrentBlock === 'function') syncCurrentBlock();
   const base = filterAppliedForSlot(block.date, block.time);
@@ -290,11 +392,14 @@ function dndCandAt(el, uid) {
 // コンボボックスの候補分類（buildCandidates／validation.js）と同じ基準を使う
 function dndWarnMsg(hit, uid) {
   if (!hit || !hit.el || hit.kind === 'remove' || hit.kind === 'full') return '';
-  if (typeof buildCandidates !== 'function') return '';
-  const fromEl = _dnd ? _dnd.fromEl : null;
-  const partner = hit.kind === 'swap' ? (hit.el.dataset.value || '') : '';
-  const key = hit.el.id + '|' + uid + '|' + partner;
+  const key = hit.el.id + '|' + uid;
   if (_dnd.warnCache && _dnd.warnCache.key === key) return _dnd.warnCache.msg;
+  if (hit.role) {
+    const m = dndRoleWarn(hit.el, uid);
+    _dnd.warnCache = { key, msg: m };
+    return m;
+  }
+  if (typeof buildCandidates !== 'function') return '';
   let msg = '';
   const c = dndCandAt(hit.el, uid);
   if (c) {
@@ -302,13 +407,6 @@ function dndWarnMsg(hit, uid) {
     if (c.state === 'notetime') msg = c.reason || '備考の参加時間外です';
     else if (c.state === 'consec') msg = '連続配置になります';
     else if (c.state === 'crosspw') msg = '他のPWに配置済みです';
-  }
-  // 入れ替えでは相手が掴んだ側の位置へ移る。相手にとっての時間外も見落とさない
-  if (!msg && partner && fromEl) {
-    const pc = dndCandAt(fromEl, partner);
-    if (pc && pc.state === 'notetime') {
-      msg = '入れ替え相手の ' + (pc.name || partner) + ' が' + (pc.reason || '備考の参加時間外');
-    }
   }
   _dnd.warnCache = { key, msg };
   return msg;
@@ -332,8 +430,18 @@ document.addEventListener('pointerup', e => {
 
   if (hit.kind === 'remove') {
     if (!fromEl) return;
+    const nm = buildNameMap()[uid] || uid;
+    if (dndIsRole(fromEl)) {
+      const rn = dndRoleName(fromEl.dataset.role);
+      setPsDom(fromEl, '');
+      syncRoleCartNum(fromEl);
+      mu(+fromEl.dataset.bi);
+      dndRerenderBlock();
+      toast(`${nm} を${rn}から外しました`, 's');
+      return;
+    }
     setPsValue(fromEl, '');
-    toast(`${buildNameMap()[uid] || uid} を外しました`, 's');
+    toast(`${nm} を外しました`, 's');
     return;
   }
   dndApply(fromEl, hit.el, uid);
@@ -353,31 +461,63 @@ function dndCancel() {
   if (_dnd.ghost) _dnd.ghost.remove();
   if (_dnd.msgEl) _dnd.msgEl.remove();
   document.body.classList.remove('dnd-on');
-  document.querySelectorAll('.dnd-over,.dnd-swap,.dnd-ng,.dnd-warn,.dnd-press').forEach(el =>
-    el.classList.remove('dnd-over', 'dnd-swap', 'dnd-ng', 'dnd-warn', 'dnd-press'));
+  document.querySelectorAll('.dnd-over,.dnd-replace,.dnd-ng,.dnd-warn,.dnd-press').forEach(el =>
+    el.classList.remove('dnd-over', 'dnd-replace', 'dnd-ng', 'dnd-warn', 'dnd-press'));
   _dnd = null;
 }
 
-// 移動または入れ替え。人が消える経路は作らない
+// 移動または置き換え。消えた人が誰かは必ず知らせる
 function dndApply(fromEl, targetEl, uid) {
+  if (dndIsRole(targetEl)) { dndApplyRole(fromEl, targetEl, uid); return; }
   const bi = +targetEl.dataset.bi;
   const nm = buildNameMap();
   const tgtVal = targetEl.dataset.value || '';
+  const sameLayer = fromEl && !dndIsRole(fromEl);   // 表の中での操作か
 
-  if (!fromEl) {
-    // 左メニューから：空き位置に入れるだけ
-    setPsDom(targetEl, uid);
-    compactCell(bi, +targetEl.dataset.ri, +targetEl.dataset.li);
-    mu(bi);
-    toast(`${nm[uid] || uid} を配置しました`, 's');
-    return;
-  }
-  // 表の中：移動元に相手を入れる（空なら移動、人がいれば入れ替え）
   setPsDom(targetEl, uid);
-  setPsDom(fromEl, tgtVal);
-  compactCell(+fromEl.dataset.bi, +fromEl.dataset.ri, +fromEl.dataset.li);
+  // 表の中での操作だけ移動元が空く。左メニュー・役割欄からは元の位置が残る
+  if (sameLayer) {
+    setPsDom(fromEl, '');
+    compactCell(+fromEl.dataset.bi, +fromEl.dataset.ri, +fromEl.dataset.li);
+  }
   compactCell(bi, +targetEl.dataset.ri, +targetEl.dataset.li);
   mu(bi);
-  toast(tgtVal ? `${nm[uid] || uid} と ${nm[tgtVal] || tgtVal} を入れ替えました`
-               : `${nm[uid] || uid} を移動しました`, 's');
+  const who = nm[uid] || uid;
+  toast(tgtVal    ? `${nm[tgtVal] || tgtVal} を ${who} に置き換えました`
+      : sameLayer ? `${who} を移動しました`
+      : fromEl    ? `${who} を配置しました（${dndRoleName(fromEl.dataset.role)}のままです）`
+                  : `${who} を配置しました`, 's');
+}
+
+// 責任者・カート担当欄への確定。役割欄どうしなら移動・置き換え、
+// 左メニュー・スロット表からなら役に就けるだけで元の位置はそのまま残す
+function dndApplyRole(fromEl, targetEl, uid) {
+  const nm = buildNameMap();
+  const tgtVal = targetEl.dataset.value || '';
+  const sameLayer = dndIsRole(fromEl);
+  // カート番号は「その人が運ぶカート」なので、人と一緒に動かす。位置に残すと
+  // 動かしたとたんに別のカートを運ぶことになってしまう。責任者欄との行き来には
+  // 運ぶカートが無いので、その場合は番号を位置に残す
+  const bothCart = sameLayer && fromEl.dataset.role !== 'resp' && targetEl.dataset.role !== 'resp';
+  const fromNum = bothCart ? roleCartNumEl(fromEl) : null;
+  const tgtNum  = bothCart ? roleCartNumEl(targetEl) : null;
+  const fromNumVal = fromNum ? (fromNum.dataset.value || '') : '';
+
+  setPsDom(targetEl, uid);
+  syncRoleCartNum(targetEl);
+  if (sameLayer) {
+    setPsDom(fromEl, '');
+    syncRoleCartNum(fromEl);
+  }
+  // 番号は担当者をそろえたあとに入れ直す（空いた欄の番号は syncRoleCartNum が消すため）
+  if (tgtNum) setCartDom(tgtNum, fromNumVal);
+
+  mu(+targetEl.dataset.bi);
+  // ゴースト提案（候補：〜）は欄が空のときだけ出る。作り直して食い違いを消す
+  dndRerenderBlock();
+  const who = nm[uid] || uid;
+  const sameRole = sameLayer && fromEl.dataset.role === targetEl.dataset.role;
+  toast(tgtVal    ? `${nm[tgtVal] || tgtVal} を ${who} に置き換えました`
+      : sameRole  ? `${who} を移動しました`
+                  : `${who} を${dndRoleName(targetEl.dataset.role)}にしました`, 's');
 }

@@ -1130,8 +1130,11 @@ function buildNameMap() {
 function buildRespArea(bi, resp) {
   const nm = buildNameMap();
   function sel(id, val) {
+    // data-role は dnd.js が「同じ役の欄」を集めるのに使う（責任者①②で1組）
     return `<button type="button" class="role-sel${val ? '' : ' empty'}${val ? vGenderCls(val) : ''}" id="${id}"`
-         + ` data-value="${esc(val)}" data-bi="${bi}" onclick="openRespPicker(this)">${esc(val ? (nm[val] || val) : '—')}</button>`;
+         + ` data-value="${esc(val)}" data-bi="${bi}" data-role="resp"`
+         + ` title="${val ? 'ドラッグして入れ替え・移動できます' : 'クリックして選択（表の人をここへドラッグしても入ります）'}"`
+         + ` onclick="openRespPicker(this)">${esc(val ? (nm[val] || val) : '—')}</button>`;
   }
   return `<div class="resp-area"><div class="area-title">責任者（最大2名）</div><div class="ra-row">
     <div class="ra-item"><span class="ra-label">担当①</span><span class="ra-col">${sel('resp1-'+bi, resp.r1||'')}${ghostHtml(bi, 'resp', 'resp1-'+bi, resp.r1||'')}</span></div>
@@ -1202,9 +1205,23 @@ function applyGhost(targetId, uid, bi) {
   const el = document.getElementById(targetId);
   if (!el) return;
   setPsDom(el, uid);
-  if (el.id.startsWith('ci') || el.id.startsWith('co')) ucn(el.id, el.id.replace('ci', 'cn').replace('co', 'con'));
+  syncRoleCartNum(el);
   mu(bi);
   renderBlock();
+}
+
+// カート担当欄に対応するカート番号チップ。責任者欄には無いので null
+// （欄とチップを結ぶ id の規則をここ一箇所に閉じ込める）
+function roleCartNumEl(el) {
+  if (!el || !el.dataset.role || el.dataset.role === 'resp') return null;
+  return document.getElementById(el.id.replace('ci', 'cn').replace('co', 'con'));
+}
+
+// カート担当欄の値が変わったら、その列のカート番号チップの有効／無効をそろえる
+// （dnd.js からも呼ばれる）
+function syncRoleCartNum(el) {
+  const n = roleCartNumEl(el);
+  if (n) ucn(el.id, n.id);
 }
 
 function buildCartArea(bi, cart) {
@@ -1219,7 +1236,9 @@ function buildCartArea(bi, cart) {
   function cSel(id, val, role) {
     const nm = buildNameMap();
     return `<button type="button" class="role-sel${val ? '' : ' empty'}${val ? vGenderCls(val) : ''}" id="${id}"`
-         + ` data-value="${esc(val)}" data-bi="${bi}" data-role="${role}" onclick="openCartRolePicker(this)">${esc(val ? (nm[val] || val) : '—')}</button>`;
+         + ` data-value="${esc(val)}" data-bi="${bi}" data-role="${role}"`
+         + ` title="${val ? 'ドラッグして入れ替え・移動できます' : 'クリックして選択（表の人をここへドラッグしても入ります）'}"`
+         + ` onclick="openCartRolePicker(this)">${esc(val ? (nm[val] || val) : '—')}</button>`;
   }
   const { ki1='', kc1='', ki2='', kc2='', ko1='', oc1='', ko2='', oc2='' } = cart;
   const unlocked = window._cartUnlock || {};
@@ -1299,7 +1318,7 @@ function openCartRolePicker(el) {
     search: true, value: cur, items,
     onPick: v => {
       setPsDom(el, v);
-      ucn(el.id, el.id.replace('ci', 'cn').replace('co', 'con'));
+      syncRoleCartNum(el);
       mu(bi);
     },
   });
@@ -1343,10 +1362,14 @@ function openCartPicker(el) {
   });
 }
 
-function setCartValue(el, v) {
+function setCartDom(el, v) {
   el.dataset.value = v;
   el.textContent = cartLabel(v);
   el.classList.toggle('empty', !v);
+}
+
+function setCartValue(el, v) {
+  setCartDom(el, v);
   mu(+el.dataset.bi);
 }
 

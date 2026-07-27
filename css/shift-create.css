@@ -263,8 +263,9 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cs:focus{border-color:var(--blue);outline:2px solid var(--purple-l);}
 .cs.new-sel{border-style:dashed;color:var(--ink3);}
 
-/* 責任者・カート担当ボタン。.cs と見た目は揃えつつ、DnD（dnd.js のグローバル
-   pointerdown 監視）が .cs を掴む対象にしているため巻き込まれないよう別クラスにする */
+/* 責任者・カート担当ボタン。.cs と見た目は揃えつつ、スロット表の配置とは別の層
+   （役割）なので、dnd.js が両者を見分けられるよう別クラスにしている。
+   ドラッグ中の見た目はファイル末尾の「ドラッグ＆ドロップ」節にまとめてある */
 .role-sel{flex:1;width:100%;border:1px solid var(--border2);border-radius:5px;padding:4px 6px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);text-align:left;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left-width:3px;border-left-color:var(--border2);}
 .role-sel:hover{background:var(--surface2);border-color:var(--purple);}
 .role-sel.empty{color:var(--ink3);}
@@ -477,9 +478,11 @@ body.dnd-on *{cursor:grabbing !important;}
 .cs:active{cursor:grabbing;}
 /* 指で押している間の反応。長押しが効いていないのか、掴む対象を外しているのかが分かる */
 #lp-members .mr-wrap.dnd-press,.cs.dnd-press{background:var(--purple-l);}
-/* 移動＝セル全体、入れ替え＝相手だけ を光らせて、どちらになるか指を離す前に分かるようにする */
+/* 移動＝セル全体、置き換え＝消える人だけ を光らせて、どちらになるか指を離す前に
+   分かるようにする。置き換えは取り消し線で「この人が外れる」と一目で見せる */
 .cell-w.dnd-over{outline:2px solid var(--green);outline-offset:-2px;background:var(--green-l) !important;}
-.cs.dnd-swap{outline:2px solid var(--purple);outline-offset:1px;background:var(--purple-l);}
+.cs.dnd-replace,.role-sel.dnd-replace{outline:2px solid var(--purple);outline-offset:1px;
+  background:var(--purple-l);text-decoration:line-through;text-decoration-thickness:2px;}
 .cell-w.dnd-ng{outline:2px solid var(--red);outline-offset:-2px;background:var(--red-l) !important;}
 #lp.dnd-over{outline:2px solid var(--red);outline-offset:-2px;}
 /* 落とせるが注意が必要（連続配置・他PW重複など）。落とせないエラーとは色で区別する */
@@ -490,6 +493,17 @@ body.dnd-on *{cursor:grabbing !important;}
   font-size:11px;font-weight:700;white-space:nowrap;background:var(--red);color:#fff;
   box-shadow:0 4px 14px rgba(0,0,0,.25);}
 .dnd-msg.warn{background:var(--amber);}
+/* 誰が消えるか・元の位置が残るかを伝える案内。エラー・注意と混ざらないよう色を分ける */
+.dnd-msg.info{background:var(--purple);}
+
+/* 責任者・カート担当欄。人が入っている欄だけ掴める（空欄はクリックで選択） */
+.role-sel:not(.empty){cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.role-sel:not(.empty):active{cursor:grabbing;}
+.role-sel.dnd-press{background:var(--purple-l);}
+/* 欄が小さいので outline は外側に出す（セルは内側 -2px） */
+.role-sel.dnd-over{outline:2px solid var(--green);outline-offset:1px;background:var(--green-l);}
+.role-sel.dnd-ng{outline:2px solid var(--red);outline-offset:1px;background:var(--red-l);}
+.role-sel.dnd-warn{outline:2px dashed var(--amber);outline-offset:1px;background:var(--amber-l);}
 
 /* 希望編集モーダルの備考（選択式）。奉仕者フォームと同じ文言を組み立てる */
 /* .add-form label{display:block} / .add-form input{width:100%} を打ち消す。
