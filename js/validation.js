@@ -648,6 +648,10 @@ function validateBlock(block, ctx) {
   }
 
   // --- 公開前チェック：同じカート番号の重複 ---
+  // カートは1台しか無いので同時に2か所へは置けない。入力時にも UI 側で選べない
+  // ようにしてあるが、他の管理者との同時編集や過去のデータでは重複しうるので
+  // ここでも見る。持ち込み↔持ち帰りをまたぐ重複（①を持ち込んだ人と①を持ち帰る人）
+  // は通常の運用なので対象にしない
   const c = block.cart || {};
   [['持ち込み', [c.kc1, c.kc2]], ['持ち帰り', [c.oc1, c.oc2]]].forEach(([lbl, vals]) => {
     const seen = {};
@@ -656,6 +660,17 @@ function validateBlock(block, ctx) {
     });
     const dup = Object.keys(seen).filter(n => seen[n] > 1);
     if (dup.length) push('cartNumDup', { msg: `${lbl}のカート番号 ${dup.join('・')} が重複しています` });
+  });
+  // 場所別カート番号：同じ時間帯の別の場所に同じ番号が設置されている
+  const pcSeen = {};
+  (block.placeCart || []).forEach((v, li) => {
+    String(v || '').split(',').map(x => x.trim()).filter(Boolean)
+      .forEach(n => { (pcSeen[n] = pcSeen[n] || []).push(li); });
+  });
+  Object.entries(pcSeen).forEach(([n, lis]) => {
+    if (lis.length < 2) return;
+    const where = lis.map(li => cols[li] || '（場所未設定）').join('・');
+    push('cartNumDup', { li: lis[0], msg: `カート番号 ${n} が ${where} に重複して設置されています` });
   });
 
   // --- 公開前チェック：申込のない人の配置 ---

@@ -26,6 +26,15 @@
 //   役割欄 → 表              … その場所に配置する（役割はそのまま）
 //   役割欄 → 左メニュー      … その役から外す
 //
+// カート番号の枠（.cart-chip）はさらに別の層で、運ぶのは人ではなく番号。
+// カートは1台しか無いので同じ番号を2か所へは置けず、ピッカーでは他所で使用中の
+// 番号を選べないようにしてある。その制限の下で置き場所を入れ替えるための操作。
+//   番号の入った枠へ … 入れ替え（相手の番号がこちらへ来る。消えるものは無い）
+//   空の枠へ         … 移動
+//   層をまたぐ入れ替え（場所の番号 ↔ 担当欄の番号）は意味が違うので受け付けない
+// 担当者を動かすとその人が運ぶ番号も一緒に動く（dndApplyRole）。番号の枠を直接
+// 掴んだときだけ番号だけが動く、と操作の起点で区別している
+//
 // マウスとタッチの両方で動かすため Pointer Events を使う
 // （HTML5 の drag&drop API はタッチで動かない）。
 // タッチでは長押しで開始し、通常のスクロールを妨げない。
@@ -45,6 +54,8 @@ function dndActive() { return !!(_dnd && _dnd.started); }
 
 // 責任者・カート担当欄かどうか。スロット表（.cs）とは別の層として扱う
 function dndIsRole(el) { return !!el && el.classList && el.classList.contains('role-sel'); }
+// カート番号の枠かどうか。人ではなく番号を運ぶので、また別の層として扱う
+function dndIsCart(el) { return !!el && el.classList && el.classList.contains('cart-chip'); }
 function dndRoleName(role) {
   return role === 'resp' ? '責任者' : role === 'bring' ? '持ち込み担当' : '持ち帰り担当';
 }
@@ -81,12 +92,16 @@ function dndMemberRow(e) {
 // ===== 開始 =====
 document.addEventListener('pointerdown', e => {
   if (e.button !== undefined && e.button !== 0) return;
+  const cc = e.target.closest && e.target.closest('.cart-chip');
   const cs = e.target.closest && e.target.closest('.cs');
   const rs = e.target.closest && e.target.closest('.role-sel');
   const mr = dndMemberRow(e);
-  let uid = '', name = '', fromEl = null, srcEl = null;
+  let uid = '', name = '', fromEl = null, srcEl = null, kind = 'person';
 
-  if (cs && cs.dataset.value) {
+  if (cc && cc.dataset.value && !cc.disabled) {
+    // カート番号には uid が無い。ゴーストに出すラベル（①②）だけを name に入れる
+    kind = 'cart'; name = cartLabel(cc.dataset.value); fromEl = cc; srcEl = cc;
+  } else if (cs && cs.dataset.value) {
     uid = cs.dataset.value; name = cs.textContent; fromEl = cs; srcEl = cs;
   } else if (rs && rs.dataset.value) {
     uid = rs.dataset.value; name = rs.textContent; fromEl = rs; srcEl = rs;
@@ -94,7 +109,7 @@ document.addEventListener('pointerdown', e => {
     uid = mr.dataset.uid; name = mr.dataset.name || ''; srcEl = mr;
   } else return;
 
-  _dnd = { uid, name, fromEl, srcEl, ghost: null, started: false, x: e.clientX, y: e.clientY,
+  _dnd = { kind, uid, name, fromEl, srcEl, ghost: null, started: false, x: e.clientX, y: e.clientY,
            holdTimer: null, scrollTimer: null, pointerType: e.pointerType, pointerId: e.pointerId };
   // タッチは長押しで開始（すぐ始めるとスクロールできなくなる）
   if (e.pointerType === 'touch') {
@@ -230,6 +245,8 @@ function dndHitTest(x, y) {
   if (_dnd && _dnd.ghost) _dnd.ghost.style.display = '';
   if (!el || !el.closest) return null;
 
+  if (_dnd.kind === 'cart') return dndCartHit(el);
+
   if (el.closest('#lp')) return _dnd.fromEl ? { kind: 'remove' } : null;
 
   const role = dndRoleTarget(el);
@@ -268,6 +285,48 @@ function dndRoleTarget(el) {
   return box ? box.querySelector('.role-sel') : null;
 }
 
+// カート番号の落とし先。番号が入っている枠なら「入れ替え」、空の枠なら「移動」。
+// 枠そのものは小さいので、枡の余白を押しても同じ枠として扱う。
+// 担当者が居ない担当欄の枠は無効（disabled）なので落とせない
+function dndCartHit(el) {
+  let chip = el.closest('.cart-chip');
+  if (!chip) {
+    const box = el.closest('.cart-cell, .cart-tbl td');
+    chip = box ? box.querySelector('.cart-chip') : null;
+  }
+  if (!chip || chip.disabled || chip === _dnd.fromEl) return null;
+  return { kind: chip.dataset.value ? 'swap' : 'move', el: chip, cart: true };
+}
+
+// カート番号を落とせない理由。落とせるなら空文字。
+// 場所の番号（どこに置くか）と担当欄の番号（誰が運ぶか）は意味が違うので
+// 層をまたいだ入れ替えは受け付けない。持ち込み↔持ち帰りの入れ替えだけは、
+// 入れ替えた結果 同じ側に同じ番号が並んでしまうときに拒否する
+function dndCartReject(hit, fromEl) {
+  if (!fromEl || typeof cartLayerOf !== 'function') return '';
+  const a = cartLayerOf(fromEl), b = cartLayerOf(hit.el);
+  if (!a || !b) return '';
+  if (a === 'place' || b === 'place') {
+    return a === b ? '' : '場所のカート番号と担当欄のカート番号は入れ替えられません';
+  }
+  if (a === b) return '';   // 同じ側どうしの入れ替えは重複を作らない
+  const dup = dndCartSwapDup(fromEl, hit.el) || dndCartSwapDup(hit.el, fromEl);
+  return dup ? `入れ替えると ${dup} が重複します` : '';
+}
+
+// dstEl に srcEl の番号を入れたときに重複する番号（無ければ空文字）。
+// srcEl 自身はこの操作で別の値になるので、重複の数に入れない
+function dndCartSwapDup(dstEl, srcEl) {
+  const incoming = cartNums(srcEl.dataset.value);
+  const used = {};
+  cartPeerChips(dstEl).forEach(p => {
+    if (p === srcEl) return;
+    cartNums(p.dataset.value).forEach(n => { used[n] = true; });
+  });
+  const n = incoming.find(x => used[x]);
+  return n ? circledNum(n) : '';
+}
+
 // 誰の上でもない、セルの余白へ落としたときの行き先。
 // 空きがあればそこへ入れる（姉妹は1番目＝固定枠に入れないので後ろの空きを優先）。
 // 3人埋まっていれば指に一番近い人を置き換える。位置を決め打ちすると誰が消えるか
@@ -298,17 +357,24 @@ function dndNearest(els, x, y) {
 }
 
 function dndHighlight(hit) {
-  document.querySelectorAll('.dnd-over,.dnd-replace,.dnd-ng,.dnd-warn').forEach(el =>
-    el.classList.remove('dnd-over', 'dnd-replace', 'dnd-ng', 'dnd-warn'));
+  document.querySelectorAll('.dnd-over,.dnd-replace,.dnd-swap,.dnd-ng,.dnd-warn').forEach(el =>
+    el.classList.remove('dnd-over', 'dnd-replace', 'dnd-swap', 'dnd-ng', 'dnd-warn'));
   if (!hit) { dndSetMsg(''); return; }
   if (hit.kind === 'remove') {
     const lp = document.getElementById('lp'); if (lp) lp.classList.add('dnd-over');
     dndSetMsg(''); return;
   }
-  // 光らせる範囲。表はセル全体、役割欄は欄そのもの
-  const box = hit.role ? hit.el : (hit.el.closest('.cell-w') || hit.el);
+  // 光らせる範囲。表はセル全体、役割欄・カート番号の枠は枠そのもの
+  const box = (hit.role || hit.cart) ? hit.el : (hit.el.closest('.cell-w') || hit.el);
   const bad = dndReject(hit, _dnd.uid, _dnd.fromEl);
   if (bad) { box.classList.add('dnd-ng'); dndSetMsg(bad, 'ng'); return; }
+  // カート番号の入れ替えは、消えるのではなく相手の番号がこちらへ来る。
+  // 取り消し線（置き換え）と混同させないよう別の見た目にする
+  if (hit.cart) {
+    box.classList.add(hit.kind === 'swap' ? 'dnd-swap' : 'dnd-over');
+    dndSetMsg(dndDropNote(hit), 'info');
+    return;
+  }
   // 置き換えは消える人だけに取り消し線、移動はセル全体を光らせて、
   // どちらになるか・誰が消えるかを指を離す前に見せる
   if (hit.kind === 'over') hit.el.classList.add('dnd-replace');
@@ -328,6 +394,12 @@ function dndHighlight(hit) {
 // 二重に入ったように見える
 function dndDropNote(hit) {
   if (!_dnd || !hit || !hit.el) return '';
+  if (hit.cart) {
+    const to = cartChipLabel(hit.el);
+    return hit.kind === 'swap'
+      ? `${cartLabel(hit.el.dataset.value)} と入れ替え（${to}）`
+      : `${to} へ移動`;
+  }
   const parts = [];
   if (hit.kind === 'over') {
     const p = hit.el.dataset.value;
@@ -350,6 +422,7 @@ function dndIsSister(uid) {
 // uid・fromEl は引数で受け取る（確定処理では _dnd を破棄したあとに呼ぶため）
 function dndReject(hit, uid, fromEl) {
   if (!hit || !hit.el || hit.kind === 'remove') return '';
+  if (hit.cart) return dndCartReject(hit, fromEl);
   if (hit.role) return dndRoleReject(hit, uid, fromEl);
   const cell = hit.el.closest('.cell-w');
   if (!cell) return '';
@@ -419,7 +492,7 @@ function dndCandAt(el, uid) {
 // 落とせるが注意が必要な理由（備考の時間外・連続配置・他PW重複）。無ければ空文字
 // コンボボックスの候補分類（buildCandidates／validation.js）と同じ基準を使う
 function dndWarnMsg(hit, uid) {
-  if (!hit || !hit.el || hit.kind === 'remove') return '';
+  if (!hit || !hit.el || hit.kind === 'remove' || hit.cart) return '';
   const key = hit.el.id + '|' + uid;
   if (_dnd.warnCache && _dnd.warnCache.key === key) return _dnd.warnCache.msg;
   if (hit.role) {
@@ -489,13 +562,14 @@ function dndCancel() {
   if (_dnd.ghost) _dnd.ghost.remove();
   if (_dnd.msgEl) _dnd.msgEl.remove();
   document.body.classList.remove('dnd-on');
-  document.querySelectorAll('.dnd-over,.dnd-replace,.dnd-ng,.dnd-warn,.dnd-press').forEach(el =>
-    el.classList.remove('dnd-over', 'dnd-replace', 'dnd-ng', 'dnd-warn', 'dnd-press'));
+  document.querySelectorAll('.dnd-over,.dnd-replace,.dnd-swap,.dnd-ng,.dnd-warn,.dnd-press').forEach(el =>
+    el.classList.remove('dnd-over', 'dnd-replace', 'dnd-swap', 'dnd-ng', 'dnd-warn', 'dnd-press'));
   _dnd = null;
 }
 
 // 移動または置き換え。消えた人が誰かは必ず知らせる
 function dndApply(fromEl, targetEl, uid) {
+  if (dndIsCart(targetEl)) { dndApplyCart(fromEl, targetEl); return; }
   if (dndIsRole(targetEl)) { dndApplyRole(fromEl, targetEl, uid); return; }
   const bi = +targetEl.dataset.bi;
   const nm = buildNameMap();
@@ -515,6 +589,19 @@ function dndApply(fromEl, targetEl, uid) {
       : sameLayer ? `${who} を移動しました`
       : fromEl    ? `${who} を配置しました（${dndRoleName(fromEl.dataset.role)}のままです）`
                   : `${who} を配置しました`, 's');
+}
+
+// カート番号の移動・入れ替え。どの番号がどこへ動いたかを必ず知らせる。
+// 人と違って置き換え（消える）は無い。相手に番号が入っていれば必ず入れ替えになる
+function dndApplyCart(fromEl, targetEl) {
+  const src = fromEl.dataset.value || '';
+  const dst = targetEl.dataset.value || '';
+  setCartDom(targetEl, src);
+  setCartDom(fromEl, dst);
+  mu(+targetEl.dataset.bi);
+  const a = cartChipLabel(fromEl), b = cartChipLabel(targetEl);
+  toast(dst ? `${cartLabel(src)} と ${cartLabel(dst)} を入れ替えました（${a} ⇄ ${b}）`
+            : `${cartLabel(src)} を ${a} から ${b} へ移しました`, 's');
 }
 
 // 責任者・カート担当欄への確定。役割欄どうしなら移動・置き換え、

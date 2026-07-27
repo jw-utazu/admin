@@ -505,6 +505,19 @@ body.dnd-on *{cursor:grabbing !important;}
 .role-sel.dnd-ng{outline:2px solid var(--red);outline-offset:1px;background:var(--red-l);}
 .role-sel.dnd-warn{outline:2px dashed var(--amber);outline-offset:1px;background:var(--amber-l);}
 
+/* カート番号の枠。番号が入っている枠だけ掴める（空欄はクリックで選択）。
+   入れ替えは相手の番号がこちらへ来るだけで消えるものが無いので、
+   人の「置き換え」（取り消し線）とは別の見た目にする */
+.cart-chip:not(.empty):not(:disabled){cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.cart-chip:not(.empty):not(:disabled):active{cursor:grabbing;}
+/* :not(:disabled) は詳細度を上げるために必要。これが無いと上の
+   .cart-chip:hover:not(:disabled) のほうが強く、マウスで指した落とし先が
+   常に緑（＝落とせる）に見えてしまう */
+.cart-chip.dnd-press:not(:disabled){background:var(--purple-l);}
+.cart-chip.dnd-over:not(:disabled){outline:2px solid var(--green);outline-offset:1px;background:var(--green-l);}
+.cart-chip.dnd-swap:not(:disabled){outline:2px solid var(--purple);outline-offset:1px;background:var(--purple-l);border-color:var(--purple);}
+.cart-chip.dnd-ng:not(:disabled){outline:2px solid var(--red);outline-offset:1px;background:var(--red-l);border-color:var(--red);}
+
 /* 希望編集モーダルの備考（選択式）。奉仕者フォームと同じ文言を組み立てる */
 /* .add-form label{display:block} / .add-form input{width:100%} を打ち消す。
    打ち消さないとチェックボックスが横幅いっぱいに伸びて文字とずれる */

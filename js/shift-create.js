@@ -1348,13 +1348,80 @@ function cartChip(id, val, dis, bi) {
        + ` data-bi="${bi}"${dis ? ' disabled' : ''} onclick="openCartPicker(this)">${esc(lbl)}</button>`;
 }
 
+// ===== 同じカートを2か所に置かせない =====
+// カートは1台しか無いので、同じ番号を同時に2か所へは置けない。判定はこのブロック
+// （同じ日・同じ時間帯）の中だけで行う。別の時間帯は持ち帰ってまた持ち込むので対象外。
+//
+// 番号のチップは2つの層に分かれていて、層をまたいだ重複は見ない：
+//   場所別カート番号行（pc-*）… どの場所に何号車を置くか。列どうしで重複不可
+//   担当欄（cn*／con*）        … 誰が何号車を運ぶか。持ち込み欄どうし・持ち帰り欄
+//     どうしで重複不可。①を持ち込んだ人と①を持ち帰る人は同じ番号になるのが
+//     普通の運用なので、持ち込み↔持ち帰りをまたぐ重複は許す
+function cartNums(v) { return String(v || '').split(',').map(x => x.trim()).filter(Boolean); }
+
+function cartLayerOf(el) {
+  const id = (el && el.id) || '';
+  if (id.startsWith('pc-')) return 'place';
+  if (id.startsWith('con')) return 'take';
+  if (id.startsWith('cn'))  return 'bring';
+  return '';
+}
+
+// 同じ層にある他のカート番号チップ（自分は除く）
+function cartPeerChips(el) {
+  const layer = cartLayerOf(el), bi = el.dataset.bi;
+  let list;
+  if (layer === 'place') list = [...document.querySelectorAll(`#tb-${bi} .cart-cell .cart-chip`)];
+  else if (layer === 'bring' || layer === 'take') {
+    list = (layer === 'bring' ? ['cn1-', 'cn2-'] : ['con1-', 'con2-'])
+      .map(p => document.getElementById(p + bi)).filter(Boolean);
+  } else return [];
+  return list.filter(x => x !== el);
+}
+
+// そのチップが何を指しているか（重複メッセージ用）。
+// 場所はいま選ばれている場所名を読む。担当欄の1人目・2人目は「①」と書くと
+// カート番号の丸数字と紛らわしいので「1人目」と書く
+function cartChipLabel(el) {
+  const layer = cartLayerOf(el);
+  if (layer === 'place') {
+    const m = /^pc-(\d+)-(\d+)-/.exec(el.id || '');
+    const sel = m ? document.getElementById(`place-sel-${m[1]}-${m[2]}`) : null;
+    return (sel && sel.value) || '場所未設定の列';
+  }
+  if (!layer) return '';
+  const m = /(\d)-\d+$/.exec(el.id || '');
+  return (layer === 'bring' ? '持ち込み' : '持ち帰り') + (m && m[1] === '2' ? '2人目' : '1人目');
+}
+
+// 同じ層で既に使われている番号 → 使っている場所・欄の名前
+function cartUsedElsewhere(el) {
+  const used = {};
+  cartPeerChips(el).forEach(p => {
+    cartNums(p.dataset.value).forEach(n => { if (!used[n]) used[n] = cartChipLabel(p); });
+  });
+  return used;
+}
+
 function openCartPicker(el) {
-  const cur = (el.dataset.value || '').split(',').map(x => x.trim()).filter(Boolean);
-  const items = cartNumList().map(n => ({
-    value: String(n), label: circledNum(n), html: `<span style="font-size:15px;">${circledNum(n)}</span>`,
-  }));
+  const cur   = cartNums(el.dataset.value);
+  const layer = cartLayerOf(el);
+  const used  = cartUsedElsewhere(el);
+  const items = cartNumList().map(n => {
+    const s = String(n);
+    // いまこの欄に入っている番号は必ず選べる（＝外せる）ままにする。
+    // 過去に保存されたデータに重複が残っていても解除できなくなるのを防ぐ
+    const where = cur.includes(s) ? '' : used[s];
+    return {
+      value: s, label: circledNum(n), html: `<span style="font-size:15px;">${circledNum(n)}</span>`,
+      disabled: !!where,
+      sub: where ? esc(where + (layer === 'place' ? ' に設置中' : ' が運びます')) : '',
+    };
+  });
   openPicker(el, {
     title: 'カート番号を選択（複数可）', multi: true, value: cur, items,
+    note: (layer === 'place' ? '別の場所に設置中の番号は選べません。' : '同じ側の別の欄で使用中の番号は選べません。')
+        + '入れ替えるときは番号の枠をドラッグしてください',
     onToggle: vals => {
       const next = cartNumList().filter(n => vals.includes(String(n))); // 設定タブの並び順に整える
       setCartValue(el, next.join(','));

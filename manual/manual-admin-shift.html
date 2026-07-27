@@ -286,7 +286,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;line
 
     <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">責任者・カート担当欄との行き来</h4>
     <p>責任者・カート担当は「場所への割り当て」とは別の扱いです。同じ人がスロットテーブルにも責任者にも入るのが普通なので、<strong>表の人を責任者欄に落としても、その人は表から消えません</strong>（責任者に「する」だけ）。逆に責任者欄の人を表に落としたときも、責任者のまま表にも配置されます。このときは指の下に「責任者にする（配置はそのまま）」と出ます。</p>
-    <p style="margin-top:12px;">責任者欄どうし・カート担当欄どうしで動かしたときは、元の欄は空きます。カート番号は担当者と一緒についてきます。</p>
+    <p style="margin-top:12px;">責任者欄どうし・カート担当欄どうしで動かしたときは、元の欄は空きます。カート番号は担当者と一緒についてきます（番号だけを動かしたいときは、次の「カート番号を入れ替える」を参照してください）。</p>
 
     <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">落とせないとき・注意が出るとき</h4>
     <ul>
@@ -297,6 +297,32 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;line
 
     <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">配置から外す</h4>
     <p>名前を<strong>左パネルまで運んで離す</strong>と、その配置（または責任者・カート担当）から外れます。</p>
+
+    <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">カート番号を入れ替える</h4>
+    <p>カートは1台しかないので、<strong>同じ番号を同時に2か所へ置くことはできません</strong>。番号を選ぶ画面では、すでに別の場所で使われている番号は取り消し線が引かれて選べなくなり、その横に「中央公園 に設置中」と使用先が出ます。</p>
+    <p style="margin-top:12px;">置き場所を交換したいときは、<strong>カート番号の枠そのものをつかんで、交換したい相手の枠まで運びます</strong>（名前と同じく、スマホ・タブレットは長押ししてから動かします）。</p>
+    <ul>
+      <li><strong>番号が入っている枠に落とす → 入れ替え。</strong>紫色に光り、指の下に「② と入れ替え（中央公園）」と出ます。名前の置き換えと違って<strong>消えるものはありません</strong>。相手の番号がこちらへ来ます</li>
+      <li><strong>空の枠に落とす → 移動。</strong>緑色に光ります。元の枠は空きます</li>
+      <li>場所のカート番号（どこに置くか）と、持ち込み・持ち帰り担当のカート番号（誰が運ぶか）は<strong>別のもの</strong>なので、その2つの間では入れ替えられません（赤く光ります）</li>
+    </ul>
+    <div class="note-box">入れ替えたあとは「① と ② を入れ替えました（駅前 ⇄ 中央公園）」と表示されます。間違えたときは「元に戻す」ボタン（パソコンは Ctrl+Z）で戻せます。</div>
+    <p style="margin-top:12px;">持ち込み担当・持ち帰り担当のカート番号も同じように入れ替えられます。こちらは<strong>持ち込みどうし・持ち帰りどうし</strong>で番号が重ならないようにしています。①を持ち込んだ人と①を持ち帰る人は同じ番号のままで構いません。</p>
+    <div class="note-box">すでに保存済みのシフトで同じ番号が2か所に入っている場合は、その番号だけは今まで通り外せます。公開前チェックでも「カート番号 1 が 駅前・中央公園 に重複して設置されています」と知らせます。</div>
+  </div>
+
+  <div class="ui-preview">
+    <div class="ui-preview-title">カート番号を選ぶ画面（別の場所で使用中の番号）</div>
+    <div style="background:#fff;border:1px solid #e4e4e7;border-radius:10px;padding:12px 14px;max-width:320px;">
+      <div style="font-size:12px;font-weight:700;color:#3f3f46;padding-bottom:8px;border-bottom:1px solid #e4e4e7;">カート番号を選択（複数可）</div>
+      <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;">
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;background:#dcfce7;font-size:13px;font-weight:700;"><span>☑</span><span style="font-size:15px;">①</span></div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;opacity:.4;text-decoration:line-through;font-size:13px;"><span>☐</span><span style="font-size:15px;">②</span><span style="margin-left:auto;font-size:10px;color:#71717a;">中央公園 に設置中</span></div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;font-size:13px;"><span>☐</span><span style="font-size:15px;">③</span></div>
+      </div>
+      <div style="font-size:10px;color:#71717a;padding-top:6px;border-top:1px solid #e4e4e7;">別の場所に設置中の番号は選べません。入れ替えるときは番号の枠をドラッグしてください</div>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#71717a;">②は中央公園に置いてあるので選べません。この場所と交換したいときは、番号の枠どうしをドラッグして入れ替えます。</div>
   </div>
 
   <div class="ui-preview">
