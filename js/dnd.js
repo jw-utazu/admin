@@ -11,8 +11,11 @@
 //
 //   セルの空き位置へ   … 移動
 //   人の上へ           … 置き換え（元いた人は外れる）
-//   満杯のセルの余白へ … 受け付けない（誰の上でもないので置き換え先が無い）
+//   満杯のセルの余白へ … 指に一番近い人を置き換え（空きが無いので誰かと交代になる）
 //   左メニューへ       … 配置から外す
+//
+// すでに本人が入っている欄に本人を落としても変化が無いので、警告も出さずに
+// 受け流す（掴んだ場所に戻したときと同じ扱い）。
 //
 // 責任者・カート担当欄（.role-sel）も同じ操作で編集できる。ただし役割は
 // スロット表の配置とは別の層で、同じ人が両方に入るのが通常の運用なので、
@@ -231,23 +234,29 @@ function dndHitTest(x, y) {
 
   const role = dndRoleTarget(el);
   if (role) {
-    if (role === _dnd.fromEl) return null;   // つかんだ場所に戻しただけ
+    if (dndNoChange(role)) return null;
     return { kind: role.dataset.value ? 'over' : 'move', el: role, role: true };
   }
 
   const cs = el.closest('.cs');
-  // つかんだ場所に戻しただけ。cs が null のときに素通りさせないと、左メニューから
-  // （fromEl も null）セルの余白へ落とす操作が無反応になる
-  if (cs && cs === _dnd.fromEl) return null;
+  // cs が null のときに素通りさせないと、左メニューから（fromEl も null）
+  // セルの余白へ落とす操作が無反応になる
+  if (cs && dndNoChange(cs)) return null;
   if (cs) return { kind: cs.dataset.value ? 'over' : 'move', el: cs };
 
   const cell = el.closest('.cell-w');
   if (cell) {
     // 同じセルの中で位置を変えても意味がないので何もしない
     if (_dnd.fromEl && cell.contains(_dnd.fromEl)) return null;
-    return dndFreeInCell(cell, _dnd.uid);
+    return dndFreeInCell(cell, _dnd.uid, x, y);
   }
   return null;
+}
+
+// 落としても何も変わらない欄か。掴んだ場所に戻した場合と、すでに本人が
+// 入っている欄（本人を本人に置き換えても意味が無い）。どちらも警告は出さない
+function dndNoChange(el) {
+  return el === _dnd.fromEl || el.dataset.value === _dnd.uid;
 }
 
 // 責任者・カート担当欄を返す。欄そのものは小さいので、ラベルや枡の余白を
@@ -259,13 +268,33 @@ function dndRoleTarget(el) {
   return box ? box.querySelector('.role-sel') : null;
 }
 
-// セル内の空き位置を返す。姉妹は1番目（固定枠）に入れないので後ろの空きを優先する
-function dndFreeInCell(cell, uid) {
+// 誰の上でもない、セルの余白へ落としたときの行き先。
+// 空きがあればそこへ入れる（姉妹は1番目＝固定枠に入れないので後ろの空きを優先）。
+// 3人埋まっていれば指に一番近い人を置き換える。位置を決め打ちすると誰が消えるか
+// 予想できないので、いちばん近い人＝狙った相手として扱う（取り消し線で確認できる）
+function dndFreeInCell(cell, uid, x, y) {
   if (!cell) return null;
-  const frees = [...cell.querySelectorAll('.cs')].filter(s => !s.dataset.value);
-  if (frees.length === 0) return { kind: 'full', el: cell };
+  const els = [...cell.querySelectorAll('.cs')];
+  const frees = els.filter(s => !s.dataset.value);
+  if (frees.length === 0) {
+    const near = dndNearest(els, x, y);
+    return !near || near.dataset.value === uid ? null : { kind: 'over', el: near };
+  }
   const free = frees.find(s => !(+s.dataset.pi === 0 && dndIsSister(uid))) || frees[0];
   return { kind: 'move', el: free };
+}
+
+// 指に一番近い欄。枠の中なら距離0になるので、重なっていても素直に選ばれる
+function dndNearest(els, x, y) {
+  let best = null, bestD = Infinity;
+  els.forEach(el => {
+    const r = el.getBoundingClientRect();
+    const dx = Math.max(r.left - x, 0, x - r.right);
+    const dy = Math.max(r.top - y, 0, y - r.bottom);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = el; }
+  });
+  return best;
 }
 
 function dndHighlight(hit) {
@@ -322,7 +351,6 @@ function dndIsSister(uid) {
 function dndReject(hit, uid, fromEl) {
   if (!hit || !hit.el || hit.kind === 'remove') return '';
   if (hit.role) return dndRoleReject(hit, uid, fromEl);
-  if (hit.kind === 'full') return 'この場所は3名までです';
   const cell = hit.el.closest('.cell-w');
   if (!cell) return '';
   // 掴んだ本人は除く。除かないと、同じセルの中での入れ替え（1番目と2・3番目の
@@ -391,7 +419,7 @@ function dndCandAt(el, uid) {
 // 落とせるが注意が必要な理由（備考の時間外・連続配置・他PW重複）。無ければ空文字
 // コンボボックスの候補分類（buildCandidates／validation.js）と同じ基準を使う
 function dndWarnMsg(hit, uid) {
-  if (!hit || !hit.el || hit.kind === 'remove' || hit.kind === 'full') return '';
+  if (!hit || !hit.el || hit.kind === 'remove') return '';
   const key = hit.el.id + '|' + uid;
   if (_dnd.warnCache && _dnd.warnCache.key === key) return _dnd.warnCache.msg;
   if (hit.role) {

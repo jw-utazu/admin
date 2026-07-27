@@ -205,11 +205,12 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;line
     <ol>
       <li><span class="step-num">1</span>上部の日付タブで実施日を選択</li>
       <li><span class="step-num">2</span>時間タブで担当する時間帯を選択</li>
-      <li><span class="step-num">3</span><strong style="color:#c2410c;">責任者エリア</strong>（オレンジ背景）でドロップダウンから責任者を選択（最大2名）</li>
-      <li><span class="step-num">4</span><strong style="color:#16a34a;">カート担当エリア</strong>（緑背景）で内側・外側の担当者とカート番号を入力</li>
+      <li><span class="step-num">3</span><strong style="color:#c2410c;">責任者エリア</strong>（オレンジ背景）で欄をタップし、一覧から責任者を選択（最大2名）</li>
+      <li><span class="step-num">4</span><strong style="color:#16a34a;">カート担当エリア</strong>（緑背景）で持ち込み・持ち帰りの担当者とカート番号を入力</li>
       <li><span class="step-num">5</span><strong>スロットテーブル</strong>で各時間・場所にメンバーを割り当て</li>
     </ol>
     <div class="note-box">左パネルの申込者リストから、各メンバーの申込回数・責任者回数・カート回数を確認しながら割り当てできます。</div>
+    <div class="note-box">欄をタップすると出てくる一覧は名前で検索できます。候補には性別・月内の担当回数・「連続配置になる」などの注意が並ぶので、選ぶ前に判断できます。</div>
   </div>
   <div class="ui-preview">
     <div class="ui-preview-title">シフト作成画面の主要エリア</div>
@@ -245,8 +246,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;line
           <thead>
             <tr style="background:#dcfce7;">
               <th style="padding:4px 6px;border:1px solid #bbf7d0;"></th>
-              <th style="padding:4px 6px;border:1px solid #bbf7d0;font-weight:700;color:#14532d;">内側</th>
-              <th style="padding:4px 6px;border:1px solid #bbf7d0;font-weight:700;color:#14532d;">外側</th>
+              <th style="padding:4px 6px;border:1px solid #bbf7d0;font-weight:700;color:#14532d;">持ち込み</th>
+              <th style="padding:4px 6px;border:1px solid #bbf7d0;font-weight:700;color:#14532d;">持ち帰り</th>
             </tr>
           </thead>
           <tbody>
@@ -263,6 +264,55 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;line
           </tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <div class="step-desc">
+    <h3 style="margin-top:16px;">ドラッグ＆ドロップで動かす</h3>
+    <p>一覧から選ぶだけでなく、名前を直接つかんで動かせます。すでに組んだシフトを並べ替えるときはこちらが速いです。</p>
+    <ul>
+      <li><strong>つかめるもの</strong> — 左パネルの申込者名／スロットテーブルの名前／責任者・カート担当の名前</li>
+      <li><strong>置ける場所</strong> — スロットテーブルのマス／責任者・カート担当の欄／左パネル（＝外す）</li>
+    </ul>
+    <p style="margin-top:12px;">パソコンはそのままドラッグ、スマホ・タブレットは<strong>名前を長押ししてから</strong>動かします（すぐ動かすと画面のスクロールになります）。</p>
+
+    <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">空いている場所に落とす → 移動</h4>
+    <p>落とす先が緑色に光ります。元いた場所は空きます。</p>
+
+    <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">人の上に落とす → 置き換え</h4>
+    <p>その場所にいた人は外れて、運んできた人に入れ替わります。<strong>外れる人には取り消し線が引かれ</strong>、指の下に「〇〇 を置き換え」と表示されるので、指を離す前に誰が外れるか確認できます。落としたあとも「〇〇 を △△ に置き換えました」と両方の名前が出ます。</p>
+    <div class="note-box">間違えて置き換えてしまっても、ヘッダーの「元に戻す」ボタン（パソコンは Ctrl+Z）で1つ前に戻せます。</div>
+    <p>3人埋まっているマスでも置き換えられます。マスの余白に落としたときは<strong>指に一番近い人</strong>が置き換え先になります（取り消し線でどの人か分かります）。</p>
+
+    <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">責任者・カート担当欄との行き来</h4>
+    <p>責任者・カート担当は「場所への割り当て」とは別の扱いです。同じ人がスロットテーブルにも責任者にも入るのが普通なので、<strong>表の人を責任者欄に落としても、その人は表から消えません</strong>（責任者に「する」だけ）。逆に責任者欄の人を表に落としたときも、責任者のまま表にも配置されます。このときは指の下に「責任者にする（配置はそのまま）」と出ます。</p>
+    <p style="margin-top:12px;">責任者欄どうし・カート担当欄どうしで動かしたときは、元の欄は空きます。カート番号は担当者と一緒についてきます。</p>
+
+    <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">落とせないとき・注意が出るとき</h4>
+    <ul>
+      <li><strong>赤く光る＝落とせません。</strong>理由がその場に出ます（例：「責任者に登録されていません」「1番目（固定枠）には兄弟しか入れられません」「この時間はすでに別の場所に配置されています」）</li>
+      <li><strong>黄色く光る＝落とせますが注意</strong>（例：「連続配置になります」「カート不可で希望を出しています」「10:00から参加の希望です」）。意図した配置ならそのまま落として構いません</li>
+    </ul>
+    <div class="note-box">すでにその人が入っている欄に同じ人を落としても何も起きません（変化が無いため）。つかんだ場所に戻したときと同じです。</div>
+
+    <h4 style="margin-top:16px;font-size:.95rem;color:#c2410c;">配置から外す</h4>
+    <p>名前を<strong>左パネルまで運んで離す</strong>と、その配置（または責任者・カート担当）から外れます。</p>
+  </div>
+
+  <div class="ui-preview">
+    <div class="ui-preview-title">人の上に落としたとき（置き換えの確認表示）</div>
+    <div style="background:#fff;border:1px solid #e4e4e7;border-radius:10px;padding:14px;max-width:360px;">
+      <div style="font-size:10px;font-weight:700;color:#a1a1aa;margin-bottom:8px;">10:00〜10:15／北口</div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div style="border:1px solid #e4e4e7;border-left:3px solid #2563eb;border-radius:5px;padding:4px 7px;font-size:12px;">山田 太郎</div>
+        <div style="border:2px solid #7c3aed;background:#f5f3ff;border-radius:5px;padding:4px 7px;font-size:12px;text-decoration:line-through;text-decoration-thickness:2px;">佐藤 次郎</div>
+        <div style="border:1px solid #e4e4e7;border-radius:5px;padding:4px 7px;font-size:12px;color:#a1a1aa;">—</div>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:flex-start;gap:6px;">
+        <span style="background:#7c3aed;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;white-space:nowrap;">鈴木 三郎</span>
+        <span style="background:#7c3aed;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;white-space:nowrap;">佐藤 次郎 を置き換え</span>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#71717a;">取り消し線の「佐藤 次郎」が外れて、運んでいる「鈴木 三郎」が入ります。</div>
     </div>
   </div>
 </section>
