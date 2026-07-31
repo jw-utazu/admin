@@ -542,3 +542,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .rec-flabel{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:6px;}
 .rec-otp-name{font-size:13px;color:var(--ink2);text-align:center;}
 .rec-otp-code{font-size:40px;font-weight:700;letter-spacing:.18em;text-indent:.18em;text-align:center;margin:10px 0 4px;font-family:var(--mono,monospace);color:var(--ink);}
+.rec-otp-inline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--r);}
+.rec-otp-inline-label{font-size:11px;color:var(--ink3);}
+.rec-otp-inline-code{font-size:22px;font-weight:700;letter-spacing:.12em;font-family:var(--mono,monospace);}
+.rec-otp-inline .btn{font-size:11px;padding:4px 10px;margin-left:auto;}

@@ -2397,9 +2397,11 @@ async function loadRecoveryRequests() {
     const active  = all.filter(r => r.status === 'approved');
     const past    = all.filter(r => !['pending','approved'].includes(r.status));
 
-    let html = '<div class="rec-note">パスコードは<b>この画面にしか表示されません</b>。'
-             + '承認したら、必ず電話や対面など<b>アプリの外の手段で本人に伝えてください</b>。<br>'
-             + '合言葉を知っていることは本人確認になりません。心当たりのない申請は却下してください。</div>';
+    let html = '<div class="rec-note">承認したら、パスコードを<b>本人と確実に連絡が取れる手段</b>'
+             + '（電話・LINEなど、普段その人とやりとりしている連絡先）でお伝えください。<br>'
+             + '⚠️ <b>申請フォームに入力されたメールアドレス宛には送らないでください。</b>'
+             + 'そのアドレスは申請者が自由に入力できるため、本人確認になりません。<br>'
+             + '合言葉を知っていることも本人確認にはなりません。心当たりのない申請は却下してください。</div>';
 
     if (pending.length === 0 && active.length === 0 && past.length === 0) {
       html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">申請はありません</div>';
@@ -2428,6 +2430,8 @@ async function loadRecoveryRequests() {
 
     if (active.length > 0) {
       html += '<div class="rec-sec-title">パスコード発行済み（本人の入力待ち）</div>';
+      // パスコードはここに出し続ける。本人と連絡が取れず時間が空いても
+      // 再申請してもらう必要がないようにするため
       html += active.map(r => `
         <div class="rec-card">
           <div class="rec-card-hd">
@@ -2435,7 +2439,16 @@ async function loadRecoveryRequests() {
             <span class="rec-card-time">${esc(fmtRecTime(r.approved_at))} 承認</span>
           </div>
           <div class="rec-card-mail">承認者: ${esc(r.approved_by_name || '-')}</div>
-          <div class="rec-tag">⏳ 本人がパスコードを入力するのを待っています</div>
+          ${r.otp_plain ? `<div class="rec-otp-inline">
+            <span class="rec-otp-inline-label">パスコード</span>
+            <span class="rec-otp-inline-code">${esc(r.otp_plain)}</span>
+            <button class="btn btn-g" onclick="copyRecoveryOtp('${esc(r.otp_plain)}')">コピー</button>
+          </div>
+          <div class="rec-tag">⏳ 本人の入力待ち　有効期限: ${esc(fmtRecTime(r.otp_expires_at))}まで</div>`
+          : '<div class="rec-tag">⏳ 本人がパスコードを入力するのを待っています</div>'}
+          <div class="rec-card-actions">
+            <button class="btn btn-g" onclick="rejectRecoveryRequest(${r.id})">取り消す</button>
+          </div>
         </div>`).join('');
     }
 
@@ -2481,7 +2494,7 @@ function updateRecoveryBadge(n) {
 }
 
 async function approveRecoveryRequest(id) {
-  if (!confirm('この申請を承認しますか？\n\n承認するとパスコードが表示されます。\n必ず電話などで本人に直接お伝えください。')) return;
+  if (!confirm('この申請を承認しますか？\n\n承認するとパスコードが表示されます。\n電話やLINEなど、本人と確実に連絡が取れる手段でお伝えください。')) return;
   showProc('承認しています...', '少々お待ちください');
   try {
     const res = await apiPost({ action: 'approveRecoveryRequest', requestId: id });
@@ -2499,11 +2512,14 @@ async function approveRecoveryRequest(id) {
     document.getElementById('m-recovery-otp-body').innerHTML =
       `<div class="rec-otp-name">${esc(res.name)} さんへ</div>
        <div class="rec-otp-code">${esc(res.otp)}</div>
-       <div class="rec-note" style="margin-top:14px;">
-         このパスコードは <b>${res.expiresInMin}分間</b> 有効です。<br>
-         <b>電話や対面で直接ご本人に伝えてください。</b>
-         メールやメッセージアプリで送ると、本人確認の意味がなくなります。<br>
-         この画面を閉じると二度と表示されません（その場合は再度申請してもらってください）。
+       <div style="text-align:center;margin-bottom:12px;">
+         <button class="btn btn-g" onclick="copyRecoveryOtp('${esc(res.otp)}')">コピー</button>
+       </div>
+       <div class="rec-note">
+         このパスコードは <b>${Math.round(res.expiresInMin / 60)}時間</b> 有効です。<br>
+         電話・LINEなど、<b>普段その方とやりとりしている連絡先</b>にお伝えください。<br>
+         ⚠️ 申請フォームに入力されたメールアドレス宛には送らないでください。<br>
+         この画面を閉じても、一覧の「パスコード発行済み」からいつでも確認できます。
        </div>`;
     openM('m-recovery-otp');
   } catch (e) { hideProc(); toast('承認失敗: ' + e.message, 'e'); }
@@ -2519,6 +2535,12 @@ async function rejectRecoveryRequest(id) {
     hideProc();
     toast('申請を却下しました', 's');
   } catch (e) { hideProc(); toast('却下失敗: ' + e.message, 'e'); }
+}
+
+function copyRecoveryOtp(otp) {
+  navigator.clipboard.writeText(otp)
+    .then(() => toast('パスコードをコピーしました', 's'))
+    .catch(() => toast('コピーできませんでした。手入力してください', 'e'));
 }
 
 function openRecoveryKeyModal() {
