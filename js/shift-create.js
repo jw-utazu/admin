@@ -68,6 +68,26 @@ async function initAuth() {
   try { const u = JSON.parse(localStorage.getItem('adminUser') || 'null'); if (u && u.isAdmin) { adminUser = u; showApp(); return; } } catch (_) {}
   // Googleアカウントが使えない管理者のための救済セッション（有効期限はサーバー側で検証）
   if (await tryRecoveryLogin()) return;
+
+  // 共通ログイン画面でログイン済みなら引き継ぐ（管理者権限は必ずサーバーで確認する）
+  const shared = pwgwsGetSession();
+  if (shared) {
+    try {
+      setLoading(true, '権限を確認中...');
+      const d = await apiAuthGet(shared.email, 'admin');
+      setLoading(false);
+      if (d.ok && d.isAdmin) {
+        adminUser = { email: shared.email, name: d.name || shared.name || shared.email,
+                      uid: d.uid || '', isAdmin: true, picture: shared.picture || '' };
+        localStorage.setItem('adminUser', JSON.stringify(adminUser));
+        showApp();
+        return;
+      }
+    } catch (_) { setLoading(false); }
+  }
+
+  // 未ログイン：共通ログイン画面へ送る（?direct=1 で従来のログイン画面に戻れる）
+  if (pwgwsShouldRedirectToLogin()) { pwgwsGoToLogin(); return; }
   showLogin();
 }
 async function tryRecoveryLogin() {
@@ -97,13 +117,19 @@ async function onGoogleLogin(resp) {
     if (!d.ok || !d.isAdmin) { setLoading(false); toast('管理者権限がありません', 'e'); return; }
     adminUser = { email: payload.email, name: d.name || payload.email, uid: d.uid || '', isAdmin: true, picture: payload.picture || '' };
     localStorage.setItem('adminUser', JSON.stringify(adminUser));
+    pwgwsSaveSession(payload.email, adminUser.name, payload.picture || '');
     setLoading(false); showApp();
   } catch (e) { setLoading(false); toast('ログインエラー: ' + e.message, 'e'); }
 }
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch (_) {}
-  try { localStorage.removeItem('pwgws_recovery_session'); } catch (_) {}
-  toast('ログアウトしました', 's'); setTimeout(() => location.reload(), 800);
+  // 共通セッション・救済ログインも併せて破棄する（3アプリ共通のログアウト）
+  pwgwsClearSession();
+  toast('ログアウトしました', 's');
+  // 共通ログイン画面が使えない場合は従来どおりリロードしてログイン画面に戻す
+  setTimeout(() => {
+    if (pwgwsShouldRedirectToLogin()) pwgwsGoToLogin(); else location.reload();
+  }, 800);
 }
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';

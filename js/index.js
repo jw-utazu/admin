@@ -99,6 +99,15 @@ async function tryAutoLogin() {
     }
   } catch(e) { console.warn('[auto-login]', e); }
 
+  // 共通ログイン画面でログイン済みなら引き継ぐ（管理者権限は processUser 内で
+  // サーバーに問い合わせて確認するため、ここでは本人確認だけを引き継ぐ）
+  const shared = pwgwsGetSession();
+  if (shared) { processUser({ email: shared.email, name: shared.name, picture: shared.picture }); return; }
+
+  // 未ログイン：共通ログイン画面へ送る。
+  // ?direct=1 が付いている場合は従来のログイン画面を出す（緊急脱出口）
+  if (pwgwsShouldRedirectToLogin()) { pwgwsGoToLogin(); return; }
+
   // One Tap（PCブラウザ向け）
   if (!window.google || !google.accounts) return;
   google.accounts.id.initialize({
@@ -152,6 +161,8 @@ async function _processUserWithGasAuth(u, save) {
   // ログイン情報をlocalStorageに保存（次回自動ログイン用）
   if (save) {
     try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, isAdmin: true })); } catch(e) {}
+    // 他の2アプリでもログイン済みとして扱えるよう共通セッションにも保存する
+    pwgwsSaveSession(u.email, u.name, u.picture);
   }
   const av = document.getElementById('av');
   if (u.picture) {
@@ -176,9 +187,12 @@ async function _processUserWithGasAuth(u, save) {
 }
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch(e) {}
-  // 救済ログイン中でも確実にログアウトできるようにする
-  try { localStorage.removeItem('pwgws_recovery_session'); } catch(e) {}
+  // 共通セッション・救済ログインも併せて破棄する（3アプリ共通のログアウト）
+  pwgwsClearSession();
   google.accounts.id.disableAutoSelect();
+  // ログアウト後は共通ログイン画面へ戻す。
+  // 共通ログイン画面が使えない場合は従来どおりこのアプリのログイン画面を表示する
+  if (pwgwsShouldRedirectToLogin()) { pwgwsGoToLogin(); return; }
   document.getElementById('app').style.display  = 'none';
   document.getElementById('auth').style.display = 'flex';
 }

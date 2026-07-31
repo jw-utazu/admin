@@ -7,6 +7,21 @@ const API_URL   = 'https://nqtswiynoxawccldqcwi.supabase.co/functions/v1/api';
 const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xdHN3aXlub3hhd2NjbGRxY3dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MzQxNjIsImV4cCI6MjA5ODMxMDE2Mn0.M-AnCBnXBI1FIyouoa5ttF6mb8PF2YqHfv180PqQWQU';
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
 
+// session.js（共通セッション）が読み込めなかった場合の安全網。
+// 共通ログイン画面へのリダイレクトを無効化し、従来の各アプリのログイン画面に
+// フォールバックさせる。これが無いと session.js の配信失敗で誰もログインできなくなる
+if (typeof pwgwsGetSession !== 'function') {
+  console.warn('[session] session.js が読み込めませんでした。従来のログイン画面を使用します');
+  window.pwgwsGetSession           = function () { return null; };
+  window.pwgwsSaveSession          = function () {};
+  window.pwgwsClearSession         = function () {
+    try { localStorage.removeItem('pwgws_session'); } catch (_) {}
+    try { localStorage.removeItem('pwgws_recovery_session'); } catch (_) {}
+  };
+  window.pwgwsGoToLogin            = function () {};
+  window.pwgwsShouldRedirectToLogin = function () { return false; };
+}
+
 // ============================================================
 // API通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
 // ============================================================
