@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client"></script>
-<link rel="stylesheet" href="css/index.css?v=10">
+<link rel="stylesheet" href="css/index.css?v=11">
 </head>
 <body>
 
@@ -231,6 +231,12 @@
             <div class="ab-tx"><span class="ab-n">配布報告一覧</span><span class="ab-d">奉仕者からの配布報告を確認</span></div>
             <span class="ab-ar">›</span>
           </button>
+          <button class="abtn normal-only" onclick="openRecoveryModal()">
+            <div class="ab-ic" style="background:#fef9c3;color:#a16207;">🔑</div>
+            <div class="ab-tx"><span class="ab-n">ログイン救済申請</span><span class="ab-d">ログインできない人の申請を承認</span>
+              <span class="rec-badge" id="rec-badge" style="display:none;"></span></div>
+            <span class="ab-ar">›</span>
+          </button>
           <button class="abtn" id="btn-limited-members" style="display:none;" onclick="openLimitedMembersModal()">
             <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔐</div>
             <div class="ab-tx"><span class="ab-n">対象メンバー管理</span><span class="ab-d">限定PW対象メンバーの追加・削除</span></div>
@@ -419,6 +425,44 @@
     <div class="mhd"><span class="mt">📦 配布報告一覧</span><button class="mx" onclick="closeM('m-distrib-report')">&#10005;</button></div>
     <div class="mbd" id="m-distrib-report-body">読み込み中...</div>
     <div class="mft" id="m-distrib-report-ft"><button class="btn btn-g" onclick="closeM('m-distrib-report')">閉じる</button></div>
+  </div>
+</div>
+<!-- ログイン救済申請モーダル -->
+<div class="ov" id="m-recovery">
+  <div class="modal" style="max-width:560px;">
+    <div class="mhd"><span class="mt">🔑 ログイン救済申請</span><button class="mx" onclick="closeM('m-recovery')">&#10005;</button></div>
+    <div class="mbd" id="m-recovery-body">読み込み中...</div>
+    <div class="mft" id="m-recovery-ft">
+      <button class="btn btn-g" onclick="openRecoveryKeyModal()">合言葉を変更</button>
+      <button class="btn btn-g" onclick="closeM('m-recovery')">閉じる</button>
+    </div>
+  </div>
+</div>
+<!-- 承認後のパスコード表示モーダル -->
+<div class="ov" id="m-recovery-otp">
+  <div class="modal" style="max-width:420px;">
+    <div class="mhd"><span class="mt">📞 本人に電話で伝えてください</span><button class="mx" onclick="closeM('m-recovery-otp')">&#10005;</button></div>
+    <div class="mbd" id="m-recovery-otp-body"></div>
+    <div class="mft"><button class="btn btn-p" onclick="closeM('m-recovery-otp');loadRecoveryRequests()">確認しました</button></div>
+  </div>
+</div>
+<!-- 合言葉変更モーダル -->
+<div class="ov" id="m-recovery-key">
+  <div class="modal" style="max-width:420px;">
+    <div class="mhd"><span class="mt">🔒 合言葉の変更</span><button class="mx" onclick="closeM('m-recovery-key')">&#10005;</button></div>
+    <div class="mbd">
+      <p class="rec-note">
+        合言葉は「部外者からの申請を防ぐ」ためのもので、本人確認そのものではありません。
+        会衆の皆さんに口頭で伝え、年に一度など定期的に変更してください。
+      </p>
+      <label class="rec-flabel">新しい合言葉（4文字以上）</label>
+      <input type="text" id="rec-newkey" class="inp" placeholder="例：utazu2026" autocomplete="off">
+      <div id="rec-key-msg" style="margin-top:10px;font-size:13px;"></div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-g" onclick="closeM('m-recovery-key')">キャンセル</button>
+      <button class="btn btn-p" onclick="saveRecoveryKey()">変更する</button>
+    </div>
   </div>
 </div>
 <!-- マニュアル選択モーダル -->
@@ -649,7 +693,7 @@
 
 <!-- フェーズ追加・編集モーダル -->
 
-<script src="js/api.js?v=3"></script>
-<script src="js/index.js?v=14"></script>
+<script src="js/api.js?v=4"></script>
+<script src="js/index.js?v=15"></script>
 </body>
 </html>

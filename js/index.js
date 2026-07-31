@@ -53,8 +53,40 @@ function signIn() {
   tc.requestAccessToken({ prompt: '' });
 }
 
-// 自動ログイン（One Tap → localStorageフォールバック）
-function tryAutoLogin() {
+// 救済ログインのセッションで管理アプリに入る（Googleアカウントが使えない管理者向け）。
+// 有効期限はサーバー側で検証される。shift-form と同一オリジンのため localStorage を共有できる
+async function tryRecoveryLogin() {
+  let token = '';
+  try { token = localStorage.getItem('pwgws_recovery_session') || ''; } catch (_) {}
+  if (!token) return false;
+  try {
+    const res = await apiPost({ action: 'validateRecoverySession', sessionToken: token });
+    if (!res.ok || !res.isAdmin) return false;
+    _currentUser = { uid: res.uid || '', name: res.name, email: '', isRecoverySession: true };
+    document.getElementById('auth').style.display = 'none';
+    document.getElementById('loading').classList.add('show');
+    setLoadingStep(3, 'データを読み込み中...');
+    const av = document.getElementById('av');
+    av.textContent = ([...res.name || '?'][0] || '?').toUpperCase();
+    const now = new Date();
+    const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    curY = _nm.getFullYear(); curM = _nm.getMonth() + 1;
+    scY = curY; scM = curM; slotY = curY; slotM = curM;
+    calY = now.getFullYear(); calM = now.getMonth() + 1;
+    loadAdminData();
+    if (res.daysLeft <= 3) {
+      setTimeout(() => alert('この一時ログインはあと ' + res.daysLeft + '日で終了します。\n' +
+        'Googleアカウントの再設定、またはメールアドレスの変更を済ませてください。'), 1500);
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+// 自動ログイン（救済セッション → One Tap → localStorageフォールバック）
+async function tryAutoLogin() {
+  // Googleアカウントが使えない管理者のための救済セッションを最優先で確認
+  if (await tryRecoveryLogin()) return;
+
   // まずlocalStorageに保存済みユーザーがあれば即復元
   try {
     const saved = localStorage.getItem('adminUser');
@@ -144,6 +176,8 @@ async function _processUserWithGasAuth(u, save) {
 }
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch(e) {}
+  // 救済ログイン中でも確実にログアウトできるようにする
+  try { localStorage.removeItem('pwgws_recovery_session'); } catch(e) {}
   google.accounts.id.disableAutoSelect();
   document.getElementById('app').style.display  = 'none';
   document.getElementById('auth').style.display = 'flex';
@@ -2338,6 +2372,173 @@ async function resolveBugReport(rowIndex) {
     hideProc();
     toast('対応済みにしました', 's');
   } catch (e) { hideProc(); toast('更新失敗: ' + e.message, 'e'); }
+}
+
+// ============================================================
+// ログイン救済申請
+//
+// 承認しただけでは相手はログインできない。承認で発行されるパスコードを
+// 管理者が電話・対面で本人に伝えて初めてログインできる仕組みにしてあるため、
+// 「承認ボタンを押すだけ」の形骸化が起きないようになっている
+// ============================================================
+async function openRecoveryModal() {
+  openM('m-recovery');
+  await loadRecoveryRequests();
+}
+
+async function loadRecoveryRequests() {
+  const body = document.getElementById('m-recovery-body');
+  body.innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
+  try {
+    const d = await apiPost({ action: 'getRecoveryRequests' });
+    if (!d.ok) throw new Error(d.reason === 'unauthorized' ? '権限がありません' : (d.reason || '取得失敗'));
+    const all     = d.requests || [];
+    const pending = all.filter(r => r.status === 'pending');
+    const active  = all.filter(r => r.status === 'approved');
+    const past    = all.filter(r => !['pending','approved'].includes(r.status));
+
+    let html = '<div class="rec-note">パスコードは<b>この画面にしか表示されません</b>。'
+             + '承認したら、必ず電話や対面など<b>アプリの外の手段で本人に伝えてください</b>。<br>'
+             + '合言葉を知っていることは本人確認になりません。心当たりのない申請は却下してください。</div>';
+
+    if (pending.length === 0 && active.length === 0 && past.length === 0) {
+      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">申請はありません</div>';
+    }
+
+    if (pending.length > 0) {
+      html += '<div class="rec-sec-title" style="color:var(--red);">未対応の申請</div>';
+      html += pending.map(r => `
+        <div class="rec-card rec-card-pending">
+          <div class="rec-card-hd">
+            <span class="rec-card-name">${esc(r.name)}</span>
+            <span class="rec-card-time">${esc(fmtRecTime(r.created_at))}</span>
+          </div>
+          <div class="rec-card-mail">${esc(r.email || '(メールアドレス未入力)')}</div>
+          ${r.matched
+            ? `<div class="rec-tag rec-tag-ok">✅ メンバーと一致（${esc(recScopeLabel(r.role_scope))}）</div>`
+            : '<div class="rec-tag rec-tag-ng">⚠️ 一致するメンバーが見つかりません。心当たりがなければ却下してください</div>'}
+          <div class="rec-card-actions">
+            ${r.matched
+              ? `<button class="btn btn-p" onclick="approveRecoveryRequest(${r.id})">承認してパスコードを発行</button>`
+              : ''}
+            <button class="btn btn-g" onclick="rejectRecoveryRequest(${r.id})">却下</button>
+          </div>
+        </div>`).join('');
+    }
+
+    if (active.length > 0) {
+      html += '<div class="rec-sec-title">パスコード発行済み（本人の入力待ち）</div>';
+      html += active.map(r => `
+        <div class="rec-card">
+          <div class="rec-card-hd">
+            <span class="rec-card-name">${esc(r.name)}</span>
+            <span class="rec-card-time">${esc(fmtRecTime(r.approved_at))} 承認</span>
+          </div>
+          <div class="rec-card-mail">承認者: ${esc(r.approved_by_name || '-')}</div>
+          <div class="rec-tag">⏳ 本人がパスコードを入力するのを待っています</div>
+        </div>`).join('');
+    }
+
+    if (past.length > 0) {
+      html += `<details style="margin-top:10px;"><summary class="rec-sec-title" style="cursor:pointer;">過去の申請 (${past.length}件)</summary>`;
+      html += past.map(r => `
+        <div class="rec-card rec-card-past">
+          <div class="rec-card-hd">
+            <span class="rec-card-name">${esc(r.name)}</span>
+            <span class="rec-card-time">${esc(recStatusLabel(r.status))}</span>
+          </div>
+          <div class="rec-card-mail">${esc(r.email || '')}　${esc(fmtRecTime(r.created_at))}</div>
+        </div>`).join('');
+      html += '</details>';
+    }
+    body.innerHTML = html;
+    updateRecoveryBadge(pending.length);
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:12px;">読み込みに失敗しました: ' + esc(e.message) + '</div>';
+  }
+}
+
+function recScopeLabel(s) {
+  return s === 'admin' ? '管理者・7日間有効' : s === 'accountant' ? '会計者・30日間有効' : '奉仕者・30日間有効';
+}
+function recStatusLabel(s) {
+  return { consumed: 'ログイン完了', rejected: '却下', expired: '期限切れ' }[s] || s;
+}
+function fmtRecTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+         String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+// メニューボタンの未対応バッジ
+function updateRecoveryBadge(n) {
+  const el = document.getElementById('rec-badge');
+  if (!el) return;
+  if (n > 0) { el.textContent = n; el.style.display = ''; }
+  else { el.style.display = 'none'; }
+}
+
+async function approveRecoveryRequest(id) {
+  if (!confirm('この申請を承認しますか？\n\n承認するとパスコードが表示されます。\n必ず電話などで本人に直接お伝えください。')) return;
+  showProc('承認しています...', '少々お待ちください');
+  try {
+    const res = await apiPost({ action: 'approveRecoveryRequest', requestId: id });
+    if (!res.ok) {
+      const msgs = {
+        unauthorized:   '権限がありません',
+        already_handled:'この申請は既に処理済みです',
+        expired:        'この申請は期限切れです',
+        not_matched:    'メンバーと一致していないため承認できません',
+        self_approval:  '自分自身の申請は承認できません。他の管理者に依頼してください',
+      };
+      throw new Error(msgs[res.reason] || res.reason || '承認に失敗しました');
+    }
+    hideProc();
+    document.getElementById('m-recovery-otp-body').innerHTML =
+      `<div class="rec-otp-name">${esc(res.name)} さんへ</div>
+       <div class="rec-otp-code">${esc(res.otp)}</div>
+       <div class="rec-note" style="margin-top:14px;">
+         このパスコードは <b>${res.expiresInMin}分間</b> 有効です。<br>
+         <b>電話や対面で直接ご本人に伝えてください。</b>
+         メールやメッセージアプリで送ると、本人確認の意味がなくなります。<br>
+         この画面を閉じると二度と表示されません（その場合は再度申請してもらってください）。
+       </div>`;
+    openM('m-recovery-otp');
+  } catch (e) { hideProc(); toast('承認失敗: ' + e.message, 'e'); }
+}
+
+async function rejectRecoveryRequest(id) {
+  if (!confirm('この申請を却下しますか？')) return;
+  showProc('却下しています...', '少々お待ちください');
+  try {
+    const res = await apiPost({ action: 'rejectRecoveryRequest', requestId: id });
+    if (!res.ok) throw new Error(res.reason || '却下に失敗しました');
+    await loadRecoveryRequests();
+    hideProc();
+    toast('申請を却下しました', 's');
+  } catch (e) { hideProc(); toast('却下失敗: ' + e.message, 'e'); }
+}
+
+function openRecoveryKeyModal() {
+  document.getElementById('rec-newkey').value = '';
+  document.getElementById('rec-key-msg').textContent = '';
+  openM('m-recovery-key');
+}
+
+async function saveRecoveryKey() {
+  const key = document.getElementById('rec-newkey').value.trim();
+  const msg = document.getElementById('rec-key-msg');
+  if (key.length < 4) { msg.style.color = 'var(--red)'; msg.textContent = '4文字以上で入力してください。'; return; }
+  showProc('合言葉を変更しています...', '少々お待ちください');
+  try {
+    const res = await apiPost({ action: 'setRecoverySharedKey', sharedKey: key });
+    if (!res.ok) throw new Error(res.reason || '変更に失敗しました');
+    hideProc();
+    closeM('m-recovery-key');
+    toast('合言葉を変更しました', 's');
+  } catch (e) { hideProc(); toast('変更失敗: ' + e.message, 'e'); }
 }
 
 async function openDistributionReportModal() {

@@ -45,6 +45,10 @@ function apiPost(actionOrPayload, params) {
     payload.adminUid  = payload.adminUid  || _currentUser.uid;
     payload.adminName = payload.adminName || _currentUser.name;
   }
+  // オーナーアカウントは uid を持たないため、権限確認用にメールアドレスも送る
+  if (_currentUser && _currentUser.email) {
+    payload.adminEmail = payload.adminEmail || _currentUser.email;
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
   return fetch(API_URL, {

@@ -64,9 +64,23 @@ function ymP(extra) {
 // ============================================================
 // 認証
 // ============================================================
-function initAuth() {
+async function initAuth() {
   try { const u = JSON.parse(localStorage.getItem('adminUser') || 'null'); if (u && u.isAdmin) { adminUser = u; showApp(); return; } } catch (_) {}
+  // Googleアカウントが使えない管理者のための救済セッション（有効期限はサーバー側で検証）
+  if (await tryRecoveryLogin()) return;
   showLogin();
+}
+async function tryRecoveryLogin() {
+  let token = '';
+  try { token = localStorage.getItem('pwgws_recovery_session') || ''; } catch (_) {}
+  if (!token) return false;
+  try {
+    const res = await apiPost({ action: 'validateRecoverySession', sessionToken: token });
+    if (!res.ok || !res.isAdmin) return false;
+    adminUser = { email: '', name: res.name, uid: res.uid || '', isAdmin: true, picture: '', isRecoverySession: true };
+    showApp();
+    return true;
+  } catch (_) { return false; }
 }
 function showLogin() { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').style.display = 'none'; renderGsiButton(); }
 function renderGsiButton() {
@@ -86,7 +100,11 @@ async function onGoogleLogin(resp) {
     setLoading(false); showApp();
   } catch (e) { setLoading(false); toast('ログインエラー: ' + e.message, 'e'); }
 }
-function signOut() { try { localStorage.removeItem('adminUser'); } catch (_) {} toast('ログアウトしました', 's'); setTimeout(() => location.reload(), 800); }
+function signOut() {
+  try { localStorage.removeItem('adminUser'); } catch (_) {}
+  try { localStorage.removeItem('pwgws_recovery_session'); } catch (_) {}
+  toast('ログアウトしました', 's'); setTimeout(() => location.reload(), 800);
+}
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'flex';
