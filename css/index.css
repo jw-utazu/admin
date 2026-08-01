@@ -259,6 +259,29 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .ab-n{font-size:12px;font-weight:700;color:var(--ink);display:block;}
 .ab-d{font-size:10px;color:var(--ink2);display:block;margin-top:1px;}
 .ab-ar{color:var(--ink3);font-size:12px;}
+/* ===== 進行状況ストリップ ===== */
+/* 月の作業は一本道なので、現在地と次の一手を1行で示す。
+   段階は「済＝緑」「今ここ＝青の枠付き」「未着手＝灰」の3状態だけにして、
+   色の意味を覚えなくても濃さで順序が読めるようにしている */
+.prog{padding:8px 14px 10px;background:var(--surface);border-bottom:1px solid var(--border);}
+.prog-steps{display:flex;align-items:center;gap:0;flex-wrap:wrap;row-gap:4px;}
+.pstep{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;
+  font-size:11px;font-weight:700;white-space:nowrap;border:1px solid transparent;}
+.pstep-ic{font-size:10px;line-height:1;}
+.pstep.done{color:var(--green);background:var(--green-l);}
+.pstep.now{color:var(--blue);background:var(--blue-l);border-color:var(--blue);}
+.pstep.todo{color:var(--ink3);background:var(--surface2);}
+.pstep-sep{color:var(--border2);font-size:10px;padding:0 1px;flex-shrink:0;}
+.prog-next{display:flex;align-items:baseline;gap:6px;margin-top:7px;font-size:12px;
+  line-height:1.6;color:var(--ink2);}
+.prog-next b{color:var(--ink);font-weight:700;}
+.prog-next-lbl{flex-shrink:0;font-size:11px;font-weight:700;color:var(--ink3);}
+/* 手が止まっている・急ぎの状態は色で分ける */
+.prog.warn{background:#fffbeb;border-bottom-color:#fde68a;}
+.prog.warn .prog-next{color:#92400e;}
+.prog.warn .prog-next b{color:#92400e;}
+.prog.ok .prog-next b{color:var(--green);}
+
 /* ===== サイドバー：未対応リスト ===== */
 /* 「開かないと中身があるか分からない」を無くすための区画。
    件数があるものだけ濃く出し、0件は薄くして視線を素通りさせる */

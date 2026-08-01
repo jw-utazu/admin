@@ -234,6 +234,8 @@ async function loadAdminData() {
   loadCalPubStatus();
   loadAutoPublishSettings();
   loadPendingCounts();   // サイドバー「未対応」の件数（件数だけを返す軽量API）
+  loadShiftStatus();     // 進行状況ストリップ用（シフトの作成完了・確認完了）
+  renderProgressStrip(); // 先に日程・公開状態だけで描いておく（シフト状態は後追い）
   // 描画完了後にローディングを非表示・appを表示。
   // requestAnimationFrame はタブが非表示のあいだ発火しないため、
   // バックグラウンドで開かれた場合に備えてタイマーでも必ず実行する
@@ -1795,7 +1797,101 @@ async function loadCalPubStatus() {
 // 公開できる月は常に1つだけで、別の月を公開すると前の月は自動的に非公開になる
 function isCurMonthPublished() { return !!(calPubStatus && calPubYM && calPubYM.y === curY && calPubYM.m === curM); }
 
+// ============================================================
+// 進行状況ストリップ
+// ============================================================
+// 月の作業は「日程設定 → 募集開始 → 受付 → シフト作成 → 公開」の一本道で、
+// 今どこにいて次に何をするかは一意に決まる。それが従来は
+//   受付状況     … ヘッダーのバッジ
+//   予定表の公開 … カレンダー右上のバッジ
+//   日程         … 下の方の日程一覧カード
+//   シフトの状態 … このアプリには無い（シフト管理アプリを開くしかない）
+// と散っていたので、1か所にまとめる。
+let shiftStatus = null;   // getShiftPublishStatus の結果（公開中の月のもの）
+
+async function loadShiftStatus() {
+  try {
+    const r = await apiGet('getShiftPublishStatus');
+    shiftStatus = (r && r.ok) ? r : null;
+  } catch (e) { shiftStatus = null; }
+  renderProgressStrip();
+}
+
+function renderProgressStrip() {
+  const wrap = document.getElementById('prog-strip');
+  if (!wrap) return;
+  // 限定PWは複数月が同時に走りうるので一本道にならない。ここでは扱わない
+  if (currentPwType !== 'normal') { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const toDate = o => (o && o.y && o.m && o.d) ? new Date(o.y, o.m - 1, o.d) : null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const ad = toDate(dates.apply), dd = toDate(dates.deadline), od = toDate(dates.open);
+  const hasDates = !!(ad && dd && od);
+  const calOn = isCurMonthPublished();
+  // シフトの状態は「公開中のカレンダー」に対して返ってくる。表示中の対象年月が
+  // それと違うときは、この月の状態として読んではいけない
+  const ss = (calOn && shiftStatus) ? shiftStatus : null;
+  const applyStarted   = !!(ad && today >= ad);
+  const deadlinePassed = !!(dd && today > dd);
+  const created  = !!(ss && ss.published);     // シフト作成完了
+  const approved = !!(ss && ss.approvedAll);   // 確認者全員の確認完了
+  const notified = !!(ss && ss.notified);      // 奉仕者へ公開・通知済み
+
+  const st = {
+    dates:  hasDates ? 'done' : 'now',
+    cal:    !hasDates ? 'todo' : (calOn ? 'done' : 'now'),
+    apply:  !calOn ? 'todo' : (deadlinePassed ? 'done' : 'now'),
+    create: !calOn ? 'todo' : (approved ? 'done' : (deadlinePassed || created ? 'now' : 'todo')),
+    open:   notified ? 'done' : (approved ? 'now' : 'todo'),
+  };
+  const ic = s => s === 'done' ? '✔' : (s === 'now' ? '●' : '○');
+  const steps = [
+    ['dates', '日程設定'], ['cal', '募集開始'], ['apply', '受付'],
+    ['create', 'シフト作成'], ['open', '公開'],
+  ];
+  document.getElementById('prog-steps').innerHTML = steps.map(([k, label], i) =>
+    (i ? '<span class="pstep-sep">›</span>' : '') +
+    `<span class="pstep ${st[k]}"><span class="pstep-ic">${ic(st[k])}</span>${label}</span>`
+  ).join('');
+
+  // 次にやること。上から順に「まだ済んでいない最初のもの」を出す
+  const md = o => o ? (o.m + '/' + o.d) : '';
+  const days = t => Math.ceil((t - today) / 86400000);
+  let msg = '', tone = '';
+  if (!hasDates) {
+    msg = '申込開始日・締切日・シフト公開日を設定してください（日程一覧の「編集」から）';
+    tone = 'warn';
+  } else if (!calOn) {
+    const other = (calPubStatus && calPubYM) ? `（いま公開中は ${calPubYM.y}年${calPubYM.m}月）` : '';
+    msg = `この月はまだ公開されていません。「🚀 募集開始処理」で予定表の公開とフォーム作成を行ってください${other}`;
+    tone = 'warn';
+  } else if (!applyStarted) {
+    msg = `公開済みです。<b>${md(dates.apply)}</b> から申込受付が始まります`;
+  } else if (!deadlinePassed) {
+    const n = days(dd);
+    msg = n <= 0 ? `本日 <b>${md(dates.deadline)}</b> が締切です` : `申込受付中。締切 <b>${md(dates.deadline)}</b> まであと <b>${n}日</b>`;
+  } else if (!created) {
+    msg = '締切済みです。「🗂 シフト管理アプリ」でシフトを作成し、<b>シフト作成完了</b>にしてください';
+    tone = 'warn';
+  } else if (!approved) {
+    const c = (ss && ss.approvedCount) || 0, r = (ss && ss.required) || 0;
+    msg = `シフト作成完了。<b>確認者の確認待ち</b>${r ? `（${c}/${r}人）` : ''}`;
+    tone = 'warn';
+  } else if (!notified) {
+    msg = `確認完了。シフト公開日 <b>${md(dates.open)}</b> に自動で奉仕者へ公開されます`;
+  } else {
+    msg = '<b>奉仕者へ公開済みです。</b>今月の作業は完了しています';
+    tone = 'ok';
+  }
+  wrap.className = 'prog' + (tone ? ' ' + tone : '');
+  document.getElementById('prog-next').innerHTML =
+    `<span class="prog-next-lbl">次にやること</span><span>${msg}</span>`;
+}
+
 function updCalPubBadge() {
+  // 公開状態が変わると進行状況も変わる
+  renderProgressStrip();
   const badge = document.getElementById('cal-pub-badge');
   const text  = document.getElementById('cal-pub-badge-text');
   const note  = document.getElementById('cal-pub-note');
