@@ -233,6 +233,7 @@ async function loadAdminData() {
   renderAll();
   loadCalPubStatus();
   loadAutoPublishSettings();
+  loadPendingCounts();   // サイドバー「未対応」の件数（件数だけを返す軽量API）
   // 描画完了後にローディングを非表示・appを表示。
   // requestAnimationFrame はタブが非表示のあいだ発火しないため、
   // バックグラウンドで開かれた場合に備えてタイマーでも必ず実行する
@@ -1923,9 +1924,6 @@ function getWeekNum(y,m,d){
   const fm=new Date(ms); fm.setDate(1-msMon);
   return Math.floor((mon-fm)/(7*86400000))+1;
 }
-function copyUrl(){
-  navigator.clipboard.writeText('https://jw-utazu.github.io/shift-form/').then(()=>toast('URLをコピーしました','s'));
-}
 function toast(msg,type){
   const a=document.getElementById('ta');
   const el=document.createElement('div');
@@ -2259,6 +2257,9 @@ async function refreshRequestModal() {
     const all     = d.requests || [];
     const pending = all.filter(r => r.status === '未対応');
     const done    = all.filter(r => r.status !== '未対応');
+    // ここで正確な件数が分かるので、サイドバーの表示もそろえる
+    // （対応済みにした直後に getPendingCounts を呼び直さずに済む）
+    setInboxCount('requests', pending.length);
     let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">未対応: ${pending.length}件 / 対応済み: ${done.length}件</div>`;
     if (pending.length === 0 && done.length === 0) {
       html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">要望はありません 🎉</div>';
@@ -2319,6 +2320,7 @@ async function refreshBugReportModal() {
     const all     = d.reports || [];
     const pending = all.filter(r => r.status === '未対応');
     const done    = all.filter(r => r.status !== '未対応');
+    setInboxCount('bugs', pending.length);   // サイドバーの件数もそろえる
     let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">未対応: ${pending.length}件 / 対応済み: ${done.length}件</div>`;
     if (pending.length === 0 && done.length === 0) {
       html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">バグ報告はありません 🎉</div>';
@@ -2503,13 +2505,65 @@ function fmtRecTime(iso) {
          String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
-// メニューボタンの未対応バッジ
-function updateRecoveryBadge(n) {
-  const el = document.getElementById('rec-badge');
-  if (!el) return;
-  if (n > 0) { el.textContent = n; el.style.display = ''; }
-  else { el.style.display = 'none'; }
+// ============================================================
+// サイドバーの「未対応」件数
+// ============================================================
+// 要望・バグ報告・ログイン救済は、開くまで中身があるか分からなかった。
+// 件数を出して「そもそも開く必要があるか」を見ただけで判断できるようにする。
+// 一覧APIを3本叩くと全行のデータが返ってくるので、件数だけを返す
+// getPendingCounts にまとめてある（呼び出しは1回）。
+//
+// 配布報告だけ扱いが違う。あれは「対応するもの」ではなく溜まっていくのが
+// 正常なので、未対応ではなく今月の件数を中立な色で出す
+function setInboxCount(key, n, neutral) {
+  const row = document.getElementById('ibx-' + key);
+  const cell = document.getElementById('ibx-c-' + key);
+  if (!row || !cell) return;
+  const has = n > 0;
+  cell.textContent = has ? n : '－';
+  row.classList.toggle('has-items', has);
+  if (neutral) cell.classList.add('neutral');
 }
+
+function renderInboxCounts(c) {
+  setInboxCount('recovery',     c.recovery     || 0);
+  setInboxCount('requests',     c.requests     || 0);
+  setInboxCount('bugs',         c.bugs         || 0);
+  setInboxCount('distribution', c.distribution || 0, true);
+  // 見出しの合計。配布報告は「対応するもの」ではないので合計に入れない
+  const total = (c.recovery || 0) + (c.requests || 0) + (c.bugs || 0);
+  const el = document.getElementById('inbox-total');
+  if (el) el.textContent = total > 0 ? '合計 ' + total + '件' : '';
+}
+
+async function loadPendingCounts() {
+  try {
+    const res = await apiGet('getPendingCounts');
+    if (res && res.ok && res.counts) renderInboxCounts(res.counts);
+  } catch (e) { console.warn('[loadPendingCounts]', e); }
+}
+
+// 救済申請モーダルは未対応の一覧を持っているので、その件数をそのまま使う
+// （ここで getPendingCounts を呼び直す必要はない）
+function updateRecoveryBadge(n) { setInboxCount('recovery', n); }
+
+// ===== 管理・設定セクションの開閉 =====
+// 数ヶ月に一度しか触らない区画なので畳めるようにする。
+// 開閉は端末ごとの好みなので localStorage に覚えさせる
+const SB_TOOLS_KEY = 'pwgws_admin_tools_open';
+function toggleSbTools() {
+  const t = document.getElementById('tools-toggle');
+  if (!t) return;
+  const open = !t.classList.contains('open');
+  t.classList.toggle('open', open);
+  t.querySelector('.sec-arrow').textContent = open ? '▾' : '▸';
+  try { localStorage.setItem(SB_TOOLS_KEY, open ? '1' : '0'); } catch (_) {}
+}
+(function restoreSbTools() {
+  let saved = null;
+  try { saved = localStorage.getItem(SB_TOOLS_KEY); } catch (_) {}
+  if (saved === '0') toggleSbTools();   // 既定は開いた状態
+})();
 
 async function approveRecoveryRequest(id) {
   if (!confirm('この申請を承認しますか？\n\n承認するとパスコードが表示されます。\n電話やLINEなど、本人と確実に連絡が取れる手段でお伝えください。')) return;

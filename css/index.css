@@ -259,9 +259,54 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .ab-n{font-size:12px;font-weight:700;color:var(--ink);display:block;}
 .ab-d{font-size:10px;color:var(--ink2);display:block;margin-top:1px;}
 .ab-ar{color:var(--ink3);font-size:12px;}
-.url-row{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;display:flex;align-items:center;gap:6px;}
-.url-txt{flex:1;font-size:11px;color:var(--blue);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.copy-btn-s{font-size:10px;padding:3px 7px;border:1px solid var(--border);border-radius:5px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+/* ===== サイドバー：未対応リスト ===== */
+/* 「開かないと中身があるか分からない」を無くすための区画。
+   件数があるものだけ濃く出し、0件は薄くして視線を素通りさせる */
+.sb-sec{display:flex;flex-direction:column;}
+.inbox-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.inbox-total{font-size:10px;font-weight:700;color:var(--red);letter-spacing:0;text-transform:none;}
+.inbox-total:empty{display:none;}
+.inbox{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.ibx{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:none;
+  border-bottom:1px solid var(--border);background:var(--surface2);cursor:pointer;
+  font-family:var(--sans);text-align:left;transition:background .12s;}
+.ibx:last-child{border-bottom:none;}
+.ibx:hover{background:var(--surface);}
+.ibx-ic{font-size:13px;flex-shrink:0;line-height:1;}
+.ibx-n{flex:1;font-size:12px;font-weight:700;color:var(--ink2);}
+/* 件数。0件のときは「－」を薄く出すだけにして、あるときだけ赤く目立たせる */
+.ibx-c{flex-shrink:0;min-width:20px;text-align:center;font-size:10px;font-weight:700;
+  color:var(--ink3);}
+.ibx.has-items{background:var(--red-l);}
+.ibx.has-items .ibx-n{color:var(--ink);}
+.ibx.has-items .ibx-c{background:var(--red);color:#fff;border-radius:9px;padding:1px 6px;}
+/* 配布報告は「対応するもの」ではないので、件数があっても赤くしない */
+.ibx.has-items .ibx-c.neutral{background:var(--blue-l);color:var(--blue-d);}
+
+/* ===== サイドバー：管理・設定（3列アイコン） ===== */
+/* 数ヶ月に一度しか触らない項目。説明文を落としてアイコン＋短い名前だけにする。
+   説明は title 属性に残してあるので、ホバーで読める */
+.sec-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;
+  padding:0;border:none;background:none;cursor:pointer;font-family:var(--sans);}
+.sec-arrow{font-size:9px;transition:transform .15s;}
+.sec-toggle:not(.open) .sec-arrow{transform:rotate(-90deg);}
+.tool-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.sec-toggle:not(.open)+.tool-grid{display:none;}
+.tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  padding:9px 2px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);
+  cursor:pointer;font-family:var(--sans);transition:all .12s;}
+.tool:hover{background:var(--surface);border-color:var(--border2);}
+.tool-ic{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;font-size:14px;flex-shrink:0;}
+.tool-n{font-size:10px;font-weight:700;color:var(--ink2);white-space:nowrap;}
+
+/* ===== サイドバー：フッター ===== */
+.sb-foot{flex-direction:row;gap:6px;}
+.foot-btn{flex:1;padding:8px 6px;border:1px solid var(--border);border-radius:var(--r);
+  background:var(--surface2);cursor:pointer;font-family:var(--sans);font-size:11px;
+  font-weight:700;color:var(--ink2);white-space:nowrap;}
+.foot-btn:hover{background:var(--surface);}
+.foot-btn.accent{background:var(--blue-l);border-color:var(--blue);color:var(--blue);}
 
 /* MODAL */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px);}
@@ -524,7 +569,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .pm-slot-row .pm-del{padding:3px 8px;border:none;background:var(--red-l);color:var(--red);border-radius:4px;cursor:pointer;font-size:11px;font-family:var(--sans);}
 
 /* ===== ログイン救済申請 ===== */
-.rec-badge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:9px;background:var(--red);color:#fff;font-size:10px;font-weight:700;text-align:center;vertical-align:middle;}
 .rec-note{font-size:12px;line-height:1.7;color:var(--ink2);background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r);padding:10px 12px;margin-bottom:12px;}
 .rec-sec-title{font-size:11px;font-weight:700;color:var(--ink3);margin:12px 0 6px;}
 .rec-card{border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);}

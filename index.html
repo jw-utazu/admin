@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=15">
+<link rel="stylesheet" href="css/index.css?v=16">
 </head>
 <body>
 
@@ -182,8 +182,15 @@
     </div>
 
     <!-- SIDEBAR -->
+    <!-- 役割で3層に分ける：
+         今月の作業 … 毎月必ず通る操作。大きいカードのまま残す
+         未対応     … 開くまで中身があるか分からないもの。件数を出して
+                      「開く必要があるか」を見ただけで判断できるようにする
+         管理・設定 … 数ヶ月に一度しか触らないもの。3列アイコンに畳む
+         全部を同じ大きさで並べると頻度の差が見た目に出ず、探すものが埋もれる -->
     <div class="sb">
-      <div>
+      <div class="sb-sec">
+        <div class="plbl">今月の作業</div>
         <div class="ag">
           <button class="abtn" onclick="openMonthlyModal()">
             <div class="ab-ic ic-a">&#128640;</div>
@@ -195,77 +202,62 @@
             <div class="ab-tx"><span class="ab-n">🗂 シフト管理アプリ</span><span class="ab-d">シフト作成・希望確認・設定</span></div>
             <span class="ab-ar">›</span>
           </a>
-          <button class="abtn normal-only" onclick="openMemberModal()">
-            <div class="ab-ic" style="background:#f0f9ff;color:#0369a1;">👥</div>
-            <div class="ab-tx"><span class="ab-n">メンバー管理</span><span class="ab-d">メンバーの追加・編集・有効無効</span></div>
-            <span class="ab-ar">›</span>
+        </div>
+      </div>
+
+      <div class="sb-sec normal-only">
+        <div class="plbl inbox-hd">未対応<span class="inbox-total" id="inbox-total"></span></div>
+        <div class="inbox">
+          <button class="ibx" id="ibx-recovery" onclick="openRecoveryModal()">
+            <span class="ibx-ic">🔑</span><span class="ibx-n">ログイン救済</span>
+            <span class="ibx-c" id="ibx-c-recovery">－</span>
           </button>
-          <button class="abtn normal-only" onclick="openNoticeModal()">
-            <div class="ab-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</div>
-            <div class="ab-tx"><span class="ab-n">お知らせ管理</span><span class="ab-d">お知らせの追加・編集・削除</span></div>
-            <span class="ab-ar">›</span>
+          <button class="ibx" id="ibx-requests" onclick="openRequestModal()">
+            <span class="ibx-ic">💬</span><span class="ibx-n">要望</span>
+            <span class="ibx-c" id="ibx-c-requests">－</span>
           </button>
-          <button class="abtn normal-only" onclick="openRequestModal()">
-            <div class="ab-ic" style="background:#fef3c7;color:#d97706;">💬</div>
-            <div class="ab-tx"><span class="ab-n">要望確認</span><span class="ab-d">未対応の要望を確認・対応</span></div>
-            <span class="ab-ar">›</span>
+          <button class="ibx" id="ibx-bugs" onclick="openBugReportModal()">
+            <span class="ibx-ic">🐛</span><span class="ibx-n">バグ報告</span>
+            <span class="ibx-c" id="ibx-c-bugs">－</span>
           </button>
-          <button class="abtn normal-only" onclick="openBugReportModal()">
-            <div class="ab-ic" style="background:#fee2e2;color:#b91c1c;">🐛</div>
-            <div class="ab-tx"><span class="ab-n">バグ報告確認</span><span class="ab-d">ユーザーからのバグ報告を確認・対応</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn normal-only" onclick="openDistributionReportModal()">
-            <div class="ab-ic" style="background:#e0f2fe;color:#0369a1;">📦</div>
-            <div class="ab-tx"><span class="ab-n">配布報告一覧</span><span class="ab-d">奉仕者からの配布報告を確認</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn normal-only" onclick="openRecoveryModal()">
-            <div class="ab-ic" style="background:#fef9c3;color:#a16207;">🔑</div>
-            <div class="ab-tx"><span class="ab-n">ログイン救済申請</span><span class="ab-d">ログインできない人の申請を承認</span>
-              <span class="rec-badge" id="rec-badge" style="display:none;"></span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" id="btn-limited-members" style="display:none;" onclick="openLimitedMembersModal()">
-            <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔐</div>
-            <div class="ab-tx"><span class="ab-n">対象メンバー管理</span><span class="ab-d">限定PW対象メンバーの追加・削除</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn normal-only" onclick="openProxyModal()">
-            <div class="ab-ic" style="background:#ede9fe;color:#7c3aed;">🔄</div>
-            <div class="ab-tx"><span class="ab-n">代理送信設定</span><span class="ab-d">代理送信の追加・削除</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn normal-only" onclick="openCoupleModal()">
-            <div class="ab-ic" style="background:#fdf2f8;color:#be185d;">💍</div>
-            <div class="ab-tx"><span class="ab-n">夫婦設定</span><span class="ab-d">夫婦ペアの追加・削除</span></div>
-            <span class="ab-ar">›</span>
-          </button>
-          <button class="abtn" onclick="openPhotoMgmtModal('exhibit')">
-            <div class="ab-ic" style="background:#f0fdf4;color:#16a34a;">🖼</div>
-            <div class="ab-tx"><span class="ab-n">展示内容写真管理</span><span class="ab-d">カート展示写真のアップロード・削除</span></div>
-            <span class="ab-ar">›</span>
+          <!-- 配布報告は「対応する」ものではなく溜まっていくのが正常なので、
+               未対応バッジではなく今月の件数を出す -->
+          <button class="ibx" id="ibx-distribution" onclick="openDistributionReportModal()">
+            <span class="ibx-ic">📦</span><span class="ibx-n">配布報告</span>
+            <span class="ibx-c neutral" id="ibx-c-distribution">－</span>
           </button>
         </div>
       </div>
-      <div>
-        <div class="plbl">フォームURL</div>
-        <div class="url-row">
-          <a href="https://jw-utazu.github.io/shift-form/" target="_blank" class="url-txt">https://jw-utazu.github.io/shift-form/</a>
-          <button class="copy-btn-s" onclick="copyUrl()">コピー</button>
-        </div>
-      </div>
-      <div>
-        <div class="plbl">マニュアル</div>
-        <button class="abtn" onclick="openM('m-manual')">
-          <div class="ab-ic" style="background:#eff6ff;color:#2563eb;">📖</div>
-          <div class="ab-tx"><span class="ab-n">操作マニュアル</span><span class="ab-d">各機能の操作手順を確認</span></div>
-          <span class="ab-ar">›</span>
+
+      <div class="sb-sec">
+        <button class="plbl sec-toggle open" id="tools-toggle" onclick="toggleSbTools()">
+          <span>管理・設定</span><span class="sec-arrow">▾</span>
         </button>
+        <div class="tool-grid" id="tool-grid">
+          <button class="tool normal-only" onclick="openMemberModal()" title="メンバーの追加・編集・有効無効">
+            <span class="tool-ic" style="background:#f0f9ff;color:#0369a1;">👥</span><span class="tool-n">メンバー</span>
+          </button>
+          <button class="tool normal-only" onclick="openNoticeModal()" title="お知らせの追加・編集・削除">
+            <span class="tool-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</span><span class="tool-n">お知らせ</span>
+          </button>
+          <button class="tool" onclick="openPhotoMgmtModal('exhibit')" title="カート展示写真のアップロード・削除">
+            <span class="tool-ic" style="background:#f0fdf4;color:#16a34a;">🖼</span><span class="tool-n">写真</span>
+          </button>
+          <button class="tool normal-only" onclick="openProxyModal()" title="代理送信の追加・削除">
+            <span class="tool-ic" style="background:#ede9fe;color:#7c3aed;">🔄</span><span class="tool-n">代理送信</span>
+          </button>
+          <button class="tool normal-only" onclick="openCoupleModal()" title="夫婦ペアの追加・削除">
+            <span class="tool-ic" style="background:#fdf2f8;color:#be185d;">💍</span><span class="tool-n">夫婦</span>
+          </button>
+          <button class="tool" id="btn-limited-members" style="display:none;" onclick="openLimitedMembersModal()" title="限定PW対象メンバーの追加・削除">
+            <span class="tool-ic" style="background:#ede9fe;color:#7c3aed;">🔐</span><span class="tool-n">対象者</span>
+          </button>
+        </div>
       </div>
-      <div>
-        <div class="plbl">アプリ</div>
-        <button onclick="openPwaModal()" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--blue-l);border:1.5px solid var(--blue);border-radius:var(--r);cursor:pointer;font-family:var(--sans);color:var(--blue);font-size:12px;font-weight:700;"><span style="font-size:15px;">📲</span><span>ホーム画面に追加</span></button>
+
+      <div class="sb-sec sb-foot">
+        <button class="foot-btn" onclick="openM('m-manual')">📖 マニュアル</button>
+        <button class="foot-btn accent" onclick="openPwaModal()">📲 ホームに追加</button>
       </div>
     </div>
   </div>
@@ -685,6 +677,6 @@
 
 <script src="js/session.js?v=2"></script>
 <script src="js/api.js?v=6"></script>
-<script src="js/index.js?v=21"></script>
+<script src="js/index.js?v=22"></script>
 </body>
 </html>
