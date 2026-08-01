@@ -1832,7 +1832,6 @@ function renderProgressStrip() {
   // シフトの状態は「公開中のカレンダー」に対して返ってくる。表示中の対象年月が
   // それと違うときは、この月の状態として読んではいけない
   const ss = (calOn && shiftStatus) ? shiftStatus : null;
-  const applyStarted   = !!(ad && today >= ad);
   const deadlinePassed = !!(dd && today > dd);
   const created  = !!(ss && ss.published);     // シフト作成完了
   const approved = !!(ss && ss.approvedAll);   // 確認者全員の確認完了
@@ -1845,48 +1844,24 @@ function renderProgressStrip() {
     create: !calOn ? 'todo' : (approved ? 'done' : (deadlinePassed || created ? 'now' : 'todo')),
     open:   notified ? 'done' : (approved ? 'now' : 'todo'),
   };
-  const ic = s => s === 'done' ? '✔' : (s === 'now' ? '●' : '○');
-  const steps = [
-    ['dates', '日程設定'], ['cal', '募集開始'], ['apply', '受付'],
-    ['create', 'シフト作成'], ['open', '公開'],
-  ];
-  document.getElementById('prog-steps').innerHTML = steps.map(([k, label], i) =>
-    (i ? '<span class="pstep-sep">›</span>' : '') +
-    `<span class="pstep ${st[k]}"><span class="pstep-ic">${ic(st[k])}</span>${label}</span>`
-  ).join('');
-
-  // 次にやること。上から順に「まだ済んでいない最初のもの」を出す
+  // 丸の下に日付を小さく添える。段の名前だけだと「受付はいつまでか」が
+  // 結局スクロールしないと分からないため
   const md = o => o ? (o.m + '/' + o.d) : '';
-  const days = t => Math.ceil((t - today) / 86400000);
-  let msg = '', tone = '';
-  if (!hasDates) {
-    msg = '申込開始日・締切日・シフト公開日を設定してください（日程一覧の「編集」から）';
-    tone = 'warn';
-  } else if (!calOn) {
-    const other = (calPubStatus && calPubYM) ? `（いま公開中は ${calPubYM.y}年${calPubYM.m}月）` : '';
-    msg = `この月はまだ公開されていません。「🚀 募集開始処理」で予定表の公開とフォーム作成を行ってください${other}`;
-    tone = 'warn';
-  } else if (!applyStarted) {
-    msg = `公開済みです。<b>${md(dates.apply)}</b> から申込受付が始まります`;
-  } else if (!deadlinePassed) {
-    const n = days(dd);
-    msg = n <= 0 ? `本日 <b>${md(dates.deadline)}</b> が締切です` : `申込受付中。締切 <b>${md(dates.deadline)}</b> まであと <b>${n}日</b>`;
-  } else if (!created) {
-    msg = '締切済みです。「🗂 シフト管理アプリ」でシフトを作成し、<b>シフト作成完了</b>にしてください';
-    tone = 'warn';
-  } else if (!approved) {
-    const c = (ss && ss.approvedCount) || 0, r = (ss && ss.required) || 0;
-    msg = `シフト作成完了。<b>確認者の確認待ち</b>${r ? `（${c}/${r}人）` : ''}`;
-    tone = 'warn';
-  } else if (!notified) {
-    msg = `確認完了。シフト公開日 <b>${md(dates.open)}</b> に自動で奉仕者へ公開されます`;
-  } else {
-    msg = '<b>奉仕者へ公開済みです。</b>今月の作業は完了しています';
-    tone = 'ok';
-  }
-  wrap.className = 'prog' + (tone ? ' ' + tone : '');
-  document.getElementById('prog-next').innerHTML =
-    `<span class="prog-next-lbl">次にやること</span><span>${msg}</span>`;
+  const steps = [
+    ['dates',  '日程設定',   ''],
+    ['cal',    '募集開始',   md(dates.apply)],
+    ['apply',  '受付',       dd ? '〜' + md(dates.deadline) : ''],
+    ['create', 'シフト作成', ''],
+    ['open',   '公開',       md(dates.open)],
+  ];
+  document.getElementById('prog-steps').innerHTML = steps.map(([k, label, sub], i) => {
+    // 連結線は「手前の段が済んでいれば緑」。線をたどれば進み具合が読める
+    const line = i ? `<div class="pline${st[steps[i - 1][0]] === 'done' ? ' done' : ''}"></div>` : '';
+    const mark = st[k] === 'done' ? '✓' : (i + 1);
+    return line + `<div class="pstep ${st[k]}"><div class="pdot">${mark}</div>`
+      + `<div class="plabel">${label}</div>`
+      + (sub ? `<div class="psub">${sub}</div>` : '') + '</div>';
+  }).join('');
 }
 
 function updCalPubBadge() {
