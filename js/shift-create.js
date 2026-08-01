@@ -871,7 +871,11 @@ async function submitWishChange(applied) {
   if (!wishEditCtx) return;
   const ctx = wishEditCtx;
   if (!applied && ctx.isAssigned) {
-    if (!confirm(`${ctx.name} さんは既にこのスロットにシフト割当済みです。\n不参加に変更しますか？\n※シフト側の割当は自動では変更されません。`)) return;
+    if (!await uiConfirm({
+      type: 'warn', title: '割当済みの奉仕者を不参加にする',
+      message: `${ctx.name} さんは既にこのスロットにシフト割当済みです。\n不参加に変更しますか？\n\n※シフト側の割当は自動では変更されません。`,
+      confirmText: '不参加にする',
+    })) return;
   }
   const si   = ctx.slot.indexOf(' ');
   const date = si >= 0 ? ctx.slot.slice(0, si) : ctx.slot;
@@ -1558,7 +1562,7 @@ function insColAt(bi, block, li, isEnd) {
   mu(bi); renderBlock();
 }
 
-function delCol(bi, li) {
+async function delCol(bi, li) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
@@ -1566,7 +1570,11 @@ function delCol(bi, li) {
   if ((block.usedPlaces || []).length <= 1) { toast('最後の列は削除できません', 'e'); return; }
   const hasContent = (block.slots || []).some(s => ((s.places||[])[li] || []).length > 0);
   const label = block.usedPlaces[li] || '（場所未設定）';
-  if (!confirm(`列「${label}」を削除しますか？` + (hasContent ? '\n※ この列に配置された奉仕者も削除されます。' : ''))) return;
+  if (!await uiConfirm({
+    type: 'danger', title: '列の削除',
+    message: `列「${label}」を削除しますか？` + (hasContent ? '\n\n※ この列に配置された奉仕者も削除されます。' : ''),
+    confirmText: '削除する',
+  })) return;
   block.usedPlaces.splice(li, 1);
   block.placeCart.splice(li, 1);
   (block.slots || []).forEach(s => { s.places.splice(li, 1); s.watch.splice(li, 1); });
@@ -2224,7 +2232,10 @@ function hasUnsavedChanges() {
 
 // シフト作成タブの再読み込みボタン
 async function reloadCreateData() {
-  if (hasUnsavedChanges() && !confirm('未保存の変更が失われます。続行しますか？')) return;
+  if (hasUnsavedChanges() && !await uiConfirm({
+    type: 'danger', title: '未保存の変更があります',
+    message: '未保存の変更が失われます。続行しますか？', confirmText: '破棄して続行',
+  })) return;
   await loadCreateData();
 }
 
@@ -2698,9 +2709,11 @@ async function togglePublish() {
 
   if (shiftPublished) {
     const msg = shiftApproval.required > 0
-      ? 'シフト作成完了を取り消しますか？\n確認者の確認記録もリセットされ、次に作成完了にしたとき改めて確認が必要になります。'
-      : 'シフト作成完了を取り消しますか？\n公開予定日を迎えていた場合、奉仕者はシフトを確認できなくなります。';
-    if (!confirm(msg)) return;
+      ? 'シフト作成完了を取り消しますか？\n\n確認者の確認記録もリセットされ、次に作成完了にしたとき改めて確認が必要になります。'
+      : 'シフト作成完了を取り消しますか？\n\n公開予定日を迎えていた場合、奉仕者はシフトを確認できなくなります。';
+    if (!await uiConfirm({
+      type: 'danger', title: 'シフト作成完了の取り消し', message: msg, confirmText: '取り消す',
+    })) return;
     try {
       await apiGet('unpublishShift', {
         adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
@@ -2715,13 +2728,17 @@ async function togglePublish() {
     refreshValidationUI();
     if (_vResult.issues.some(x => x.level === 'error')) { openPreflight(); return; }
     const names = shiftApproval.approvers.map(x => x.name).join('・');
-    const msg = (shiftApproval.required > 0 && shiftApproval.isOwner)
+    const isOwnerSkip = shiftApproval.required > 0 && shiftApproval.isOwner;
+    const msg = isOwnerSkip
       // オーナーは確認を省略して公開できる。黙って抜けないよう明示する
       ? ('オーナー権限で確認者の確認を省略して公開します。\n確認者（' + names + '）への確認依頼は送られません。\n\nシフト作成完了にしますか？\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます。')
       : shiftApproval.required > 0
-      ? ('シフト作成完了にしますか？\n確認者（' + names + '）に確認依頼の通知が送られます。\n全員の確認が完了し、公開予定日を迎えると奉仕者へ自動的に公開・通知されます。')
-      : 'シフト作成完了にしますか？\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます（予定日を過ぎている場合は即座に公開・通知されます）。';
-    if (!confirm(msg)) return;
+      ? ('シフト作成完了にしますか？\n\n確認者（' + names + '）に確認依頼の通知が送られます。\n全員の確認が完了し、公開予定日を迎えると奉仕者へ自動的に公開・通知されます。')
+      : 'シフト作成完了にしますか？\n\n公開予定日を迎えると自動的に奉仕者へ公開・通知されます（予定日を過ぎている場合は即座に公開・通知されます）。';
+    if (!await uiConfirm({
+      type: isOwnerSkip ? 'danger' : 'warn', title: 'シフト作成完了', message: msg,
+      confirmText: '作成完了にする',
+    })) return;
     await doPublish();
   }
 }
@@ -2758,9 +2775,13 @@ async function approveShift(force) {
     }
   }
   const rest = Math.max(0, shiftApproval.required - shiftApproval.approvedCount - 1);
-  if (!confirm('シフト内容を確認しました（確認完了）にしますか？\n' + (rest > 0
-    ? '残り ' + rest + ' 名の確認が完了すると公開できる状態になります。'
-    : 'あなたの確認で全員そろいます。公開予定日を迎えると奉仕者へ自動的に公開・通知されます。'))) return;
+  if (!await uiConfirm({
+    type: 'warn', title: 'シフトの確認完了',
+    message: 'シフト内容を確認しました（確認完了）にしますか？\n\n' + (rest > 0
+      ? '残り ' + rest + ' 名の確認が完了すると公開できる状態になります。'
+      : 'あなたの確認で全員そろいます。公開予定日を迎えると奉仕者へ自動的に公開・通知されます。'),
+    confirmText: '確認完了にする',
+  })) return;
   setLoading(true, '確認完了として登録しています...');
   try {
     const res = await apiGet('approveShift', {
@@ -2783,7 +2804,11 @@ async function rejectShift() {
   const extra = shiftApproval.notified
     ? '\n\n※ このシフトは既に奉仕者へ公開されています。差し戻すと奉仕者から見えなくなります。'
     : '';
-  if (!confirm('シフトを差し戻しますか？\n作成完了が取り消され、確認記録もリセットされます。' + extra)) return;
+  if (!await uiConfirm({
+    type: 'danger', title: 'シフトの差し戻し',
+    message: 'シフトを差し戻しますか？\n\n作成完了が取り消され、確認記録もリセットされます。' + extra,
+    confirmText: '差し戻す',
+  })) return;
   setLoading(true, '差し戻しています...');
   try {
     const res = await apiGet('rejectShift', {
@@ -2942,7 +2967,13 @@ function renderLocationList() {
       </div>
     </div>`).join('');
 }
-function deleteLocation(i) { if (!confirm(`「${settingsLocations[i].name}」を削除しますか？`)) return; settingsLocations.splice(i, 1); renderLocationList(); }
+async function deleteLocation(i) {
+  if (!await uiConfirm({
+    type: 'danger', title: '場所の削除',
+    message: `「${settingsLocations[i].name}」を削除しますか？`, confirmText: '削除する',
+  })) return;
+  settingsLocations.splice(i, 1); renderLocationList();
+}
 
 // ===== 追加・編集モーダル（追加と編集で同じモーダルを使う） =====
 let locForm    = { idx: -1, name: '', mode: 'always', startYM: '', endYM: '', linkPwType: '' };
@@ -3122,8 +3153,11 @@ async function saveValidationRules() {
   } catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
-function resetValidationRules() {
-  if (!confirm('検証ルールを既定値に戻しますか？')) return;
+async function resetValidationRules() {
+  if (!await uiConfirm({
+    type: 'danger', title: '検証ルールのリセット',
+    message: '検証ルールを既定値に戻しますか？', confirmText: '既定値に戻す',
+  })) return;
   settingsVRules = {};
   renderValidationRules();
   saveValidationRules();
@@ -3148,7 +3182,11 @@ async function saveDefaultSlot() {
 }
 
 async function execCreateShiftSheet() {
-  if (!confirm('現在のシフトデータをバックアップし、3シートをクリアします。\n実行してもよいですか？')) return;
+  if (!await uiConfirm({
+    type: 'danger', title: 'シフト作成枠の作成',
+    message: '現在のシフトデータをバックアップし、3シートをクリアします。\n\n実行してもよいですか？',
+    confirmText: '実行する',
+  })) return;
   setLoading(true, 'シフト作成枠を作成中...');
   try {
     const res = await apiGet('createShiftSheet', ymP());

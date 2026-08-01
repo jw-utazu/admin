@@ -66,8 +66,11 @@ async function tryRecoveryLogin() {
     calY = now.getFullYear(); calM = now.getMonth() + 1;
     loadAdminData();
     if (res.daysLeft <= 3) {
-      setTimeout(() => alert('この一時ログインはあと ' + res.daysLeft + '日で終了します。\n' +
-        'Googleアカウントの再設定、またはメールアドレスの変更を済ませてください。'), 1500);
+      setTimeout(() => uiAlert({
+        type: 'warn', title: '一時ログインの期限が近づいています',
+        message: 'この一時ログインはあと ' + res.daysLeft + '日で終了します。\n'
+          + 'Googleアカウントの再設定、またはメールアドレスの変更を済ませてください。',
+      }), 1500);
     }
     return true;
   } catch (e) { return false; }
@@ -614,7 +617,11 @@ async function saveLimitedLabel() {
 }
 
 async function removeLimitedMember(uid) {
-  if (!confirm(`UID: ${uid} を対象メンバーから削除しますか？`)) return;
+  if (!await uiConfirm({
+    type: 'danger', title: '対象メンバーから削除',
+    message: `UID: ${uid} を対象メンバーから削除しますか？`,
+    confirmText: '削除する',
+  })) return;
   try {
     const res = await apiGet('removeLimitedMember', { uid });
     if (!res.ok) throw new Error(res.error);
@@ -626,7 +633,11 @@ async function removeLimitedMember(uid) {
 }
 
 async function clearAllLimitedMembers() {
-  if (!confirm('全メンバーを削除します。よろしいですか？\n（期間終了時に使用してください）')) return;
+  if (!await uiConfirm({
+    type: 'danger', title: '全メンバーを削除',
+    message: '対象メンバーを全員削除します。よろしいですか？\n（期間終了時に使用してください）',
+    confirmText: '全員削除する',
+  })) return;
   try {
     const res = await apiGet('clearLimitedMembers');
     if (!res.ok) throw new Error(res.error);
@@ -805,13 +816,12 @@ async function confirmDeleteLimitedSlot() {
   // シート削除が必要か判定（メンバー1人以上 かつ 申込日等すべて設定済み かつ 実施日1件以上 → シート保持）
   const deleteSheets = !(check.memberCount >= 1 && check.hasEventDates && check.calSlotCount >= 1);
 
-  let msg;
-  if (deleteSheets) {
-    msg = `「${slotName}」を削除しますか？\n\nメンバーまたはカレンダーのデータが未入力のため、\n関連するシートもすべて削除されます。\n\nこの操作は取り消せません。`;
-  } else {
-    msg = `「${slotName}」を削除しますか？\n（スプレッドシートのシートとデータは保持されます）`;
-  }
-  if (!confirm(msg)) return;
+  const msg = deleteSheets
+    ? `「${slotName}」を削除しますか？\n\nメンバーまたはカレンダーのデータが未入力のため、\n関連するシートもすべて削除されます。\n\nこの操作は取り消せません。`
+    : `「${slotName}」を削除しますか？\n（スプレッドシートのシートとデータは保持されます）`;
+  if (!await uiConfirm({
+    type: 'danger', title: '限定PWの削除', message: msg, confirmText: '削除する',
+  })) return;
 
   showProc('削除しています...', '少々お待ちください');
   try {
@@ -1273,7 +1283,11 @@ async function addNewPhaseFromModal() {
 }
 
 async function deleteCurPhase() {
-  if (!confirm(`フェーズ ${currentPhaseIndex + 1} を削除しますか？`)) return;
+  if (!await uiConfirm({
+    type: 'danger', title: 'フェーズの削除',
+    message: `フェーズ ${currentPhaseIndex + 1} を削除しますか？`,
+    confirmText: '削除する',
+  })) return;
   adminPhases.splice(currentPhaseIndex, 1);
   if (currentPhaseIndex >= adminPhases.length) currentPhaseIndex = Math.max(0, adminPhases.length - 1);
   syncSlotsFromPhases();
@@ -1304,7 +1318,7 @@ async function savePhases() {
     if (!res.ok) throw new Error(res.error || '保存失敗');
     buildPhaseManageArea(true);
   } catch (e) {
-    alert('フェーズの保存に失敗しました: ' + e.message);
+    uiAlert({ type: 'danger', title: '保存に失敗しました', message: 'フェーズの保存に失敗しました。\n\n' + e.message });
   } finally {
     if (ov) ov.style.display = 'none';
   }
@@ -1560,13 +1574,19 @@ async function deleteSlotDay(){
     buildSlotSetList(); buildCalScroll(); buildInfoArea();
   }
 }
-function resetAllSlots(){
-  if(!confirm('実施日一覧を全てリセットしますか？')) return;
+async function resetAllSlots(){
+  if(!await uiConfirm({
+    type:'danger', title:'実施日一覧のリセット',
+    message:'実施日一覧を全てリセットしますか？', confirmText:'リセットする',
+  })) return;
   slots=[];
   buildSlotSetList(); buildCalScroll(); buildInfoArea();
 }
-function resetDates(){
-  if(!confirm('日程一覧（申込開始・締切・シフト公開日）をリセットしますか？')) return;
+async function resetDates(){
+  if(!await uiConfirm({
+    type:'danger', title:'日程一覧のリセット',
+    message:'日程一覧（申込開始・締切・シフト公開日）をリセットしますか？', confirmText:'リセットする',
+  })) return;
   dates={apply:null,deadline:null,open:null};
   datesChanged=true;
   buildInfoArea();
@@ -1822,17 +1842,66 @@ function renderProgressStrip() {
     ['create', 'シフト作成', ''],
     ['open',   '公開',       md(dates.open)],
   ];
+  // 段そのものを操作口にする。どちらも「その段が表している公開状態」を
+  // 切り替えるので、状態表示と操作が同じ場所にまとまる：
+  //   募集開始 … 予定表（カレンダー）の公開/非公開
+  //   公開     … シフトの公開/非公開（カレンダーは公開したまま戻せる）
+  const action = {
+    cal:  st.cal  !== 'todo' ? 'toggleCalPub()'   : '',
+    open: st.open !== 'todo' ? 'toggleShiftPub()' : '',
+  };
   document.getElementById('prog-steps').innerHTML = steps.map(([k, label, sub], i) => {
     // 連結線は「手前の段が済んでいれば緑」。線をたどれば進み具合が読める
     const line = i ? `<div class="pline${st[steps[i - 1][0]] === 'done' ? ' done' : ''}"></div>` : '';
     const mark = st[k] === 'done' ? '✓' : (i + 1);
-    // 「募集開始」段は予定表の公開/非公開そのもの。日程設定済みなら
-    // クリックで toggleCalPub() を呼べるようにする（旧cal-pub-badgeの操作を統合）
-    const clickable = k === 'cal' && st[k] !== 'todo';
-    return line + `<div class="pstep ${st[k]}${clickable ? ' pstep-click' : ''}"${clickable ? ' onclick="toggleCalPub()"' : ''}><div class="pdot">${mark}</div>`
+    const act = action[k] || '';
+    const tip = !act ? ''
+      : k === 'cal'  ? (st.cal === 'done' ? '予定表を非公開にする' : 'この月の予定表を公開する')
+      : (st.open === 'done' ? 'シフトを非公開にする' : 'シフトの作成完了を取り消す');
+    return line + `<div class="pstep ${st[k]}${act ? ' pstep-click' : ''}"`
+      + (act ? ` onclick="${act}" title="${tip}"` : '')
+      + `><div class="pdot">${mark}</div>`
       + `<div class="plabel">${label}</div>`
       + (sub ? `<div class="psub">${sub}</div>` : '') + '</div>';
   }).join('');
+}
+
+// 「公開」段のクリック。シフトだけを引っ込める操作。
+// カレンダー（予定表）は公開したまま、シフトの公開状態だけを戻すので、
+// 奉仕者は日程・実施日は見られるがシフト表は見えない状態になる。
+// unpublishShift は「作成完了」フラグを落とすため、確認記録も破棄される
+// （＝次に作成完了にしたとき確認をやり直す）。そこまで明示して確認を取る
+async function toggleShiftPub() {
+  const ss = shiftStatus;
+  if (!ss || !isCurMonthPublished()) return;
+  const notified = !!ss.notified;
+  const needsApproval = (ss.required || 0) > 0;
+  const msg = (notified
+      ? 'シフトを非公開にしますか？\n\n奉仕者はシフト表を確認できなくなります。\n予定表（日程・実施日）は公開したままです。'
+      : 'シフトの作成完了を取り消しますか？\n\n公開予定日を迎えても奉仕者へ公開されなくなります。\n予定表（日程・実施日）は公開したままです。')
+    + (needsApproval ? '\n\n確認者の確認記録もリセットされ、次に作成完了にしたとき改めて確認が必要になります。' : '');
+  if (!await uiConfirm({
+    type: 'danger',
+    title: notified ? 'シフトを非公開にする' : 'シフト作成完了の取り消し',
+    message: msg,
+    confirmText: notified ? '非公開にする' : '取り消す',
+  })) return;
+
+  showProc(notified ? 'シフトを非公開にしています...' : '作成完了を取り消しています...', '少々お待ちください');
+  try {
+    // apiGet は type しか自動付与しないので、管理ログ用の実行者情報は明示的に渡す
+    const r = await apiGet('unpublishShift', {
+      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
+    });
+    if (!r.ok) throw new Error(r.error || '失敗しました');
+    await loadShiftStatus();   // 取得完了後に描き直す（内部で renderProgressStrip する）
+    hideProc();
+    toast(notified ? 'シフトを非公開にしました' : '作成完了を取り消しました', 's');
+  } catch (e) {
+    hideProc();
+    toast('エラー: ' + e.message, 'e');
+    loadShiftStatus();
+  }
 }
 
 function updCalPubState() {
@@ -1868,10 +1937,20 @@ async function toggleCalPub() {
   // 表示中の月が公開中のときだけ「非公開」操作。別の月が公開中なら、
   // 表示中の月を公開する導線（＝公開月の切り替え）にする
   if (isCurMonthPublished()) {
-    if (!confirm('予定表を非公開にしますか？\n奉仕者はカレンダー情報（日程・実施日）を確認できなくなります。')) return;
+    if (!await uiConfirm({
+      type: 'danger', title: '予定表を非公開にする',
+      message: curY + '年' + curM + '月の予定表を非公開にしますか？\n\n奉仕者はカレンダー情報（日程・実施日）を確認できなくなります。',
+      confirmText: '非公開にする',
+    })) return;
     showProc('予定表を非公開にしています...', '少々お待ちください');
     try {
-      await apiGet('unpublishCalendar');
+      // 年月を明示して「表示中の月だけ」を非公開にする。省略すると API 側は
+      // その pw_type の公開中カレンダーを全て落とすため、複数月が同時に走りうる
+      // 限定PWで、確認文が示した月以外まで巻き込んでしまう
+      await apiGet('unpublishCalendar', {
+        year: curY, month: curM,
+        adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
+      });
       calPubStatus = false; calPubYM = null;
       updCalPubState();
       hideProc();
@@ -1924,7 +2003,10 @@ async function execCalPub(){
   document.getElementById('cp-exec-btn').disabled=true;
   document.getElementById('cp-st').classList.add('show');
   try{
-    await apiGet('publishCalendar',{year:curY,month:curM});
+    await apiGet('publishCalendar',{
+      year:curY, month:curM,
+      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
+    });
     document.getElementById('cp-st').classList.remove('show');
     document.getElementById('cp-done').style.display='block';
     document.getElementById('m-cp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-cal-pub')">閉じる</button>`;
@@ -1967,7 +2049,12 @@ function toast(msg,type){
   setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);
 }
 (function(){
-  if(window.matchMedia('(display-mode: standalone)').matches) return;
+  // インストール済み（ホーム画面から起動）なら「ホームに追加」ボタン自体を隠す。
+  // 以前は早期 return だけで openPwaModal が未定義のままボタンが残り、押しても無反応だった。
+  if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true){
+    const b=document.getElementById('btn-pwa-install'); if(b) b.style.display='none';
+    return;
+  }
   let deferredPrompt=null;
   window.addEventListener('beforeinstallprompt', e=>{
     e.preventDefault(); deferredPrompt=e;
@@ -2091,7 +2178,10 @@ function editNotice(id) {
   refreshNoticeModal();
 }
 async function deleteNotice(id) {
-  if (!confirm('このお知らせを削除しますか？')) return;
+  if (!await uiConfirm({
+    type: 'danger', title: 'お知らせの削除',
+    message: 'このお知らせを削除しますか？', confirmText: '削除する',
+  })) return;
   showProc('削除しています...', '少々お待ちください');
   try {
     const res = await apiPost({ action: 'deleteNotice', id });
@@ -2171,7 +2261,10 @@ async function addProxy() {
   } catch (e) { hideProc(); toast('追加失敗: ' + e.message, 'e'); }
 }
 async function deleteProxy(rowIndex) {
-  if (!confirm('この代理設定を解除しますか？')) return;
+  if (!await uiConfirm({
+    type: 'danger', title: '代理設定の解除',
+    message: 'この代理設定を解除しますか？', confirmText: '解除する',
+  })) return;
   showProc('解除しています...', '少々お待ちください');
   try {
     const res = await apiPost({ action: 'deleteProxySetting', rowIndex });
@@ -2266,7 +2359,10 @@ async function addCouple() {
   } catch (e) { hideProc(); toast('追加失敗: ' + e.message, 'e'); }
 }
 async function deleteCouple(rowIndex) {
-  if (!confirm('この夫婦設定を解除しますか？')) return;
+  if (!await uiConfirm({
+    type: 'danger', title: '夫婦ペアの解除',
+    message: 'この夫婦設定を解除しますか？', confirmText: '解除する',
+  })) return;
   showProc('解除しています...', '少々お待ちください');
   try {
     const res = await apiPost({ action: 'deleteCouple', rowIndex });
@@ -2600,7 +2696,11 @@ function toggleSbTools() {
 })();
 
 async function approveRecoveryRequest(id) {
-  if (!confirm('この申請を承認しますか？\n\n承認するとパスコードが表示されます。\n電話やLINEなど、本人と確実に連絡が取れる手段でお伝えください。')) return;
+  if (!await uiConfirm({
+    type: 'warn', title: 'アカウント復旧申請の承認',
+    message: 'この申請を承認しますか？\n\n承認するとパスコードが表示されます。\n電話やLINEなど、本人と確実に連絡が取れる手段でお伝えください。',
+    confirmText: '承認する',
+  })) return;
   showProc('承認しています...', '少々お待ちください');
   try {
     const res = await apiPost({ action: 'approveRecoveryRequest', requestId: id });
@@ -2632,7 +2732,10 @@ async function approveRecoveryRequest(id) {
 }
 
 async function rejectRecoveryRequest(id) {
-  if (!confirm('この申請を却下しますか？')) return;
+  if (!await uiConfirm({
+    type: 'danger', title: 'アカウント復旧申請の却下',
+    message: 'この申請を却下しますか？', confirmText: '却下する',
+  })) return;
   showProc('却下しています...', '少々お待ちください');
   try {
     const res = await apiPost({ action: 'rejectRecoveryRequest', requestId: id });
@@ -2704,10 +2807,210 @@ async function refreshDistributionReportModal() {
 }
 
 // ============================================================
+// ログ閲覧
+//
+// サーバーに溜まっている4種類のログを読むための画面。
+// 既定は「管理者の操作」＝誰がいつ公開作業をしたかを確認するためのもの。
+// 一度に全部は取らず、50件ずつ「もっと見る」で継ぎ足す
+// ============================================================
+const LOG_PAGE = 50;
+const LOG_KIND_LABEL = {
+  admin:   '管理者の操作',
+  wish:    '希望提出',
+  access:  'ログイン',
+  account: 'アカウント',
+};
+let logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false };
+
+function openLogModal() {
+  logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false };
+  document.getElementById('log-from').value = '';
+  document.getElementById('log-to').value   = '';
+  document.getElementById('log-q').value    = '';
+  document.getElementById('log-content').innerHTML = '';
+  document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
+    b.classList.toggle('on', b.dataset.kind === 'admin');
+  });
+  openM('m-logs');
+  loadLogs(true);
+}
+
+function switchLogKind(kind) {
+  if (logState.loading || logState.kind === kind) return;
+  logState.kind = kind;
+  document.getElementById('log-q').value = '';
+  document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
+    b.classList.toggle('on', b.dataset.kind === kind);
+  });
+  loadLogs(true);
+}
+
+function reloadLogs() { loadLogs(true); }
+function loadMoreLogs() { loadLogs(false); }
+
+function showLogOv(text) {
+  document.getElementById('log-ov-text').textContent = text;
+  document.getElementById('log-ov').classList.add('on');
+  document.querySelectorAll('#log-tabs .log-tab').forEach(b => b.disabled = true);
+}
+function hideLogOv() {
+  document.getElementById('log-ov').classList.remove('on');
+  document.querySelectorAll('#log-tabs .log-tab').forEach(b => b.disabled = false);
+}
+
+async function loadLogs(reset) {
+  if (logState.loading) return;
+  logState.loading = true;
+  if (reset) { logState.offset = 0; logState.rows = []; }
+  showLogOv(LOG_KIND_LABEL[logState.kind] + ' のログを読み込み中...');
+  try {
+    const d = await apiGet('getLogs', {
+      kind:   logState.kind,
+      from:   document.getElementById('log-from').value || '',
+      to:     document.getElementById('log-to').value   || '',
+      q:      document.getElementById('log-q').value.trim(),
+      limit:  LOG_PAGE,
+      offset: logState.offset,
+      adminUid:   _currentUser ? _currentUser.uid   : '',
+      adminEmail: _currentUser ? _currentUser.email : '',
+    });
+    if (!d.ok) throw new Error(d.error === 'unauthorized' ? '権限がありません' : (d.error || '取得に失敗しました'));
+    logState.rows  = logState.rows.concat(d.rows || []);
+    logState.total = d.total || logState.rows.length;
+    logState.offset = logState.rows.length;
+    renderLogs();
+  } catch (e) {
+    document.getElementById('log-content').innerHTML =
+      `<div class="log-empty" style="color:var(--red);">エラー: ${esc(e.message)}</div>`;
+  } finally {
+    logState.loading = false;
+    hideLogOv();
+  }
+}
+
+function renderLogs() {
+  const kind = logState.kind;
+  const rows = logState.rows;
+  let html = '';
+
+  if (kind === 'access') {
+    html += `<div class="log-hint">ログインの試行・成功・失敗の記録です。ふだん見る必要はありませんが、
+      身に覚えのないログイン失敗が並んでいないかの確認に使えます。</div>`;
+  }
+
+  html += `<div class="log-count">${logState.total}件中 ${rows.length}件を表示</div>`;
+
+  if (rows.length === 0) {
+    html += '<div class="log-empty">該当するログはありません</div>';
+  } else {
+    html += '<div class="log-list">' + rows.map(r => logRowHtml(kind, r)).join('') + '</div>';
+    if (rows.length < logState.total) {
+      html += `<div class="log-more"><button class="btn btn-g" onclick="loadMoreLogs()">もっと見る（残り${logState.total - rows.length}件）</button></div>`;
+    }
+  }
+
+  // アクセスログだけは放っておくと際限なく増えるので、この場で整理できるようにする
+  if (kind === 'access') html += logPurgeBoxHtml();
+
+  document.getElementById('log-content').innerHTML = html;
+}
+
+function logRowHtml(kind, r) {
+  let main = '', sub = '';
+  if (kind === 'admin') {
+    main = `<span class="log-who">${esc(r.name || '（不明）')}</span> <span class="log-op">${esc(r.operation)}</span>`;
+    sub  = r.detail;
+  } else if (kind === 'wish') {
+    main = `<span class="log-who">${esc(r.name || '（不明）')}</span> <span class="log-op">希望を提出</span>` +
+           (r.isProxy ? '<span class="log-tag info">代理</span>' : '');
+    sub  = [r.sendType, r.slotCount != null ? r.slotCount + '枠' : ''].filter(Boolean).join(' / ');
+  } else if (kind === 'access') {
+    const cls = r.result === '成功' ? 'ok' : (r.result === '失敗' ? 'ng' : 'try');
+    main = `<span class="log-who">${esc(r.email || '（不明）')}</span><span class="log-tag ${cls}">${esc(r.result || '－')}</span>`;
+    sub  = [r.appName, r.reason].filter(Boolean).join(' / ');
+  } else {
+    main = `<span class="log-who">${esc(r.name || r.email || '（不明）')}</span>` +
+           (r.isFirst ? '<span class="log-tag info">新規登録</span>' : '');
+    sub  = [r.appName, r.email].filter(Boolean).join(' / ');
+  }
+  return `<div class="log-row">
+      <div class="log-at">${esc(r.at)}</div>
+      <div class="log-main">${main}${sub ? `<div class="log-detail">${esc(sub)}</div>` : ''}</div>
+    </div>`;
+}
+
+function logPurgeBoxHtml() {
+  return `<div class="log-purge">
+      <b>アクセスログの整理</b><br>
+      ログは自動では消えません。指定した時期より前の「試行」「成功」だけをまとめて削除します。
+      <b>「失敗」の記録は不正アクセスの手がかりになるため残します。</b>
+      <div class="log-purge-row">
+        <select id="log-purge-months" class="log-purge-sel">
+          <option value="3">3ヶ月</option>
+          <option value="6" selected>6ヶ月</option>
+          <option value="12">1年</option>
+          <option value="24">2年</option>
+        </select>
+        <span>より前のものを削除</span>
+        <button class="btn btn-d" onclick="purgeAccessLogs()">🗑 整理する</button>
+      </div>
+    </div>`;
+}
+
+// 指定月数より前のアクセスログを削除する。
+// 消える前に必ず件数を数えて（dryRun）から確認を取る
+async function purgeAccessLogs() {
+  const months = parseInt(document.getElementById('log-purge-months').value) || 6;
+  const cut = new Date();
+  cut.setMonth(cut.getMonth() - months);
+  const before = cut.getFullYear() + '-' +
+    String(cut.getMonth() + 1).padStart(2, '0') + '-' +
+    String(cut.getDate()).padStart(2, '0');
+
+  showLogOv('削除対象を数えています...');
+  let count = 0;
+  try {
+    const d = await apiPost('purgeAccessLogs', { before, dryRun: true });
+    if (!d.ok) throw new Error(d.error === 'unauthorized' ? '権限がありません' : (d.error || '取得に失敗しました'));
+    count = d.count || 0;
+  } catch (e) {
+    hideLogOv();
+    toast('削除対象の確認に失敗: ' + e.message, 'e');
+    return;
+  }
+  hideLogOv();
+
+  if (count === 0) { toast('削除対象のログはありませんでした', 's'); return; }
+  if (!await uiConfirm({
+    type: 'danger',
+    title: 'アクセスログの整理',
+    message: `${before} より前の「試行」「成功」のログ ${count}件を削除します。\n` +
+             '「失敗」の記録は削除されません。\n\nこの操作は取り消せません。',
+    confirmText: '削除する',
+  })) return;
+
+  showLogOv('削除しています...');
+  try {
+    const d = await apiPost('purgeAccessLogs', { before });
+    if (!d.ok) throw new Error(d.error || '削除に失敗しました');
+    toast(`${d.count}件のログを削除しました`, 's');
+    hideLogOv();
+    await loadLogs(true);
+  } catch (e) {
+    hideLogOv();
+    toast('削除に失敗: ' + e.message, 'e');
+  }
+}
+
+// ============================================================
 // 権限リスト同期
 // ============================================================
 async function execSyncAccess() {
-  if (!confirm('公開ファイルの編集者・閲覧者をアクセス許可リストに同期しますか？')) return;
+  if (!await uiConfirm({
+    type: 'warn', title: 'アクセス許可リストの同期',
+    message: '公開ファイルの編集者・閲覧者をアクセス許可リストに同期しますか？',
+    confirmText: '同期する',
+  })) return;
   try {
     const res = await apiGet('syncAccessList');
     if (!res.ok) throw new Error(res.error || '同期失敗');
@@ -3072,7 +3375,10 @@ function fileToBase64(file) {
 }
 
 async function deletePhoto(fileId) {
-  if (!confirm('この写真を削除しますか？')) return;
+  if (!await uiConfirm({
+    type: 'danger', title: '写真の削除',
+    message: 'この写真を削除しますか？', confirmText: '削除する',
+  })) return;
   showProc('写真を削除しています...', '少々お待ちください');
   try {
     await apiGet('deletePhoto', { fileId });
@@ -3320,7 +3626,11 @@ function closeMemberForm() {
 async function confirmDeleteMember(rowIndex) {
   const m = _memberList.find(x => x.rowIndex === rowIndex);
   if (!m) return;
-  if (!confirm(`「${m.name}」を削除しますか？\nこの操作は元に戻せません。`)) return;
+  if (!await uiConfirm({
+    type: 'danger', title: 'メンバーの削除',
+    message: `「${m.name}」を削除しますか？\n\nこの操作は元に戻せません。`,
+    confirmText: '削除する',
+  })) return;
 
   const adminUid  = _currentUser?.uid  || '';
   const adminName = _currentUser?.name || '';

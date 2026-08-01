@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=21">
+<link rel="stylesheet" href="css/index.css?v=22">
 </head>
 <body>
 
@@ -243,12 +243,15 @@
           <button class="tool" id="btn-limited-members" style="display:none;" onclick="openLimitedMembersModal()" title="限定PW対象メンバーの追加・削除">
             <span class="tool-ic" style="background:#ede9fe;color:#7c3aed;">🔐</span><span class="tool-n">対象者</span>
           </button>
+          <button class="tool normal-only" onclick="openLogModal()" title="管理者の操作履歴・希望提出・ログイン履歴の確認">
+            <span class="tool-ic" style="background:#f1f5f9;color:#475569;">📋</span><span class="tool-n">ログ</span>
+          </button>
         </div>
       </div>
 
       <div class="sb-sec sb-foot">
         <button class="foot-btn" onclick="openM('m-manual')">📖 マニュアル</button>
-        <button class="foot-btn accent" onclick="openPwaModal()">📲 ホームに追加</button>
+        <button class="foot-btn accent" id="btn-pwa-install" onclick="openPwaModal()">📲 ホームに追加</button>
       </div>
     </div>
   </div>
@@ -397,6 +400,34 @@
     <div class="mhd"><span class="mt">📦 配布報告一覧</span><button class="mx" onclick="closeM('m-distrib-report')">&#10005;</button></div>
     <div class="mbd" id="m-distrib-report-body">読み込み中...</div>
     <div class="mft" id="m-distrib-report-ft"><button class="btn btn-g" onclick="closeM('m-distrib-report')">閉じる</button></div>
+  </div>
+</div>
+<!-- ログ閲覧モーダル
+     これまでログは書き込むだけで読む手段が無かった。
+     既定タブは「操作ログ」＝誰がいつ公開作業をしたかを確認するためのもの。
+     アクセスログ・アカウントは常時見るものではないので後ろのタブに置く -->
+<div class="ov" id="m-logs">
+  <div class="modal" style="max-width:640px;">
+    <div class="mhd"><span class="mt">📋 ログ</span><button class="mx" onclick="closeM('m-logs')">&#10005;</button></div>
+    <div class="log-tabs" id="log-tabs">
+      <button class="log-tab on" data-kind="admin"   onclick="switchLogKind('admin')">管理者の操作</button>
+      <button class="log-tab"    data-kind="wish"    onclick="switchLogKind('wish')">希望提出</button>
+      <button class="log-tab"    data-kind="access"  onclick="switchLogKind('access')">ログイン</button>
+      <button class="log-tab"    data-kind="account" onclick="switchLogKind('account')">アカウント</button>
+    </div>
+    <div class="log-filter">
+      <span class="log-filter-lbl">期間</span>
+      <input type="date" id="log-from" onchange="reloadLogs()">
+      <span class="log-filter-lbl">〜</span>
+      <input type="date" id="log-to" onchange="reloadLogs()">
+      <input type="search" id="log-q" placeholder="名前・操作で絞り込み" onkeydown="if(event.key==='Enter')reloadLogs()">
+      <button class="btn btn-g" onclick="reloadLogs()">絞り込む</button>
+    </div>
+    <div class="mbd log-body" id="m-logs-body" style="padding:0;">
+      <div class="log-ov" id="log-ov"><div class="spin"></div><div class="log-ov-text" id="log-ov-text">読み込み中...</div></div>
+      <div id="log-content"></div>
+    </div>
+    <div class="mft"><button class="btn btn-g" onclick="closeM('m-logs')">閉じる</button></div>
   </div>
 </div>
 <!-- ログイン救済申請モーダル -->
@@ -669,6 +700,6 @@
 <script src="js/session.js?v=2"></script>
 <script src="js/api.js?v=6"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=27"></script>
+<script src="js/index.js?v=29"></script>
 </body>
 </html>
