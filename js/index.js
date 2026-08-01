@@ -269,7 +269,6 @@ function renderAll() {
   const calViewNavBar = document.getElementById('cal-view-nav-bar');
   if (calViewNavBar) calViewNavBar.style.display = isLimited ? '' : 'none';
   updYmTitle();
-  updStatus();
   updDateViews();
   buildCalScroll();
   buildSlotSetList();
@@ -286,7 +285,7 @@ function updYmTitle() {
   const el2 = document.getElementById('cal-ym-label');
   if(el2) el2.textContent = t;
   // 対象年月を動かしたら、公開中の月とのズレ表示も即座に追従させる
-  updCalPubBadge();
+  updCalPubState();
 }
 function updCalViewLabel() {
   const el = document.getElementById('cal-view-label');
@@ -312,31 +311,6 @@ function applyYmChange() {
   scY=curY; scM=curM; slotY=curY; slotM=curM;
   document.getElementById('ym-dropdown').classList.remove('open');
   loadAdminData();
-}
-
-// ============================================================
-// 受付状況
-// ============================================================
-function updStatus() {
-  const badge = document.getElementById('status-badge');
-  const dot   = document.getElementById('status-dot');
-  const txt   = document.getElementById('status-text');
-  const s     = calcStatus();
-  badge.className = 'status-badge ' + (s==='受付中'?'sb-open':s==='受付終了'?'sb-end':'sb-prep');
-  dot.className   = 'sb-dot '       + (s==='受付中'?'sb-dot-open':s==='受付終了'?'sb-dot-end':'sb-dot-prep');
-  txt.textContent = s;
-}
-function calcStatus() {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const t = today.getTime();
-  const toDate = obj => obj ? new Date(obj.y,obj.m-1,obj.d).getTime() : null;
-  const ap = toDate(dates.apply), dl = toDate(dates.deadline);
-  const nextM = new Date(curM===12?curY+1:curY, curM===12?0:curM, 1).getTime();
-  if (!ap || t < ap) return '準備中';
-  if (t >= nextM) return '準備中';
-  if (ap && dl && t >= ap && t <= dl) return '受付中';
-  if (dl && t > dl) return '受付終了';
-  return '準備中';
 }
 
 // ============================================================
@@ -1774,9 +1748,6 @@ let calPubStatus = null;
 let calPubYM     = null;  // 実際に公開中のカレンダーの年月 {y,m}（公開できるのは常に1ヶ月だけ）
 
 async function loadCalPubStatus() {
-  const badge = document.getElementById('cal-pub-badge');
-  const text  = document.getElementById('cal-pub-badge-text');
-  if (!badge || !text) return;
   try {
     const r = await apiGet('getCalPubStatus');
     calPubStatus = r.published;
@@ -1785,12 +1756,10 @@ async function loadCalPubStatus() {
       const [py, pm] = r.publishedYM.split('.').map(Number);
       if (py && pm) calPubYM = { y: py, m: pm };
     }
-    updCalPubBadge();
   } catch(e) {
     calPubStatus = null; calPubYM = null;
-    badge.className = 'cal-pub-badge loading';
-    text.textContent = '確認中...';
   }
+  updCalPubState();
 }
 
 // 表示中の「対象年月」と「実際に公開中の月」がズレていることが一目で分かるようにする。
@@ -1858,44 +1827,40 @@ function renderProgressStrip() {
     // 連結線は「手前の段が済んでいれば緑」。線をたどれば進み具合が読める
     const line = i ? `<div class="pline${st[steps[i - 1][0]] === 'done' ? ' done' : ''}"></div>` : '';
     const mark = st[k] === 'done' ? '✓' : (i + 1);
-    return line + `<div class="pstep ${st[k]}"><div class="pdot">${mark}</div>`
+    // 「募集開始」段は予定表の公開/非公開そのもの。日程設定済みなら
+    // クリックで toggleCalPub() を呼べるようにする（旧cal-pub-badgeの操作を統合）
+    const clickable = k === 'cal' && st[k] !== 'todo';
+    return line + `<div class="pstep ${st[k]}${clickable ? ' pstep-click' : ''}"${clickable ? ' onclick="toggleCalPub()"' : ''}><div class="pdot">${mark}</div>`
       + `<div class="plabel">${label}</div>`
       + (sub ? `<div class="psub">${sub}</div>` : '') + '</div>';
   }).join('');
 }
 
-function updCalPubBadge() {
-  // 公開状態が変わると進行状況も変わる
+function updCalPubState() {
+  // 公開状態が変わると進行状況ストリップも変わる
   renderProgressStrip();
-  const badge = document.getElementById('cal-pub-badge');
-  const text  = document.getElementById('cal-pub-badge-text');
-  const note  = document.getElementById('cal-pub-note');
-  if (!badge || !text) return;
-  if (calPubStatus === null) {
-    badge.className = 'cal-pub-badge loading';
-    text.textContent = '確認中...';
-    if (note) note.style.display = 'none';
-    return;
-  }
-  if (!calPubStatus || !calPubYM) {
-    badge.className = 'cal-pub-badge unpublished';
-    text.textContent = '🔒 公開中の月はありません';
-  } else if (isCurMonthPublished()) {
-    badge.className = 'cal-pub-badge published';
-    text.textContent = '📅 ' + calPubYM.y + '年' + calPubYM.m + '月 公開中';
-  } else {
-    badge.className = 'cal-pub-badge mismatch';
-    text.textContent = '⚠️ 公開中は ' + calPubYM.y + '年' + calPubYM.m + '月';
-  }
-  if (note) {
-    if (calPubStatus && calPubYM && !isCurMonthPublished()) {
-      note.innerHTML = '表示中の <b>' + curY + '年' + curM + '月</b> は未公開です。奉仕者とシフト作成アプリに出ているのは <b>'
-        + calPubYM.y + '年' + calPubYM.m + '月</b> です（公開できる月は1つだけ。この月を公開すると '
-        + calPubYM.y + '年' + calPubYM.m + '月 は自動的に非公開になります）';
-      note.style.display = '';
+  // 限定PWは複数月が同時進行しうるため一本道の進行状況ストリップに乗らない。
+  // 公開/非公開の操作口をミニボタンとして残す（通常PWでは非表示、ストリップ側に一本化）
+  const mini = document.getElementById('cal-pub-mini');
+  const miniText = document.getElementById('cal-pub-mini-text');
+  if (mini && miniText) {
+    if (currentPwType === 'normal') {
+      mini.style.display = 'none';
     } else {
-      note.style.display = 'none';
+      mini.style.display = '';
+      mini.className = 'cal-pub-mini' + (isCurMonthPublished() ? ' published' : ' unpublished');
+      miniText.textContent = isCurMonthPublished() ? '📅 公開中' : '🔒 未公開';
     }
+  }
+  const note = document.getElementById('cal-pub-note');
+  if (!note) return;
+  if (currentPwType === 'normal' && calPubStatus && calPubYM && !isCurMonthPublished()) {
+    note.innerHTML = '表示中の <b>' + curY + '年' + curM + '月</b> は未公開です。奉仕者とシフト作成アプリに出ているのは <b>'
+      + calPubYM.y + '年' + calPubYM.m + '月</b> です（公開できる月は1つだけ。この月を公開すると '
+      + calPubYM.y + '年' + calPubYM.m + '月 は自動的に非公開になります）';
+    note.style.display = '';
+  } else {
+    note.style.display = 'none';
   }
 }
 
@@ -1905,16 +1870,15 @@ async function toggleCalPub() {
   // 表示中の月を公開する導線（＝公開月の切り替え）にする
   if (isCurMonthPublished()) {
     if (!confirm('予定表を非公開にしますか？\n奉仕者はカレンダー情報（日程・実施日）を確認できなくなります。')) return;
-    const badge = document.getElementById('cal-pub-badge');
-    const text  = document.getElementById('cal-pub-badge-text');
-    badge.className = 'cal-pub-badge loading';
-    text.textContent = '処理中...';
+    showProc('予定表を非公開にしています...', '少々お待ちください');
     try {
       await apiGet('unpublishCalendar');
       calPubStatus = false; calPubYM = null;
-      updCalPubBadge();
+      updCalPubState();
+      hideProc();
       toast('予定表を非公開にしました', 's');
     } catch(e) {
+      hideProc();
       toast('エラー: ' + e.message, 'e');
       loadCalPubStatus();
     }

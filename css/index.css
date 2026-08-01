@@ -42,15 +42,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .ym-title:hover{background:var(--bg);}
 .ym-title-text{font-size:18px;font-weight:700;white-space:nowrap;letter-spacing:-.02em;}
 .ym-title-caret{color:var(--ink3);font-size:11px;}
-/* 受付状況バッジ */
-.status-badge{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;flex-shrink:0;}
-.sb-open{background:#dcfce7;color:#15803d;}
-.sb-prep{background:#f4f4f5;color:#71717a;}
-.sb-end{background:#fee2e2;color:#dc2626;}
-.sb-dot{width:7px;height:7px;border-radius:50%;}
-.sb-dot-open{background:#16a34a;}
-.sb-dot-prep{background:#a1a1aa;}
-.sb-dot-end{background:#dc2626;}
 .av{width:26px;height:26px;border-radius:50%;background:var(--blue-l);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;overflow:hidden;flex-shrink:0;}
 .av img{width:100%;height:100%;object-fit:cover;}
 .so-btn{font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);}
@@ -92,15 +83,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-view-nav{display:flex;align-items:center;gap:6px;padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);}
 .cal-view-nav-label{font-size:10px;color:var(--ink3);font-weight:700;white-space:nowrap;}
 #cal-view-label{font-size:12px;font-weight:700;color:var(--ink2);}
-.cal-pub-badge{display:flex;align-items:center;gap:4px;padding:4px 10px;border:none;border-radius:20px;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;line-height:1;}
-.cal-pub-badge.loading{background:var(--surface2);color:var(--ink3);cursor:default;}
-.cal-pub-badge.published{background:var(--green-l);color:var(--green);}
-.cal-pub-badge.unpublished{background:#f3f4f6;color:var(--ink3);}
-.cal-pub-badge.published:hover{background:#dcfce7;}
-.cal-pub-badge.unpublished:hover{background:#e5e7eb;}
-/* 対象年月 ≠ 公開中の月。見落とすと違う月を編集し続けることになるので目立たせる */
-.cal-pub-badge.mismatch{background:#fef3c7;color:#92400e;}
-.cal-pub-badge.mismatch:hover{background:#fde68a;}
+/* 限定PW専用の公開/非公開ミニボタン（通常PWでは非表示） */
+.cal-pub-mini{display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;background:var(--surface);font-family:var(--sans);font-size:11px;font-weight:700;color:var(--ink3);cursor:pointer;transition:all .15s;line-height:1;}
+.cal-pub-mini.published{color:var(--green);border-color:var(--green);background:var(--green-l);}
+.cal-pub-mini.unpublished:hover{background:var(--bg);}
 .cal-pub-note{font-size:11px;line-height:1.5;color:#92400e;background:#fffbeb;border-bottom:1px solid #fde68a;padding:6px 14px;}
 .cal-pub-note b{font-weight:700;}
 .mini-cal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
@@ -286,6 +272,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .pline{flex:1;min-width:12px;height:2px;background:var(--border2);margin-top:14px;
   transition:background .4s;}
 .pline.done{background:var(--green);}
+/* 「募集開始」段は予定表の公開/非公開の切替ボタンを兼ねる */
+.pstep-click{cursor:pointer;}
+.pstep-click:hover .pdot{filter:brightness(.92);}
+.pstep-click:hover .plabel{text-decoration:underline;}
 
 /* ===== サイドバー：未対応リスト ===== */
 /* 「開かないと中身があるか分からない」を無くすための区画。
@@ -638,7 +628,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 
   /* ===== ヘッダー ===== */
   .hdr{padding:0 10px;gap:8px;}
-  .status-badge{padding:3px 7px;font-size:10px;}
   .so-btn{padding:6px 9px;}
 
   /* 年月ドロップダウン：ラベル＋セレクタ2つ＋ボタン2つは1行に入らない */

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=19">
+<link rel="stylesheet" href="css/index.css?v=20">
 </head>
 <body>
 
@@ -52,11 +52,6 @@
   <header class="hdr">
     <div class="hdr-logo" id="hdr-logo"><img src="logo.png" alt="PW" onerror="this.parentNode.textContent='PW'"></div>
     <span style="font-size:14px;font-weight:700;color:var(--ink);margin-right:auto;padding-left:8px;">PW管理アプリ</span>
-    <!-- 受付状況 -->
-    <div class="status-badge sb-prep" id="status-badge">
-      <div class="sb-dot sb-dot-prep" id="status-dot"></div>
-      <span id="status-text">--</span>
-    </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div class="av" id="av"></div>
       <button class="so-btn" onclick="signOut()">ログアウト</button>
@@ -94,15 +89,19 @@
             <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
             <span class="cal-ym-section-label">シフト管理</span>
           </div>
-          <button id="cal-pub-badge" class="cal-pub-badge loading" onclick="toggleCalPub()">
-            <span id="cal-pub-badge-text">確認中...</span>
+          <!-- 限定PWは複数月が同時進行しうるため進行状況ストリップの一本道モデルに乗らない。
+               公開/非公開の操作口をここに残す（通常PWでは非表示、ストリップ側の操作に一本化） -->
+          <button id="cal-pub-mini" class="cal-pub-mini" style="display:none;" onclick="toggleCalPub()">
+            <span id="cal-pub-mini-text"></span>
           </button>
         </div>
         <!-- 進行状況ストリップ
              月の作業は「日程設定 → 募集開始 → 受付 → シフト作成 → 公開」の一本道
              なので、今どこにいて次に何をするかは一意に決まる。それを1か所に出す。
              とくにシフトの作成完了・確認完了はこのアプリのどこにも無く、
-             シフト管理アプリを開かないと分からなかった -->
+             シフト管理アプリを開かないと分からなかった。
+             「募集開始」段は予定表の公開/非公開そのものなので、クリックで
+             toggleCalPub() を呼べるようにし、旧cal-pub-badgeの操作を引き継ぐ -->
         <div class="prog" id="prog-strip" style="display:none;">
           <div class="prog-steps" id="prog-steps"></div>
         </div>
@@ -685,6 +684,6 @@
 
 <script src="js/session.js?v=2"></script>
 <script src="js/api.js?v=6"></script>
-<script src="js/index.js?v=24"></script>
+<script src="js/index.js?v=25"></script>
 </body>
 </html>
