@@ -48,12 +48,6 @@ function pwgwsGoToLogin(reason) {
   location.replace(url);
 }
 
-// 共通ログイン画面へのリダイレクトを行うべきか。
-// ?direct=1 が付いている場合は従来の各アプリのログイン画面を使う（緊急脱出口）。
-// 共通ログイン画面に不具合が出てもアプリに入れなくならないように必ず残しておくこと
-function pwgwsShouldRedirectToLogin() {
-  try {
-    if (new URLSearchParams(location.search).get('direct') === '1') return false;
-  } catch (_) {}
-  return true;
-}
+// 各アプリは認証画面を持たず、未認証なら必ず共通ログイン画面へ送る。
+// この関数は互換のために残してある（常に true）
+function pwgwsShouldRedirectToLogin() { return true; }

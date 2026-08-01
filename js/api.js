@@ -8,18 +8,20 @@ const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const CLIENT_ID = '538467678510-7ltuvmuj0d1mmgngtj980me3daenqmm7.apps.googleusercontent.com';
 
 // session.js（共通セッション）が読み込めなかった場合の安全網。
-// 共通ログイン画面へのリダイレクトを無効化し、従来の各アプリのログイン画面に
-// フォールバックさせる。これが無いと session.js の配信失敗で誰もログインできなくなる
+// このアプリは認証画面を持たないため、最低限リダイレクトだけは動くようにしておく
 if (typeof pwgwsGetSession !== 'function') {
-  console.warn('[session] session.js が読み込めませんでした。従来のログイン画面を使用します');
+  console.warn('[session] session.js が読み込めませんでした。最低限の動作で継続します');
   window.pwgwsGetSession           = function () { return null; };
   window.pwgwsSaveSession          = function () {};
   window.pwgwsClearSession         = function () {
     try { localStorage.removeItem('pwgws_session'); } catch (_) {}
     try { localStorage.removeItem('pwgws_recovery_session'); } catch (_) {}
   };
-  window.pwgwsGoToLogin            = function () {};
-  window.pwgwsShouldRedirectToLogin = function () { return false; };
+  window.pwgwsGoToLogin            = function (reason) {
+    location.replace('https://jw-utazu.github.io/shift-form/login.html?return=' +
+      encodeURIComponent(location.href) + (reason ? '&reason=' + encodeURIComponent(reason) : ''));
+  };
+  window.pwgwsShouldRedirectToLogin = function () { return true; };
 }
 
 // ============================================================

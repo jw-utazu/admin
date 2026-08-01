@@ -86,9 +86,9 @@ async function initAuth() {
     } catch (_) { setLoading(false); }
   }
 
-  // 未ログイン：共通ログイン画面へ送る（?direct=1 で従来のログイン画面に戻れる）
-  if (pwgwsShouldRedirectToLogin()) { pwgwsGoToLogin(); return; }
-  showLogin();
+  // 未ログイン・管理者権限なし：共通ログイン画面へ送る
+  // （このアプリ内に認証画面は持たない）
+  pwgwsGoToLogin(shared ? 'noadmin' : '');
 }
 async function tryRecoveryLogin() {
   let token = '';
@@ -102,37 +102,15 @@ async function tryRecoveryLogin() {
     return true;
   } catch (_) { return false; }
 }
-function showLogin() { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').style.display = 'none'; renderGsiButton(); }
-function renderGsiButton() {
-  if (typeof google !== 'undefined' && google.accounts) {
-    google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onGoogleLogin });
-    google.accounts.id.renderButton(document.getElementById('gsi-btn'), { theme: 'outline', size: 'large', text: 'signin_with', locale: 'ja' });
-  } else { setTimeout(renderGsiButton, 100); }
-}
-async function onGoogleLogin(resp) {
-  try {
-    setLoading(true, '認証中...');
-    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
-    const d = await apiAuthGet(payload.email, 'admin');
-    if (!d.ok || !d.isAdmin) { setLoading(false); toast('管理者権限がありません', 'e'); return; }
-    adminUser = { email: payload.email, name: d.name || payload.email, uid: d.uid || '', isAdmin: true, picture: payload.picture || '' };
-    localStorage.setItem('adminUser', JSON.stringify(adminUser));
-    pwgwsSaveSession(payload.email, adminUser.name, payload.picture || '');
-    setLoading(false); showApp();
-  } catch (e) { setLoading(false); toast('ログインエラー: ' + e.message, 'e'); }
-}
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch (_) {}
   // 共通セッション・救済ログインも併せて破棄する（3アプリ共通のログアウト）
   pwgwsClearSession();
   toast('ログアウトしました', 's');
-  // 共通ログイン画面が使えない場合は従来どおりリロードしてログイン画面に戻す
-  setTimeout(() => {
-    if (pwgwsShouldRedirectToLogin()) pwgwsGoToLogin(); else location.reload();
-  }, 800);
+  setTimeout(() => pwgwsGoToLogin(), 800);
 }
 function showApp() {
-  document.getElementById('login-screen').style.display = 'none';
+
   document.getElementById('app-screen').style.display = 'flex';
   const icon = document.getElementById('acc-icon');
   if (icon && adminUser && adminUser.picture) {

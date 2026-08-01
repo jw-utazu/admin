@@ -546,3 +546,4 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .rec-otp-inline-label{font-size:11px;color:var(--ink3);}
 .rec-otp-inline-code{font-size:22px;font-weight:700;letter-spacing:.12em;font-family:var(--mono,monospace);}
 .rec-otp-inline .btn{font-size:11px;padding:4px 10px;margin-left:auto;}
+.load-err{margin-top:16px;padding:10px 14px;background:var(--red-l);border:1px solid var(--red);border-radius:var(--r);color:var(--red);font-size:12px;line-height:1.6;max-width:320px;}

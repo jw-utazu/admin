@@ -39,19 +39,11 @@ let mappingResult = {};
 let fcAdminData = null;  // フォーム作成時に取得したデータ
 
 // ============================================================
-// Google OAuth
+// 認証
+//
+// このアプリはログイン画面を持たない。未認証なら共通ログイン画面
+// （login.html）へリダイレクトし、認証が済んだ状態で戻ってくる
 // ============================================================
-function signIn() {
-  const tc = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID, scope: 'email profile openid',
-    callback: r => {
-      if (r.error) { showAuthErr('ログインに失敗しました。'); return; }
-      fetchUser(r.access_token);
-    }
-  });
-  // prompt: '' で前回アカウントを自動選択、初回は選択画面
-  tc.requestAccessToken({ prompt: '' });
-}
 
 // 救済ログインのセッションで管理アプリに入る（Googleアカウントが使えない管理者向け）。
 // 有効期限はサーバー側で検証される。shift-form と同一オリジンのため localStorage を共有できる
@@ -63,7 +55,6 @@ async function tryRecoveryLogin() {
     const res = await apiPost({ action: 'validateRecoverySession', sessionToken: token });
     if (!res.ok || !res.isAdmin) return false;
     _currentUser = { uid: res.uid || '', name: res.name, email: '', isRecoverySession: true };
-    document.getElementById('auth').style.display = 'none';
     document.getElementById('loading').classList.add('show');
     setLoadingStep(3, 'データを読み込み中...');
     const av = document.getElementById('av');
@@ -104,40 +95,17 @@ async function tryAutoLogin() {
   const shared = pwgwsGetSession();
   if (shared) { processUser({ email: shared.email, name: shared.name, picture: shared.picture }); return; }
 
-  // 未ログイン：共通ログイン画面へ送る。
-  // ?direct=1 が付いている場合は従来のログイン画面を出す（緊急脱出口）
-  if (pwgwsShouldRedirectToLogin()) { pwgwsGoToLogin(); return; }
+  // 未ログイン：共通ログイン画面へ送る（このアプリ内に認証画面は持たない）
+  pwgwsGoToLogin();
+}
+// リダイレクトは即座に判断してよいので待たない
+tryAutoLogin();
 
-  // One Tap（PCブラウザ向け）
-  if (!window.google || !google.accounts) return;
-  google.accounts.id.initialize({
-    client_id: CLIENT_ID,
-    callback: r => {
-      try {
-        const p = JSON.parse(atob(r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-        processUser({ email: p.email, name: p.name, picture: p.picture });
-      } catch(e) { console.warn('[one-tap]', e); }
-    },
-    auto_select: true,
-    cancel_on_tap_outside: false,
-  });
-  google.accounts.id.prompt();
-}
-setTimeout(tryAutoLogin, 800);
-function fetchUser(token) {
-  document.getElementById('auth').style.display = 'none';
-  document.getElementById('loading').classList.add('show');
-  setLoadingStep(1, 'Googleアカウントを確認中...');
-  fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + token } })
-    .then(r => r.json()).then(u => processUser({ email: u.email, name: u.name, picture: u.picture }))
-    .catch(() => showAuthErr('ユーザー情報の取得に失敗しました。'));
-}
 function processUser(u, save = true) {
   _processUserWithGasAuth(u, save);
 }
 async function _processUserWithGasAuth(u, save) {
   if (!document.getElementById('loading').classList.contains('show')) {
-    document.getElementById('auth').style.display = 'none';
     document.getElementById('loading').classList.add('show');
   }
   setLoadingStep(2, '管理者権限を確認中...');
@@ -153,8 +121,8 @@ async function _processUserWithGasAuth(u, save) {
         if (err.name === 'AbortError') throw new Error('タイムアウト');
         throw new Error('通信エラー');
       });
-    if (!res.ok) { showAuthErr('このアカウントはアクセスが許可されていません。'); return; }
-    if (!res.isAdmin) { showAuthErr('このアカウントには管理者権限がありません。'); return; }
+    if (!res.ok) { showAuthErr('', 'unauthorized'); return; }
+    if (!res.isAdmin) { showAuthErr('', 'noadmin'); return; }
     // ログインユーザー情報を保持（uid空＝オーナーアカウント）
     _currentUser = { uid: res.uid || '', name: u.name, email: u.email };
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
@@ -190,11 +158,8 @@ function signOut() {
   // 共通セッション・救済ログインも併せて破棄する（3アプリ共通のログアウト）
   pwgwsClearSession();
   google.accounts.id.disableAutoSelect();
-  // ログアウト後は共通ログイン画面へ戻す。
-  // 共通ログイン画面が使えない場合は従来どおりこのアプリのログイン画面を表示する
-  if (pwgwsShouldRedirectToLogin()) { pwgwsGoToLogin(); return; }
-  document.getElementById('app').style.display  = 'none';
-  document.getElementById('auth').style.display = 'flex';
+  // ログアウト後は共通ログイン画面へ戻す
+  pwgwsGoToLogin();
 }
 function setLoadingStep(step, msg) {
   document.getElementById('ld-status').textContent = msg;
@@ -208,12 +173,20 @@ function setLoadingStep(step, msg) {
   const pct = [0, 20, 55, 80];
   document.getElementById('ld-bar').style.width = pct[step] + '%';
 }
-function showAuthErr(msg) {
+// 認証に関する失敗は共通ログイン画面へ戻して、そこで理由を表示させる。
+// データ読み込み失敗など認証以外の失敗はこの画面上に出す
+function showAuthErr(msg, reason) {
+  if (reason) {
+    // 誤ったアカウントのセッションが残り続けないよう破棄してから戻す
+    try { localStorage.removeItem('adminUser'); } catch (_) {}
+    pwgwsClearSession();
+    pwgwsGoToLogin(reason);
+    return;
+  }
   document.getElementById('loading').classList.remove('show');
-  document.getElementById('auth').style.display = 'flex';
-  const el = document.getElementById('auth-err');
+  const el = document.getElementById('load-err');
   el.textContent = msg;
-  el.classList.add('show');
+  el.style.display = 'block';
 }
 
 // apiGet は js/api.js（共有通信層）で定義
@@ -228,9 +201,7 @@ async function loadAdminData() {
   try {
     d = await apiGet('adminData', { year: curY, month: curM });
   } catch(e) {
-    // エラー時はローディングを閉じて認証画面に戻す
-    document.getElementById('loading').classList.remove('show');
-    document.getElementById('auth').style.display = 'flex';
+    // 認証は済んでいるので、ローディング画面上にエラーを表示する
     showAuthErr('データの読み込みに失敗しました: ' + e.message);
     return;
   }
