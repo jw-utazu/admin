@@ -681,15 +681,18 @@ body.dnd-on *{cursor:grabbing !important;}
   .cs,.role-sel{padding:6px;min-height:30px;font-size:11px;}
   .cart-chip{padding:6px 4px;min-height:28px;font-size:11px;}
 
-  /* 見守り＝1人目の選択欄の右に並べる普通のチェックボックス。
-     縦並びのままだと 1人目と2人目の間に挟まって名前の並びが途切れるので、
-     この欄だけ横並びにして右端へ寄せる。名前が優先で縮むのはチェック側ではなく
-     名前側（.cs に min-width:0）。担当者が居ない欄には出さない */
-  /* .cell-wrap 付きで書く。素の .ps-watch-wrap だと
-     .cell-wrap .ps-watch-wrap{flex-direction:column} に詳細度で負ける */
-  .cell-wrap .ps-watch-wrap{flex-direction:row;align-items:center;gap:5px;}
-  .cell-wrap .ps-watch-wrap .cs{flex:1;min-width:0;width:auto;}
-  .watch-label{flex-shrink:0;margin:0;padding:0;gap:3px;font-size:9px;color:var(--ink3);}
+  /* 見守り＝3人の下に置く独立した行。
+     1人目だけを包んでいる .ps-watch-wrap を display:contents で透明にすると、
+     中の名前欄とチェックが .cell-wrap（縦並び）の直接の子になる。そのうえで
+     チェックだけ order で最後へ送ると、名前3つが同じ幅で連続して並び、
+     見守りはセルの一番下に来る。
+     ・1人目だけ幅が狭くなる（チェックと分け合う）問題が無くなる
+     ・名前の並びが途中で途切れない
+     JS 側の構造（buildPS の <div class="ps-watch-wrap">）には触らずに済む。
+     担当者が居ない欄にはチェックを出さない */
+  .cell-wrap .ps-watch-wrap{display:contents;}
+  .watch-label{order:9;margin:0;padding:1px 0 0;gap:4px;font-size:9px;color:var(--ink3);
+    justify-content:flex-start;}
   .watch-label:has(input:disabled){display:none;}
   .watch-label input[type="checkbox"]{width:15px;height:15px;accent-color:var(--purple);}
 
