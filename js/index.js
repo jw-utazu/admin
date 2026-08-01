@@ -2809,7 +2809,6 @@ const LOG_KIND_LABEL = {
   admin:   '管理者の操作',
   wish:    '希望提出',
   access:  'ログイン',
-  account: 'アカウント',
 };
 let logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true };
 
@@ -2923,14 +2922,12 @@ function logRowHtml(kind, r) {
     main = `<span class="log-who">${esc(r.name || '（不明）')}</span> <span class="log-op">希望を提出</span>` +
            (r.isProxy ? '<span class="log-tag info">代理</span>' : '');
     sub  = [r.sendType, r.slotCount != null ? r.slotCount + '枠' : ''].filter(Boolean).join(' / ');
-  } else if (kind === 'access') {
-    const cls = r.result === '成功' ? 'ok' : (r.result === '失敗' ? 'ng' : 'try');
-    main = `<span class="log-who">${esc(r.email || '（不明）')}</span><span class="log-tag ${cls}">${esc(r.result || '－')}</span>`;
-    sub  = [r.appName, r.reason].filter(Boolean).join(' / ');
   } else {
-    main = `<span class="log-who">${esc(r.name || r.email || '（不明）')}</span>` +
-           (r.isFirst ? '<span class="log-tag info">新規登録</span>' : '');
-    sub  = [r.appName, r.email].filter(Boolean).join(' / ');
+    // 氏名が分かるのはログインに成功したときだけ。
+    // 試行・失敗の行はメールアドレスしか無いので、それを見出しにする
+    const cls = r.result === '成功' ? 'ok' : (r.result === '失敗' ? 'ng' : 'try');
+    main = `<span class="log-who">${esc(r.name || r.email || '（不明）')}</span><span class="log-tag ${cls}">${esc(r.result || '－')}</span>`;
+    sub  = [r.name ? r.email : '', r.appName, r.reason].filter(Boolean).join(' / ');
   }
   return `<div class="log-row">
       <div class="log-at">${esc(r.at)}</div>

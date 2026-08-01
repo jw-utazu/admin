@@ -25,11 +25,37 @@ if (typeof pwgwsGetSession !== 'function') {
 }
 
 // ============================================================
+// ログイン中の管理者を返す。
+// 保持している変数名がページごとに違う（index.html は _currentUser、
+// shift-create.html は adminUser）ため、両方を見て拾う。
+// 未定義の変数は参照するだけで ReferenceError になるので typeof で確かめる
+// ============================================================
+function currentAdmin() {
+  if (typeof _currentUser !== 'undefined' && _currentUser) return _currentUser;
+  if (typeof adminUser   !== 'undefined' && adminUser)     return adminUser;
+  return null;
+}
+
+// 操作ログに「誰が」を残すため、リクエストに管理者UID・名前・メールを付ける。
+// これが欠けると admin_op_logs の実行者が空欄になり、後から追跡できない
+function attachAdmin(payload) {
+  const u = currentAdmin();
+  if (!u) return payload;
+  // オーナーは uid を持たないので、uid と名前はそれぞれ独立して付ける
+  // （uid の有無で名前まで落とすと、オーナーの操作が名無しで記録される）
+  if (u.uid)  payload.adminUid  = payload.adminUid  || u.uid;
+  if (u.name) payload.adminName = payload.adminName || u.name;
+  // オーナーアカウントは uid を持たないため、権限確認用にメールアドレスも送る
+  if (u.email) payload.adminEmail = payload.adminEmail || u.email;
+  return payload;
+}
+
+// ============================================================
 // API通信（fetch方式・リダイレクト追従対応・Android Chrome対応）
 // ============================================================
 function apiGet(action, params) {
   // type パラメータを自動付与（認証系・メンバー取得など type 不要なアクションはサーバー側で無視する）
-  const p = Object.assign({ type: currentPwType }, params || {});
+  const p = attachAdmin(Object.assign({ type: currentPwType }, params || {}));
   let url = API_URL+'?action='+action;
   url += '&params='+encodeURIComponent(JSON.stringify(p));
   const controller = new AbortController();
@@ -57,15 +83,7 @@ function apiPost(actionOrPayload, params) {
   } else {
     payload = actionOrPayload;
   }
-  // 管理者UID・名前を自動付与
-  if (_currentUser && _currentUser.uid) {
-    payload.adminUid  = payload.adminUid  || _currentUser.uid;
-    payload.adminName = payload.adminName || _currentUser.name;
-  }
-  // オーナーアカウントは uid を持たないため、権限確認用にメールアドレスも送る
-  if (_currentUser && _currentUser.email) {
-    payload.adminEmail = payload.adminEmail || _currentUser.email;
-  }
+  attachAdmin(payload);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 180000);
   return fetch(API_URL, {
