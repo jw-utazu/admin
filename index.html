@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=20">
+<link rel="stylesheet" href="css/index.css?v=21">
 </head>
 <body>
 
@@ -126,25 +126,6 @@
             </div>
             <div class="sdc-body" id="sdc-body"></div>
           </div>
-          <!-- 自動公開設定カード -->
-          <div class="dsp-card" style="margin-top:10px;" id="auto-pub-card">
-            <div class="dsp-hd">
-              <span class="dsp-title">自動公開設定</span>
-            </div>
-            <div style="padding:10px 0 4px;display:flex;flex-direction:column;gap:10px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <label style="font-size:12px;color:var(--ink2);flex:1;">📅 申込開始日に自動公開（カレンダー）</label>
-                <label class="auto-pub-toggle" title="申込開始日を過ぎたら自動でカレンダーを公開">
-                  <input type="checkbox" id="auto-pub-cal-chk" onchange="onAutoPublishChange()">
-                  <span class="apt-slider"></span>
-                </label>
-              </div>
-              <div style="font-size:11px;color:var(--ink3);line-height:1.6;">
-                🗂 シフトは「シフト作成完了」→「確認者全員の確認完了」の後、シフト公開日を迎えると自動的に奉仕者へ公開・通知されます（常時有効・設定不要）
-              </div>
-            </div>
-          </div>
-
           <!-- 日程一覧カード（カレンダータブ内） -->
           <div class="dsp-card" style="margin-top:10px;" id="info-dates-card">
             <div class="dsp-hd" style="display:flex;align-items:center;justify-content:space-between;">
@@ -165,6 +146,9 @@
                   <span class="dgc-label">シフト公開</span>
                   <span class="dgc-val" id="dv-open"><span class="dgc-val unset">未設定</span></span>
                 </div>
+              </div>
+              <div style="font-size:11px;color:var(--ink3);line-height:1.6;margin-top:8px;">
+                📅 カレンダーは申込開始日、🗂 シフトは「シフト作成完了」→「確認者全員の確認完了」の後シフト公開日を迎えると、それぞれ自動的に公開されます（常時有効・設定不要）
               </div>
             </div>
           </div>
@@ -684,6 +668,7 @@
 
 <script src="js/session.js?v=2"></script>
 <script src="js/api.js?v=6"></script>
-<script src="js/index.js?v=25"></script>
+<script src="js/confirm.js?v=1"></script>
+<script src="js/index.js?v=27"></script>
 </body>
 </html>

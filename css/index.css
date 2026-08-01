@@ -568,13 +568,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .lm-name{flex:1;font-size:13px;font-weight:600;}
 .lm-date{font-size:11px;color:var(--ink3);width:80px;text-align:right;}
 .lm-del{padding:2px 8px;border:none;background:var(--red-l);color:var(--red);border-radius:4px;cursor:pointer;font-family:var(--sans);font-size:11px;}
-/* 自動公開トグル */
-.auto-pub-toggle{position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0;}
-.auto-pub-toggle input{opacity:0;width:0;height:0;}
-.apt-slider{position:absolute;cursor:pointer;inset:0;background:#cbd5e1;border-radius:20px;transition:.2s;}
-.apt-slider::before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;}
-.auto-pub-toggle input:checked + .apt-slider{background:var(--green,#16a34a);}
-.auto-pub-toggle input:checked + .apt-slider::before{transform:translateX(16px);}
 /* フェーズ管理UI */
 .phase-list-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface);}
 .phase-list-item.active-phase{border-color:var(--green);background:#f0fdf4;}

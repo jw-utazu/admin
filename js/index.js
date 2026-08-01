@@ -232,7 +232,6 @@ async function loadAdminData() {
   renderPwTypeTabs();
   renderAll();
   loadCalPubStatus();
-  loadAutoPublishSettings();
   loadPendingCounts();   // サイドバー「未対応」の件数（件数だけを返す軽量API）
   loadShiftStatus();     // 進行状況ストリップ用（シフトの作成完了・確認完了）
   renderProgressStrip(); // 先に日程・公開状態だけで描いておく（シフト状態は後追い）
@@ -3393,31 +3392,5 @@ async function refreshAdminData() {
   }
   renderAll();
   loadCalPubStatus();
-  loadAutoPublishSettings();
-}
-
-// ============================================================
-// 自動公開トグル
-// ============================================================
-async function loadAutoPublishSettings() {
-  try {
-    const r = await apiGet('getAutoPublishSettings');
-    if (!r.ok) return;
-    const calChk = document.getElementById('auto-pub-cal-chk');
-    if (calChk) calChk.checked = r.calAuto;
-  } catch (e) { console.warn('[loadAutoPublishSettings]', e); }
-}
-
-async function onAutoPublishChange() {
-  const calAuto = document.getElementById('auto-pub-cal-chk')?.checked || false;
-  try {
-    const r = await apiGet('setAutoPublishSettings', { calAuto });
-    if (!r.ok) throw new Error(r.error);
-    toast('自動公開設定を保存しました', 's');
-  } catch (e) {
-    toast('自動公開設定の保存に失敗: ' + e.message, 'e');
-    // 失敗時は元の状態に戻す
-    loadAutoPublishSettings();
-  }
 }
 
