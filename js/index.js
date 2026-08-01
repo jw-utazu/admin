@@ -1574,14 +1574,6 @@ async function deleteSlotDay(){
     buildSlotSetList(); buildCalScroll(); buildInfoArea();
   }
 }
-async function resetAllSlots(){
-  if(!await uiConfirm({
-    type:'danger', title:'実施日一覧のリセット',
-    message:'実施日一覧を全てリセットしますか？', confirmText:'リセットする',
-  })) return;
-  slots=[];
-  buildSlotSetList(); buildCalScroll(); buildInfoArea();
-}
 async function resetDates(){
   if(!await uiConfirm({
     type:'danger', title:'日程一覧のリセット',
@@ -2062,7 +2054,6 @@ function toast(msg,type){
   });
   window.addEventListener('appinstalled', ()=>{ deferredPrompt=null; toast('インストールしました!','s'); closeM('m-pwa'); });
   window.openPwaModal=function(){
-    if(window.matchMedia('(display-mode: standalone)').matches){ toast('すでにインストール済みです','s'); return; }
     const s=document.getElementById('pwa-auto-section'); if(s) s.style.display=deferredPrompt?'block':'none';
     openM('m-pwa');
   };
@@ -2820,7 +2811,7 @@ const LOG_KIND_LABEL = {
   access:  'ログイン',
   account: 'アカウント',
 };
-let logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false };
+let logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true };
 
 function openLogModal() {
   logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false };
@@ -2878,6 +2869,10 @@ async function loadLogs(reset) {
     logState.rows  = logState.rows.concat(d.rows || []);
     logState.total = d.total || logState.rows.length;
     logState.offset = logState.rows.length;
+    // 日時が記録されていない種類のログでは、期間を指定させても効かないので入力を閉じる
+    logState.hasDate = d.hasDate !== false;
+    document.getElementById('log-from').disabled = !logState.hasDate;
+    document.getElementById('log-to').disabled   = !logState.hasDate;
     renderLogs();
   } catch (e) {
     document.getElementById('log-content').innerHTML =
@@ -2896,6 +2891,10 @@ function renderLogs() {
   if (kind === 'access') {
     html += `<div class="log-hint">ログインの試行・成功・失敗の記録です。ふだん見る必要はありませんが、
       身に覚えのないログイン失敗が並んでいないかの確認に使えます。</div>`;
+  }
+
+  if (!logState.hasDate) {
+    html += `<div class="log-hint" style="color:var(--amber);">このログには日時が記録されていないため、期間での絞り込みと日時の表示はできません（新しい順に並びます）。</div>`;
   }
 
   html += `<div class="log-count">${logState.total}件中 ${rows.length}件を表示</div>`;
