@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/shift-create.css?v=28">
+<link rel="stylesheet" href="css/shift-create.css?v=29">
 </head>
 <body>
 
@@ -37,7 +37,7 @@
         <select class="ym-sel" id="sc-ym-sel" onchange="onYmChange(this.value)"></select>
         <span class="ym-note" id="sc-ym-note"></span>
       </div>
-      <div style="flex:1;"></div>
+      <div class="hdr-spacer" style="flex:1;"></div>
       <span id="publish-approval" style="display:none;font-size:11px;margin-right:6px;white-space:nowrap;" onclick="openApprovalModal()"></span>
       <span id="publish-open-date" style="display:none;font-size:11px;color:var(--ink3);margin-right:6px;white-space:nowrap;"></span>
       <button class="hbtn" id="reject-btn" style="display:none;" onclick="rejectShift()">⚠️ 差し戻す</button>
@@ -49,7 +49,7 @@
     <button class="mtab on"  id="mtab-wish"     onclick="switchMainTab('wish',this)">📋 希望確認</button>
     <button class="mtab"     id="mtab-create"   onclick="switchMainTab('create',this)">✏️ シフト作成</button>
     <button class="mtab"     id="mtab-settings" onclick="switchMainTab('settings',this)">⚙️ 設定</button>
-    <div style="flex:1;"></div>
+    <div class="mt-spacer" style="flex:1;"></div>
     <div id="create-tools" style="display:none;align-items:center;gap:6px;margin-right:8px;">
       <button class="tb-btn" id="undo-btn" style="white-space:nowrap;" title="元に戻す（Ctrl+Z）／やり直す（Ctrl+Shift+Z）" onclick="doUndo()" disabled>↶ 元に戻す</button>
       <button class="tb-btn" style="white-space:nowrap;" onclick="openPreflight()">🔍 チェック</button>
@@ -80,6 +80,8 @@
   <div class="tab-content" id="tab-create">
     <div class="dtabs" id="dtabs" style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;overflow-x:auto;flex-shrink:0;align-items:center;"><div style="padding:10px 14px;font-size:12px;color:var(--ink3);">読み込み中...</div></div>
     <div class="sc-body">
+      <!-- スマホでは左パネルを引き出しにするので、外をタップして閉じるための覆い -->
+      <div class="lp-backdrop" id="lp-backdrop" onclick="toggleLp()"></div>
       <div class="lp-wrap" id="lpWrap">
         <div class="lp-resize" id="lpResize"></div>
         <button class="lp-toggle" id="lpToggle" onclick="toggleLp()">◀</button>
@@ -94,6 +96,8 @@
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);gap:8px;flex-shrink:0;">
           <div class="dtabs-time" id="dtabs-time"></div>
           <div style="display:flex;gap:8px;flex-shrink:0;">
+            <!-- スマホ専用。左パネル（申込者一覧）の引き出しを開く -->
+            <button class="tb-btn lp-open-btn" style="white-space:nowrap;" onclick="toggleLp()">👥 申込者</button>
             <button class="tb-btn" id="cmp-toggle-btn" style="border-color:var(--teal);color:var(--teal);white-space:nowrap;" onclick="toggleCompareMode()">⬜ 比較</button>
           </div>
         </div>
@@ -282,6 +286,6 @@
 <script src="js/validation.js?v=9"></script>
 <script src="js/picker.js?v=4"></script>
 <script src="js/dnd.js?v=13"></script>
-<script src="js/shift-create.js?v=34"></script>
+<script src="js/shift-create.js?v=35"></script>
 </body>
 </html>

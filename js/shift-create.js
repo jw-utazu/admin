@@ -950,7 +950,7 @@ function buildCreateTabs() {
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
   // 「元に戻す」「チェック」はメインタブ行（分割表示ボタンの隣）に常設してあるのでここには置かない
-  document.getElementById('dtabs').innerHTML = tabs + '<div style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
+  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
   if (compareMode) populateCmpDateSel();
 }
 
@@ -1591,6 +1591,9 @@ function buildSlotTable(bi, block) {
     html += `<div style="display:flex;align-items:center;gap:3px;">`;
     html += makeLocSel(li, loc);
     html += `<button class="col-del-btn" onclick="delCol(${bi},${li})" title="この列を削除">✕</button>`;
+    // スマホ用。指ではホバーできず .col-ins-zone の ＋ が出せないので、
+    // 「この列の右に1列足す」ボタンを見出しに常設する（CSS で PC 幅では隠す）
+    html += `<button class="col-add-m" onclick="insCol(${bi},${li + 1})" title="右に列を追加">＋</button>`;
     html += `</div></th>`;
   });
   html += '</tr>';
@@ -2770,10 +2773,35 @@ async function rejectShift() {
   finally { setLoading(false); }
 }
 
+// ===== スマートフォン表示 =====
+// css/shift-create.css の @media (max-width:700px) と同じ境界。
+// 分割表示・比較パネルのように横幅を前提にした機能は、この幅では成立しない
+const SC_MOBILE_Q = window.matchMedia('(max-width:700px)');
+function isScMobile() { return SC_MOBILE_Q.matches; }
+
+// 幅が境界をまたいだら、その幅で成立しない表示状態を解除する
+SC_MOBILE_Q.addEventListener('change', e => {
+  if (e.matches) {
+    if (splitMode)   toggleSplitView();
+    if (compareMode) toggleCompareMode();
+  } else {
+    setLpDrawer(false);   // PC 幅に戻ったら引き出しは畳んで通常の左パネルに戻す
+  }
+});
+
+// スマホでは左パネルを本文に重ねる引き出しにする（畳んだ幅を確保できないため）
+function setLpDrawer(open) {
+  const w = document.getElementById('lpWrap'), bd = document.getElementById('lp-backdrop');
+  if (!w) return;
+  w.classList.toggle('lp-open', open);
+  if (bd) bd.classList.toggle('on', open);
+}
+
 // 左パネルリサイズ
 const LP_MIN = 140, LP_MAX = 360;
 let lpCollapsed = false, lpWidth = 196;
 function toggleLp() {
+  if (isScMobile()) { setLpDrawer(!document.getElementById('lpWrap').classList.contains('lp-open')); return; }
   lpCollapsed = !lpCollapsed;
   const w = document.getElementById('lpWrap'), t = document.getElementById('lpToggle');
   if (lpCollapsed) { w.classList.add('collapsed'); t.textContent = '▶'; }

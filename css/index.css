@@ -555,3 +555,71 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .rec-key-box .btn{font-size:11px;padding:4px 10px;}
 .rec-key-box .btn:first-of-type{margin-left:auto;}
 .rec-curkey{font-size:12px;color:var(--ink2);margin-bottom:12px;word-break:break-all;}
+
+/* ============================================================
+   スマートフォン最適化（〜700px）
+   この画面はもともと縦積みのカード中心で、サイドバーも 780px で下に回る
+   （上の .layout の @media）。ここで直すのは「1行に並べきれない箇所」と
+   「指には小さすぎる部品」の2点に絞ってある
+   ============================================================ */
+@media (max-width:700px){
+
+  /* ===== ヘッダー ===== */
+  .hdr{padding:0 10px;gap:8px;}
+  .status-badge{padding:3px 7px;font-size:10px;}
+  .so-btn{padding:6px 9px;}
+
+  /* 年月ドロップダウン：ラベル＋セレクタ2つ＋ボタン2つは1行に入らない */
+  .ym-dropdown{padding:10px;}
+  .ym-dropdown.open{flex-wrap:wrap;row-gap:8px;}
+
+  /* ===== カレンダー ===== */
+  /* 年月ナビ・区分名・公開バッジが1行に収まらないので折り返す */
+  .cal-ym-header{padding:6px 10px;flex-wrap:wrap;row-gap:6px;}
+  .cal-ym-header #cal-ym-label{font-size:15px;font-weight:700;}
+  .cal-ym-section-label{font-size:15px;}
+  .cal-ym-nav-btn{width:32px;height:32px;}
+  .cal-view-nav{padding:5px 10px;flex-wrap:wrap;row-gap:4px;}
+  /* 560px 固定だと画面の大半を内側スクロールが占めてしまい、
+     下のカードまで指が届きにくい。画面高に対する比率にする */
+  .cal-scroll-area{height:auto;max-height:58vh;padding:10px;}
+  .cal-info-area{padding:0 10px 14px;}
+  .cc{min-height:40px;}
+
+  /* ===== 日程・実施日カード ===== */
+  .date-grid-cards{gap:6px;padding:8px;}
+  .dgc{padding:8px 3px;min-height:64px;}
+  .dgc-val{font-size:10px;}
+  .set-panel{padding:10px;}
+  /* 5列（開始・〜・終了・間隔・削除）のまま。間隔の幅を詰めれば 390px に収まる */
+  .sp-time-row{gap:5px;}
+  .intv-sel{width:58px;padding:6px 4px;}
+  .sp-del-btn{width:30px;height:30px;}
+  .sdel{padding:5px 7px;font-size:13px;}
+  .slot-set-list{max-height:none;}
+
+  /* ===== サイドバー（780px で下に回ったあとの中身） ===== */
+  .sb{padding:12px 10px;}
+
+  /* ===== モーダル ===== */
+  .ov{padding:10px;}
+  .modal{max-height:92dvh;}
+  .mbd{padding:12px;}
+  .mhd{padding:12px 12px 9px;}
+  .mft{padding:10px 12px;flex-wrap:wrap;}
+  .map-row{grid-template-columns:88px 12px 1fr;}
+  .ms-info-k,.sumk{width:82px;}
+  /* 手順表示・読み込み中の手順は、ラベルと連結線を詰めて1行に収める */
+  .sl{font-size:8px;}
+  .ld-step{min-width:60px;}
+  .ld-line{width:32px;}
+
+  /* ===== メンバー行・救済申請 ===== */
+  .member-row{padding:8px 10px;flex-wrap:wrap;}
+  .rec-card-actions .btn{padding:7px 12px;}
+  .rec-otp-code{font-size:34px;}
+
+  /* ===== トースト ===== */
+  .ta{left:10px;right:10px;bottom:10px;}
+  .toast{max-width:none;}
+}
