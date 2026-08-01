@@ -2371,9 +2371,18 @@ async function resolveBugReport(rowIndex) {
 // 管理者が電話・対面で本人に伝えて初めてログインできる仕組みにしてあるため、
 // 「承認ボタンを押すだけ」の形骸化が起きないようになっている
 // ============================================================
+let _recSharedKey = null; // 現在の合言葉（管理者にのみ表示）
+
 async function openRecoveryModal() {
   openM('m-recovery');
   await loadRecoveryRequests();
+}
+
+function copyRecoveryKey() {
+  if (!_recSharedKey) return;
+  navigator.clipboard.writeText(_recSharedKey)
+    .then(() => toast('合言葉をコピーしました', 's'))
+    .catch(() => toast('コピーできませんでした', 'e'));
 }
 
 async function loadRecoveryRequests() {
@@ -2387,7 +2396,26 @@ async function loadRecoveryRequests() {
     const active  = all.filter(r => r.status === 'approved');
     const past    = all.filter(r => !['pending','approved'].includes(r.status));
 
-    let html = '<div class="rec-note">承認したら、パスコードを<b>本人と確実に連絡が取れる手段</b>'
+    // 現在の合言葉。奉仕者から「合言葉は何だったか」と聞かれたときに答えられるようにする
+    _recSharedKey = d.sharedKey || null;
+    let html = _recSharedKey
+      ? `<div class="rec-key-box">
+           <span class="rec-key-label">現在の合言葉</span>
+           <span class="rec-key-val">${esc(_recSharedKey)}</span>
+           <button class="btn btn-g" onclick="copyRecoveryKey()">コピー</button>
+           <button class="btn btn-g" onclick="openRecoveryKeyModal()">変更</button>
+         </div>`
+      : `<div class="rec-key-box rec-key-unknown">
+           <span class="rec-key-label">現在の合言葉</span>
+           <span class="rec-key-val-none">確認できません</span>
+           <button class="btn btn-g" onclick="openRecoveryKeyModal()">設定し直す</button>
+         </div>
+         <div class="rec-note" style="margin-bottom:12px;">
+           以前は合言葉を暗号化して保存していたため、元の文字列を取り出せません。
+           一度「設定し直す」で登録すると、以後はここで確認できるようになります。
+         </div>`;
+
+    html += '<div class="rec-note">承認したら、パスコードを<b>本人と確実に連絡が取れる手段</b>'
              + '（電話・LINEなど、普段その人とやりとりしている連絡先）でお伝えください。<br>'
              + '⚠️ <b>申請フォームに入力されたメールアドレス宛には送らないでください。</b>'
              + 'そのアドレスは申請者が自由に入力できるため、本人確認になりません。<br>'
@@ -2534,8 +2562,11 @@ function copyRecoveryOtp(otp) {
 }
 
 function openRecoveryKeyModal() {
+  // 変更前に現在の合言葉を見せておく（同じものを入れ直す事故を防ぐ）
   document.getElementById('rec-newkey').value = '';
   document.getElementById('rec-key-msg').textContent = '';
+  const cur = document.getElementById('rec-curkey');
+  cur.textContent = _recSharedKey ? '現在の合言葉：' + _recSharedKey : '現在の合言葉は確認できません';
   openM('m-recovery-key');
 }
 
@@ -2546,9 +2577,10 @@ async function saveRecoveryKey() {
   showProc('合言葉を変更しています...', '少々お待ちください');
   try {
     const res = await apiPost({ action: 'setRecoverySharedKey', sharedKey: key });
-    if (!res.ok) throw new Error(res.reason || '変更に失敗しました');
-    hideProc();
+    if (!res.ok) throw new Error(res.reason === 'too_short' ? '4文字以上で入力してください' : (res.reason || '変更に失敗しました'));
     closeM('m-recovery-key');
+    await loadRecoveryRequests();   // 表示中の合言葉を新しいものに更新する
+    hideProc();
     toast('合言葉を変更しました', 's');
   } catch (e) { hideProc(); toast('変更失敗: ' + e.message, 'e'); }
 }
