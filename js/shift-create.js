@@ -642,7 +642,10 @@ function buildWishTable(data, shiftRes) {
     dg.forEach(g => { h += `<th class="th-date" colspan="${g.times.length}" style="position:sticky;top:0;z-index:3;">${esc(g.date)}</th>`; });
     h += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:50px;z-index:11;min-width:50px;">合計</th>';
     h += '<th class="th-date" rowspan="2" style="position:sticky;top:0;right:0;z-index:11;min-width:50px;background:var(--purple-l);color:var(--purple);">割当</th></tr><tr>';
-    sortedSlots.forEach(slot => { const si = slot.indexOf(' '); h += `<th class="th-time" style="position:sticky;top:28px;z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
+    // top は日付行の高さと一致していないといけない。28px 決め打ちだと余白や
+    // 文字サイズを変えた瞬間にズレ、隙間から下の行がちらついて見える。
+    // 実際の高さを描画後に --th-date-h へ入れる（fixWishHeadOffset）
+    sortedSlots.forEach(slot => { const si = slot.indexOf(' '); h += `<th class="th-time" style="position:sticky;top:var(--th-date-h,28px);z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
     h += '</tr>';
     return h;
   };
@@ -692,7 +695,24 @@ function buildWishTable(data, shiftRes) {
   }
 
   document.getElementById('wish-table-wrap').innerHTML = html;
+  fixWishHeadOffset();
 }
+
+// 2段の固定見出し（日付／時間帯）の段差を実測値で合わせる。
+// 時間帯行の top が日付行の高さより小さいと段の間に隙間ができ、そこを
+// 本文がスクロールして通り抜けてちらつく。端数は切り捨てて、隙間ではなく
+// わずかな重なり側へ倒す（重なりは背景が不透明なので見えない）
+function fixWishHeadOffset() {
+  const wrap = document.getElementById('wish-table-wrap');
+  if (!wrap) return;
+  const dateTh = wrap.querySelector('.th-date[colspan]') || wrap.querySelector('.th-date');
+  if (!dateTh) return;
+  const h = Math.floor(dateTh.getBoundingClientRect().height);
+  if (h > 0) wrap.style.setProperty('--th-date-h', h + 'px');
+}
+// 文字サイズや折り返しが変わると段差も変わるので、幅の変化に追随させる
+window.addEventListener('resize', () => fixWishHeadOffset());
+
 // 参加希望 編集モーダル（希望確認タブのセルクリックで開く）
 let wishEditCtx = null;
 // 割当状態（isAssigned）はセルの class から読み取る。refreshWishAssign() が
@@ -949,8 +969,12 @@ function buildCreateTabs() {
   const tabs = dt.map((t, i) =>
     `<button class="dtab${i === 0 ? ' on' : ''}" onclick="switchDateTab(${i})">${esc(t.date)}（${esc(t.weekday)}）</button>`
   ).join('');
-  // 「元に戻す」「チェック」はメインタブ行（分割表示ボタンの隣）に常設してあるのでここには置かない
-  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="border-color:var(--purple);color:var(--purple);font-weight:700;margin-right:4px;white-space:nowrap;" onclick="saveAll()">💾 すべて保存</button>';
+  // 「元に戻す」「チェック」はメインタブ行（分割表示ボタンの隣）に常設してあるのでここには置かない。
+  // 「すべて保存」は置かない：編集は 0.5 秒のデバウンスで自動保存され、失敗しても
+  // 自動リトライとブロック単位の「⚠ 保存失敗（タップで再試行）」が受け持つ。
+  // 全ブロックを描き直して書き戻すため、押すと未編集のブロックまで更新扱いになり、
+  // 他の管理者側で無用な同期が走るという副作用の方が大きかった
+  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div>';
   if (compareMode) populateCmpDateSel();
 }
 
@@ -1653,7 +1677,8 @@ function buildPS(bi, ri, li, pi, val, sa, nm, watchOn, dateKey) {
   const cbId = `watch-${bi}-${ri}-${li}`;
   const isDisabled = !val;
   const isChecked = !!(watchOn && val);
-  const cb = `<label class="watch-label"><input type="checkbox" class="watch-cb" id="${cbId}" data-bi="${bi}" data-ri="${ri}" data-li="${li}"${isDisabled ? ' disabled' : ''}${isChecked ? ' checked' : ''} onchange="onWatchChange(this,${bi})"> 見守り</label>`;
+  // title はスマホで必要。狭い幅では文字を消して 👁 アイコンだけにするため（CSS 側）
+  const cb = `<label class="watch-label" title="見守り"><input type="checkbox" class="watch-cb" id="${cbId}" data-bi="${bi}" data-ri="${ri}" data-li="${li}"${isDisabled ? ' disabled' : ''}${isChecked ? ' checked' : ''} onchange="onWatchChange(this,${bi})"> 見守り</label>`;
   return `<div class="ps-watch-wrap">${sel}${cb}</div>`;
 }
 
@@ -2780,32 +2805,56 @@ const SC_MOBILE_Q = window.matchMedia('(max-width:700px)');
 function isScMobile() { return SC_MOBILE_Q.matches; }
 
 // 幅が境界をまたいだら、その幅で成立しない表示状態を解除する
-SC_MOBILE_Q.addEventListener('change', e => {
-  if (e.matches) {
+SC_MOBILE_Q.addEventListener('change', () => {
+  if (isScMobile()) {
     if (splitMode)   toggleSplitView();
     if (compareMode) toggleCompareMode();
-  } else {
-    setLpDrawer(false);   // PC 幅に戻ったら引き出しは畳んで通常の左パネルに戻す
   }
+  applyLpForWidth();
 });
-
-// スマホでは左パネルを本文に重ねる引き出しにする（畳んだ幅を確保できないため）
-function setLpDrawer(open) {
-  const w = document.getElementById('lpWrap'), bd = document.getElementById('lp-backdrop');
-  if (!w) return;
-  w.classList.toggle('lp-open', open);
-  if (bd) bd.classList.toggle('on', open);
-}
 
 // 左パネルリサイズ
 const LP_MIN = 140, LP_MAX = 360;
 let lpCollapsed = false, lpWidth = 196;
+
+// 開閉は PC・スマホ共通で collapsed の付け外し。違いは CSS 側で、
+// スマホでは開いても枠は幅0のまま、中身だけが本文の上に重なる
 function toggleLp() {
-  if (isScMobile()) { setLpDrawer(!document.getElementById('lpWrap').classList.contains('lp-open')); return; }
   lpCollapsed = !lpCollapsed;
+  setLpCollapsed(lpCollapsed);
+}
+
+function setLpCollapsed(collapsed) {
+  lpCollapsed = collapsed;
   const w = document.getElementById('lpWrap'), t = document.getElementById('lpToggle');
-  if (lpCollapsed) { w.classList.add('collapsed'); t.textContent = '▶'; }
-  else { w.classList.remove('collapsed'); w.style.width = lpWidth + 'px'; t.textContent = '◀'; }
+  if (!w || !t) return;
+  if (collapsed) { w.classList.add('collapsed'); t.textContent = '▶'; }
+  else {
+    w.classList.remove('collapsed');
+    // スマホは CSS の width:0!important が効くので、幅は触らない
+    if (!isScMobile()) w.style.width = lpWidth + 'px';
+    t.textContent = '◀';
+  }
+  syncLpBackdrop();
+}
+
+// 引き出しが開いている間だけ、外をタップして閉じるための覆いを出す
+function syncLpBackdrop() {
+  const bd = document.getElementById('lp-backdrop'), w = document.getElementById('lpWrap');
+  if (bd && w) bd.classList.toggle('on', isScMobile() && !w.classList.contains('collapsed'));
+}
+
+// スマホでは画面の大半を覆ってしまうので、初期状態は閉じておく
+function applyLpForWidth() {
+  if (isScMobile()) { if (!lpCollapsed) setLpCollapsed(true); else syncLpBackdrop(); }
+  else syncLpBackdrop();
+}
+applyLpForWidth();
+
+// ドラッグ中に左パネルを閉じる（js/dnd.js から呼ぶ）。
+// スマホでは引き出しが表を覆っているので、掴んだままでは運ぶ先が見えない
+function closeLpForDrag() {
+  if (isScMobile() && !lpCollapsed) setLpCollapsed(true);
 }
 document.getElementById('lpResize').addEventListener('mousedown', e => {
   e.preventDefault(); document.getElementById('lpResize').classList.add('dragging');

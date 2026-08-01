@@ -496,6 +496,19 @@ body.dnd-on *{cursor:grabbing !important;}
 /* 誰が消えるか・元の位置が残るかを伝える案内。エラー・注意と混ざらないよう色を分ける */
 .dnd-msg.info{background:var(--purple);}
 
+/* スマホでドラッグ中だけ出る受け皿。
+   引き出しを閉じて運ぶため、これまで「外す」に使っていた左パネルへの
+   ドロップ先が無くなる。その代わりと、掴み直したいときの取り消し口を兼ねる。
+   js/dnd.js が中身と表示を切り替える */
+.dnd-drop-bar{position:fixed;left:0;right:0;bottom:0;height:60px;z-index:9998;
+  display:none;align-items:center;justify-content:center;gap:8px;
+  font-size:13px;font-weight:700;font-family:var(--sans);
+  background:rgba(255,255,255,.96);border-top:2px dashed var(--border2);color:var(--ink2);
+  box-shadow:0 -4px 14px rgba(0,0,0,.12);pointer-events:none;user-select:none;}
+.dnd-drop-bar.on{display:flex;}
+.dnd-drop-bar.hot{background:var(--red-l);border-top-color:var(--red);border-top-style:solid;color:var(--red);}
+.dnd-drop-bar.hot.cancel{background:var(--bg);border-top-color:var(--ink3);color:var(--ink2);}
+
 /* 責任者・カート担当欄。人が入っている欄だけ掴める（空欄はクリックで選択） */
 .role-sel:not(.empty){cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 .role-sel:not(.empty):active{cursor:grabbing;}
@@ -539,7 +552,6 @@ body.dnd-on *{cursor:grabbing !important;}
 
 /* スマホ専用の部品。既定は隠しておき、下の @media で出す */
 .lp-backdrop{display:none;}
-.lp-open-btn{display:none;}
 /* 列の追加。PC は列の境界にホバーで出る ＋（.col-ins-zone）を使うが、
    指ではホバーできないので、スマホでは見出しセルに常設の ＋ を出す */
 .col-add-m{display:none;background:none;border:none;cursor:pointer;font-size:13px;font-weight:700;color:var(--purple);padding:4px 5px;border-radius:3px;flex-shrink:0;line-height:1.2;font-family:var(--sans);}
@@ -564,17 +576,23 @@ body.dnd-on *{cursor:grabbing !important;}
   /* ===== ヘッダー ===== */
   .hdr-row1{height:42px;padding:0 10px;gap:8px;}
   .hdr-title{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* 1行に収まらないので折り返す。押し出し用の空きは折り返しの邪魔になるので消す */
-  .hdr-row2{height:auto;min-height:36px;padding:5px 10px;row-gap:5px;flex-wrap:wrap;}
+  /* 1行に収まらないので折り返す。押し出し用の空きは折り返しの邪魔になるので消す。
+     下の余白は 0。PW タブが行の下線に接する必要がある（フォルダタブの形の前提） */
+  .hdr-row2{height:auto;min-height:36px;padding:5px 10px 0;row-gap:5px;flex-wrap:wrap;}
   .hdr-spacer{display:none;}
   .ym-lbl{display:none;}
   .ym-sel{padding:5px 6px;}
-  /* 折り返すとフォルダタブの「下線に乗る」形が崩れるので、ただのボタンに戻す */
-  #pw-tabs{align-self:auto;align-items:center;gap:6px;flex-wrap:wrap;}
-  .pw-tab-sc{padding:5px 10px;}
-  .pw-tab-sc.on{margin-bottom:0;padding:5px 10px;border-radius:var(--r);
-    border:1px solid var(--purple);background:var(--purple-l);}
-  .pw-tab-sc.on::before,.pw-tab-sc.on::after{display:none;}
+  /* PW タブはフォルダ型のまま残す。ただし他の要素と同じ行に折り返されると
+     「行の下線に乗る」形が崩れるので、order と flex-basis で必ず最下段の
+     独立した行に回す。タブが多いときはその行だけ横スクロールする */
+  #pw-tabs{order:9;flex-basis:100%;align-self:stretch;align-items:flex-end;
+    gap:8px;flex-wrap:nowrap;overflow-x:auto;padding-top:2px;}
+  .pw-tab-sc{padding:4px 11px;}
+  .pw-tab-sc.on{padding:4px 12px 6px;}
+  /* 折り返した行数だけヘッダーが伸びるので、この行の部品は一回り小さくする */
+  .hdr-row2 .hbtn{padding:5px 9px;}
+  #publish-approval,#publish-open-date{font-size:10px!important;}
+  .ym-note{padding:2px 7px;font-size:10px;}
 
   /* ===== メインタブ ===== */
   .main-tabs{padding:0 6px;overflow-x:auto;}
@@ -596,22 +614,28 @@ body.dnd-on *{cursor:grabbing !important;}
   .ttab{padding:7px 10px;font-size:11px;}
 
   /* ===== 左パネル（申込者一覧）＝引き出し ===== */
-  /* 幅 196px は画面の半分を占めてしまう。本文の上に重ねて開き、
-     開閉は時間帯バーの「👥 申込者」と背面タップで行う */
+  /* 開閉は PC と同じ ◀/▶ トグル（.lp-toggle）をそのまま使う。
+     違いは「開いても本文を押しのけない」こと：枠の幅は常に 0 のまま、
+     中身の .lp だけを本文の上に重ねる。閉じている間はトグルだけが
+     左端に残るので、そこから引き出す。初期状態は閉じ（JS 側で collapsed） */
   .sc-body{position:relative;}
-  .sc-body .lp-wrap,
-  .sc-body .lp-wrap.collapsed{
-    position:absolute;left:0;top:0;bottom:0;z-index:70;
-    width:min(78vw,280px)!important;
-    transform:translateX(-101%);transition:transform .22s ease;
-    box-shadow:2px 0 14px rgba(0,0,0,.18);overflow:visible;
-  }
-  .sc-body .lp-wrap.lp-open{transform:translateX(0);}
-  .sc-body .lp-wrap.collapsed .lp{display:flex;}
-  .lp-resize,.lp-toggle{display:none;}
+  /* 幅は常に 0 なので、幅のアニメーションは要らない。
+     残しておくと、裏に回ったタブでは transition が進まず幅が途中で
+     固まったままになる（ブラウザが背景タブのアニメを止めるため） */
+  .sc-body .lp-wrap{width:0!important;min-width:0!important;overflow:visible;transition:none;}
+  .sc-body .lp-wrap .lp{position:absolute;left:0;top:0;bottom:0;z-index:70;
+    width:min(78vw,280px);box-shadow:2px 0 14px rgba(0,0,0,.18);}
+  .sc-body .lp-wrap.collapsed .lp{display:none;}
+  /* 枠の幅が 0 なので、PC 用の right:-14px だと画面の左外へはみ出す */
+  .sc-body .lp-wrap.collapsed .lp-toggle{left:0;right:auto;}
+  /* 開いている間はトグルが引き出しの下に隠れるので、右肩へ動かす */
+  .sc-body .lp-wrap:not(.collapsed) .lp-toggle{left:min(78vw,280px);right:auto;z-index:80;
+    border-left:1px solid var(--border);border-radius:0 6px 6px 0;}
+  .lp-resize{display:none;}
+  /* 指で押しやすいよう、閉じているときのつまみを大きくする */
+  .lp-toggle{width:18px;height:56px;}
   .lp-backdrop{position:absolute;inset:0;z-index:69;background:rgba(0,0,0,.32);}
   .lp-backdrop.on{display:block;}
-  .lp-open-btn{display:inline-block;}
   .mr{padding:10px 12px;}
 
   /* ===== シフト表 ===== */
@@ -646,13 +670,28 @@ body.dnd-on *{cursor:grabbing !important;}
      縦にならないから縮まない、の堂々巡り）。幅で決め打ちする */
   .cell-wrap{flex-direction:column;}
   .cell-wrap .cs,.cell-wrap .ps-watch-wrap{min-width:0;width:100%;max-width:100%;}
-  /* 1列 98px。時間列 60px と合わせて 3列で 354px＝画面内に収まる */
-  .cell-w{min-width:98px;padding:5px 4px 6px;}
-  .cart-cell{min-width:98px;padding:3px 4px;}
+  /* 1列 130px。時間列 60px と合わせて 2列なら画面内、3列以上は横スクロール。
+     これ以上詰めると場所名・カート番号・見守りが重なって読めなくなる */
+  .cell-w{min-width:130px;padding:5px 4px 6px;position:relative;}
+  .cart-cell{min-width:130px;padding:3px 4px;}
   /* 指で押せる高さを確保する */
   .cs,.role-sel{padding:6px;min-height:30px;font-size:11px;}
   .cart-chip{padding:6px 4px;min-height:28px;font-size:11px;}
-  .watch-label input[type="checkbox"]{width:15px;height:15px;}
+
+  /* 見守り＝セル右上の 👁 トグル。
+     縦並びにすると 1人目と2人目の間に挟まって読みにくいので、名前の並びから外す。
+     中身は今までどおりの <input type=checkbox>（onWatchChange はそのまま）で、
+     見た目だけ差し替えている。担当者が居ない欄には出さない */
+  .watch-label{position:absolute;top:3px;right:4px;z-index:2;
+    margin:0;padding:2px;gap:0;font-size:0;line-height:1;border-radius:4px;
+    background:rgba(255,255,255,.8);}
+  .watch-label::before{content:'👁';font-size:12px;line-height:1;opacity:.28;filter:grayscale(1);}
+  .watch-label:has(input:checked)::before{opacity:1;filter:none;}
+  .watch-label:has(input:disabled){display:none;}
+  .watch-label input[type="checkbox"]{position:absolute;inset:0;width:100%;height:100%;
+    margin:0;opacity:0;}
+  /* 👁 が1人目の名前に重ならないよう、その欄だけ右に逃がす */
+  .ps-watch-wrap .cs{padding-right:22px;}
 
   /* ===== 責任者・カート担当 ===== */
   .resp-area,.cart-area{padding:6px 9px;}

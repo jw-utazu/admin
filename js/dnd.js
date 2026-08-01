@@ -140,7 +140,52 @@ function dndStart(x, y) {
   _dnd.ghost = g;
   dndMoveGhost(x, y);
   closePicker && closePicker();
+  // スマホでは左パネルが表を覆っている。掴んだ瞬間に閉じないと運ぶ先が見えない
+  if (typeof closeLpForDrag === 'function') closeLpForDrag();
+  dndShowDropBar();
   _dnd.scrollTimer = setInterval(() => dndAutoScroll(), 50);
+}
+
+// ===== スマホ用の受け皿バー =====
+// 左パネルを閉じて運ぶので、これまで「外す」に使っていた左パネルへの
+// ドロップ先が無くなる。その代わりと、掴み直したいときの取り消し口を兼ねる。
+// 掴む元がセル（fromEl あり）なら「外す」、一覧からなら「取り消し」
+function dndDropBarEl() {
+  let el = document.getElementById('dnd-drop-bar');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'dnd-drop-bar';
+    el.id = 'dnd-drop-bar';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function dndShowDropBar() {
+  if (!_dnd) return;
+  // 指操作のときだけ出す。マウスは画面外へ逃がせば取り消せるので要らない
+  if (_dnd.pointerType !== 'touch') return;
+  const el = dndDropBarEl();
+  const isCancel = !_dnd.fromEl;
+  el.textContent = isCancel ? '✕ ここへ離すと取り消し' : '🗑 ここへ離すと外します';
+  el.classList.toggle('cancel', isCancel);
+  el.classList.remove('hot');
+  el.classList.add('on');
+  _dnd.dropBar = el;
+}
+
+function dndHideDropBar() {
+  const el = document.getElementById('dnd-drop-bar');
+  if (el) el.classList.remove('on', 'hot');
+}
+
+// 指がバーの上にあるか。バーは pointer-events:none なので
+// elementFromPoint には出てこない。座標で判定する
+function dndOverDropBar(x, y) {
+  const el = _dnd && _dnd.dropBar;
+  if (!el || !el.classList.contains('on')) return false;
+  const b = el.getBoundingClientRect();
+  return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
 }
 
 // ===== 移動 =====
@@ -210,6 +255,9 @@ function dndMoveMsg(x, y) {
 // 役割欄まで運べない
 function dndAutoScroll() {
   if (!_dnd || !_dnd.started || _dnd.lx === undefined) return;
+  // 受け皿バーの上では動かさない。バーは画面下端にあるので、
+  // そのままだと「下端に近い＝下へスクロール」と誤って判定される
+  if (dndOverDropBar(_dnd.lx, _dnd.ly)) return;
   const wrap = dndSlotWrap();
   if (wrap) {
     const r = wrap.getBoundingClientRect();
@@ -240,6 +288,8 @@ function dndRerenderBlock() {
 // ===== 落とし先の判定 =====
 // 人の上なら「入れ替え」、セルの空き部分なら「移動」。左メニューなら「外す」
 function dndHitTest(x, y) {
+  // 受け皿バーは他のどの落とし先より優先する（画面下端に重ねてあるため）
+  if (dndOverDropBar(x, y)) return _dnd.fromEl ? { kind: 'remove', dropBar: true } : { kind: 'cancel' };
   if (_dnd && _dnd.ghost) _dnd.ghost.style.display = 'none';
   const el = document.elementFromPoint(x, y);
   if (_dnd && _dnd.ghost) _dnd.ghost.style.display = '';
@@ -359,9 +409,14 @@ function dndNearest(els, x, y) {
 function dndHighlight(hit) {
   document.querySelectorAll('.dnd-over,.dnd-replace,.dnd-swap,.dnd-ng,.dnd-warn').forEach(el =>
     el.classList.remove('dnd-over', 'dnd-replace', 'dnd-swap', 'dnd-ng', 'dnd-warn'));
-  if (!hit) { dndSetMsg(''); return; }
+  // 受け皿バーは指が乗っているときだけ色を変える。落とすとどうなるかを
+  // 離す前に見せる（赤＝外す／灰＝取り消し）
+  const bar = document.getElementById('dnd-drop-bar');
+  if (bar) bar.classList.toggle('hot', !!hit && (hit.dropBar || hit.kind === 'cancel'));
+  if (!hit || hit.kind === 'cancel') { dndSetMsg(''); return; }
   if (hit.kind === 'remove') {
-    const lp = document.getElementById('lp'); if (lp) lp.classList.add('dnd-over');
+    // 受け皿バー経由のときはバー自身が色で示すので、左パネルは光らせない
+    if (!hit.dropBar) { const lp = document.getElementById('lp'); if (lp) lp.classList.add('dnd-over'); }
     dndSetMsg(''); return;
   }
   // 光らせる範囲。表はセル全体、役割欄・カート番号の枠は枠そのもの
@@ -524,7 +579,7 @@ document.addEventListener('pointerup', e => {
   // そのままだと落とした先の奉仕者ピッカーが勝手に開くので、少しの間だけ止める
   _dndClickBlock = Date.now() + 400;
   dndCancel();
-  if (!hit) return;
+  if (!hit || hit.kind === 'cancel') return;
 
   const bad = dndReject(hit, uid, fromEl);
   if (bad) { toast(bad, 'e'); return; }
@@ -556,6 +611,7 @@ document.addEventListener('click', e => {
 
 function dndCancel() {
   if (!_dnd) return;
+  dndHideDropBar();
   clearTimeout(_dnd.holdTimer);
   clearInterval(_dnd.scrollTimer);
   try { document.documentElement.releasePointerCapture(_dnd.pointerId); } catch (_) {}
