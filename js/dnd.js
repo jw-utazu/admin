@@ -163,8 +163,12 @@ function dndDropBarEl() {
 
 function dndShowDropBar() {
   if (!_dnd) return;
-  // 指操作のときだけ出す。マウスは画面外へ逃がせば取り消せるので要らない
-  if (_dnd.pointerType !== 'touch') return;
+  // 出す条件は「指かどうか」ではなく「左パネルが引き出しかどうか」。
+  // 引き出し＝ドラッグ開始時に閉じるので、左パネルへ落として外すことが
+  // できなくなる。その穴埋めが目的なので、指でもマウスでも同じように要る
+  // （PC のウィンドウを狭めた場合も引き出しになる）。
+  // 逆に左パネルが出たままの幅なら、そこへ落とせば外せるので出さない
+  if (!(typeof isScMobile === 'function' && isScMobile())) return;
   const el = dndDropBarEl();
   const isCancel = !_dnd.fromEl;
   el.textContent = isCancel ? '✕ ここへ離すと取り消し' : '🗑 ここへ離すと外します';
