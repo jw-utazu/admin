@@ -157,8 +157,8 @@ function signOut() {
   try { localStorage.removeItem('adminUser'); } catch(e) {}
   // 共通セッション・救済ログインも併せて破棄する（3アプリ共通のログアウト）
   pwgwsClearSession();
-  google.accounts.id.disableAutoSelect();
   // ログアウト後は共通ログイン画面へ戻す
+  // （Google認証は login.html 側で行うため、ここでGISを触ってはいけない）
   pwgwsGoToLogin();
 }
 function setLoadingStep(step, msg) {
