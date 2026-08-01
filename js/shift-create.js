@@ -33,7 +33,8 @@ let activeTimeIdx = 0;
 let curYM         = null;  // 編集中の年月（ヘッダーの対象年月セレクタで切り替える）
 let ymList        = [];    // カレンダーが存在する年月 [{year,month,calPublished,shiftPublished}]
 let ymLoaded      = false; // ymList / publishedYM を取得済みか（未取得のうちは公開ボタンを制限しない）
-let publishedYM   = null;  // 奉仕者に公開中のカレンダーの年月 {year,month}（通常PWでは常に最大1ヶ月）
+let publishedYM   = null;  // 申込を受け付け中のカレンダーの年月 {year,month}（通常PWでは常に最大1ヶ月）
+let shiftPubYMs   = [];    // シフトが作成完了になっている年月 [{year,month}]（申込中の月とずれうる）
 let createLoaded  = false;
 let settingsLoaded = false;
 const bs = {};
@@ -54,9 +55,13 @@ const AUTOSAVE_RETRY_MS    = 5000;
 
 // apiGet / apiAuthGet は js/api.js（共有通信層）で定義
 
-// 年月依存のAPI（getWishData / getApplicants / getShiftCreateData / createShiftSheet）には
+// 年月依存のAPI（getWishData / getApplicants / getShiftCreateData / createShiftSheet と
+// 公開操作系 publishShift / unpublishShift / approveShift / rejectShift / getShiftPublishStatus）には
 // 必ず編集中の年月を渡す。curYM が未確定な初回読み込み時だけ付けず、サーバー既定
-// （＝公開中カレンダーの年月）に従う
+// （＝申込中カレンダーの年月）に従う。
+// 公開操作系に年月が要るのは、前月のシフトが動いている最中に次月の申込を開始できるため。
+// 年月を送らないと、重なり期間はサーバーが常に「申込中の月」を対象にしてしまい、
+// 前月のシフトの取り消し・確認完了・差し戻しができなくなる
 function ymP(extra) {
   return Object.assign({}, extra || {}, curYM ? { year: curYM.year, month: curYM.month } : {});
 }
@@ -151,22 +156,28 @@ async function loadInitData() {
 // カレンダーが存在する年月の一覧と、公開中カレンダーの年月を取得する。
 // 限定PWはフェーズが複数月にまたがるため対象外（セレクタを出さない）
 async function loadYmList() {
-  if (currentPwType !== 'normal') { ymList = []; publishedYM = null; ymLoaded = false; renderYmSelect(); return; }
+  if (currentPwType !== 'normal') { ymList = []; publishedYM = null; shiftPubYMs = []; ymLoaded = false; renderYmSelect(); return; }
   try {
     const r = await apiGet('getCalendarSheetList', {});
     ymList = r && r.ok ? (r.list || []) : [];
     ymLoaded = true;
   } catch (e) { ymList = []; ymLoaded = false; }
-  // 通常PWの公開中カレンダーは常に最大1件だが、念のため最新の月を採用する
+  // 通常PWの申込中カレンダーは常に最大1件だが、念のため最新の月を採用する
   // （サーバー側 getCurrentCal と同じ「年月の降順で先頭」の解釈に合わせる）
   const pubs = ymList.filter(c => c.calPublished);
   publishedYM = pubs.length > 0 ? { year: pubs[pubs.length - 1].year, month: pubs[pubs.length - 1].month } : null;
+  // 作成完了になっている月。前月のシフトが動いている最中に次月の申込を開始すると
+  // 前月は「申込中」ではなくなるため、申込中の月だけを操作対象にすると
+  // 前月のシフトの取り消し・確認完了・差し戻しができなくなる
+  shiftPubYMs = ymList.filter(c => c.shiftPublished).map(c => ({ year: c.year, month: c.month }));
   renderYmSelect();
   updatePublishBtn();
 }
 
 function ymKey(o) { return o ? o.year + '.' + o.month : ''; }
 function isPublishedYM(o) { return !!(o && publishedYM && publishedYM.year === o.year && publishedYM.month === o.month); }
+// シフトが作成完了になっている月か（申込は次の月に移っていてもシフトは動いていることがある）
+function isShiftPubYM(o) { return !!o && shiftPubYMs.some(x => x.year === o.year && x.month === o.month); }
 
 function renderYmSelect() {
   const wrap = document.getElementById('sc-ym-wrap');
@@ -176,7 +187,9 @@ function renderYmSelect() {
   const cur = ymKey(curYM);
   let html = ymList.map(c => {
     const v = c.year + '.' + c.month;
-    return `<option value="${v}"${v === cur ? ' selected' : ''}>${c.year}年${c.month}月${c.calPublished ? '（公開中）' : ''}</option>`;
+    // 申込中の月とシフトが動いている月は別々になりうるので、それぞれ区別して示す
+    const tag = c.calPublished ? '（申込中）' : c.shiftPublished ? '（シフト公開中）' : '';
+    return `<option value="${v}"${v === cur ? ' selected' : ''}>${c.year}年${c.month}月${tag}</option>`;
   }).join('');
   // 一覧に無い年月（カレンダー未作成の月）を表示している場合も選択肢として残す
   if (cur && !ymList.some(c => c.year + '.' + c.month === cur)) {
@@ -187,16 +200,21 @@ function renderYmSelect() {
   renderYmNote();
 }
 
-// 「いま奉仕者に公開されているのはどの月か」を常に明示する
+// 「いま奉仕者に公開されているのはどの月か」を常に明示する。
+// 申込中の月とシフトが動いている月がずれることがあるので、その場合は両方書く
 function renderYmNote() {
   const note = document.getElementById('sc-ym-note');
   if (!note) return;
   if (currentPwType !== 'normal' || !curYM || !ymLoaded) { note.textContent = ''; note.className = 'ym-note'; return; }
+  const pubTxt = publishedYM ? publishedYM.year + '年' + publishedYM.month + '月' : '';
   if (isPublishedYM(curYM)) {
-    note.textContent = 'この月が公開中';
+    note.textContent = 'この月が申込中';
+    note.className = 'ym-note ok';
+  } else if (isShiftPubYM(curYM)) {
+    note.textContent = 'この月のシフトが公開中' + (pubTxt ? '（申込は ' + pubTxt + '）' : '');
     note.className = 'ym-note ok';
   } else if (publishedYM) {
-    note.textContent = '公開中は ' + publishedYM.year + '年' + publishedYM.month + '月（表示中の月は未公開）';
+    note.textContent = '申込中は ' + pubTxt + '（表示中の月は未公開）';
     note.className = 'ym-note warn';
   } else {
     note.textContent = '公開中の月はありません';
@@ -2262,7 +2280,7 @@ async function checkShiftCreateUpdate() {
       _scKnownTs = res.lastUpdated;
       // 作成完了・確認完了・差し戻しも touchShift でタイムスタンプを動かすため、
       // 他の係の操作を待たずにヘッダーの確認状況を追随させる
-      applyPublishStatus(await fetchPublishStatus());
+      await refreshPublishState();
       if (createLoaded) await syncShiftCreateData();
     }
     if (_scKnownWishTs === null) _scKnownWishTs = wishTs;
@@ -2525,13 +2543,20 @@ async function saveAll() {
   toast('すべて保存しました', 's');
 }
 
+// 公開状態を変える操作のあとに使う。作成完了フラグが変わると年月セレクタの
+// 「（シフト公開中）」表示と、どの月を公開操作できるかの判定も変わるため合わせて取り直す
+async function refreshPublishState() {
+  applyPublishStatus(await fetchPublishStatus());
+  await loadYmList();
+}
+
 // 公開状態＋確認状況を取得する。確認者かどうかの判定にログイン中の管理者UID、
 // オーナー（確認省略可）かどうかの判定にメールアドレスが必要
 function fetchPublishStatus() {
-  return apiGet('getShiftPublishStatus', {
+  return apiGet('getShiftPublishStatus', ymP({
     adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '',
     adminEmail: (adminUser && adminUser.email) || ''
-  });
+  }));
 }
 
 function applyPublishStatus(res) {
@@ -2562,14 +2587,14 @@ function updatePublishBtn() {
   const openLabel = document.getElementById('publish-open-date');
   const hide = el => { if (el) { el.textContent = ''; el.style.display = 'none'; } };
 
-  // 公開（作成完了）は「公開中カレンダーの月」に対してのみ行える。別の月を表示している
-  // ときに押せてしまうと、表示中でない月のフラグを立ててしまうため操作させない
+  // 公開（作成完了）は「申込中の月」か「シフトが作成完了になっている月」に対してのみ行える。
+  // それ以外の月を表示しているときに押せてしまうと、まだ準備段階の月のフラグを立ててしまう
   if (isOffPublishedMonth()) {
     btn.textContent = '✅ シフト作成完了';
     btn.className = 'hbtn pub';
     btn.disabled = true;
     btn.title = publishedYM
-      ? ('公開中カレンダーは ' + publishedYM.year + '年' + publishedYM.month + '月 です。表示中の月は公開操作できません（管理アプリで対象月の予定表を公開してください）')
+      ? ('申込中カレンダーは ' + publishedYM.year + '年' + publishedYM.month + '月 です。表示中の月は公開操作できません（管理アプリで対象月の予定表を公開してください）')
       : '公開中のカレンダーがありません。管理アプリで予定表を公開してください';
     hide(openLabel);
     hide(apprLabel);
@@ -2694,10 +2719,13 @@ function closeApprovalModal() {
   if (box) box.classList.remove('on');
 }
 
-// 表示中の月が「公開中カレンダーの月」と違うか（限定PW・未取得のうちは制限しない）
+// 表示中の月が公開操作の対象外か（限定PW・未取得のうちは制限しない）。
+// 対象になるのは「申込中の月」と「シフトが作成完了になっている月」の両方。
+// 前月のシフトが動いている最中に次月の申込を開始すると前月は申込中ではなくなるが、
+// そのシフトの取り消し・確認完了・差し戻しは引き続きできる必要がある
 function isOffPublishedMonth() {
   if (currentPwType !== 'normal' || !ymLoaded || !curYM) return false;
-  return !isPublishedYM(curYM);
+  return !isPublishedYM(curYM) && !isShiftPubYM(curYM);
 }
 
 // ヘッダーの1つのボタンが、押した人の役割で意味を変える：
@@ -2715,10 +2743,10 @@ async function togglePublish() {
       type: 'danger', title: 'シフト作成完了の取り消し', message: msg, confirmText: '取り消す',
     })) return;
     try {
-      await apiGet('unpublishShift', {
+      await apiGet('unpublishShift', ymP({
         adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
-      });
-      applyPublishStatus(await fetchPublishStatus());
+      }));
+      await refreshPublishState();
       toast('作成完了を取り消しました', 's');
     } catch (e) { toast('取り消しに失敗しました: ' + e.message, 'e'); }
   } else {
@@ -2747,11 +2775,11 @@ async function doPublish() {
   closePreflight();
   setLoading(true, 'シフトを作成完了にしています...');
   try {
-    const res = await apiGet('publishShift', {
+    const res = await apiGet('publishShift', ymP({
       adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '',
       adminEmail: (adminUser && adminUser.email) || ''
-    });
-    applyPublishStatus(await fetchPublishStatus());
+    }));
+    await refreshPublishState();
     toast(res && res.approvalRequired ? 'シフト作成完了にしました。確認者へ確認依頼を送信しました'
         : res && res.approvalSkipped  ? 'シフト作成完了にしました（オーナー権限で確認を省略）'
         : 'シフト作成完了にしました', 's');
@@ -2784,11 +2812,11 @@ async function approveShift(force) {
   })) return;
   setLoading(true, '確認完了として登録しています...');
   try {
-    const res = await apiGet('approveShift', {
+    const res = await apiGet('approveShift', ymP({
       adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
-    });
+    }));
     if (!res.ok) throw new Error(res.error || '登録に失敗しました');
-    applyPublishStatus(await fetchPublishStatus());
+    await refreshPublishState();
     toast(res.allApproved
       ? (res.published ? '確認が揃い、奉仕者へ公開しました' : '確認が揃いました。公開予定日に自動公開されます')
       : '確認完了にしました（あと ' + Math.max(0, (res.approval?.required || 0) - (res.approval?.approvedCount || 0)) + ' 名）', 's');
@@ -2811,11 +2839,11 @@ async function rejectShift() {
   })) return;
   setLoading(true, '差し戻しています...');
   try {
-    const res = await apiGet('rejectShift', {
+    const res = await apiGet('rejectShift', ymP({
       note, adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
-    });
+    }));
     if (!res.ok) throw new Error(res.error || '差し戻しに失敗しました');
-    applyPublishStatus(await fetchPublishStatus());
+    await refreshPublishState();
     toast('差し戻しました。作成担当者へ通知しました', 's');
   } catch (e) { toast('差し戻しに失敗しました: ' + e.message, 'e'); }
   finally { setLoading(false); }
