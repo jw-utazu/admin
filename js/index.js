@@ -421,6 +421,7 @@ async function loadAdminDataWithOverlay() {
   }
   renderAll();
   loadCalPubStatus();
+  loadShiftStatus();   // シフトの状態は月ごとに違うので、月を切り替えたら取り直す
 }
 
 // ============================================================
@@ -1787,14 +1788,22 @@ function isCurMonthPublished() { return !!(calPubStatus && calPubYM && calPubYM.
 //   日程         … 下の方の日程一覧カード
 //   シフトの状態 … このアプリには無い（シフト管理アプリを開くしかない）
 // と散っていたので、1か所にまとめる。
-let shiftStatus = null;   // getShiftPublishStatus の結果（公開中の月のもの）
+let shiftStatus = null;   // getShiftPublishStatus の結果（表示中の対象年月のもの）
 
+// 対象年月を明示して取得する。前月のシフトが動いている最中に次月の申込を開始できるため、
+// 年月を送らないとサーバーは常に「申込中の月」の状態を返してしまい、
+// 重なり期間に前月の進行状況ストリップが読めなくなる
 async function loadShiftStatus() {
   try {
-    const r = await apiGet('getShiftPublishStatus');
+    const r = await apiGet('getShiftPublishStatus', { year: curY, month: curM });
     shiftStatus = (r && r.ok) ? r : null;
   } catch (e) { shiftStatus = null; }
   renderProgressStrip();
+}
+
+// shiftStatus が表示中の対象年月のものか（月を切り替えた直後の取得待ちで取り違えない）
+function isShiftStatusForCurMonth() {
+  return !!(shiftStatus && shiftStatus.year === curY && shiftStatus.month === curM);
 }
 
 function renderProgressStrip() {
@@ -2228,7 +2237,7 @@ async function refreshProxyModal() {
         const toM   = _proxyMembers.find(m => m.uid === s.toUid);
         return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:12px;">${esc(fromM?fromM.name:s.fromUid)} → ${esc(toM?toM.name:s.toUid)}</span>
-          <button class="btn btn-d" onclick="deleteProxy(${s.rowIndex})" style="font-size:10px;padding:3px 8px;">解除</button>
+          <button class="btn btn-d" onclick="deleteProxy('${esc(s.fromUid)}','${esc(s.toUid)}')" style="font-size:10px;padding:3px 8px;">解除</button>
         </div>`;
       }).join('');
     }
@@ -2251,14 +2260,14 @@ async function addProxy() {
     toast('代理設定を追加しました', 's');
   } catch (e) { hideProc(); toast('追加失敗: ' + e.message, 'e'); }
 }
-async function deleteProxy(rowIndex) {
+async function deleteProxy(fromUid, toUid) {
   if (!await uiConfirm({
     type: 'danger', title: '代理設定の解除',
     message: 'この代理設定を解除しますか？', confirmText: '解除する',
   })) return;
   showProc('解除しています...', '少々お待ちください');
   try {
-    const res = await apiPost({ action: 'deleteProxySetting', rowIndex });
+    const res = await apiPost({ action: 'deleteProxySetting', fromUid, toUid });
     if (!res.ok) throw new Error(res.error || '削除失敗');
     await refreshProxyModal();
     hideProc();
