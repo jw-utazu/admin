@@ -342,6 +342,9 @@ function switchMainTab(name, btn) {
   // 年月を切り替えると各タブのデータは無効になる（resetMonthState でフラグを落とす）ため、
   // 未読み込みのタブを開いたときに読み直す
   updateCreateToolsVis();
+  // 非表示のまま組まれた表は高さを測れず段差が既定値のままなので、
+  // 見えるようになったこの時点で測り直す
+  if (name === 'wish') fixWishHeadOffset();
   if (name === 'wish' && !wishLoaded) loadWishData();
   if (name === 'create' && !createLoaded) loadCreateData();
   if (name === 'settings' && !settingsLoaded) loadSettingsData();
@@ -645,7 +648,9 @@ function buildWishTable(data, shiftRes) {
     // top は日付行の高さと一致していないといけない。28px 決め打ちだと余白や
     // 文字サイズを変えた瞬間にズレ、隙間から下の行がちらついて見える。
     // 実際の高さを描画後に --th-date-h へ入れる（fixWishHeadOffset）
-    sortedSlots.forEach(slot => { const si = slot.indexOf(' '); h += `<th class="th-time" style="position:sticky;top:var(--th-date-h,28px);z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
+    // 既定値は実測が効かなかったときの保険。日付行はスマホで約27.5px・PCで約29.5px
+    // なので、どちらでも隙間側に倒れないよう小さめ（26px＝必ず重なる）にしてある
+    sortedSlots.forEach(slot => { const si = slot.indexOf(' '); h += `<th class="th-time" style="position:sticky;top:var(--th-date-h,26px);z-index:3;">${esc(si >= 0 ? slot.slice(si + 1) : slot)}</th>`; });
     h += '</tr>';
     return h;
   };
@@ -699,19 +704,25 @@ function buildWishTable(data, shiftRes) {
 }
 
 // 2段の固定見出し（日付／時間帯）の段差を実測値で合わせる。
-// 時間帯行の top が日付行の高さより小さいと段の間に隙間ができ、そこを
-// 本文がスクロールして通り抜けてちらつく。端数は切り捨てて、隙間ではなく
-// わずかな重なり側へ倒す（重なりは背景が不透明なので見えない）
+// 時間帯行の top が日付行の高さに足りないと段の間に隙間ができ、そこを
+// 本文がスクロールして通り抜けてちらつく。
+// わざと 1px 余分に詰めて必ず重なる側へ倒す。重なりは背景が不透明なので
+// 見えないが、隙間は必ず見える。ぴったり合わせようとすると端数（実測 29.5px
+// のような値）やフォント読み込み後の高さ変化で簡単に隙間側へ倒れる
 function fixWishHeadOffset() {
   const wrap = document.getElementById('wish-table-wrap');
   if (!wrap) return;
   const dateTh = wrap.querySelector('.th-date[colspan]') || wrap.querySelector('.th-date');
   if (!dateTh) return;
-  const h = Math.floor(dateTh.getBoundingClientRect().height);
-  if (h > 0) wrap.style.setProperty('--th-date-h', h + 'px');
+  const h = dateTh.getBoundingClientRect().height;
+  // タブが非表示のときは 0 になる。その値を入れると見出しが重なって潰れる
+  if (h > 0) wrap.style.setProperty('--th-date-h', Math.max(0, Math.floor(h) - 1) + 'px');
 }
 // 文字サイズや折り返しが変わると段差も変わるので、幅の変化に追随させる
 window.addEventListener('resize', () => fixWishHeadOffset());
+// 表を組んだ時点ではまだ Noto Sans JP が来ておらず、あとから行の高さが
+// 変わることがある。フォント確定後にもう一度測り直す
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fixWishHeadOffset());
 
 // 参加希望 編集モーダル（希望確認タブのセルクリックで開く）
 let wishEditCtx = null;

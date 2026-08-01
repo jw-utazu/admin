@@ -681,20 +681,17 @@ body.dnd-on *{cursor:grabbing !important;}
   .cs,.role-sel{padding:6px;min-height:30px;font-size:11px;}
   .cart-chip{padding:6px 4px;min-height:28px;font-size:11px;}
 
-  /* 見守り＝3人の下に置く独立した行。
-     1人目だけを包んでいる .ps-watch-wrap を display:contents で透明にすると、
-     中の名前欄とチェックが .cell-wrap（縦並び）の直接の子になる。そのうえで
-     チェックだけ order で最後へ送ると、名前3つが同じ幅で連続して並び、
-     見守りはセルの一番下に来る。
-     ・1人目だけ幅が狭くなる（チェックと分け合う）問題が無くなる
-     ・名前の並びが途中で途切れない
-     JS 側の構造（buildPS の <div class="ps-watch-wrap">）には触らずに済む。
-     担当者が居ない欄にはチェックを出さない */
-  .cell-wrap .ps-watch-wrap{display:contents;}
-  .watch-label{order:9;margin:0;padding:1px 0 0;gap:4px;font-size:9px;color:var(--ink3);
-    justify-content:flex-start;}
+  /* 見守り＝1人目の欄の右端に重ねるチェックボックス。
+     欄の外に並べると1人目だけ幅が狭くなり、下にまとめると誰に紐づくのか
+     分からなくなる。重ねれば3つの欄は同じ幅のまま、紐づく先も一目で分かる。
+     文字の逃げ場は padding-right で作る（幅ではなく内側の余白を削るので、
+     枠の大きさは 2・3人目と変わらない）。担当者が居ない欄には出さない */
+  .cell-wrap .ps-watch-wrap{position:relative;flex-direction:column;}
+  .cell-wrap .ps-watch-wrap .cs{padding-right:24px;}
+  .watch-label{position:absolute;right:5px;top:50%;transform:translateY(-50%);
+    z-index:2;margin:0;padding:0;gap:0;font-size:0;line-height:0;}
   .watch-label:has(input:disabled){display:none;}
-  .watch-label input[type="checkbox"]{width:15px;height:15px;accent-color:var(--purple);}
+  .watch-label input[type="checkbox"]{width:16px;height:16px;margin:0;accent-color:var(--purple);}
 
   /* ===== 責任者・カート担当 ===== */
   .resp-area,.cart-area{padding:6px 9px;}
