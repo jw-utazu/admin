@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=22">
+<link rel="stylesheet" href="css/index.css?v=23">
 </head>
 <body>
 
@@ -421,6 +421,11 @@
       <input type="date" id="log-to" onchange="reloadLogs()">
       <input type="search" id="log-q" placeholder="名前・操作で絞り込み" onkeydown="if(event.key==='Enter')reloadLogs()">
       <button class="btn btn-g" onclick="reloadLogs()">絞り込む</button>
+      <!-- シフト枠保存は自動保存で大量に積まれ、公開作業の記録を埋めてしまうので既定では隠す -->
+      <label class="log-minor" id="log-minor-wrap">
+        <input type="checkbox" id="log-minor" onchange="reloadLogs()">
+        <span>細かい編集も表示</span>
+      </label>
     </div>
     <div class="mbd log-body" id="m-logs-body" style="padding:0;">
       <div class="log-ov" id="log-ov"><div class="spin"></div><div class="log-ov-text" id="log-ov-text">読み込み中...</div></div>
@@ -699,6 +704,6 @@
 <script src="js/session.js?v=2"></script>
 <script src="js/api.js?v=7"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=32"></script>
+<script src="js/index.js?v=33"></script>
 </body>
 </html>

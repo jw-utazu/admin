@@ -1818,19 +1818,22 @@ function renderProgressStrip() {
   const ad = toDate(dates.apply), dd = toDate(dates.deadline), od = toDate(dates.open);
   const hasDates = !!(ad && dd && od);
   const calOn = isCurMonthPublished();
-  // シフトの状態は「公開中のカレンダー」に対して返ってくる。表示中の対象年月が
-  // それと違うときは、この月の状態として読んではいけない
-  const ss = (calOn && shiftStatus) ? shiftStatus : null;
+  // シフトの状態は年月を指定して取ってくる。取得待ちで別の月のものが残っている
+  // ときは、この月の状態として読んではいけない
+  const ss = isShiftStatusForCurMonth() ? shiftStatus : null;
   const deadlinePassed = !!(dd && today > dd);
   const created  = !!(ss && ss.published);     // シフト作成完了
   const approved = !!(ss && ss.approvedAll);   // 確認者全員の確認完了
   const notified = !!(ss && ss.notified);      // 奉仕者へ公開・通知済み
+  // 次の月の申込を先に開始すると、シフトがまだ動いている月は「申込中」ではなくなる。
+  // その月の募集・受付は既に済んだものとして読む（さもないと募集開始まで巻き戻って見える）
+  const calDone = calOn || created;
 
   const st = {
     dates:  hasDates ? 'done' : 'now',
-    cal:    !hasDates ? 'todo' : (calOn ? 'done' : 'now'),
-    apply:  !calOn ? 'todo' : (deadlinePassed ? 'done' : 'now'),
-    create: !calOn ? 'todo' : (approved ? 'done' : (deadlinePassed || created ? 'now' : 'todo')),
+    cal:    !hasDates ? 'todo' : (calDone ? 'done' : 'now'),
+    apply:  !calDone ? 'todo' : (deadlinePassed ? 'done' : 'now'),
+    create: !calDone ? 'todo' : (approved ? 'done' : (deadlinePassed || created ? 'now' : 'todo')),
     open:   notified ? 'done' : (approved ? 'now' : 'todo'),
   };
   // 丸の下に日付を小さく添える。段の名前だけだと「受付はいつまでか」が
@@ -1847,8 +1850,10 @@ function renderProgressStrip() {
   // 切り替えるので、状態表示と操作が同じ場所にまとまる：
   //   募集開始 … 予定表（カレンダー）の公開/非公開
   //   公開     … シフトの公開/非公開（カレンダーは公開したまま戻せる）
+  // 「募集開始」段は実際に申込中の月でしか切り替えられない。既に次の月へ申込が
+  // 移っている月（calDone だが calOn ではない）は非公開にする対象が無い
   const action = {
-    cal:  st.cal  !== 'todo' ? 'toggleCalPub()'   : '',
+    cal:  (calOn || st.cal === 'now') ? 'toggleCalPub()' : '',
     open: st.open !== 'todo' ? 'toggleShiftPub()' : '',
   };
   document.getElementById('prog-steps').innerHTML = steps.map(([k, label, sub], i) => {
@@ -1873,8 +1878,10 @@ function renderProgressStrip() {
 // unpublishShift は「作成完了」フラグを落とすため、確認記録も破棄される
 // （＝次に作成完了にしたとき確認をやり直す）。そこまで明示して確認を取る
 async function toggleShiftPub() {
+  // 表示中の月の状態が取れているかだけを見る。次の月の申込が先に始まっていても、
+  // シフトが動いている月の公開状態は戻せる必要がある
+  if (!isShiftStatusForCurMonth()) return;
   const ss = shiftStatus;
-  if (!ss || !isCurMonthPublished()) return;
   const notified = !!ss.notified;
   const needsApproval = (ss.required || 0) > 0;
   const msg = (notified
@@ -1890,8 +1897,10 @@ async function toggleShiftPub() {
 
   showProc(notified ? 'シフトを非公開にしています...' : '作成完了を取り消しています...', '少々お待ちください');
   try {
-    // apiGet は type しか自動付与しないので、管理ログ用の実行者情報は明示的に渡す
+    // apiGet は type しか自動付与しないので、管理ログ用の実行者情報は明示的に渡す。
+    // 年月も明示する（省略するとサーバーは申込中の月を対象にしてしまう）
     const r = await apiGet('unpublishShift', {
+      year: curY, month: curM,
       adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
     });
     if (!r.ok) throw new Error(r.error || '失敗しました');
@@ -2332,7 +2341,7 @@ async function refreshCoupleModal() {
         const wm = _coupleMembers.find(m => m.uid === c.wifeUid);
         return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:12px;">👨 ${esc(hm ? hm.name : c.husbandUid)} &nbsp;＆&nbsp; 👩 ${esc(wm ? wm.name : c.wifeUid)}</span>
-          <button class="btn btn-d" onclick="deleteCouple(${c.rowIndex})" style="font-size:10px;padding:3px 8px;">解除</button>
+          <button class="btn btn-d" onclick="deleteCouple('${esc(c.husbandUid)}','${esc(c.wifeUid)}')" style="font-size:10px;padding:3px 8px;">解除</button>
         </div>`;
       }).join('');
     }
@@ -2358,14 +2367,14 @@ async function addCouple() {
     toast('夫婦ペアを追加しました', 's');
   } catch (e) { hideProc(); toast('追加失敗: ' + e.message, 'e'); }
 }
-async function deleteCouple(rowIndex) {
+async function deleteCouple(husbandUid, wifeUid) {
   if (!await uiConfirm({
     type: 'danger', title: '夫婦ペアの解除',
     message: 'この夫婦設定を解除しますか？', confirmText: '解除する',
   })) return;
   showProc('解除しています...', '少々お待ちください');
   try {
-    const res = await apiPost({ action: 'deleteCouple', rowIndex });
+    const res = await apiPost({ action: 'deleteCouple', husbandUid, wifeUid });
     if (!res.ok) throw new Error(res.error || '削除失敗');
     await refreshCoupleModal();
     hideProc();
@@ -2809,7 +2818,7 @@ async function refreshDistributionReportModal() {
 // ============================================================
 // ログ閲覧
 //
-// サーバーに溜まっている4種類のログを読むための画面。
+// サーバーに溜まっている3種類のログを読むための画面。
 // 既定は「管理者の操作」＝誰がいつ公開作業をしたかを確認するためのもの。
 // 一度に全部は取らず、50件ずつ「もっと見る」で継ぎ足す
 // ============================================================
@@ -2821,11 +2830,19 @@ const LOG_KIND_LABEL = {
 };
 let logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true };
 
+// 「細かい編集も表示」は管理者の操作タブでしか意味がないので、他のタブでは隠す
+function syncLogMinorToggle() {
+  document.getElementById('log-minor-wrap').style.display =
+    logState.kind === 'admin' ? '' : 'none';
+}
+
 function openLogModal() {
-  logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false };
-  document.getElementById('log-from').value = '';
-  document.getElementById('log-to').value   = '';
-  document.getElementById('log-q').value    = '';
+  logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true };
+  document.getElementById('log-from').value  = '';
+  document.getElementById('log-to').value    = '';
+  document.getElementById('log-q').value     = '';
+  document.getElementById('log-minor').checked = false;
+  syncLogMinorToggle();
   document.getElementById('log-content').innerHTML = '';
   document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
     b.classList.toggle('on', b.dataset.kind === 'admin');
@@ -2841,6 +2858,7 @@ function switchLogKind(kind) {
   document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
     b.classList.toggle('on', b.dataset.kind === kind);
   });
+  syncLogMinorToggle();
   loadLogs(true);
 }
 
@@ -2868,6 +2886,7 @@ async function loadLogs(reset) {
       from:   document.getElementById('log-from').value || '',
       to:     document.getElementById('log-to').value   || '',
       q:      document.getElementById('log-q').value.trim(),
+      includeMinor: document.getElementById('log-minor').checked,
       limit:  LOG_PAGE,
       offset: logState.offset,
       adminUid:   _currentUser ? _currentUser.uid   : '',
@@ -2899,6 +2918,11 @@ function renderLogs() {
   if (kind === 'access') {
     html += `<div class="log-hint">ログインの試行・成功・失敗の記録です。ふだん見る必要はありませんが、
       身に覚えのないログイン失敗が並んでいないかの確認に使えます。</div>`;
+  }
+
+  // 隠していること自体を伏せると「記録されていない」と誤解されるので明示する
+  if (kind === 'admin' && !document.getElementById('log-minor').checked) {
+    html += `<div class="log-hint">シフト枠保存（自動保存）は件数が多いため隠しています。「細かい編集も表示」で出せます。</div>`;
   }
 
   if (!logState.hasDate) {
