@@ -204,10 +204,6 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .sts{display:flex;gap:3px;flex-wrap:wrap;}
 .sc-badge{display:inline-block;box-sizing:border-box;width:100%;text-align:center;font-size:10px;padding:2px 0;border-radius:3px;font-weight:700;}
 .sc-a{background:#fef3c7;color:#92400e;}.sc-r{background:var(--green-l);color:var(--green);}.sc-k{background:var(--purple-l);color:var(--purple);}.sc-w{background:var(--blue-l);color:var(--blue);}
-.lp-sec-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
-.lp-sec-toggle:hover{background:var(--border);}
-.lp-sec-arrow{font-size:9px;margin-right:4px;transition:transform .15s;}
-.lp-sec-toggle.open .lp-sec-arrow{transform:rotate(90deg);}
 /* 希望確認テーブル */
 .wish-snap-outer{overflow:auto;min-height:412px;}
 .th-date{background:var(--green4);color:var(--green-d);font-weight:700;font-size:11px;padding:6px 10px;position:sticky;top:0;z-index:3;box-shadow:0 1px 0 var(--border);}
@@ -577,16 +573,22 @@ body.dnd-on *{cursor:grabbing !important;}
   .hdr-row1{height:42px;padding:0 10px;gap:8px;}
   .hdr-title{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   /* 1行に収まらないので折り返す。押し出し用の空きは折り返しの邪魔になるので消す。
-     下の余白は 0。PW タブが行の下線に接する必要がある（フォルダタブの形の前提） */
-  .hdr-row2{height:auto;min-height:36px;padding:5px 10px 0;row-gap:5px;flex-wrap:wrap;}
+     背景は白。フォルダタブは「下線の下が白い」ことで下のコンテンツと
+     つながって見える形なので、タブの下に来る領域を白にしておく必要がある
+     （PC では下が .main-tabs＝白なので成立している） */
+  .hdr-row2{height:auto;min-height:36px;padding:5px 10px;row-gap:5px;flex-wrap:wrap;
+    background:var(--surface);}
   .hdr-spacer{display:none;}
   .ym-lbl{display:none;}
   .ym-sel{padding:5px 6px;}
-  /* PW タブはフォルダ型のまま残す。ただし他の要素と同じ行に折り返されると
-     「行の下線に乗る」形が崩れるので、order と flex-basis で必ず最下段の
-     独立した行に回す。タブが多いときはその行だけ横スクロールする */
-  #pw-tabs{order:9;flex-basis:100%;align-self:stretch;align-items:flex-end;
-    gap:8px;flex-wrap:nowrap;overflow-x:auto;padding-top:2px;}
+  /* PW タブはフォルダ型のまま、常に最上段に固定する。
+     他の要素と同じ行に混ざると「行の下線に乗る」形が崩れるので、
+     order:-1 と flex-basis:100% で必ず独立した1行目に回し、
+     その行自身に下線を引いてタブの受け皿にする。
+     タブが多いときはこの行だけ横スクロールする */
+  #pw-tabs{order:-1;flex-basis:100%;align-self:stretch;align-items:flex-end;
+    gap:8px;flex-wrap:nowrap;overflow-x:auto;
+    margin:-5px -10px 0;padding:6px 10px 0;border-bottom:1px solid var(--border);}
   .pw-tab-sc{padding:4px 11px;}
   .pw-tab-sc.on{padding:4px 12px 6px;}
   /* 折り返した行数だけヘッダーが伸びるので、この行の部品は一回り小さくする */
@@ -670,28 +672,26 @@ body.dnd-on *{cursor:grabbing !important;}
      縦にならないから縮まない、の堂々巡り）。幅で決め打ちする */
   .cell-wrap{flex-direction:column;}
   .cell-wrap .cs,.cell-wrap .ps-watch-wrap{min-width:0;width:100%;max-width:100%;}
-  /* 1列 130px。時間列 60px と合わせて 2列なら画面内、3列以上は横スクロール。
-     これ以上詰めると場所名・カート番号・見守りが重なって読めなくなる */
-  .cell-w{min-width:130px;padding:5px 4px 6px;position:relative;}
-  .cart-cell{min-width:130px;padding:3px 4px;}
+  /* 1列 140px。時間列 60px と合わせて 2列なら画面内、3列以上は横スクロール。
+     1人目の欄は見守りチェック（約50px）と分け合うので、これ以上詰めると
+     名前がほとんど省略されてしまう */
+  .cell-w{min-width:140px;padding:5px 4px 6px;}
+  .cart-cell{min-width:140px;padding:3px 4px;}
   /* 指で押せる高さを確保する */
   .cs,.role-sel{padding:6px;min-height:30px;font-size:11px;}
   .cart-chip{padding:6px 4px;min-height:28px;font-size:11px;}
 
-  /* 見守り＝セル右上の 👁 トグル。
-     縦並びにすると 1人目と2人目の間に挟まって読みにくいので、名前の並びから外す。
-     中身は今までどおりの <input type=checkbox>（onWatchChange はそのまま）で、
-     見た目だけ差し替えている。担当者が居ない欄には出さない */
-  .watch-label{position:absolute;top:3px;right:4px;z-index:2;
-    margin:0;padding:2px;gap:0;font-size:0;line-height:1;border-radius:4px;
-    background:rgba(255,255,255,.8);}
-  .watch-label::before{content:'👁';font-size:12px;line-height:1;opacity:.28;filter:grayscale(1);}
-  .watch-label:has(input:checked)::before{opacity:1;filter:none;}
+  /* 見守り＝1人目の選択欄の右に並べる普通のチェックボックス。
+     縦並びのままだと 1人目と2人目の間に挟まって名前の並びが途切れるので、
+     この欄だけ横並びにして右端へ寄せる。名前が優先で縮むのはチェック側ではなく
+     名前側（.cs に min-width:0）。担当者が居ない欄には出さない */
+  /* .cell-wrap 付きで書く。素の .ps-watch-wrap だと
+     .cell-wrap .ps-watch-wrap{flex-direction:column} に詳細度で負ける */
+  .cell-wrap .ps-watch-wrap{flex-direction:row;align-items:center;gap:5px;}
+  .cell-wrap .ps-watch-wrap .cs{flex:1;min-width:0;width:auto;}
+  .watch-label{flex-shrink:0;margin:0;padding:0;gap:3px;font-size:9px;color:var(--ink3);}
   .watch-label:has(input:disabled){display:none;}
-  .watch-label input[type="checkbox"]{position:absolute;inset:0;width:100%;height:100%;
-    margin:0;opacity:0;}
-  /* 👁 が1人目の名前に重ならないよう、その欄だけ右に逃がす */
-  .ps-watch-wrap .cs{padding-right:22px;}
+  .watch-label input[type="checkbox"]{width:15px;height:15px;accent-color:var(--purple);}
 
   /* ===== 責任者・カート担当 ===== */
   .resp-area,.cart-area{padding:6px 9px;}

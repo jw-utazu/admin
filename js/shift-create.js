@@ -974,7 +974,8 @@ function buildCreateTabs() {
   // 自動リトライとブロック単位の「⚠ 保存失敗（タップで再試行）」が受け持つ。
   // 全ブロックを描き直して書き戻すため、押すと未編集のブロックまで更新扱いになり、
   // 他の管理者側で無用な同期が走るという副作用の方が大きかった
-  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><button class="tb-btn" style="margin-right:4px;white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div>';
+  // 並びは「… 保存ステータス → 再読み込み」。再読み込みは右端に固定する
+  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button>';
   if (compareMode) populateCmpDateSel();
 }
 
@@ -1071,9 +1072,6 @@ function buildLeftPanel() {
 
   // その時間帯に申込がある人のみ
   const applied = filterAppliedForSlot(tab.date, blockTime);
-  const notApplied = applicants.filter(a => !applied.find(b => b.uid === a.uid));
-  // mu() から毎回呼ばれるため、「未申込」セクションの開閉状態を再描画で失わないようにする
-  const naOpen = !!document.querySelector('#lp-members .lp-sec-toggle.open');
 
   document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）' + (blockTime ? ' ' + blockTime : '');
 
@@ -1119,12 +1117,9 @@ function buildLeftPanel() {
     const dotClass = assignedUids.has(a.uid) ? 'd-on' : 'd-off';
     return `<div class="mr-wrap" data-uid="${esc(a.uid)}" data-name="${esc(a.name)}" title="ドラッグしてシフト表に配置できます"><div class="mr"><div class="m-dot ${dotClass}"></div><div class="m-name${vGenderCls(a.uid)}">${esc(a.name)}${bothBadge}</div><div class="lp-badges"><div class="lp-badge-col">${badgeA}${badgeR}</div><div class="lp-badge-col">${badgeW}${badgeK}</div></div></div>${commentHtml}</div>`;
   }).join('');
-  if (notApplied.length > 0) {
-    html += `<div class="lp-sec lp-sec-toggle${naOpen ? ' open' : ''}" onclick="toggleNotApplied(this)"><span>未申込</span><span class="lp-sec-arrow">▶</span></div>`;
-    html += `<div class="lp-not-applied" style="display:${naOpen ? '' : 'none'};">`;
-    html += notApplied.map(a => `<div class="mr-wrap"><div class="mr"><div class="m-dot d-off"></div><div class="m-name off${vGenderCls(a.uid)}">${esc(a.name)}</div></div></div>`).join('');
-    html += `</div>`;
-  }
+  // 「未申込」セクションは置かない。この一覧から人を掴むことはできず（申込が無いので
+  // シフトには入れられない）、名前を眺める以外の用途が無かった。
+  // 誰が申し込んでいないかは希望確認タブの未申込一覧で見られる
   document.getElementById('lp-members').innerHTML = html;
 }
 
@@ -2356,14 +2351,6 @@ async function acceptSyncUpdate(bi) {
     }
   } catch (e) { toast('読み込みエラー: ' + e.message, 'e'); }
   finally { setLoading(false); }
-}
-
-function toggleNotApplied(el) {
-  el.classList.toggle("open");
-  const next = el.nextElementSibling;
-  if (next && next.classList.contains("lp-not-applied")) {
-    next.style.display = next.style.display === "none" ? "" : "none";
-  }
 }
 
 function applyCellWrapLayout(el) {
