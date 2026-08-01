@@ -233,16 +233,21 @@ async function loadAdminData() {
   renderAll();
   loadCalPubStatus();
   loadAutoPublishSettings();
-  // 描画完了後にローディングを非表示・appを表示
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      document.getElementById('ld-bar').style.width = '100%';
-      setTimeout(() => {
-        document.getElementById('loading').classList.remove('show');
-        document.getElementById('app').style.display = 'flex';
-      }, 400);
-    });
-  });
+  // 描画完了後にローディングを非表示・appを表示。
+  // requestAnimationFrame はタブが非表示のあいだ発火しないため、
+  // バックグラウンドで開かれた場合に備えてタイマーでも必ず実行する
+  let _appShown = false;
+  const showAppNow = () => {
+    if (_appShown) return;
+    _appShown = true;
+    document.getElementById('ld-bar').style.width = '100%';
+    setTimeout(() => {
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('app').style.display = 'flex';
+    }, 400);
+  };
+  requestAnimationFrame(() => requestAnimationFrame(showAppNow));
+  setTimeout(showAppNow, 1000);
 }
 
 function renderAll() {
