@@ -431,35 +431,49 @@ function toggleCompareMode() {
     panel.style.flex = '';
   }
 }
-function populateCmpDateSel() {
-  const sel = document.getElementById('cmp-date-sel');
-  if (!sel) return;
-  const dt = window._dateTabs || [];
-  sel.innerHTML = '<option value="">日付を選択...</option>';
-  dt.forEach((t, i) => { sel.innerHTML += `<option value="${i}">${esc(t.date)}（${esc(t.weekday)}）</option>`; });
-  document.getElementById('cmp-time-sel').innerHTML = '<option value="">時間帯を選択...</option>';
+// ------------------------------------------------------------
+// 選択チップ（チェックボックス・ドロップダウンの置き換え）
+// 状態は class="on" が持つ。index.js 側と同じ規約
+// ------------------------------------------------------------
+function uiChipToggle(el) {
+  if (el.classList.contains('dis')) return;
+  el.classList.toggle('on');
 }
-function onCmpDateChange() {
-  const dateSel = document.getElementById('cmp-date-sel');
-  const timeSel = document.getElementById('cmp-time-sel');
-  const i = parseInt(dateSel.value);
-  if (isNaN(i)) {
-    timeSel.innerHTML = '<option value="">時間帯を選択...</option>';
-    document.getElementById('cmp-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">比較する日付・時間帯を選択してください</div>';
-    return;
-  }
-  cmpDateIdx = i;
+function uiChipPick(el) {
+  if (el.classList.contains('dis')) return;
+  [...el.parentNode.children].forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+function uiChipOn(key) { return !!document.querySelector(`[data-chip="${key}"].on`); }
+
+// 比較表示の日付・時間帯は選択チップで選ぶ（ドロップダウンから置き換え）。
+// 候補は多くても月内の実施日ぶんなので、開かずに全部見えるほうが速い
+function cmpChip(label, on, onclick) {
+  return `<button type="button" class="uic${on ? ' on' : ''}" onclick="${onclick}">${esc(label)}</button>`;
+}
+function populateCmpDateSel() {
+  const box = document.getElementById('cmp-date-chips');
+  if (!box) return;
+  const dt = window._dateTabs || [];
+  box.innerHTML = dt.length === 0 ? '<span class="cmp-empty">日付がありません</span>'
+    : dt.map((t, i) => cmpChip(t.date + '（' + t.weekday + '）', false, `onCmpDateChange(${i})`)).join('');
+  document.getElementById('cmp-time-chips').innerHTML = '';
+}
+function onCmpDateChange(i) {
+  const dateBox = document.getElementById('cmp-date-chips');
+  const timeBox = document.getElementById('cmp-time-chips');
   const tab = (window._dateTabs || [])[i];
   if (!tab) return;
+  cmpDateIdx = i;
+  [...dateBox.children].forEach((c, ci) => c.classList.toggle('on', ci === i));
+
   const dayBlocks = shiftDates.filter(d => d.date === tab.date);
-  timeSel.innerHTML = '<option value="">時間帯を選択...</option>';
-  dayBlocks.forEach((b, bi) => { timeSel.innerHTML += `<option value="${bi}">${esc(b.time)}</option>`; });
+  timeBox.innerHTML = dayBlocks.map((b, bi) => cmpChip(b.time, false, `onCmpTimeChange(${bi})`)).join('');
   document.getElementById('cmp-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">時間帯を選択してください</div>';
 }
-function onCmpTimeChange() {
-  const timeSel = document.getElementById('cmp-time-sel');
-  const bi = parseInt(timeSel.value);
-  if (isNaN(bi)) return;
+function onCmpTimeChange(bi) {
+  const timeBox = document.getElementById('cmp-time-chips');
+  [...timeBox.children].forEach((c, ci) => c.classList.toggle('on', ci === bi));
   cmpTimeIdx = bi;
   renderCmpBlock();
 }
@@ -876,7 +890,7 @@ function openWishEdit(el, uid, name, slot, applied, comment) {
   // 入っているデータでは、隠して黙って消してしまわないよう表示する
   const isCartUser = !!(memberFlags[uid] || {}).cartFlag;
   document.getElementById('we-cart-row').style.display = (isCartUser || hasCartNg) ? '' : 'none';
-  document.getElementById('we-cartng').checked = hasCartNg;
+  document.querySelector('[data-chip="we-cartng"]')?.classList.toggle('on', hasCartNg);
   weRenderNote(weParseNote(raw.replace('カート不可', '').trim()));
   const toggleBtn = document.getElementById('we-toggle-btn');
   const saveBtn   = document.getElementById('we-save-btn');
@@ -907,7 +921,7 @@ async function submitWishChange(applied) {
   const time = si >= 0 ? ctx.slot.slice(si + 1) : '';
   // 保存形式は奉仕者フォームと同じ（1行目にカート不可、2行目に備考）
   const note = weBuildNote(weReadState());
-  let comment = document.getElementById('we-cartng').checked ? 'カート不可' : '';
+  let comment = uiChipOn('we-cartng') ? 'カート不可' : '';
   if (note) comment += (comment ? '\n' : '') + note;
   setLoading(true, '保存中...');
   try {
@@ -2121,7 +2135,7 @@ function paintTabBadges() {
 function openPreflight() {
   syncCurrentBlock();
   if (!document.getElementById('preflight-modal').classList.contains('on')) refreshValidationUI();
-  const showAcked = document.getElementById('pf-show-acked').checked;
+  const showAcked = uiChipOn('pf-show-acked');
   const issues = _vResult.issues.concat(showAcked ? (_vResult.acked || []) : []).sort((a, b) => {
     if (a.acked !== b.acked) return a.acked ? 1 : -1;
     if (a.level !== b.level) return a.level === 'error' ? -1 : 1;
@@ -3156,19 +3170,24 @@ function renderValidationRules() {
     const cur = Object.assign({}, def, settingsVRules[id] || {});
     const scope = def.scope === 'publish' ? '公開前のみ' : '編集中';
     return `<div class="vr-row">
-      <label class="vr-on"><input type="checkbox" data-rule="${id}" data-f="on"${cur.on ? ' checked' : ''} onchange="onVRuleChange(this)"></label>
+      <button type="button" class="uic vr-on${cur.on ? ' on' : ''}" data-rule="${id}" data-f="on"
+        onclick="uiChipToggle(this);onVRuleChange(this)">${cur.on ? '有効' : '無効'}</button>
       <div class="vr-main"><div class="vr-label">${esc(def.label)}</div><div class="vr-meta">${scope}</div></div>
-      <select class="vr-level" data-rule="${id}" data-f="level" onchange="onVRuleChange(this)">
-        <option value="error"${cur.level === 'error' ? ' selected' : ''}>⛔ エラー</option>
-        <option value="warn"${cur.level === 'warn' ? ' selected' : ''}>⚠️ 警告</option>
-      </select>
+      <div class="uic-row vr-level">
+        <button type="button" class="uic${cur.level === 'error' ? ' on' : ''}" data-rule="${id}" data-f="level" data-val="error"
+          onclick="uiChipPick(this);onVRuleChange(this)">⛔ エラー</button>
+        <button type="button" class="uic${cur.level === 'warn' ? ' on' : ''}" data-rule="${id}" data-f="level" data-val="warn"
+          onclick="uiChipPick(this);onVRuleChange(this)">⚠️ 警告</button>
+      </div>
     </div>`;
   }).join('');
 }
 
 function onVRuleChange(el) {
   const id = el.dataset.rule, f = el.dataset.f;
-  const v = f === 'on' ? el.checked : el.value;
+  // チップは class="on" が状態を持つ。レベルは data-val
+  const v = f === 'on' ? el.classList.contains('on') : el.dataset.val;
+  if (f === 'on') el.textContent = v ? '有効' : '無効';
   settingsVRules[id] = settingsVRules[id] || {};
   settingsVRules[id][f] = v;
   // 既定値と同じに戻したら上書きを消しておく（保存内容を最小限に保つ）

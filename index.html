@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=29">
+<link rel="stylesheet" href="css/index.css?v=31">
 </head>
 <body>
 
@@ -228,6 +228,9 @@
           <button class="tool normal-only" onclick="openMemberModal()" title="メンバーの追加・編集・有効無効">
             <span class="tool-ic" style="background:#f0f9ff;color:#0369a1;">👥</span><span class="tool-n">メンバー</span>
           </button>
+          <button class="tool normal-only" onclick="openPositionModal()" title="区域係での立ち位置と、そこから決まる権限の設定">
+            <span class="tool-ic" style="background:#f1f5f9;color:#334155;">🎫</span><span class="tool-n">立ち位置</span>
+          </button>
           <button class="tool normal-only" onclick="openNoticeModal()" title="お知らせの追加・編集・削除">
             <span class="tool-ic" style="background:var(--teal-l,#ccfbf1);color:var(--teal,#0d9488);">📢</span><span class="tool-n">お知らせ</span>
           </button>
@@ -258,6 +261,15 @@
 </div>
 
 <!-- MODALS -->
+<!-- 立ち位置マスタ（区域係での役割と、そこから決まる権限） -->
+<div class="ov" id="m-position">
+  <div class="modal" style="max-width:620px;">
+    <div class="mhd"><span class="mt">🎫 立ち位置</span><button class="mx" onclick="closeM('m-position')">&#10005;</button></div>
+    <div class="mbd" id="m-position-body" style="padding:12px;"></div>
+    <div class="mft" id="m-position-ft"></div>
+  </div>
+</div>
+
 <!-- 限定PW 対象メンバー管理モーダル -->
 <div class="ov" id="m-limited-members">
   <div class="modal" style="max-width:540px;">
@@ -578,17 +590,11 @@
           </div>
         </div>
         <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">— 追加処理（選択）—</div>
-        <div class="ms-check-row">
-          <input type="checkbox" id="mc-calpub" checked>
-          <label for="mc-calpub">📅 予定表公開</label>
-        </div>
-        <div class="ms-check-row">
-          <input type="checkbox" id="mc-form" checked>
-          <label for="mc-form">📝 シフトフォーム作成</label>
-        </div>
-        <div class="ms-check-row">
-          <input type="checkbox" id="mc-shift" checked>
-          <label for="mc-shift">🗂 シフト作成準備</label>
+        <!-- 選択チップ。状態は class="on" が持つ（uiChipOn で読む） -->
+        <div class="uic-row">
+          <button type="button" class="uic lg on" data-chip="mc-calpub" onclick="uiChipToggle(this)">📅 予定表公開</button>
+          <button type="button" class="uic lg on" data-chip="mc-form"   onclick="uiChipToggle(this)">📝 シフトフォーム作成</button>
+          <button type="button" class="uic lg on" data-chip="mc-shift"  onclick="uiChipToggle(this)">🗂 シフト作成準備</button>
         </div>
         <div class="ms-step-nav">
           <button class="ms-btn sec" onclick="closeM('m-monthly')">キャンセル</button>
@@ -723,6 +729,6 @@
 <script src="js/session.js?v=3"></script>
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=44"></script>
+<script src="js/index.js?v=46"></script>
 </body>
 </html>

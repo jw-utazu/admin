@@ -2124,7 +2124,7 @@ async function refreshNoticeModal() {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" id="notice-display-in" checked> 表示ON</label>
+            ${uiCheckChip('notice-display-in', '表示する', true)}
             <button class="btn btn-p" onclick="saveNotice()" style="font-size:11px;padding:5px 12px;">保存</button>
             ${_noticeEditId ? '<button class="btn btn-g" onclick="_noticeEditId=null;refreshNoticeModal()" style="font-size:11px;padding:5px 10px;">キャンセル</button>' : ''}
           </div>
@@ -2160,7 +2160,7 @@ async function refreshNoticeModal() {
       if (n) {
         document.getElementById('notice-title-in').value = n.title || '';
         document.getElementById('notice-body-in').value  = n.body  || '';
-        document.getElementById('notice-display-in').checked = n.display === 'ON';
+        document.querySelector('[data-chip="notice-display-in"]')?.classList.toggle('on', n.display === 'ON');
         document.getElementById('notice-start-in').value = (n.startDate || '').replace(/\//g, '-');
         document.getElementById('notice-end-in').value   = (n.endDate   || '').replace(/\//g, '-');
         document.getElementById('m-notice-body').scrollTop = 0;
@@ -2174,7 +2174,7 @@ async function refreshNoticeModal() {
 async function saveNotice() {
   const title     = document.getElementById('notice-title-in').value.trim();
   const body      = document.getElementById('notice-body-in').value.trim();
-  const display   = document.getElementById('notice-display-in').checked;
+  const display   = uiChipOn('notice-display-in');
   const startDate = (document.getElementById('notice-start-in').value || '').replace(/-/g, '/');
   const endDate   = (document.getElementById('notice-end-in').value   || '').replace(/-/g, '/');
   if (!title) { toast('タイトルを入力してください', 'e'); return; }
@@ -3017,9 +3017,44 @@ function logOpGroups(all) {
   return groups;
 }
 
-function lfChip(label, on, onclick, extra) {
-  return `<button class="lfc${on ? ' on' : ''}" onclick="${onclick}">${esc(label)}` +
-    (extra ? `<span class="lfc-n">${esc(extra)}</span>` : '') + `</button>`;
+// ------------------------------------------------------------
+// 選択チップ（チェックボックス・ラジオ・ドロップダウンの置き換え）
+//
+// 状態は class="on" が持つ。読み出しは uiChipOn / uiChipVal で行うため、
+// 呼び出し側は input の .checked を触らない
+// ------------------------------------------------------------
+// 複数選択（チェックボックス相当）
+function uiChipToggle(el) {
+  if (el.classList.contains('dis')) return;
+  el.classList.toggle('on');
+}
+// 単一選択（ラジオ・ドロップダウン相当）。同じ親の中で1つだけ on になる
+function uiChipPick(el, onPicked) {
+  if (el.classList.contains('dis')) return;
+  [...el.parentNode.children].forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  if (onPicked) onPicked(el.dataset.val);
+}
+function uiChipOn(key)   { return !!document.querySelector(`[data-chip="${key}"].on`); }
+function uiChipVal(group){ return document.querySelector(`[data-group="${group}"].on`)?.dataset.val ?? ''; }
+
+// 複数選択チップ1個（key で uiChipOn から読む）
+function uiCheckChip(key, label, on, disabled) {
+  return `<button type="button" class="uic lg${on ? ' on' : ''}${disabled ? ' dis' : ''}"` +
+    ` data-chip="${esc(key)}" onclick="uiChipToggle(this)">${esc(label)}</button>`;
+}
+// 単一選択チップの並び（group で uiChipVal から読む）
+function uiPickChips(group, items, current, disabled, onPicked) {
+  return `<div class="uic-row">` + items.map(it =>
+    `<button type="button" class="uic lg${it.value === current ? ' on' : ''}${disabled ? ' dis' : ''}"` +
+    ` data-group="${esc(group)}" data-val="${esc(it.value)}"` +
+    ` onclick="uiChipPick(this${onPicked ? ',' + onPicked : ''})">${esc(it.label)}</button>`).join('') +
+    `</div>`;
+}
+
+function uiChip(label, on, onclick, extra) {
+  return `<button class="uic${on ? ' on' : ''}" onclick="${onclick}">${esc(label)}` +
+    (extra ? `<span class="uic-n">${esc(extra)}</span>` : '') + `</button>`;
 }
 
 // 配列に入れる／外す（チップは押した時点で状態を変え、表示は「この条件で表示」で反映する）
@@ -3077,7 +3112,7 @@ function renderLogFilterPanel() {
             <span class="lf-all${all ? ' on' : ''}" onclick="event.stopPropagation();toggleLogOpGroup(${i})">${all ? '解除' : 'すべて'}</span>
           </button>
           <div class="lf-ops${open ? ' on' : ''}">` +
-        g.ops.map(op => lfChip(op, f.ops.includes(op), `toggleLogValue('ops','${esc(op)}')`)).join('') +
+        g.ops.map(op => uiChip(op, f.ops.includes(op), `toggleLogValue('ops','${esc(op)}')`)).join('') +
         `</div></div>`;
     });
     html += `</div>`;
@@ -3086,21 +3121,21 @@ function renderLogFilterPanel() {
   if (kind === 'access') {
     if (o.results.length > 0) {
       html += `<div class="log-fg"><div class="log-fg-t">結果</div><div class="log-fg-b">` +
-        o.results.map(v => lfChip(v, f.results.includes(v), `toggleLogValue('results','${esc(v)}')`)).join('') +
+        o.results.map(v => uiChip(v, f.results.includes(v), `toggleLogValue('results','${esc(v)}')`)).join('') +
         `</div></div>`;
     }
     if (o.apps.length > 0) {
       html += `<div class="log-fg"><div class="log-fg-t">アプリ</div><div class="log-fg-b">` +
-        o.apps.map(v => lfChip(v, f.apps.includes(v), `toggleLogValue('apps','${esc(v)}')`)).join('') +
+        o.apps.map(v => uiChip(v, f.apps.includes(v), `toggleLogValue('apps','${esc(v)}')`)).join('') +
         `</div></div>`;
     }
     html += `<div class="log-fg"><div class="log-fg-t">確認済み</div><div class="log-fg-b">` +
-      lfChip('確認済みは隠す', f.onlyUnreviewed, 'toggleLogUnreviewed()') + `</div></div>`;
+      uiChip('確認済みは隠す', f.onlyUnreviewed, 'toggleLogUnreviewed()') + `</div></div>`;
   }
 
   if (o.people && o.people.length > 0) {
     html += `<div class="log-fg"><div class="log-fg-t">人</div><div class="log-fg-b lf-scroll">` +
-      o.people.map(pp => lfChip(pp.name, f.person === pp.id, `toggleLogPerson('${esc(pp.id)}')`)).join('') +
+      o.people.map(pp => uiChip(pp.name, f.person === pp.id, `toggleLogPerson('${esc(pp.id)}')`)).join('') +
       `</div></div>`;
   }
 
@@ -3317,7 +3352,7 @@ function logPurgeBoxHtml() {
       <b>「失敗」の記録は不正アクセスの手がかりになるため、自動でも手動でも削除しません。</b>
       不要な失敗は各行の「確認済みにする」で一覧から隠せます。
       <div class="log-purge-row">` +
-      [3, 6, 12, 24].map(m => lfChip(m < 12 ? m + 'ヶ月' : (m / 12) + '年',
+      [3, 6, 12, 24].map(m => uiChip(m < 12 ? m + 'ヶ月' : (m / 12) + '年',
         logState.purgeMonths === m, `setLogPurgeMonths(${m})`)).join('') + `
         <span>より前のものを削除</span>
         <button class="btn btn-d" onclick="purgeAccessLogs()">🗑 整理する</button>
@@ -3394,9 +3429,7 @@ async function execSyncAccess() {
 let monthlyChecks = { calpub: true, form: true, shift: true };
 
 function openMonthlyModal() {
-  document.getElementById('mc-calpub').checked = true;
-  document.getElementById('mc-form').checked = true;
-  document.getElementById('mc-shift').checked = true;
+  ['mc-calpub','mc-form','mc-shift'].forEach(k => document.querySelector(`[data-chip="${k}"]`)?.classList.add('on'));
   monthlyStep(1);
   openM('m-monthly');
 }
@@ -3412,9 +3445,9 @@ function monthlyStep(n) {
 }
 
 function monthlyGoStep3or4() {
-  monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
-  monthlyChecks.form   = document.getElementById('mc-form').checked;
-  monthlyChecks.shift  = document.getElementById('mc-shift').checked;
+  monthlyChecks.calpub = uiChipOn('mc-calpub');
+  monthlyChecks.form   = uiChipOn('mc-form');
+  monthlyChecks.shift  = uiChipOn('mc-shift');
   if (monthlyChecks.form) {
     monthlyStep(3);
   } else {
@@ -3529,9 +3562,9 @@ function buildMstep2() {
 }
 
 function buildMstep4() {
-  monthlyChecks.calpub = document.getElementById('mc-calpub').checked;
-  monthlyChecks.form   = document.getElementById('mc-form').checked;
-  monthlyChecks.shift  = document.getElementById('mc-shift').checked;
+  monthlyChecks.calpub = uiChipOn('mc-calpub');
+  monthlyChecks.form   = uiChipOn('mc-form');
+  monthlyChecks.shift  = uiChipOn('mc-shift');
   const tasks = [
     { id: 'calregen', label: '🔄 日程・実施日を保存' }
   ];
@@ -3774,19 +3807,171 @@ async function deletePhoto(fileId) {
 
 
 // ============================================================
+// 立ち位置マスタ
+// ============================================================
+// 権限は「区域係での立ち位置」から決まる。立ち位置ごとに何ができるかを
+// ここで決め、メンバー編集では立ち位置を選ぶだけで済むようにする。
+// 立ち位置と実情がずれる人は、メンバー編集の個別設定で上書きする
+let _posEdit = [];   // 編集中の立ち位置一覧（保存するまで DB には書かない）
+
+const POS_CAPS = [
+  { key: 'canAdmin',           label: '管理者' },
+  { key: 'canAccountant',      label: '会計者' },
+  { key: 'canApproveCalendar', label: '予定表承認' },
+  { key: 'canApproveShift',    label: 'シフト確認' },
+];
+
+async function openPositionModal() {
+  openM('m-position');
+  const body = document.getElementById('m-position-body');
+  body.innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
+  document.getElementById('m-position-ft').innerHTML = '';
+  try {
+    const res = await apiGet('getPositions');
+    if (!res.ok) throw new Error(res.error || '取得失敗');
+    _positions = res.positions || [];
+    _posEdit = JSON.parse(JSON.stringify(_positions));
+    renderPositionEditor();
+  } catch (e) {
+    body.innerHTML = '<div style="padding:20px;color:var(--red);">エラー: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderPositionEditor() {
+  document.getElementById('m-position-body').innerHTML = `
+    <div style="font-size:11px;color:var(--ink3);line-height:1.6;margin-bottom:10px;">
+      立ち位置ごとに「何ができるか」を決めます。メンバーの権限はここで決めた内容から自動で決まります。<br>
+      ※「予定表承認」「シフト確認」は管理者権限が前提です（管理者でない立ち位置に付けても効きません）。
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${_posEdit.map((p, i) => `
+        <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px;">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+            <input class="mf-inp" style="flex:1;" type="text" value="${esc(p.name || '')}"
+              placeholder="立ち位置の名前" oninput="_posEdit[${i}].name=this.value">
+            <button class="btn" style="font-size:11px;padding:5px 10px;border-color:var(--red);background:var(--red-l);color:var(--red);"
+              onclick="removePositionRow(${i})">🗑</button>
+          </div>
+          <div class="uic-row">
+            ${POS_CAPS.map(c => `<button type="button" class="uic${p[c.key] ? ' on' : ''}"
+              onclick="togglePosCap(${i},'${c.key}',this)">${c.label}</button>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>
+    <button class="sp-add-btn" style="margin-top:10px;" onclick="addPositionRow()">&#65291; 立ち位置を追加</button>`;
+
+  document.getElementById('m-position-ft').innerHTML = `
+    <button class="btn btn-g" onclick="openPositionSyncPreview()" title="個別設定を外して、全員の権限を立ち位置から決め直します">⚖ 権限を立ち位置から再計算</button>
+    <button class="btn btn-g" onclick="closeM('m-position')">閉じる</button>
+    <button class="btn btn-p" onclick="savePositions()">保存</button>`;
+}
+
+function togglePosCap(i, key, el) {
+  _posEdit[i][key] = !_posEdit[i][key];
+  el.classList.toggle('on');
+}
+function addPositionRow() {
+  _posEdit.push({ id: null, name: '', canAdmin: false, canAccountant: false, canApproveCalendar: false, canApproveShift: false });
+  renderPositionEditor();
+}
+async function removePositionRow(i) {
+  const p = _posEdit[i];
+  // 既に保存されている立ち位置を消すと、その立ち位置だった人は「立ち位置なし」に戻り、
+  // 個別設定が無ければ権限を失う。消す前にそれを伝える
+  if (p.id && !await uiConfirm({
+    type: 'danger', title: '立ち位置の削除',
+    message: '「' + (p.name || '') + '」を削除しますか？\n\nこの立ち位置だった方は「立ち位置なし」に戻り、個別設定が無ければ権限が外れます。',
+    confirmText: '削除する',
+  })) return;
+  _posEdit.splice(i, 1);
+  renderPositionEditor();
+}
+
+async function savePositions() {
+  showProc('立ち位置を保存しています...', '権限を計算し直しています');
+  try {
+    const res = await apiGet('savePositions', {
+      positions: _posEdit,
+      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
+    });
+    if (!res.ok) throw new Error(res.error || '保存失敗');
+    const re = await apiGet('getPositions');
+    _positions = (re && re.ok) ? (re.positions || []) : [];
+    _posEdit = JSON.parse(JSON.stringify(_positions));
+    renderPositionEditor();
+    hideProc();
+    toast('立ち位置を保存しました', 's');
+  } catch (e) {
+    hideProc();
+    toast('保存に失敗しました: ' + e.message, 'e');
+  }
+}
+
+// ------------------------------------------------------------
+// 個別設定を落として立ち位置由来へ一本化する（移行用の一括切替）
+// 取り返しがつかないので、誰がどう変わるかを見せてから実行する
+// ------------------------------------------------------------
+async function openPositionSyncPreview() {
+  showProc('変更内容を確認しています...', '少々お待ちください');
+  let changes;
+  try {
+    const res = await apiGet('previewPositionSync');
+    if (!res.ok) throw new Error(res.error || '取得失敗');
+    changes = res.changes || [];
+    hideProc();
+  } catch (e) {
+    hideProc();
+    toast('確認に失敗しました: ' + e.message, 'e');
+    return;
+  }
+
+  const lost = changes.filter(c => c.diff.some(d => !d.to));
+  const body = changes.length === 0
+    ? '現在の権限は、すでに立ち位置どおりです。個別設定を外しても変わりません。'
+    : changes.map(c => c.name + '（' + c.position + '）：' +
+        c.diff.map(d => d.cap + (d.to ? ' を付与' : ' を解除')).join('、')).join('\n');
+
+  if (!await uiConfirm({
+    type: lost.length ? 'danger' : 'warn',
+    title: '権限を立ち位置から再計算',
+    message: '全員の個別設定を外し、権限を立ち位置だけで決め直します。\n\n' +
+      (changes.length ? '【変わる人】\n' + body : body) +
+      (lost.length ? '\n\n⚠️ 権限が外れる方がいます。立ち位置の割り当てが済んでいるか確認してください。' : ''),
+    confirmText: '再計算する',
+  })) return;
+
+  showProc('権限を計算し直しています...', '少々お待ちください');
+  try {
+    const res = await apiGet('applyPositionSync', {
+      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
+    });
+    if (!res.ok) throw new Error(res.error || '実行失敗');
+    hideProc();
+    toast('権限を立ち位置から再計算しました', 's');
+  } catch (e) {
+    hideProc();
+    toast('実行に失敗しました: ' + e.message, 'e');
+  }
+}
+
+// ============================================================
 // メンバー管理モーダル
 // ============================================================
 let _memberList = [];
 let _memberEditRowIndex = null; // 編集中のrowIndex
+let _positions = [];            // 立ち位置マスタ（メンバー編集の選択肢に使う）
+
+const positionName = id => _positions.find(p => String(p.id) === String(id))?.name || '';
 
 async function openMemberModal() {
   openM('m-member');
   document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
   document.getElementById('m-member-add-btn').style.display = '';
   try {
-    const [res] = await Promise.all([apiGet('getMemberListAll'), loadAvatars()]);
+    const [res, posRes] = await Promise.all([apiGet('getMemberListAll'), apiGet('getPositions'), loadAvatars()]);
     if (!res.ok) throw new Error(res.error || '取得失敗');
     _memberList = res.members || [];
+    _positions  = (posRes && posRes.ok) ? (posRes.positions || []) : [];
     renderMemberList();
   } catch(e) {
     document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;color:var(--red);">エラー: ' + esc(e.message) + '</div>';
@@ -3839,7 +4024,9 @@ function renderMemberList() {
           <span class="member-gender-badge ${m.gender === 'M' ? 'mgb-m' : 'mgb-f'}">${m.gender === 'M' ? '男' : '女'}</span>
           ${m.isResponsible ? '<span class="role-badge rb-resp">責任者</span>' : ''}
           ${m.isCart        ? '<span class="role-badge rb-cart">カート</span>' : ''}
+          ${positionName(m.positionId) ? '<span class="role-badge rb-pos">' + esc(positionName(m.positionId)) + '</span>' : ''}
           ${m.isAdmin       ? '<span class="role-badge rb-admin">管理者</span>' : ''}
+          ${m.isCalApprover ? '<span class="role-badge rb-appr">予定表承認</span>' : ''}
           ${m.isShiftApprover ? '<span class="role-badge rb-appr">確認者</span>' : ''}
           ${m.isAccountant  ? '<span class="role-badge rb-acct">会計者</span>' : ''}
         </div>
@@ -3861,7 +4048,9 @@ function openMemberAddForm() {
   _memberEditRowIndex = null;
   document.getElementById('m-member-add-btn').style.display = 'none';
   const isOwner = !_currentUser?.uid; // uidが空＝オーナーアカウント
+  _mfMember = null; _mfIsOwner = isOwner;
   document.getElementById('m-member-body').innerHTML = buildMemberForm(null, isOwner);
+  renderMfPermRows();
 }
 
 function openMemberEditForm(rowIndex) {
@@ -3870,7 +4059,47 @@ function openMemberEditForm(rowIndex) {
   const m = _memberList.find(x => x.rowIndex === rowIndex);
   if (!m) return;
   const isOwner = !_currentUser?.uid;
+  _mfMember = m; _mfIsOwner = isOwner;
   document.getElementById('m-member-body').innerHTML = buildMemberForm(m, isOwner);
+  renderMfPermRows();
+}
+
+// ------------------------------------------------------------
+// 権限は立ち位置から決まり、能力ごとに個別設定で上書きできる。
+// 個別設定は3状態：'' 立ち位置に従う ／ '1' 個別に付与 ／ '0' 個別に外す。
+// 「立ち位置に従う」を選んだとき実際にどうなるかは立ち位置を変えると変わるので、
+// 選択肢のラベルに現在の立ち位置での結果（付与／なし）を添えて、
+// 立ち位置チップを押すたびに描き直す
+// ------------------------------------------------------------
+const CAP_DEFS = [
+  { key: 'admin',           label: '管理者',     pos: 'canAdmin',           mk: 'ovAdmin' },
+  { key: 'accountant',      label: '会計者',     pos: 'canAccountant',      mk: 'ovAccountant' },
+  { key: 'approveCalendar', label: '予定表承認', pos: 'canApproveCalendar', mk: 'ovApproveCalendar' },
+  { key: 'approveShift',    label: 'シフト確認', pos: 'canApproveShift',    mk: 'ovApproveShift' },
+];
+let _mfMember  = null;   // 編集中のメンバー（権限行を描き直すときに参照する）
+let _mfIsOwner = false;
+
+const ovStr = v => v === true ? '1' : v === false ? '0' : '';
+
+function renderMfPermRows() {
+  const el = document.getElementById('mf-perm-rows');
+  if (!el) return;
+  const pos = _positions.find(p => String(p.id) === uiChipVal('mf-pos'));
+  // 描き直しても選択中の個別設定を失わないよう、いま画面にある値を先に読む
+  // （まだ描かれていない初回は、保存されている値を使う）
+  el.innerHTML = CAP_DEFS.map(c => {
+    const cur = document.querySelector(`[data-group="mf-ov-${c.key}"].on`)?.dataset.val
+             ?? ovStr(_mfMember?.[c.mk]);
+    return `<div class="mf-perm">
+      <span class="mf-perm-l">${c.label}</span>
+      ${uiPickChips('mf-ov-' + c.key, [
+        { value: '',  label: '立ち位置に従う（' + (pos?.[c.pos] ? '付与' : 'なし') + '）' },
+        { value: '1', label: '付与' },
+        { value: '0', label: '外す' },
+      ], cur, !_mfIsOwner)}
+    </div>`;
+  }).join('');
 }
 
 function buildMemberForm(m, isOwner) {
@@ -3904,14 +4133,9 @@ function buildMemberForm(m, isOwner) {
       </div>
       <div class="mf-row">
         <label class="mf-lbl">性別 <span class="req">*</span></label>
-        <div style="display:flex;gap:12px;align-items:center;padding:6px 0;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-gender" value="M" ${(!m || m.gender === 'M') ? 'checked' : ''}> 男
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-gender" value="F" ${(m?.gender === 'F') ? 'checked' : ''}> 女
-          </label>
-        </div>
+        ${uiPickChips('mf-gender',
+          [{ value: 'M', label: '男' }, { value: 'F', label: '女' }],
+          (!m || m.gender === 'M') ? 'M' : 'F')}
       </div>
       <div class="mf-row">
         <label class="mf-lbl">メールアドレス
@@ -3924,43 +4148,30 @@ function buildMemberForm(m, isOwner) {
       </div>
       <div class="mf-row">
         <label class="mf-lbl">役割</label>
-        <div style="display:flex;gap:16px;padding:6px 0;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="mf-resp" ${m?.isResponsible ? 'checked' : ''}> 責任者
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="checkbox" id="mf-cart" ${m?.isCart ? 'checked' : ''}> カート担当
-          </label>
+        <div class="uic-row">
+          ${uiCheckChip('mf-resp', '責任者',     !!m?.isResponsible)}
+          ${uiCheckChip('mf-cart', 'カート担当', !!m?.isCart)}
         </div>
       </div>
       <div class="mf-row">
-        <label class="mf-lbl">権限
+        <label class="mf-lbl">立ち位置
           ${!isOwner ? '<span style="font-size:10px;color:var(--ink3);font-weight:400;margin-left:4px;">（オーナーアカウントのみ変更可）</span>' : ''}
         </label>
-        <div style="display:flex;gap:16px;padding:6px 0;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;${isOwner ? 'cursor:pointer;' : 'opacity:.6;'}">
-            <input type="checkbox" id="mf-admin" ${m?.isAdmin ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> 管理者
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;${isOwner ? 'cursor:pointer;' : 'opacity:.6;'}">
-            <input type="checkbox" id="mf-acct" ${m?.isAccountant ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> 会計者
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;${isOwner ? 'cursor:pointer;' : 'opacity:.6;'}">
-            <input type="checkbox" id="mf-approver" ${m?.isShiftApprover ? 'checked' : ''} ${isOwner ? '' : 'disabled'}> シフト確認者
-          </label>
-        </div>
-        ${isOwner ? '<div style="font-size:11px;color:var(--ink3);line-height:1.6;">※ 権限は先に付与できますが、本人がログインできるのはメールアドレス登録後です。<br>※ 「シフト確認者」は管理者権限が前提です。作成担当者が「シフト作成完了」にした後、確認者全員が「確認完了」にするまで奉仕者へ公開されません。</div>' : ''}
+        ${uiPickChips('mf-pos',
+          [{ value: '', label: 'なし' }].concat(_positions.map(p => ({ value: String(p.id), label: p.name }))),
+          String(m?.positionId || ''), !isOwner, 'renderMfPermRows')}
+      </div>
+      <div class="mf-row">
+        <label class="mf-lbl">権限</label>
+        <div id="mf-perm-rows"></div>
+        ${isOwner ? '<div style="font-size:11px;color:var(--ink3);line-height:1.6;">※ 権限は立ち位置から決まります。この人だけ扱いを変えたいときに「付与」「外す」で上書きしてください。<br>※ 権限は先に与えられますが、本人がログインできるのはメールアドレス登録後です。<br>※ 「予定表承認」「シフト確認」は管理者権限が前提です。</div>' : ''}
       </div>
       ${isEdit ? `
       <div class="mf-row">
         <label class="mf-lbl">ステータス</label>
-        <div style="display:flex;gap:12px;align-items:center;padding:6px 0;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-valid" value="1" ${m.valid ? 'checked' : ''}> 有効
-          </label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;">
-            <input type="radio" name="mf-valid" value="0" ${!m.valid ? 'checked' : ''}> 無効
-          </label>
-        </div>
+        ${uiPickChips('mf-valid',
+          [{ value: '1', label: '有効' }, { value: '0', label: '無効' }],
+          m.valid ? '1' : '0')}
         ${m.valid ? '<div style="font-size:11px;color:var(--amber);line-height:1.6;">⚠️ 無効にすると、この方に関する代理送信設定・管理者権限・会計者権限は自動的に削除されます。</div>' : ''}
       </div>` : ''}
       <div id="mf-err" style="display:none;color:var(--red);font-size:12px;padding:6px 10px;background:var(--red-l);border-radius:var(--r);"></div>
@@ -3975,15 +4186,21 @@ function buildMemberForm(m, isOwner) {
 async function saveMemberForm(isEdit, isOwner) {
   const name     = (document.getElementById('mf-name')?.value || '').trim();
   const furigana = (document.getElementById('mf-furigana')?.value || '').trim();
-  const gender   = document.querySelector('input[name="mf-gender"]:checked')?.value || '';
+  const gender   = uiChipVal('mf-gender');
   const email    = (document.getElementById('mf-email')?.value || '').trim();
-  const isResp   = document.getElementById('mf-resp')?.checked || false;
-  const isCart   = document.getElementById('mf-cart')?.checked || false;
-  const isAdmin  = document.getElementById('mf-admin')?.checked || false;
-  const isAcct   = document.getElementById('mf-acct')?.checked || false;
-  const isAppr   = document.getElementById('mf-approver')?.checked || false;
-  const validVal = document.querySelector('input[name="mf-valid"]:checked')?.value;
-  const valid    = validVal !== undefined ? validVal === '1' : true;
+  const isResp   = uiChipOn('mf-resp');
+  const isCart   = uiChipOn('mf-cart');
+  // 立ち位置と、能力ごとの個別設定（'' 立ち位置に従う ／ '1' 付与 ／ '0' 外す）
+  const perm = {
+    positionId:        uiChipVal('mf-pos'),
+    ovAdmin:           uiChipVal('mf-ov-admin'),
+    ovAccountant:      uiChipVal('mf-ov-accountant'),
+    ovApproveCalendar: uiChipVal('mf-ov-approveCalendar'),
+    ovApproveShift:    uiChipVal('mf-ov-approveShift'),
+  };
+  const validVal = uiChipVal('mf-valid');
+  // 追加フォームにはステータスの選択が無いので、その場合は有効として扱う
+  const valid    = validVal ? validVal === '1' : true;
 
   const errEl = document.getElementById('mf-err');
   if (!name || !furigana || !gender) {
@@ -4005,9 +4222,7 @@ async function saveMemberForm(isEdit, isOwner) {
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
         isCart: isCart ? '1' : '',
-        isAdmin: isAdmin ? '1' : '',
-        isAccountant: isAcct ? '1' : '',
-        isShiftApprover: isAppr ? '1' : '',
+        ...perm,
         valid: valid ? '1' : '0',
         isOwner: isOwner ? '1' : '',
         adminUid, adminName
@@ -4017,9 +4232,7 @@ async function saveMemberForm(isEdit, isOwner) {
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
         isCart: isCart ? '1' : '',
-        isAdmin: isAdmin ? '1' : '',
-        isAccountant: isAcct ? '1' : '',
-        isShiftApprover: isAppr ? '1' : '',
+        ...perm,
         isOwner: isOwner ? '1' : '',
         adminUid, adminName
       });

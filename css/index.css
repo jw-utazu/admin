@@ -519,11 +519,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .rb-admin{background:#ede9fe;color:#5b21b6;}
 .rb-acct{background:#dbeafe;color:#1e40af;}
 .rb-appr{background:#ecfeff;color:#0e7490;}
+.rb-pos{background:#f1f5f9;color:#334155;}
 .btn-edit-member{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);flex-shrink:0;}
 .btn-edit-member:hover{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
 .btn-delete-member{font-size:11px;padding:4px 8px;border:1px solid var(--red-l);border-radius:6px;background:var(--red-l);cursor:pointer;color:var(--red);font-family:var(--sans);flex-shrink:0;}
 .btn-delete-member:hover{background:var(--red);color:#fff;border-color:var(--red);}
 .mf-row{display:flex;flex-direction:column;gap:4px;}
+/* 権限1行＝能力名＋3状態チップ。狭い画面では能力名の下にチップが回り込む */
+.mf-perm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:3px 0;}
+.mf-perm-l{font-size:12px;color:var(--ink2);min-width:72px;}
 .mf-lbl{font-size:11px;font-weight:700;color:var(--ink2);}
 .mf-inp{border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--sans);font-size:13px;color:var(--ink);outline:none;width:100%;}
 .mf-inp:focus{border-color:var(--blue);}
@@ -658,11 +662,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 
 /* 絞り込みの選択チップ（.log-tab と同じ言語。チェックボックスは使わない）
    .on=全選択  .part=一部だけ選択（カテゴリのみ） */
-.lfc{padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ink2);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
-.lfc:hover:not(.on){background:var(--surface2);color:var(--ink);}
-.lfc.on{background:var(--blue);border-color:var(--blue);color:#fff;}
-.lfc.part{background:var(--blue-l);border-color:var(--blue);color:var(--blue);}
-.lfc-n{font-weight:400;opacity:.8;margin-left:4px;}
+.uic{padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ink2);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.uic:hover:not(.on){background:var(--surface2);color:var(--ink);}
+.uic.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+.uic.part{background:var(--blue-l);border-color:var(--blue);color:var(--blue);}
+.uic-n{font-weight:400;opacity:.8;margin-left:4px;}
+/* フォーム内のチップは指で押す前提なので少し大きくする */
+.uic.lg{font-size:12px;padding:6px 14px;}
+.uic.dis{opacity:.45;cursor:not-allowed;}
+.uic.dis:hover{background:var(--surface);color:var(--ink2);}
+.uic-row{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0;}
 /* 操作は数が多いのでカテゴリでたたむ。
    親（カテゴリ）は「行」、子（操作）は「ピル」。同じ形にすると展開時に見分けがつかない */
 .lf-grp{border-bottom:1px solid var(--border);}
@@ -678,7 +687,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 /* 子は左の縦線で親にぶら下がっていることを示す */
 .lf-ops{display:none;flex-wrap:wrap;gap:4px;margin:0 0 8px 12px;padding:8px 10px;background:var(--surface);border-left:2px solid var(--blue);border-radius:0 var(--r) var(--r) 0;}
 .lf-ops.on{display:flex;}
-.lf-ops .lfc{font-size:10px;padding:3px 8px;}
+.lf-ops .uic{font-size:10px;padding:3px 8px;}
 /* 人は候補が多くなりうるので高さを止めてスクロールさせる */
 .lf-scroll{max-height:96px;overflow-y:auto;}
 

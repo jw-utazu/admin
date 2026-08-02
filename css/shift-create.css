@@ -351,6 +351,17 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cmp-panel.on{display:flex;}
 .cmp-sel-bar{padding:8px 14px;background:var(--purple-l);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
 .cmp-label{font-size:11px;color:var(--purple);font-weight:700;white-space:nowrap;}
+/* 選択チップ（チェックボックス・ドロップダウンの置き換え。index.css と同じ言語） */
+.uic{padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ink2);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.uic:hover:not(.on){background:var(--surface2);color:var(--ink);}
+.uic.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+.uic.lg{font-size:12px;padding:6px 14px;}
+.uic.dis{opacity:.45;cursor:not-allowed;}
+.uic-row{display:flex;flex-wrap:wrap;gap:6px;}
+.cmp-empty{font-size:11px;color:var(--ink3);}
+/* 比較バーは横に伸びるので、チップが増えたら折り返さず横スクロールさせる */
+.cmp-sel-bar .uic-row{flex-wrap:nowrap;overflow-x:auto;}
+
 .cmp-sel{border:1px solid #ddd6fe;border-radius:var(--r);padding:4px 8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--surface);color:var(--ink);}
 .cmp-content{overflow-y:auto;flex:1;background:var(--bg);padding:14px;}
 /* ===== リサイズ仕切り ===== */
@@ -453,11 +464,11 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 /* 検証ルール設定 */
 .vr-row{display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--border);}
 .vr-row:last-child{border-bottom:none;}
-.vr-on{flex-shrink:0;display:flex;align-items:center;}
+.vr-on{flex-shrink:0;min-width:44px;text-align:center;}
 .vr-main{flex:1;min-width:0;}
 .vr-label{font-size:12px;font-weight:700;color:var(--ink);}
 .vr-meta{font-size:10px;color:var(--ink3);}
-.vr-level{flex-shrink:0;border:1px solid var(--border);border-radius:var(--r);padding:3px 6px;font-size:11px;font-family:var(--sans);outline:none;background:var(--surface);}
+.vr-level{flex-shrink:0;font-size:11px;font-family:var(--sans);outline:none;background:var(--surface);}
 .ra-col{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
 
 /* ===== ドラッグ＆ドロップ ===== */

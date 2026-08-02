@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/shift-create.css?v=33">
+<link rel="stylesheet" href="css/shift-create.css?v=34">
 </head>
 <body>
 
@@ -107,8 +107,9 @@
       <div class="cmp-panel" id="cmp-panel">
         <div class="cmp-sel-bar">
           <span class="cmp-label">比較表示</span>
-          <select class="cmp-sel" id="cmp-date-sel" onchange="onCmpDateChange()"><option value="">日付を選択...</option></select>
-          <select class="cmp-sel" id="cmp-time-sel" onchange="onCmpTimeChange()"><option value="">時間帯を選択...</option></select>
+          <!-- 選択チップ（ドロップダウンから置き換え）。中身は populateCmpDateSel が描く -->
+          <div class="uic-row" id="cmp-date-chips"></div>
+          <div class="uic-row" id="cmp-time-chips"></div>
         </div>
         <div class="cmp-content" id="cmp-content"><div style="padding:24px;color:var(--ink3);text-align:center;">比較する日付・時間帯を選択してください</div></div>
       </div>
@@ -186,7 +187,9 @@
       <div class="form-row" id="we-cart-row">
         <div class="form-col">
           <label>カート担当</label>
-          <label class="we-check"><input type="checkbox" id="we-cartng"><span>この時間はカート担当不可</span></label>
+          <div class="uic-row">
+            <button type="button" class="uic lg" data-chip="we-cartng" onclick="uiChipToggle(this)">この時間はカート担当不可</button>
+          </div>
         </div>
       </div>
       <div class="form-row">
@@ -209,7 +212,7 @@
     <div class="popup-title">🔍 公開前チェック</div>
     <div class="pf-bar">
       <div class="pf-summary" id="pf-summary"></div>
-      <label class="pf-toggle"><input type="checkbox" id="pf-show-acked" onchange="openPreflight()"> 確認済みも表示</label>
+      <button type="button" class="uic" data-chip="pf-show-acked" onclick="uiChipToggle(this);openPreflight()">確認済みも表示</button>
     </div>
     <div class="pf-list" id="pf-list"></div>
     <div class="pf-footer" id="pf-footer"></div>
@@ -285,6 +288,6 @@
 <script src="js/validation.js?v=9"></script>
 <script src="js/picker.js?v=4"></script>
 <script src="js/dnd.js?v=15"></script>
-<script src="js/shift-create.js?v=41"></script>
+<script src="js/shift-create.js?v=42"></script>
 </body>
 </html>
