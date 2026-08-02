@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=23">
+<link rel="stylesheet" href="css/index.css?v=24">
 </head>
 <body>
 
@@ -421,11 +421,16 @@
       <input type="date" id="log-to" onchange="reloadLogs()">
       <input type="search" id="log-q" placeholder="名前・操作で絞り込み" onkeydown="if(event.key==='Enter')reloadLogs()">
       <button class="btn btn-g" onclick="reloadLogs()">絞り込む</button>
-      <!-- シフト枠保存は自動保存で大量に積まれ、公開作業の記録を埋めてしまうので既定では隠す -->
-      <label class="log-minor" id="log-minor-wrap">
-        <input type="checkbox" id="log-minor" onchange="reloadLogs()">
-        <span>細かい編集も表示</span>
-      </label>
+      <!-- 操作の種類・結果・人での絞り込み。
+           「細かい編集も表示」はここの操作チェックボックスに吸収した -->
+      <button class="btn btn-g" id="log-filter-more" onclick="toggleLogFilterPanel()">▾ 条件で絞り込む</button>
+    </div>
+    <div class="log-filter-panel" id="log-filter-panel">
+      <div id="log-filter-groups"></div>
+      <div class="log-filter-actions">
+        <button class="btn btn-p" onclick="applyLogFilter()">この条件で表示</button>
+        <button class="btn btn-g" onclick="clearLogFilter()">条件をクリア</button>
+      </div>
     </div>
     <div class="mbd log-body" id="m-logs-body" style="padding:0;">
       <div class="log-ov" id="log-ov"><div class="spin"></div><div class="log-ov-text" id="log-ov-text">読み込み中...</div></div>
@@ -704,6 +709,6 @@
 <script src="js/session.js?v=2"></script>
 <script src="js/api.js?v=7"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=35"></script>
+<script src="js/index.js?v=36"></script>
 </body>
 </html>

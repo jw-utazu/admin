@@ -2828,21 +2828,44 @@ const LOG_KIND_LABEL = {
   wish:    '希望提出',
   access:  'ログイン',
 };
-let logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true };
+// 絞り込みの条件はタブごとに別物なので、タブを切り替えたら作り直す。
+// 既定値の考え方：
+//   admin  … 操作の指定なし＝サーバー側で「シフト枠保存」を隠す（従来どおり）
+//   access … 失敗だけを表示。成功・試行は量が多く、ふだん見る必要が無い
+function defaultLogFilter(kind) {
+  return {
+    ops: [], results: kind === 'access' ? ['失敗'] : [], apps: [],
+    person: '', onlyUnreviewed: true,
+  };
+}
+let logState = {
+  kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true,
+  filter: defaultLogFilter('admin'),
+  options: {},        // タブごとの絞り込み選択肢（開いた最初の1回だけ取りに行く）
+  expanded: {},       // 展開中の行 id
+  details: {},        // 取得済みの詳細（同じ行を開き直しても取り直さない）
+};
 
-// 「細かい編集も表示」は管理者の操作タブでしか意味がないので、他のタブでは隠す
-function syncLogMinorToggle() {
-  document.getElementById('log-minor-wrap').style.display =
-    logState.kind === 'admin' ? '' : 'none';
+function logFilterKey(kind, id) { return kind + ':' + id; }
+
+function toggleLogFilterPanel() {
+  const el = document.getElementById('log-filter-panel');
+  const on = !el.classList.contains('on');
+  el.classList.toggle('on', on);
+  document.getElementById('log-filter-more').textContent = (on ? '▴' : '▾') + ' 条件で絞り込む';
 }
 
 function openLogModal() {
-  logState = { kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true };
+  logState = {
+    kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true,
+    filter: defaultLogFilter('admin'), options: {}, expanded: {}, details: {},
+  };
   document.getElementById('log-from').value  = '';
   document.getElementById('log-to').value    = '';
   document.getElementById('log-q').value     = '';
-  document.getElementById('log-minor').checked = false;
-  syncLogMinorToggle();
+  document.getElementById('log-filter-panel').classList.remove('on');
+  document.getElementById('log-filter-more').textContent = '▾ 条件で絞り込む';
+  document.getElementById('log-filter-groups').innerHTML = '';
   document.getElementById('log-content').innerHTML = '';
   document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
     b.classList.toggle('on', b.dataset.kind === 'admin');
@@ -2853,12 +2876,14 @@ function openLogModal() {
 
 function switchLogKind(kind) {
   if (logState.loading || logState.kind === kind) return;
-  logState.kind = kind;
+  logState.kind     = kind;
+  logState.filter   = defaultLogFilter(kind);
+  logState.expanded = {};
   document.getElementById('log-q').value = '';
   document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
     b.classList.toggle('on', b.dataset.kind === kind);
   });
-  syncLogMinorToggle();
+  renderLogFilterPanel();
   loadLogs(true);
 }
 
@@ -2881,18 +2906,23 @@ async function loadLogs(reset) {
   if (reset) { logState.offset = 0; logState.rows = []; }
   showLogOv(LOG_KIND_LABEL[logState.kind] + ' のログを読み込み中...');
   try {
+    const f = logState.filter;
     const d = await apiGet('getLogs', {
       kind:   logState.kind,
       from:   document.getElementById('log-from').value || '',
       to:     document.getElementById('log-to').value   || '',
       q:      document.getElementById('log-q').value.trim(),
-      includeMinor: document.getElementById('log-minor').checked,
+      ops:    f.ops, results: f.results, apps: f.apps, person: f.person,
+      onlyUnreviewed: logState.kind === 'access' && f.onlyUnreviewed,
+      // 選択肢はタブごとに1回だけ取りに行く（毎回だとサーバー側の読み取りが無駄に増える）
+      withOptions: !logState.options[logState.kind],
       limit:  LOG_PAGE,
       offset: logState.offset,
       adminUid:   _currentUser ? _currentUser.uid   : '',
       adminEmail: _currentUser ? _currentUser.email : '',
     });
     if (!d.ok) throw new Error(d.error === 'unauthorized' ? '権限がありません' : (d.error || '取得に失敗しました'));
+    if (d.options) { logState.options[logState.kind] = d.options; renderLogFilterPanel(); }
     logState.rows  = logState.rows.concat(d.rows || []);
     logState.total = d.total || logState.rows.length;
     logState.offset = logState.rows.length;
@@ -2910,19 +2940,94 @@ async function loadLogs(reset) {
   }
 }
 
+// ------------------------------------------------------------
+// 絞り込みパネル（チェックボックス）
+//
+// 値の候補はサーバーから受け取る。操作名をこちら側にも書くと二重管理になり、
+// 追加した操作が画面から絞り込めない、という食い違いが起きるため
+// ------------------------------------------------------------
+function logCheckGroup(title, name, values, selected) {
+  if (!values || values.length === 0) return '';
+  return `<div class="log-fg">
+      <div class="log-fg-t">${esc(title)}</div>
+      <div class="log-fg-b">` +
+    values.map(v => `<label class="log-fg-c">
+        <input type="checkbox" data-fname="${esc(name)}" value="${esc(v)}"${selected.includes(v) ? ' checked' : ''}>
+        <span>${esc(v)}</span>
+      </label>`).join('') +
+    `</div></div>`;
+}
+
+function renderLogFilterPanel() {
+  const kind = logState.kind;
+  const o    = logState.options[kind];
+  const f    = logState.filter;
+  const box  = document.getElementById('log-filter-groups');
+  if (!o) { box.innerHTML = '<div class="log-fg-empty">選択肢を読み込んでいます...</div>'; return; }
+
+  let html = '';
+  if (kind === 'admin')  html += logCheckGroup('操作', 'ops', o.ops, f.ops);
+  if (kind === 'access') {
+    html += logCheckGroup('結果', 'results', o.results, f.results);
+    html += logCheckGroup('アプリ', 'apps', o.apps, f.apps);
+    html += `<div class="log-fg">
+        <div class="log-fg-t">確認済み</div>
+        <div class="log-fg-b"><label class="log-fg-c">
+          <input type="checkbox" id="log-f-unreviewed"${f.onlyUnreviewed ? ' checked' : ''}>
+          <span>確認済みにしたものは隠す</span>
+        </label></div>
+      </div>`;
+  }
+  // 人は候補が多くなりうるのでチェックボックスにはしない
+  if (o.people && o.people.length > 0) {
+    html += `<div class="log-fg">
+        <div class="log-fg-t">人</div>
+        <div class="log-fg-b"><select id="log-f-person" class="log-purge-sel">
+          <option value="">すべて</option>` +
+      o.people.map(pp => `<option value="${esc(pp.id)}"${f.person === pp.id ? ' selected' : ''}>${esc(pp.name)}</option>`).join('') +
+      `</select></div></div>`;
+  }
+  box.innerHTML = html || '<div class="log-fg-empty">このログに絞り込める項目はありません</div>';
+}
+
+function applyLogFilter() {
+  const f = logState.filter;
+  ['ops', 'results', 'apps'].forEach(n => {
+    f[n] = [...document.querySelectorAll(`#log-filter-groups input[data-fname="${n}"]:checked`)]
+      .map(el => el.value);
+  });
+  const un = document.getElementById('log-f-unreviewed');
+  const pe = document.getElementById('log-f-person');
+  f.onlyUnreviewed = un ? un.checked : true;
+  f.person         = pe ? pe.value   : '';
+  loadLogs(true);
+}
+
+function clearLogFilter() {
+  logState.filter = defaultLogFilter(logState.kind);
+  // access の既定は「失敗だけ」なので、クリア＝全件表示にする
+  if (logState.kind === 'access') logState.filter.results = [];
+  renderLogFilterPanel();
+  loadLogs(true);
+}
+
 function renderLogs() {
   const kind = logState.kind;
   const rows = logState.rows;
+  const f    = logState.filter;
   let html = '';
 
   if (kind === 'access') {
-    html += `<div class="log-hint">ログインの試行・成功・失敗の記録です。ふだん見る必要はありませんが、
-      身に覚えのないログイン失敗が並んでいないかの確認に使えます。</div>`;
+    html += `<div class="log-hint">ログインの試行・成功・失敗の記録です。` +
+      (f.results.length === 1 && f.results[0] === '失敗'
+        ? '<b>いまは「失敗」だけを表示しています。</b>成功・試行も見るには「条件で絞り込む」から結果を選んでください。'
+        : '身に覚えのないログイン失敗が並んでいないかの確認に使えます。') +
+      `</div>`;
   }
 
   // 隠していること自体を伏せると「記録されていない」と誤解されるので明示する
-  if (kind === 'admin' && !document.getElementById('log-minor').checked) {
-    html += `<div class="log-hint">シフト枠保存（自動保存）は件数が多いため隠しています。「細かい編集も表示」で出せます。</div>`;
+  if (kind === 'admin' && f.ops.length === 0) {
+    html += `<div class="log-hint">シフト枠保存（自動保存）は件数が多いため隠しています。「条件で絞り込む」→ 操作 から表示できます。</div>`;
   }
 
   if (!logState.hasDate) {
@@ -2947,7 +3052,7 @@ function renderLogs() {
 }
 
 function logRowHtml(kind, r) {
-  let main = '', sub = '';
+  let main = '', sub = '', foot = '';
   if (kind === 'admin') {
     main = `<span class="log-who">${esc(r.name || '（不明）')}</span> <span class="log-op">${esc(r.operation)}</span>`;
     sub  = r.detail;
@@ -2959,20 +3064,144 @@ function logRowHtml(kind, r) {
     // 氏名が分かるのはログインに成功したときだけ。
     // 試行・失敗の行はメールアドレスしか無いので、それを見出しにする
     const cls = r.result === '成功' ? 'ok' : (r.result === '失敗' ? 'ng' : 'try');
-    main = `<span class="log-who">${esc(r.name || r.email || '（不明）')}</span><span class="log-tag ${cls}">${esc(r.result || '－')}</span>`;
+    main = `<span class="log-who">${esc(r.name || r.email || '（不明）')}</span><span class="log-tag ${cls}">${esc(r.result || '－')}</span>` +
+           (r.reviewedAt ? '<span class="log-tag ok">確認済み</span>' : '');
     sub  = [r.name ? r.email : '', r.appName, r.reason].filter(Boolean).join(' / ');
+    // 失敗は消さずに「確認済み」で隠す。誰がいつ確認したかも残す
+    if (r.result === '失敗') {
+      foot = r.reviewedAt
+        ? `<div class="log-rev">${esc(r.reviewedAt)} ${esc(r.reviewedBy || '')} が確認
+             <button class="log-rev-btn" onclick="reviewAccessLog(${r.id},true)">取り消す</button></div>`
+        : `<div class="log-rev"><button class="log-rev-btn" onclick="reviewAccessLog(${r.id},false)">確認済みにする</button></div>`;
+    }
   }
+
+  const open = !!logState.expanded[logFilterKey(kind, r.id)];
+  const more = r.hasDetail
+    ? `<button class="log-more-btn" onclick="toggleLogDetail(${r.id})">${open ? '▴ 閉じる' : '▾ 詳細'}</button>`
+    : '';
+  const det = open
+    ? `<div class="log-det" id="log-det-${r.id}">${logDetailBodyHtml(kind, r.id)}</div>`
+    : '';
+
   return `<div class="log-row">
       <div class="log-at">${esc(r.at)}</div>
-      <div class="log-main">${main}${sub ? `<div class="log-detail">${esc(sub)}</div>` : ''}</div>
+      <div class="log-main">${main}${sub ? `<div class="log-detail">${esc(sub)}</div>` : ''}${foot}${det}</div>
+      ${more}
     </div>`;
+}
+
+// ------------------------------------------------------------
+// 行の展開（何がどう変わったか）
+//
+// 一覧には詳細を載せていない（集約されたシフト枠保存は変更が数百件ぶら下がる）。
+// 開いたときに1件だけ取りに行き、取れたものは覚えておいて開き直しでは取り直さない
+// ------------------------------------------------------------
+async function toggleLogDetail(id) {
+  const kind = logState.kind;
+  const key  = logFilterKey(kind, id);
+  if (logState.expanded[key]) { delete logState.expanded[key]; renderLogs(); return; }
+
+  logState.expanded[key] = true;
+  renderLogs();
+  if (logState.details[key] !== undefined) return;
+
+  try {
+    const d = await apiGet('getLogDetail', {
+      kind, id,
+      adminUid:   _currentUser ? _currentUser.uid   : '',
+      adminEmail: _currentUser ? _currentUser.email : '',
+    });
+    if (!d.ok) throw new Error(d.error || '取得に失敗しました');
+    logState.details[key] = d.detail;
+  } catch (e) {
+    logState.details[key] = { __error: e.message };
+  }
+  // 開いたまま別の操作をしている可能性があるので、閉じられていたら描き直さない
+  if (logState.expanded[key]) renderLogs();
+}
+
+function logDetailBodyHtml(kind, id) {
+  const d = logState.details[logFilterKey(kind, id)];
+  if (d === undefined) return '<div class="log-det-load"><span class="spin"></span> 詳細を読み込み中...</div>';
+  if (d && d.__error)  return `<div class="log-det-err">詳細の取得に失敗しました: ${esc(d.__error)}</div>`;
+  return logDetailHtml(d);
+}
+
+// detail_json は操作ごとに形が違う。よく出る形（変更の一覧・提出した枠・
+// カレンダーの日程）だけ整えて見せ、それ以外は素直に項目名と値を並べる
+function logDetailHtml(d) {
+  if (!d || typeof d !== 'object') return '<div class="log-det-err">詳細は記録されていません</div>';
+  const skip = new Set(['changes', 'slots', 'dates', 'before', 'after', 'inserted', 'skipped', 'member', 'ids']);
+  let h = '';
+
+  const val = v => (v === null || v === undefined || v === '') ? '－'
+    : (v === true ? 'あり' : (v === false ? 'なし' : String(v)));
+
+  if (Array.isArray(d.changes) && d.changes.length > 0) {
+    h += `<div class="log-det-t">変更（${d.changes.length}件）</div>` +
+      d.changes.map(c => `<div class="log-det-chg">
+          <span class="log-det-at">${esc(c.at || c.field || '')}</span>
+          <span class="log-det-from">${esc(val(c.from))}</span>
+          <span class="log-det-arw">→</span>
+          <span class="log-det-to">${esc(val(c.to))}</span>
+        </div>`).join('');
+  }
+  if (Array.isArray(d.slots) && d.slots.length > 0) {
+    h += `<div class="log-det-t">送信した枠（${d.slots.length}件）</div><div class="log-det-slots">` +
+      d.slots.map(s => `<span class="log-det-slot">${esc(s.date || '')} ${esc(s.time || '')}` +
+        (s.comment ? `<i>${esc(s.comment)}</i>` : '') + `</span>`).join('') + '</div>';
+  }
+  ['inserted', 'skipped'].forEach(k => {
+    if (!Array.isArray(d[k]) || d[k].length === 0) return;
+    h += `<div class="log-det-t">${k === 'inserted' ? '投入' : 'スキップ'}（${d[k].length}件）</div><div class="log-det-slots">` +
+      d[k].map(s => `<span class="log-det-slot">${esc(s.name || '')} ${esc(s.date || '')} ${esc(s.time || '')}` +
+        (s.reason ? `<i>${esc(s.reason)}</i>` : '') + `</span>`).join('') + '</div>';
+  });
+  const dateRow = (label, o) => `<div class="log-det-kv"><span>${esc(label)}</span><b>` +
+    `申込 ${esc(val(o.apply))}・締切 ${esc(val(o.deadline))}・公開 ${esc(val(o.open))}</b></div>`;
+  if (d.dates)  h += `<div class="log-det-t">日程</div>` + dateRow('この時点', d.dates);
+  if (d.before || d.after) {
+    h += `<div class="log-det-t">日程</div>`;
+    if (d.before) h += dateRow('変更前', d.before);
+    if (d.after)  h += dateRow('変更後', d.after);
+  }
+  if (d.member && typeof d.member === 'object') {
+    h += `<div class="log-det-t">内容</div>` +
+      Object.entries(d.member).map(([k, v]) => `<div class="log-det-kv"><span>${esc(k)}</span><b>${esc(val(v))}</b></div>`).join('');
+  }
+
+  const rest = Object.entries(d).filter(([k, v]) =>
+    !skip.has(k) && v !== null && v !== '' && typeof v !== 'object');
+  if (rest.length > 0) {
+    h += `<div class="log-det-t">その他</div>` +
+      rest.map(([k, v]) => `<div class="log-det-kv"><span>${esc(k)}</span><b>${esc(val(v))}</b></div>`).join('');
+  }
+  return h || '<div class="log-det-err">詳細は記録されていません</div>';
+}
+
+// 失敗ログの確認済み切り替え。消さずに一覧から隠すだけ
+async function reviewAccessLog(id, undo) {
+  showLogOv(undo ? '確認済みを取り消しています...' : '確認済みにしています...');
+  try {
+    const d = await apiPost('reviewAccessLogs', { ids: [id], undo: !!undo });
+    if (!d.ok) throw new Error(d.error || '更新に失敗しました');
+    hideLogOv();
+    toast(undo ? '確認済みを取り消しました' : '確認済みにしました', 's');
+    loadLogs(true);
+  } catch (e) {
+    hideLogOv();
+    toast('失敗: ' + e.message, 'e');
+  }
 }
 
 function logPurgeBoxHtml() {
   return `<div class="log-purge">
       <b>アクセスログの整理</b><br>
-      ログは自動では消えません。指定した時期より前の「試行」「成功」だけをまとめて削除します。
-      <b>「失敗」の記録は不正アクセスの手がかりになるため残します。</b>
+      ログイン記録は<b>90日で自動的に削除</b>されます（毎日1回）。ここでは前倒しで整理できます。
+      指定した時期より前の「試行」「成功」だけをまとめて削除します。
+      <b>「失敗」の記録は不正アクセスの手がかりになるため、自動でも手動でも削除しません。</b>
+      不要な失敗は各行の「確認済みにする」で一覧から隠せます。
       <div class="log-purge-row">
         <select id="log-purge-months" class="log-purge-sel">
           <option value="3">3ヶ月</option>
