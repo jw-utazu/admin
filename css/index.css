@@ -501,6 +501,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 /* メンバーのアイコン。未設定の人は頭文字の丸で埋めて、並びが崩れないようにする */
 .mav{border-radius:50%;object-fit:cover;flex-shrink:0;display:inline-block;vertical-align:middle;background:var(--surface2,#f1f5f9);}
 .mav-none{display:inline-flex;align-items:center;justify-content:center;color:var(--ink3);font-weight:700;border:1px solid var(--border);}
+/* メンバー編集画面。誰を編集しているのかが一目で分かるよう大きく出す */
+.mf-av{display:flex;align-items:center;gap:14px;padding:12px 14px;margin-bottom:14px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);}
+.mf-av .mav{box-shadow:0 1px 4px rgba(0,0,0,0.12);}
+.mf-av-tx{min-width:0;}
+.mf-av-n{font-size:15px;font-weight:700;color:var(--ink);}
+.mf-av-d{font-size:11px;color:var(--ink3);margin-top:4px;line-height:1.6;}
 .member-name{font-size:13px;font-weight:700;color:var(--ink);}
 .member-kana{font-size:11px;color:var(--ink3);}
 .member-gender-badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;}

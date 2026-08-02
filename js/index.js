@@ -3843,9 +3843,23 @@ function openMemberEditForm(rowIndex) {
 function buildMemberForm(m, isOwner) {
   const isEdit = !!m;
   const emailReadonly = isEdit && !isOwner;
+  // 編集のときだけアイコンを大きく出す。追加のときはまだ本人が存在しない。
+  // 差し替えはできない（本人がフォームアプリで設定するもの）ので、その旨を添える
+  const avBlock = isEdit ? `
+    <div class="mf-av">
+      ${avatarHtml(m.uid, m.name, 96)}
+      <div class="mf-av-tx">
+        <div class="mf-av-n">${esc(m.name || '')}</div>
+        <div class="mf-av-d">${_avatars[m.uid]
+          ? 'アイコンは本人がフォームアプリで設定します'
+          : 'アイコンは未設定です（本人が設定すると表示されます）'}</div>
+      </div>
+    </div>` : '';
+
   return `
   <div style="padding:14px 16px;">
     <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px;">${isEdit ? '✏️ メンバー編集' : '➕ メンバー追加'}</div>
+    ${avBlock}
     <div style="display:flex;flex-direction:column;gap:10px;">
       <div class="mf-row">
         <label class="mf-lbl">名前 <span class="req">*</span></label>
