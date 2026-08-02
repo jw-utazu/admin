@@ -626,10 +626,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
    件数が多くなりうるので、1件を1行の帯として詰めて並べる。
    日時は等幅にして縦に揃え、目で追えるようにする
    ============================================================ */
-.log-tabs{display:flex;gap:4px;padding:10px 16px 0;flex-wrap:wrap;}
-.log-tab{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:none;color:var(--ink2);font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;}
-.log-tab:hover:not(.on){background:var(--surface2);color:var(--ink);}
-.log-tab.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+/* タブは下線型。ピル（角丸の長方形）を画面から減らし、
+   「タブ＝下線」「カテゴリ＝行」「選択肢＝ピル」で階層を見分けられるようにする */
+.log-tabs{display:flex;gap:2px;padding:10px 16px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+.log-tab{padding:8px 12px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--ink3);font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;}
+.log-tab:hover:not(.on){color:var(--ink);}
+.log-tab.on{color:var(--blue);border-bottom-color:var(--blue);}
 .log-filter{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);}
 .log-filter-lbl{font-size:11px;color:var(--ink3);}
 .log-filter input{padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);font-family:var(--sans);font-size:12px;color:var(--ink);background:var(--surface);}
@@ -650,13 +652,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .lfc.on{background:var(--blue);border-color:var(--blue);color:#fff;}
 .lfc.part{background:var(--blue-l);border-color:var(--blue);color:var(--blue);}
 .lfc-n{font-weight:400;opacity:.8;margin-left:4px;}
-/* 操作は数が多いのでカテゴリでたたむ。既定は閉じている */
-.lf-grp{margin-bottom:4px;}
-.lf-grp-hd{display:flex;align-items:center;gap:4px;}
-.lf-exp{padding:4px 7px;border:1px solid var(--border);border-radius:999px;background:none;color:var(--ink3);font-family:var(--sans);font-size:10px;cursor:pointer;}
-.lf-exp:hover{color:var(--ink);background:var(--surface2);}
-.lf-ops{display:none;flex-wrap:wrap;gap:4px;padding:6px 0 4px 10px;}
+/* 操作は数が多いのでカテゴリでたたむ。
+   親（カテゴリ）は「行」、子（操作）は「ピル」。同じ形にすると展開時に見分けがつかない */
+.lf-grp{border-bottom:1px solid var(--border);}
+.lf-grp:last-child{border-bottom:0;}
+.lf-cat{display:flex;align-items:center;gap:8px;width:100%;padding:9px 2px;border:0;background:none;color:var(--ink2);font-family:var(--sans);font-size:12px;font-weight:700;text-align:left;cursor:pointer;}
+.lf-cat:hover{color:var(--ink);}
+.lf-cat.sel{color:var(--blue);}
+.lf-cat-cv{width:12px;flex-shrink:0;color:var(--ink3);font-size:9px;}
+.lf-cat-n{margin-left:auto;font-weight:400;font-size:11px;color:var(--ink3);}
+.lf-all{flex-shrink:0;padding:2px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink3);font-family:var(--sans);font-size:10px;font-weight:700;cursor:pointer;}
+.lf-all:hover{color:var(--blue);border-color:var(--blue);}
+.lf-all.on{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
+/* 子は左の縦線で親にぶら下がっていることを示す */
+.lf-ops{display:none;flex-wrap:wrap;gap:4px;margin:0 0 8px 12px;padding:8px 10px;background:var(--surface);border-left:2px solid var(--blue);border-radius:0 var(--r) var(--r) 0;}
 .lf-ops.on{display:flex;}
+.lf-ops .lfc{font-size:10px;padding:3px 8px;}
 /* 人は候補が多くなりうるので高さを止めてスクロールさせる */
 .lf-scroll{max-height:96px;overflow-y:auto;}
 

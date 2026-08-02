@@ -3041,13 +3041,17 @@ function renderLogFilterPanel() {
     html += `<div class="log-fg"><div class="log-fg-t">操作（何も選ばなければすべて表示）</div>`;
     logOpGroups(o.ops).forEach((g, i) => {
       const sel  = g.ops.filter(x => f.ops.includes(x)).length;
-      const cls  = sel === g.ops.length ? ' on' : (sel > 0 ? ' part' : '');
+      const all  = sel === g.ops.length;
       const open = !!logState.openCats[i];
+      // 行そのものは開閉。まとめて選ぶのは右端のボタンに分ける
+      // （同じ場所に2つの意味を持たせると、どちらが起きるか予測できない）
       html += `<div class="lf-grp">
-          <div class="lf-grp-hd">
-            <button class="lfc${cls}" onclick="toggleLogOpGroup(${i})">${esc(g.name)}<span class="lfc-n">${sel > 0 ? sel + '/' : ''}${g.ops.length}</span></button>
-            <button class="lf-exp" onclick="toggleLogOpGroupOpen(${i})">${open ? '▴ 閉じる' : '▾ 個別に選ぶ'}</button>
-          </div>
+          <button class="lf-cat${sel > 0 ? ' sel' : ''}" onclick="toggleLogOpGroupOpen(${i})">
+            <span class="lf-cat-cv">${open ? '▼' : '▶'}</span>
+            <span>${esc(g.name)}</span>
+            <span class="lf-cat-n">${sel > 0 ? sel + ' / ' + g.ops.length : g.ops.length + '件'}</span>
+            <span class="lf-all${all ? ' on' : ''}" onclick="event.stopPropagation();toggleLogOpGroup(${i})">${all ? '解除' : 'すべて'}</span>
+          </button>
           <div class="lf-ops${open ? ' on' : ''}">` +
         g.ops.map(op => lfChip(op, f.ops.includes(op), `toggleLogValue('ops','${esc(op)}')`)).join('') +
         `</div></div>`;
@@ -3852,7 +3856,7 @@ function buildMemberForm(m, isOwner) {
         <div class="mf-av-n">${esc(m.name || '')}</div>
         <div class="mf-av-d">${_avatars[m.uid]
           ? 'アイコンは本人がフォームアプリで設定します'
-          : 'アイコンは未設定です（本人が設定すると表示されます）'}</div>
+          : 'アイコンは表示されません（本人が未設定、または非表示の設定です）'}</div>
       </div>
     </div>` : '';
 
