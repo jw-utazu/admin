@@ -643,6 +643,17 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .log-fg-t{font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:4px;}
 .log-fg-b{display:flex;flex-wrap:wrap;gap:4px;}
 .log-fg-empty{font-size:11px;color:var(--ink3);}
+/* パネル内に移した期間・文字の入力 */
+.log-fg-date{align-items:center;}
+.log-filter-panel input[type="date"]{padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);
+  font-family:var(--sans);font-size:12px;color:var(--ink);background:var(--surface);}
+.log-filter-panel input[type="date"]:disabled{opacity:.5;}
+.log-q-inp{flex:1;min-width:140px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);
+  font-family:var(--sans);font-size:12px;color:var(--ink);background:var(--surface);}
+.log-fg-note{font-size:10.5px;color:var(--ink3);margin-top:4px;}
+/* たたんでいる間に出す絞り込みの要約 */
+.log-filter-sum{font-size:11px;color:var(--ink3);}
+.log-filter-sum.on{color:var(--blue,#1d4ed8);font-weight:700;}
 .log-filter-actions{display:flex;gap:6px;flex-wrap:wrap;}
 
 /* 絞り込みの選択チップ（.log-tab と同じ言語。チェックボックスは使わない）

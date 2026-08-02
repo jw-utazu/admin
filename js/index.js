@@ -2875,6 +2875,26 @@ function toggleLogFilterPanel() {
   document.getElementById('log-filter-more').textContent = (on ? '▴' : '▾') + ' 条件で絞り込む';
 }
 
+// たたんでいる間、何で絞り込んでいるかを一行で見せる。
+// 絞り込んでいることに気づかず「件数が少ない」と誤解するのを防ぐ。
+// 「確認済みは隠す」は絞り込みというより見せ方の指定なので数えない
+function updateLogFilterSummary() {
+  const f = logState.filter;
+  const from = document.getElementById('log-from').value;
+  const to   = document.getElementById('log-to').value;
+  const q    = document.getElementById('log-q').value.trim();
+  const parts = [];
+  if (from || to) parts.push('期間');
+  if (q)          parts.push('文字');
+  if (f.ops.length)     parts.push('操作' + f.ops.length);
+  if (f.results.length) parts.push('結果' + f.results.length);
+  if (f.apps.length)    parts.push('アプリ' + f.apps.length);
+  if (f.person)         parts.push('人');
+  const el = document.getElementById('log-filter-sum');
+  el.textContent = parts.length ? '絞り込み中： ' + parts.join('・') : '';
+  el.classList.toggle('on', parts.length > 0);
+}
+
 function openLogModal() {
   logState = {
     kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true,
@@ -2888,6 +2908,8 @@ function openLogModal() {
   document.getElementById('log-filter-more').textContent = '▾ 条件で絞り込む';
   document.getElementById('log-filter-groups').innerHTML = '';
   document.getElementById('log-content').innerHTML = '';
+  document.getElementById('log-date-note').style.display = 'none';
+  updateLogFilterSummary();
   document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
     b.classList.toggle('on', b.dataset.kind === 'admin');
   });
@@ -2909,7 +2931,6 @@ function switchLogKind(kind) {
   loadLogs(true);
 }
 
-function reloadLogs() { loadLogs(true); }
 function loadMoreLogs() { loadLogs(false); }
 
 function showLogOv(text) {
@@ -2948,10 +2969,13 @@ async function loadLogs(reset) {
     logState.rows  = logState.rows.concat(d.rows || []);
     logState.total = d.total || logState.rows.length;
     logState.offset = logState.rows.length;
-    // 日時が記録されていない種類のログでは、期間を指定させても効かないので入力を閉じる
+    // 日時が記録されていない種類のログでは、期間を指定させても効かないので
+    // 入力を閉じ、なぜ使えないのかもその場に書いておく
     logState.hasDate = d.hasDate !== false;
     document.getElementById('log-from').disabled = !logState.hasDate;
     document.getElementById('log-to').disabled   = !logState.hasDate;
+    document.getElementById('log-date-note').style.display = logState.hasDate ? 'none' : '';
+    updateLogFilterSummary();
     renderLogs();
   } catch (e) {
     document.getElementById('log-content').innerHTML =
@@ -3081,6 +3105,7 @@ function renderLogFilterPanel() {
   }
 
   box.innerHTML = html || '<div class="log-fg-empty">このログに絞り込める項目はありません</div>';
+  updateLogFilterSummary();
 }
 
 // チップは押した時点で logState.filter を変えているので、ここでは取りに行くだけ
@@ -3091,6 +3116,10 @@ function clearLogFilter() {
   // access の既定は「失敗だけ」なので、クリア＝全件表示にする
   if (logState.kind === 'access') logState.filter.results = [];
   logState.openCats = {};
+  // 期間と文字もこのパネルの条件なので、まとめて消す
+  document.getElementById('log-from').value = '';
+  document.getElementById('log-to').value   = '';
+  document.getElementById('log-q').value    = '';
   renderLogFilterPanel();
   loadLogs(true);
 }

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=28">
+<link rel="stylesheet" href="css/index.css?v=29">
 </head>
 <body>
 
@@ -414,18 +414,32 @@
       <button class="log-tab"    data-kind="wish"    onclick="switchLogKind('wish')">希望提出</button>
       <button class="log-tab"    data-kind="access"  onclick="switchLogKind('access')">ログイン</button>
     </div>
+    <!-- 絞り込みは種類を問わずこのパネルに集約する。
+         期間・文字での絞り込みも「条件」なので、操作や人と同じ場所に置く -->
     <div class="log-filter">
-      <span class="log-filter-lbl">期間</span>
-      <input type="date" id="log-from" onchange="reloadLogs()">
-      <span class="log-filter-lbl">〜</span>
-      <input type="date" id="log-to" onchange="reloadLogs()">
-      <input type="search" id="log-q" placeholder="名前・操作で絞り込み" onkeydown="if(event.key==='Enter')reloadLogs()">
-      <button class="btn btn-g" onclick="reloadLogs()">絞り込む</button>
-      <!-- 操作の種類・結果・人での絞り込み。
-           「細かい編集も表示」はここの操作チェックボックスに吸収した -->
       <button class="btn btn-g" id="log-filter-more" onclick="toggleLogFilterPanel()">▾ 条件で絞り込む</button>
+      <!-- たたんでいる間も、何かで絞り込んでいることが分かるようにする -->
+      <span class="log-filter-sum" id="log-filter-sum"></span>
     </div>
     <div class="log-filter-panel" id="log-filter-panel">
+      <!-- 期間と名前は固定で置く。チップ側（log-filter-groups）は
+           選ぶたびに作り直すので、そこに入れると入力中の値やカーソルが飛ぶ -->
+      <div class="log-fg">
+        <div class="log-fg-t">期間</div>
+        <div class="log-fg-b log-fg-date">
+          <input type="date" id="log-from">
+          <span class="log-filter-lbl">〜</span>
+          <input type="date" id="log-to">
+        </div>
+        <div class="log-fg-note" id="log-date-note" style="display:none;">このログには日時が記録されていないため、期間では絞り込めません</div>
+      </div>
+      <div class="log-fg">
+        <div class="log-fg-t">名前・操作の文字</div>
+        <div class="log-fg-b">
+          <input type="search" id="log-q" class="log-q-inp" placeholder="例：山田、公開"
+                 onkeydown="if(event.key==='Enter')applyLogFilter()">
+        </div>
+      </div>
       <div id="log-filter-groups"></div>
       <div class="log-filter-actions">
         <button class="btn btn-p" onclick="applyLogFilter()">この条件で表示</button>
@@ -709,6 +723,6 @@
 <script src="js/session.js?v=3"></script>
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=43"></script>
+<script src="js/index.js?v=44"></script>
 </body>
 </html>
