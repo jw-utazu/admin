@@ -2230,7 +2230,8 @@ async function openProxyModal() {
 async function refreshProxyModal() {
   document.getElementById('m-proxy-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const [proxyRes, memberRes] = await Promise.all([apiGet('getProxySettings'), apiGet('getMemberList')]);
+    const [proxyRes, memberRes] = await Promise.all([
+      apiGet('getProxySettings'), apiGet('getMemberList'), loadAvatars()]);
     _proxyMembers = (memberRes.members || []).filter(m => m.uid);
     const settings = proxyRes.settings || [];
     const memberOpts = _proxyMembers.map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
@@ -2252,9 +2253,13 @@ async function refreshProxyModal() {
       html += settings.map(s => {
         const fromM = _proxyMembers.find(m => m.uid === s.fromUid);
         const toM   = _proxyMembers.find(m => m.uid === s.toUid);
-        return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:12px;">${esc(fromM?fromM.name:s.fromUid)} → ${esc(toM?toM.name:s.toUid)}</span>
-          <button class="btn btn-d" onclick="deleteProxy('${esc(s.fromUid)}','${esc(s.toUid)}')" style="font-size:10px;padding:3px 8px;">解除</button>
+        return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span style="font-size:12px;display:flex;align-items:center;gap:6px;min-width:0;">
+            ${avatarHtml(s.fromUid, fromM ? fromM.name : '', 22)}${esc(fromM?fromM.name:s.fromUid)}
+            <span style="color:var(--ink3);">→</span>
+            ${avatarHtml(s.toUid, toM ? toM.name : '', 22)}${esc(toM?toM.name:s.toUid)}
+          </span>
+          <button class="btn btn-d" onclick="deleteProxy('${esc(s.fromUid)}','${esc(s.toUid)}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;">解除</button>
         </div>`;
       }).join('');
     }
@@ -2307,7 +2312,8 @@ async function openCoupleModal() {
 async function refreshCoupleModal() {
   document.getElementById('m-couple-body').innerHTML = '<div class="loading-row"><div class="spin"></div>読み込み中...</div>';
   try {
-    const [coupleRes, memberRes] = await Promise.all([apiGet('getCoupleList'), apiGet('getMemberList')]);
+    const [coupleRes, memberRes] = await Promise.all([
+      apiGet('getCoupleList'), apiGet('getMemberList'), loadAvatars()]);
     _coupleMembers = (memberRes.members || []).filter(m => m.uid);
     const couples  = coupleRes.couples || [];
 
@@ -2347,9 +2353,13 @@ async function refreshCoupleModal() {
       html += couples.map(c => {
         const hm = _coupleMembers.find(m => m.uid === c.husbandUid);
         const wm = _coupleMembers.find(m => m.uid === c.wifeUid);
-        return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:12px;">👨 ${esc(hm ? hm.name : c.husbandUid)} &nbsp;＆&nbsp; 👩 ${esc(wm ? wm.name : c.wifeUid)}</span>
-          <button class="btn btn-d" onclick="deleteCouple('${esc(c.husbandUid)}','${esc(c.wifeUid)}')" style="font-size:10px;padding:3px 8px;">解除</button>
+        return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span style="font-size:12px;display:flex;align-items:center;gap:6px;min-width:0;">
+            ${avatarHtml(c.husbandUid, hm ? hm.name : '', 22)}👨 ${esc(hm ? hm.name : c.husbandUid)}
+            <span style="color:var(--ink3);">＆</span>
+            ${avatarHtml(c.wifeUid, wm ? wm.name : '', 22)}👩 ${esc(wm ? wm.name : c.wifeUid)}
+          </span>
+          <button class="btn btn-d" onclick="deleteCouple('${esc(c.husbandUid)}','${esc(c.wifeUid)}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;">解除</button>
         </div>`;
       }).join('');
     }
@@ -2852,6 +2862,8 @@ let logState = {
   options: {},        // タブごとの絞り込み選択肢（開いた最初の1回だけ取りに行く）
   expanded: {},       // 展開中の行 id
   details: {},        // 取得済みの詳細（同じ行を開き直しても取り直さない）
+  openCats: {},       // 個別の操作を開いているカテゴリ
+  purgeMonths: 6,     // アクセスログ整理の対象期間
 };
 
 function logFilterKey(kind, id) { return kind + ':' + id; }
@@ -2867,6 +2879,7 @@ function openLogModal() {
   logState = {
     kind: 'admin', offset: 0, total: 0, rows: [], loading: false, hasDate: true,
     filter: defaultLogFilter('admin'), options: {}, expanded: {}, details: {},
+    openCats: {}, purgeMonths: 6,
   };
   document.getElementById('log-from').value  = '';
   document.getElementById('log-to').value    = '';
@@ -2887,6 +2900,7 @@ function switchLogKind(kind) {
   logState.kind     = kind;
   logState.filter   = defaultLogFilter(kind);
   logState.expanded = {};
+  logState.openCats = {};
   document.getElementById('log-q').value = '';
   document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
     b.classList.toggle('on', b.dataset.kind === kind);
@@ -2949,21 +2963,68 @@ async function loadLogs(reset) {
 }
 
 // ------------------------------------------------------------
-// 絞り込みパネル（チェックボックス）
+// 絞り込みパネル（選択チップ）
 //
 // 値の候補はサーバーから受け取る。操作名をこちら側にも書くと二重管理になり、
-// 追加した操作が画面から絞り込めない、という食い違いが起きるため
+// 追加した操作が画面から絞り込めない、という食い違いが起きるため。
+// ただし「どの操作がどの作業に属するか」は画面の都合なので、分類だけここで持つ。
+// 分類に無い操作（サーバー側で追加されたもの）は「その他」にまとめて必ず出す
 // ------------------------------------------------------------
-function logCheckGroup(title, name, values, selected) {
-  if (!values || values.length === 0) return '';
-  return `<div class="log-fg">
-      <div class="log-fg-t">${esc(title)}</div>
-      <div class="log-fg-b">` +
-    values.map(v => `<label class="log-fg-c">
-        <input type="checkbox" data-fname="${esc(name)}" value="${esc(v)}"${selected.includes(v) ? ' checked' : ''}>
-        <span>${esc(v)}</span>
-      </label>`).join('') +
-    `</div></div>`;
+const LOG_OP_GROUPS = [
+  { name: '公開・日程',   ops: ['カレンダー公開', 'カレンダー非公開', 'イベント日程更新', 'フォーム作成'] },
+  { name: 'シフト',       ops: ['シフト作成完了', 'シフト作成完了の取り消し', 'シフト確認完了', 'シフト差し戻し', 'シフト枠保存'] },
+  { name: '希望',         ops: ['シフト希望編集', 'スプレッドシート一括インポート'] },
+  { name: 'メンバー',     ops: ['メンバー追加', 'メンバー更新', 'メンバー削除'] },
+  { name: 'ログイン・設定', ops: ['救済ログイン承認', '救済ログイン却下', '救済セッション失効', '救済ログイン共通キー変更', '検証ルール保存', 'アクセスログ整理', 'ログイン失敗の確認'] },
+];
+
+// サーバーが返した操作一覧を分類に流し込む。分類漏れは「その他」へ
+function logOpGroups(all) {
+  const known = new Set();
+  const groups = LOG_OP_GROUPS
+    .map(g => {
+      const ops = g.ops.filter(o => all.includes(o));
+      ops.forEach(o => known.add(o));
+      return { name: g.name, ops };
+    })
+    .filter(g => g.ops.length > 0);
+  const rest = all.filter(o => !known.has(o));
+  if (rest.length > 0) groups.push({ name: 'その他', ops: rest });
+  return groups;
+}
+
+function lfChip(label, on, onclick, extra) {
+  return `<button class="lfc${on ? ' on' : ''}" onclick="${onclick}">${esc(label)}` +
+    (extra ? `<span class="lfc-n">${esc(extra)}</span>` : '') + `</button>`;
+}
+
+// 配列に入れる／外す（チップは押した時点で状態を変え、表示は「この条件で表示」で反映する）
+function toggleLogValue(name, value) {
+  const arr = logState.filter[name];
+  const i   = arr.indexOf(value);
+  if (i >= 0) arr.splice(i, 1); else arr.push(value);
+  renderLogFilterPanel();
+}
+// カテゴリごと入れる／外す。一部だけ選ばれている場合は「全部入れる」に倒す
+function toggleLogOpGroup(idx) {
+  const g = logOpGroups(logState.options[logState.kind].ops)[idx];
+  const f = logState.filter;
+  const all = g.ops.every(o => f.ops.includes(o));
+  f.ops = all ? f.ops.filter(o => !g.ops.includes(o))
+              : [...new Set(f.ops.concat(g.ops))];
+  renderLogFilterPanel();
+}
+function toggleLogOpGroupOpen(idx) {
+  logState.openCats[idx] = !logState.openCats[idx];
+  renderLogFilterPanel();
+}
+function toggleLogPerson(id) {
+  logState.filter.person = logState.filter.person === id ? '' : id;
+  renderLogFilterPanel();
+}
+function toggleLogUnreviewed() {
+  logState.filter.onlyUnreviewed = !logState.filter.onlyUnreviewed;
+  renderLogFilterPanel();
 }
 
 function renderLogFilterPanel() {
@@ -2974,47 +3035,58 @@ function renderLogFilterPanel() {
   if (!o) { box.innerHTML = '<div class="log-fg-empty">選択肢を読み込んでいます...</div>'; return; }
 
   let html = '';
-  if (kind === 'admin')  html += logCheckGroup('操作', 'ops', o.ops, f.ops);
+
+  // 操作は20種類前後あり、平らに並べると読む気が起きない。作業のまとまりでたたむ
+  if (kind === 'admin' && o.ops.length > 0) {
+    html += `<div class="log-fg"><div class="log-fg-t">操作（何も選ばなければすべて表示）</div>`;
+    logOpGroups(o.ops).forEach((g, i) => {
+      const sel  = g.ops.filter(x => f.ops.includes(x)).length;
+      const cls  = sel === g.ops.length ? ' on' : (sel > 0 ? ' part' : '');
+      const open = !!logState.openCats[i];
+      html += `<div class="lf-grp">
+          <div class="lf-grp-hd">
+            <button class="lfc${cls}" onclick="toggleLogOpGroup(${i})">${esc(g.name)}<span class="lfc-n">${sel > 0 ? sel + '/' : ''}${g.ops.length}</span></button>
+            <button class="lf-exp" onclick="toggleLogOpGroupOpen(${i})">${open ? '▴ 閉じる' : '▾ 個別に選ぶ'}</button>
+          </div>
+          <div class="lf-ops${open ? ' on' : ''}">` +
+        g.ops.map(op => lfChip(op, f.ops.includes(op), `toggleLogValue('ops','${esc(op)}')`)).join('') +
+        `</div></div>`;
+    });
+    html += `</div>`;
+  }
+
   if (kind === 'access') {
-    html += logCheckGroup('結果', 'results', o.results, f.results);
-    html += logCheckGroup('アプリ', 'apps', o.apps, f.apps);
-    html += `<div class="log-fg">
-        <div class="log-fg-t">確認済み</div>
-        <div class="log-fg-b"><label class="log-fg-c">
-          <input type="checkbox" id="log-f-unreviewed"${f.onlyUnreviewed ? ' checked' : ''}>
-          <span>確認済みにしたものは隠す</span>
-        </label></div>
-      </div>`;
+    if (o.results.length > 0) {
+      html += `<div class="log-fg"><div class="log-fg-t">結果</div><div class="log-fg-b">` +
+        o.results.map(v => lfChip(v, f.results.includes(v), `toggleLogValue('results','${esc(v)}')`)).join('') +
+        `</div></div>`;
+    }
+    if (o.apps.length > 0) {
+      html += `<div class="log-fg"><div class="log-fg-t">アプリ</div><div class="log-fg-b">` +
+        o.apps.map(v => lfChip(v, f.apps.includes(v), `toggleLogValue('apps','${esc(v)}')`)).join('') +
+        `</div></div>`;
+    }
+    html += `<div class="log-fg"><div class="log-fg-t">確認済み</div><div class="log-fg-b">` +
+      lfChip('確認済みは隠す', f.onlyUnreviewed, 'toggleLogUnreviewed()') + `</div></div>`;
   }
-  // 人は候補が多くなりうるのでチェックボックスにはしない
+
   if (o.people && o.people.length > 0) {
-    html += `<div class="log-fg">
-        <div class="log-fg-t">人</div>
-        <div class="log-fg-b"><select id="log-f-person" class="log-purge-sel">
-          <option value="">すべて</option>` +
-      o.people.map(pp => `<option value="${esc(pp.id)}"${f.person === pp.id ? ' selected' : ''}>${esc(pp.name)}</option>`).join('') +
-      `</select></div></div>`;
+    html += `<div class="log-fg"><div class="log-fg-t">人</div><div class="log-fg-b lf-scroll">` +
+      o.people.map(pp => lfChip(pp.name, f.person === pp.id, `toggleLogPerson('${esc(pp.id)}')`)).join('') +
+      `</div></div>`;
   }
+
   box.innerHTML = html || '<div class="log-fg-empty">このログに絞り込める項目はありません</div>';
 }
 
-function applyLogFilter() {
-  const f = logState.filter;
-  ['ops', 'results', 'apps'].forEach(n => {
-    f[n] = [...document.querySelectorAll(`#log-filter-groups input[data-fname="${n}"]:checked`)]
-      .map(el => el.value);
-  });
-  const un = document.getElementById('log-f-unreviewed');
-  const pe = document.getElementById('log-f-person');
-  f.onlyUnreviewed = un ? un.checked : true;
-  f.person         = pe ? pe.value   : '';
-  loadLogs(true);
-}
+// チップは押した時点で logState.filter を変えているので、ここでは取りに行くだけ
+function applyLogFilter() { loadLogs(true); }
 
 function clearLogFilter() {
   logState.filter = defaultLogFilter(logState.kind);
   // access の既定は「失敗だけ」なので、クリア＝全件表示にする
   if (logState.kind === 'access') logState.filter.results = [];
+  logState.openCats = {};
   renderLogFilterPanel();
   loadLogs(true);
 }
@@ -3211,13 +3283,9 @@ function logPurgeBoxHtml() {
       指定した時期より前の「試行」「成功」だけをまとめて削除します。
       <b>「失敗」の記録は不正アクセスの手がかりになるため、自動でも手動でも削除しません。</b>
       不要な失敗は各行の「確認済みにする」で一覧から隠せます。
-      <div class="log-purge-row">
-        <select id="log-purge-months" class="log-purge-sel">
-          <option value="3">3ヶ月</option>
-          <option value="6" selected>6ヶ月</option>
-          <option value="12">1年</option>
-          <option value="24">2年</option>
-        </select>
+      <div class="log-purge-row">` +
+      [3, 6, 12, 24].map(m => lfChip(m < 12 ? m + 'ヶ月' : (m / 12) + '年',
+        logState.purgeMonths === m, `setLogPurgeMonths(${m})`)).join('') + `
         <span>より前のものを削除</span>
         <button class="btn btn-d" onclick="purgeAccessLogs()">🗑 整理する</button>
       </div>
@@ -3226,8 +3294,10 @@ function logPurgeBoxHtml() {
 
 // 指定月数より前のアクセスログを削除する。
 // 消える前に必ず件数を数えて（dryRun）から確認を取る
+function setLogPurgeMonths(m) { logState.purgeMonths = m; renderLogs(); }
+
 async function purgeAccessLogs() {
-  const months = parseInt(document.getElementById('log-purge-months').value) || 6;
+  const months = logState.purgeMonths || 6;
   const cut = new Date();
   cut.setMonth(cut.getMonth() - months);
   const before = cut.getFullYear() + '-' +
@@ -3681,13 +3751,38 @@ async function openMemberModal() {
   document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
   document.getElementById('m-member-add-btn').style.display = '';
   try {
-    const res = await apiGet('getMemberListAll');
+    const [res] = await Promise.all([apiGet('getMemberListAll'), loadAvatars()]);
     if (!res.ok) throw new Error(res.error || '取得失敗');
     _memberList = res.members || [];
     renderMemberList();
   } catch(e) {
     document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;color:var(--red);">エラー: ' + esc(e.message) + '</div>';
   }
+}
+
+// ============================================================
+// メンバーのアイコン
+//
+// 一覧に出すだけで、管理者が差し替えることはしない（本人が設定するもの）。
+// 不適切な画像が設定されていないかを見て回れるようにするのが目的。
+// 未設定の人が必ずいるので、無いときは頭文字の丸で埋める
+// ============================================================
+let _avatars = {};
+
+async function loadAvatars() {
+  try {
+    const res = await apiGet('getAvatars');
+    if (res.ok) _avatars = res.avatars || {};
+  } catch (_) { /* アイコンは無くても困らないので握りつぶす */ }
+}
+
+function avatarHtml(uid, name, px) {
+  const size = px || 26;
+  const img  = uid ? _avatars[uid] : '';
+  const st   = `width:${size}px;height:${size}px;`;
+  if (img) return `<img class="mav" src="${img}" alt="" style="${st}">`;
+  const ch = (name || '?').trim().charAt(0);
+  return `<span class="mav mav-none" style="${st}font-size:${Math.round(size * 0.45)}px;">${esc(ch)}</span>`;
 }
 
 function renderMemberList() {
@@ -3705,6 +3800,7 @@ function renderMemberList() {
       s += `
       <div class="member-row" data-row="${m.rowIndex}">
         <div class="member-info">
+          ${avatarHtml(m.uid, m.name)}
           <span class="member-name">${esc(m.name)}</span>
           <span class="member-kana">${esc(m.furigana)}</span>
           <span class="member-gender-badge ${m.gender === 'M' ? 'mgb-m' : 'mgb-f'}">${m.gender === 'M' ? '男' : '女'}</span>
