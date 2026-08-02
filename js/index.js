@@ -514,8 +514,8 @@ function renderPwTypeTabs() {
   const btnLm = document.getElementById('btn-limited-members');
   if (btnLm) btnLm.style.display = currentPwType !== 'normal' ? '' : 'none';
 
-  // 通常PW専用ボタン（メンバー管理・お知らせ・要望・バグ報告・代理・夫婦）の表示切り替え
-  document.querySelectorAll('.abtn.normal-only').forEach(b => {
+  // 通常PW専用要素（メンバー管理・お知らせ・要望・バグ報告・代理・夫婦・未対応セクションなど）の表示切り替え
+  document.querySelectorAll('.normal-only').forEach(b => {
     b.style.display = currentPwType === 'normal' ? '' : 'none';
   });
 
@@ -3295,8 +3295,9 @@ async function loadPhotoMgmtList() {
   try {
     const res = await apiGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
     const photos = (res && res.photos) || [];
-    // 年月セレクタ
-    const ymHtml = buildPhotoYmSelector();
+    // 通常PWは年月セレクタ、限定PWは年月という単位に馴染まないため
+    // 現在選択中のスロット名を出すだけにする（写真は限定PWごとに完全に分けて保存される）
+    const ymHtml = currentPwType === 'normal' ? buildPhotoYmSelector() : buildPhotoScopeLabel();
     if (!photos.length) {
       body.innerHTML = ymHtml + '<div style="text-align:center;padding:20px;color:var(--ink3);font-size:13px;">写真が登録されていません</div>';
       return;
@@ -3339,6 +3340,15 @@ async function onPhotoYmChange(val) {
   await loadPhotoMgmtList();
 }
 
+// 限定PW用：年月セレクタの代わりに、今どのスロットの写真を見ているかだけ示す
+// （限定PWの写真はスロット単位で保存され、通常PWの写真とは完全に分離される）
+function buildPhotoScopeLabel() {
+  const slot = limitedSlots.find(s => s.id === currentPwType);
+  return '<div style="font-size:12px;color:var(--ink2);font-weight:700;margin-bottom:4px;">'
+    + '🔐 ' + esc(slot ? slot.name : '限定PW') + ' の写真（他の限定PW・通常PWとは別に保存されます）'
+    + '</div>';
+}
+
 async function onPhotoFilesSelected(event) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
@@ -3365,6 +3375,7 @@ async function onPhotoFilesSelected(event) {
     try {
       await apiPost('uploadPhoto', {
         category: _photoMgmtCategory,
+        type:     currentPwType,
         year:     _photoMgmtYear,
         month:    _photoMgmtMonth,
         base64:   base64List[i],
