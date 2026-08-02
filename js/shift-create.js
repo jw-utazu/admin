@@ -70,6 +70,13 @@ function ymP(extra) {
 // 認証
 // ============================================================
 async function initAuth() {
+  // 基準時刻より前の古いセッションは破棄して、共通ログイン画面からやり直してもらう
+  // （Googleのアイコンなどログイン時にしか取れない情報を集めるため。1度きり）
+  if (pwgwsEnforceRelogin()) {
+    try { localStorage.removeItem('adminUser'); } catch (_) {}
+    pwgwsGoToLogin();
+    return;
+  }
   try { const u = JSON.parse(localStorage.getItem('adminUser') || 'null'); if (u && u.isAdmin) { adminUser = u; showApp(); return; } } catch (_) {}
   // Googleアカウントが使えない管理者のための救済セッション（有効期限はサーバー側で検証）
   if (await tryRecoveryLogin()) return;

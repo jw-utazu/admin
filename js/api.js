@@ -22,6 +22,9 @@ if (typeof pwgwsGetSession !== 'function') {
       encodeURIComponent(location.href) + (reason ? '&reason=' + encodeURIComponent(reason) : ''));
   };
   window.pwgwsShouldRedirectToLogin = function () { return true; };
+  // 読み込めなかった以上、強制再ログインの基準時刻も分からない。
+  // 誤って全員をログアウトさせないよう、何もしない扱いにする
+  window.pwgwsEnforceRelogin        = function () { return false; };
 }
 
 // ============================================================

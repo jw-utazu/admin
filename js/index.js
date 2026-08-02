@@ -78,6 +78,14 @@ async function tryRecoveryLogin() {
 
 // 自動ログイン（救済セッション → One Tap → localStorageフォールバック）
 async function tryAutoLogin() {
+  // 基準時刻より前の古いセッションは破棄して、共通ログイン画面からやり直してもらう
+  // （Googleのアイコンなどログイン時にしか取れない情報を集めるため。1度きり）
+  if (pwgwsEnforceRelogin()) {
+    try { localStorage.removeItem('adminUser'); } catch (_) {}
+    pwgwsGoToLogin();
+    return;
+  }
+
   // Googleアカウントが使えない管理者のための救済セッションを最優先で確認
   if (await tryRecoveryLogin()) return;
 
