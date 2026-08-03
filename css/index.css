@@ -204,9 +204,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cc.slot-picked{background:var(--purple-l)!important;outline:2px solid var(--purple)!important;outline-offset:-2px;}
 /* ポップアップ（インライン） */
 .sp-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-lg);overflow:hidden;margin:8px 12px;}
-.sp-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
-.sp-title{font-size:12px;font-weight:700;}
-.sp-week-badge{font-size:10px;color:var(--purple);background:var(--purple-l);padding:1px 7px;border-radius:10px;font-weight:700;}
 .sp-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
 /* 時間帯行（ドロップダウン版） */
 .sp-time-row{display:grid;grid-template-columns:1fr 14px 1fr auto auto;align-items:center;gap:6px;}
@@ -513,6 +510,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .member-gender-badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;}
 .mgb-m{background:#eff6ff;color:#2563eb;}
 .mgb-f{background:#fdf2f8;color:#be185d;}
+/* 役割バッジ。同じ役割がフォームアプリでは .badge-*（shift-form/css/app.css）で
+   描かれるので、色を変えるときは両方直す */
 .role-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;}
 .rb-resp{background:#fef9c3;color:#713f12;}
 .rb-cart{background:#f0fdf4;color:#15803d;}
@@ -520,6 +519,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .rb-acct{background:#dbeafe;color:#1e40af;}
 .rb-appr{background:#ecfeff;color:#0e7490;}
 .rb-pos{background:#f1f5f9;color:#334155;}
+/* 立ち位置には有るのに個別に外された権限。持っていない印なので淡く */
+.rb-off{background:#f8fafc;color:#94a3b8;text-decoration:line-through;}
 .btn-edit-member{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;color:var(--ink2);font-family:var(--sans);flex-shrink:0;}
 .btn-edit-member:hover{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
 .btn-delete-member{font-size:11px;padding:4px 8px;border:1px solid var(--red-l);border-radius:6px;background:var(--red-l);cursor:pointer;color:var(--red);font-family:var(--sans);flex-shrink:0;}

@@ -1120,10 +1120,11 @@ async function confirmSlotModal(){
     buildCalScroll();
     buildSlotSetList();
     buildInfoArea();
+    await saveNormalSlots();
   }
 }
 
-function resetDaySettings() {
+async function resetDaySettings() {
   if(!daySelectTarget) return;
   const {y,m,d} = daySelectTarget;
   const isLimited = currentPwType !== 'normal';
@@ -1149,9 +1150,18 @@ function resetDaySettings() {
     buildCalScroll();
     buildSlotSetList();
     buildInfoArea();
-    apiGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open})
-      .then(()=>toast('設定をリセットしました','s'))
-      .catch(e=>toast('保存に失敗しました: '+e.message,'e'));
+    // 日程と実施日の両方を消すので、保存も両方行う
+    // （実施日だけローカルで消えて保存されず、リロードで復活する状態を避ける）
+    showProc('設定をリセットしています...', '少々お待ちください');
+    try {
+      await apiGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open});
+      await postNormalSlots();
+      hideProc();
+      toast('設定をリセットしました','s');
+    } catch(e) {
+      hideProc();
+      toast('保存に失敗しました: '+e.message,'e');
+    }
   }
 }
 
@@ -1333,6 +1343,29 @@ async function savePhases() {
   }
 }
 
+// 実施日（通常PW）の送信のみ。日程は送らない
+// （hUpdateCalendarSlots 側も「渡されたものだけ更新」で日程を上書きしない前提）
+// オーバーレイを自前で出したい呼び出し元（resetDaySettings）はこちらを使う
+async function postNormalSlots() {
+  const res = await apiPost({
+    action: 'updateCalendarSlots', type: currentPwType, year: curY, month: curM,
+    slots: slots.map(s => ({ y: s.y, m: s.m, d: s.d, time: s.time, interval: parseInt(s.interval) || 15 }))
+  });
+  if (!res.ok) throw new Error(res.error || '保存失敗');
+}
+
+// 実施日（通常PW）の都度保存。確定・削除のたびに呼ばれる
+async function saveNormalSlots() {
+  showProc('実施日を保存しています...', '少々お待ちください');
+  try {
+    await postNormalSlots();
+    hideProc();
+  } catch (e) {
+    hideProc();
+    uiAlert({ type: 'danger', title: '保存に失敗しました', message: '実施日の保存に失敗しました。\n\n' + e.message });
+  }
+}
+
 // ============================================================
 // 日程設定
 // ============================================================
@@ -1462,67 +1495,6 @@ function parseTimeStr(timeStr,interval){
   if(!p) return {sh:'07',sm:'00',eh:'08',em:'30',intv:parseInt(interval)||15};
   return {sh:p[1].padStart(2,'0'),sm:p[2],eh:p[3].padStart(2,'0'),em:p[4],intv:parseInt(interval)||15};
 }
-function renderPopup(y,m,d){
-  const area=document.getElementById('popup-area');
-  const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
-  const timeOpts = h => HOURS_LIST.map(v=>`<option value="${v}"${v===h?' selected':''}>${v}</option>`).join('');
-  const minOpts  = m => MINS_LIST.map(v=>`<option value="${v}"${v===m?' selected':''}>${v}</option>`).join('');
-  const intvOpts = i => INTV_LIST.map(v=>`<option value="${v}"${v===i?' selected':''}>${v}分</option>`).join('');
-  const rowsHtml=popupTimes.map((t,i)=>`
-    <div class="sp-time-row">
-      <div style="display:flex;gap:2px;">
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sh=this.value">${timeOpts(t.sh)}</select>
-        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sm=this.value">${minOpts(t.sm)}</select>
-      </div>
-      <span class="time-wave">〜</span>
-      <div style="display:flex;gap:2px;">
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].eh=this.value">${timeOpts(t.eh)}</select>
-        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].em=this.value">${minOpts(t.em)}</select>
-      </div>
-      <select class="intv-sel" onchange="popupTimes[${i}].intv=parseInt(this.value)">${intvOpts(t.intv)}</select>
-      <button class="sp-del-btn" onclick="delSpTime(${i})">&#10005;</button>
-    </div>`).join('');
-  area.innerHTML=`<div class="sp-wrap">
-    <div class="sp-hd">
-      <span class="sp-title">${m}/${d}（${dow}）</span>
-      <span class="sp-week-badge">第${wn}週</span>
-    </div>
-    <div class="sp-body">${rowsHtml}</div>
-    <div style="padding:6px 12px;">
-      <button class="sp-add-btn" onclick="addSpTime()">&#65291; 時間帯を追加</button>
-    </div>
-    <div class="sp-ft">
-      <button class="btn btn-g" onclick="closePopup()" style="font-size:11px;padding:5px 12px;">キャンセル</button>
-      <button class="btn btn-p" onclick="confirmSlot()" style="font-size:11px;padding:5px 12px;">確定</button>
-    </div>
-  </div>`;
-}
-function addSpTime(){
-  popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
-  renderPopup(popupDay.y,popupDay.m,popupDay.d);
-}
-function delSpTime(i){
-  popupTimes.splice(i,1);
-  if(popupTimes.length===0) popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
-  renderPopup(popupDay.y,popupDay.m,popupDay.d);
-}
-function closePopup(){document.getElementById('popup-area').innerHTML='';popupDay=null;}
-function confirmSlot(){
-  const{y,m,d}=popupDay;
-  slots=slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
-  popupTimes.forEach(t=>{
-    const time=parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em;
-    // intervalは必ず整数に
-    slots.push({y,m,d,time,interval:parseInt(t.intv)||15});
-  });
-  closePopup();
-  buildCalGrid('cg-slot',slotY,slotM,'slot');
-  buildCalScroll();
-  buildSlotSetList();
-  buildInfoArea();
-}
 function buildSlotSetList(){
   const el=document.getElementById('slot-set-list');
   if(slots.length===0){el.innerHTML='<div class="slot-empty">実施日がありません。「実施日を選択」から追加してください。</div>';return;}
@@ -1540,16 +1512,12 @@ function buildSlotSetList(){
     </div>`;
   }).join('');
 }
-function delSlot(key,idx){
+async function delSlot(key,idx){
   const[y,m,d]=key.split('/').map(Number);
   const ds=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
   slots=slots.filter(s=>s!==ds[idx]);
   buildSlotSetList(); buildCalScroll(); buildInfoArea();
-}
-function resetDaySlots(key){
-  const[y,m,d]=key.split('/').map(Number);
-  slots=slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
-  buildSlotSetList(); buildCalScroll(); buildInfoArea();
+  await saveNormalSlots();
 }
 function editSlotFromList(y,m,d){
   popupDay={y,m,d};
@@ -1581,6 +1549,7 @@ async function deleteSlotDay(){
     slots=slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
     closeSlotEditModal();
     buildSlotSetList(); buildCalScroll(); buildInfoArea();
+    await saveNormalSlots();
   }
 }
 async function resetDates(){
@@ -3963,6 +3932,28 @@ let _positions = [];            // 立ち位置マスタ（メンバー編集の
 
 const positionName = id => _positions.find(p => String(p.id) === String(id))?.name || '';
 
+// 一覧の権限バッジ。
+//
+// 権限は立ち位置から決まるので、立ち位置バッジと権限バッジを両方並べると
+// 同じことを二度言うことになり、1人あたりのバッジが増えすぎる。
+// ここでは立ち位置から予測される状態と食い違う人だけを出す：
+//   ＋管理者 … 立ち位置には無いのに持っている（個別付与、または立ち位置なしの管理者）
+//   −管理者 … 立ち位置には有るのに外されている
+// 立ち位置どおりの人はバッジが出ないので、例外の人だけが目に留まる
+function capDiffBadges(m) {
+  const pos = _positions.find(p => String(p.id) === String(m.positionId));
+  const posAdmin = !!pos?.canAdmin;
+  return CAP_DEFS.map(c => {
+    // 承認系は管理者権限が前提（サーバーの resolveCaps と同じ扱い）
+    const expected = c.key.startsWith('approve') ? (posAdmin && !!pos?.[c.pos]) : !!pos?.[c.pos];
+    const actual   = !!m[c.cur];
+    if (actual === expected) return '';
+    return actual
+      ? `<span class="role-badge ${c.cls}">＋${c.label}</span>`
+      : `<span class="role-badge rb-off">−${c.label}</span>`;
+  }).join('');
+}
+
 async function openMemberModal() {
   openM('m-member');
   document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
@@ -4025,10 +4016,7 @@ function renderMemberList() {
           ${m.isResponsible ? '<span class="role-badge rb-resp">責任者</span>' : ''}
           ${m.isCart        ? '<span class="role-badge rb-cart">カート</span>' : ''}
           ${positionName(m.positionId) ? '<span class="role-badge rb-pos">' + esc(positionName(m.positionId)) + '</span>' : ''}
-          ${m.isAdmin       ? '<span class="role-badge rb-admin">管理者</span>' : ''}
-          ${m.isCalApprover ? '<span class="role-badge rb-appr">予定表承認</span>' : ''}
-          ${m.isShiftApprover ? '<span class="role-badge rb-appr">確認者</span>' : ''}
-          ${m.isAccountant  ? '<span class="role-badge rb-acct">会計者</span>' : ''}
+          ${capDiffBadges(m)}
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn-edit-member" onclick="openMemberEditForm(${m.rowIndex})">編集</button>
@@ -4071,11 +4059,12 @@ function openMemberEditForm(rowIndex) {
 // 選択肢のラベルに現在の立ち位置での結果（付与／なし）を添えて、
 // 立ち位置チップを押すたびに描き直す
 // ------------------------------------------------------------
+// cur＝実際に効いている権限のプロパティ名、cls＝一覧のバッジの色
 const CAP_DEFS = [
-  { key: 'admin',           label: '管理者',     pos: 'canAdmin',           mk: 'ovAdmin' },
-  { key: 'accountant',      label: '会計者',     pos: 'canAccountant',      mk: 'ovAccountant' },
-  { key: 'approveCalendar', label: '予定表承認', pos: 'canApproveCalendar', mk: 'ovApproveCalendar' },
-  { key: 'approveShift',    label: 'シフト確認', pos: 'canApproveShift',    mk: 'ovApproveShift' },
+  { key: 'admin',           label: '管理者',     pos: 'canAdmin',           mk: 'ovAdmin',            cur: 'isAdmin',         cls: 'rb-admin' },
+  { key: 'accountant',      label: '会計者',     pos: 'canAccountant',      mk: 'ovAccountant',       cur: 'isAccountant',    cls: 'rb-acct'  },
+  { key: 'approveCalendar', label: '予定表承認', pos: 'canApproveCalendar', mk: 'ovApproveCalendar',  cur: 'isCalApprover',   cls: 'rb-appr'  },
+  { key: 'approveShift',    label: 'シフト確認', pos: 'canApproveShift',    mk: 'ovApproveShift',     cur: 'isShiftApprover', cls: 'rb-appr'  },
 ];
 let _mfMember  = null;   // 編集中のメンバー（権限行を描き直すときに参照する）
 let _mfIsOwner = false;
