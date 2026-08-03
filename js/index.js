@@ -22,12 +22,10 @@ const _nextM = new Date(_initNow.getFullYear(), _initNow.getMonth() + 1, 1);
 let curY  = _nextM.getFullYear();
 let curM  = _nextM.getMonth() + 1;  // 対象月（来月をデフォルト）
 let _currentUser = null;                   // ログイン中の管理者情報
-let slotY = curY, slotM = curM;           // 実施日カレンダー月
 let calY  = _initNow.getFullYear(), calM  = _initNow.getMonth() + 1;  // カレンダー表示月（限定PW専用）
 let adminData   = null;
 let adminPhases = [];  // 限定PWフェーズ一覧（getAdminData で取得）
 let currentPhaseIndex = 0; // 現在編集中のフェーズ番号
-let slotMode    = false;
 let slots       = [];    // [{y,m,d,time,interval}]
 let dates       = {apply:null, deadline:null, open:null};
 let popupDay    = null;
@@ -57,7 +55,6 @@ async function tryRecoveryLogin() {
     const now = new Date();
     const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     curY = _nm.getFullYear(); curM = _nm.getMonth() + 1;
-    slotY = curY; slotM = curM;
     calY = now.getFullYear(); calM = now.getMonth() + 1;
     loadAdminData();
     if (res.daysLeft <= 3) {
@@ -153,7 +150,6 @@ async function _processUserWithGasAuth(u, save) {
   const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   curY = _nm.getFullYear();
   curM = _nm.getMonth() + 1; // 来月をデフォルト
-  slotY = curY; slotM = curM;
   calY = now.getFullYear(); calM = now.getMonth() + 1;
   setLoadingStep(3, 'データを読み込み中...');
   loadAdminData();
@@ -316,7 +312,6 @@ function toggleYmDropdown() {
 function applyYmChange() {
   curY = parseInt(document.getElementById('ym-year').value);
   curM = parseInt(document.getElementById('ym-month').value);
-  slotY=curY; slotM=curM;
   document.getElementById('ym-dropdown').classList.remove('open');
   loadAdminData();
 }
@@ -366,7 +361,6 @@ function chM(dir) {
   curM += dir;
   if (curM > 12) { curM = 1; curY++; }
   if (curM < 1)  { curM = 12; curY--; }
-  slotY = curY; slotM = curM;
   // 通常PW: ローディングオーバーレイを出してデータ再取得
   const isLimited = currentPwType !== 'normal';
   if (!isLimited) {
@@ -459,8 +453,6 @@ function buildCalGrid(gid, y, m, mode) {
     else if(isDL) cls+=' period-end';
     else if(inPeriod) cls+=' in-period';
     if(hasSlot) cls+=' has-slot'+(mode==='main'&&hasSlot?' slot-picked':'');
-    if(mode==='slot'&&slotMode) cls+=' slm';
-    if(mode==='slot'&&hasSlot) cls+=' slot-picked';
     let chips='<div class="cn">'+d+'</div>';
     if(isApply) chips+='<div class="chip apply">申込</div>';
     if(isDL) chips+='<div class="chip deadline">締切</div>';
@@ -472,7 +464,6 @@ function buildCalGrid(gid, y, m, mode) {
     if(isDL) chips+='<div class="period-bar end"></div>';
     let oc='';
     if(mode==='main') oc=`onclick="openDaySelectModal(${y},${m},${d})"`;
-    if(mode==='slot'&&slotMode) oc=`onclick="onSlotClick(${y},${m},${d},this)"`;
     // メインモードでは全日付クリック可能
     if(mode==='main') cls+=' has-slot'; // カーソルpointer
     h+=`<div class="${cls}" ${oc}>${chips}</div>`;
@@ -1157,7 +1148,6 @@ async function confirmSlotModal(){
     await savePhases();
   } else {
     // 通常PW: カレンダー・実施日一覧・情報エリアを更新
-    buildCalGrid('cg-slot',slotY,slotM,'slot');
     buildCalScroll();
     buildSlotSetList();
     buildInfoArea();
@@ -1212,44 +1202,16 @@ async function resetDaySettings() {
 // カレンダー下の情報エリア
 // ============================================================
 function buildInfoArea() {
-  // 受付日程カード
-  const datesCard = document.getElementById('info-dates-card');
-  const datesRows = document.getElementById('info-dates-rows');
-  const fmt = obj => {
-    if(!obj) return '<span style="color:var(--ink3)">未設定</span>';
-    const dt=new Date(obj.y,obj.m-1,obj.d);
-    const dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];
-    return obj.m+'/'+obj.d+'（'+dow+'）';
-  };
   const isLimited = currentPwType !== 'normal';
-  if(datesCard && datesRows){
-    // 限定PWは日程表示をフェーズUIで代替するので通常PWのみ表示
-    if(!isLimited && (dates.apply||dates.deadline||dates.open)){
-      datesCard.style.display='block';
-      datesRows.innerHTML=`
-        <div class="info-row"><span class="info-label">申込開始</span><span class="info-val green">${fmt(dates.apply)}</span></div>
-        <div class="info-row"><span class="info-label">締切</span><span class="info-val amber">${fmt(dates.deadline)}</span></div>
-        <div class="info-row"><span class="info-label">シフト公開</span><span class="info-val blue">${fmt(dates.open)}</span></div>`;
-    } else if(isLimited){
-      datesCard.style.display='none';
-    }
-  }
-  // 実施日一覧カード（通常PW のみ）
+  // 日程一覧カード。中身は updDateViews が dv-* に描くので、ここは出す/隠すだけ。
+  // 限定PWは日程をフェーズUIで表すので隠す
+  // （以前は存在しない info-dates-rows を条件に入れていたため、この分岐ごと
+  //   空振りして限定PWでもカードが出たままだった）
+  const datesCard = document.getElementById('info-dates-card');
+  if (datesCard) datesCard.style.display = isLimited ? 'none' : 'block';
+  // 実施日一覧カード（通常PW のみ）。中身は buildSlotSetList が描く
   const slotsCard = document.getElementById('info-slots-card');
-  const slotsBody = document.getElementById('info-slots-body');
-  if(slotsCard) slotsCard.style.display = isLimited ? 'none' : (slots.length > 0 ? 'block' : 'none');
-  if(!isLimited && slotsCard && slotsBody && slots.length>0){
-    const groups={};
-    slots.forEach(s=>{const k=s.y+'/'+s.m+'/'+s.d;if(!groups[k])groups[k]={y:s.y,m:s.m,d:s.d,times:[]};groups[k].times.push(s);});
-    slotsBody.innerHTML=Object.values(groups).map(g=>{
-      const dt=new Date(g.y,g.m-1,g.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];
-      const wn=getWeekNum(g.y,g.m,g.d);
-      return `<div class="slc-group">
-        <div class="slc-date-row"><span class="slc-date">${g.m}/${g.d}（${dow}）</span><span class="slc-week">第${wn}週</span></div>
-        <div class="slc-times">${g.times.map(t=>`<span class="slc-chip">${t.time}</span>`).join('')}</div>
-      </div>`;
-    }).join('');
-  }
+  if (slotsCard) slotsCard.style.display = isLimited ? 'none' : (slots.length > 0 ? 'block' : 'none');
   // フェーズ管理カード（限定PW のみ）
   buildPhaseManageArea(isLimited);
   // 前月との紐づけを見直す入口（通常PWで前月の枠があるときだけ）
@@ -1523,35 +1485,6 @@ function updDateViews() {
 // ============================================================
 // 実施日設定
 // ============================================================
-function toggleSlotMode() {
-  slotMode=!slotMode;
-  const btn=document.getElementById('slot-mode-btn');
-  const area=document.getElementById('slot-cal-area');
-  btn.className='slot-toggle-btn '+(slotMode?'on':'off');
-  btn.innerHTML=slotMode?'&#10005; 選択を終了':'&#128197; 実施日を選択';
-  area.style.display=slotMode?'block':'none';
-  if(slotMode){
-    document.getElementById('slot-mlbl').textContent=slotY+'年'+slotM+'月';
-    buildCalGrid('cg-slot',slotY,slotM,'slot');
-  } else {
-    closeSlotEditModal();
-  }
-}
-function chSlotM(dir){
-  slotM+=dir; if(slotM>12){slotM=1;slotY++;} if(slotM<1){slotM=12;slotY--;}
-  document.getElementById('slot-mlbl').textContent=slotY+'年'+slotM+'月';
-  buildCalGrid('cg-slot',slotY,slotM,'slot');
-}
-function onSlotClick(y,m,d,el) {
-  if(!slotMode) return;
-  popupDay={y,m,d};
-  const exist=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
-  popupTimes=buildPopupTimes(exist);
-  const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
-  document.getElementById('m-slot-edit-title').textContent=m+'/'+d+'（'+dow+'）第'+wn+'週 実施日設定';
-  renderPopupModal(y,m,d);
-  openM('m-slot-edit');
-}
 function parseTimeStr(timeStr,interval){
   const p=timeStr.match(/(\d{1,2}):(\d{2})[~〜](\d{1,2}):(\d{2})/);
   if(!p) return {sh:'07',sm:'00',eh:'08',em:'30',intv:parseInt(interval)||15};
@@ -1559,7 +1492,7 @@ function parseTimeStr(timeStr,interval){
 }
 function buildSlotSetList(){
   const el=document.getElementById('slot-set-list');
-  if(slots.length===0){el.innerHTML='<div class="slot-empty">実施日がありません。「実施日を選択」から追加してください。</div>';return;}
+  if(slots.length===0){el.innerHTML='<div class="slot-empty">実施日がありません。カレンダーの日付をクリックして追加してください。</div>';return;}
   const groups={};
   slots.forEach(s=>{const k=s.y+'/'+s.m+'/'+s.d;if(!groups[k])groups[k]={y:s.y,m:s.m,d:s.d,times:[]};groups[k].times.push(s);});
   el.innerHTML=Object.values(groups).map(g=>{
