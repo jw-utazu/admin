@@ -160,35 +160,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .dsp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
 .dsp-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface2);border-bottom:1px solid var(--border);}
 .dsp-title{font-size:12px;font-weight:700;}
-.edit-toggle-btn{font-size:11px;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;font-family:var(--sans);transition:all .12s;}
-.edit-toggle-btn.view-mode{color:var(--blue);background:var(--blue-l);}
-.edit-toggle-btn.edit-mode{color:var(--red);background:var(--red-l);}
-/* 日程表示行 */
-.date-rows{padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
-.date-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--r);border:1px solid var(--border);cursor:pointer;transition:all .12s;}
-.date-row.active{border-color:var(--blue);background:var(--blue-l);}
-.date-row.selected-g{border-color:var(--green);background:var(--green-l);}
-.date-row.selected-a{border-color:var(--amber);background:var(--amber-l);}
-.date-row.selected-b{border-color:var(--blue);background:var(--blue-l);}
-.dr-icon{font-size:14px;flex-shrink:0;}
-.dr-label{font-size:11px;font-weight:700;flex-shrink:0;width:54px;}
-.dr-label.g{color:var(--green);}.dr-label.a{color:var(--amber);}.dr-label.b{color:var(--blue);}
-.dr-val{font-size:12px;font-weight:700;flex:1;}
-.dr-hint{font-size:10px;color:var(--ink3);}
-/* 編集時のカレンダー */
-.date-edit-cal{border-top:1px solid var(--border);}
-.cal-nav2{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:var(--surface2);border-bottom:1px solid var(--border);}
-.cal-nav2 span{font-size:12px;font-weight:700;}
-.nb{width:26px;height:26px;border:none;background:none;cursor:pointer;border-radius:5px;font-size:15px;color:var(--ink2);display:flex;align-items:center;justify-content:center;}
-.nb:hover{background:var(--border);}
-.dsp-ft{padding:8px 12px;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-top:1px solid var(--border);}
-.dsp-hint{font-size:11px;color:var(--ink3);}
-/* 編集モードのセル */
-.cc.date-mode:not(.other){cursor:pointer;}
-.cc.date-mode:not(.other):hover{background:var(--blue-l);}
-.cc.sel-apply{background:var(--green-l)!important;outline:2px solid var(--green);outline-offset:-2px;}
-.cc.sel-deadline{background:var(--amber-l)!important;outline:2px solid var(--amber);outline-offset:-2px;}
-.cc.sel-open{background:var(--blue-l)!important;outline:2px solid var(--blue);outline-offset:-2px;}
 
 /* 実施日設定 */
 .slot-set-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
@@ -458,10 +429,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .dgc.b .dgc-label{color:var(--blue);}
 .dgc-val{font-size:11px;font-weight:700;color:var(--ink);line-height:1.4;}
 .dgc-val.unset{color:var(--ink3);font-weight:400;font-size:10px;}
-/* 日程保存ボタン */
-.save-dates-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);background:var(--surface2);color:var(--ink3);}
-.save-dates-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
-.save-dates-btn:disabled{opacity:.5;cursor:default;}
 /* 月次一括処理モーダル */
 .monthly-step{display:none;}.monthly-step.on{display:block;}
 .ms-title{font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:10px;}

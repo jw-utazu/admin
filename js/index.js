@@ -18,19 +18,15 @@ const _initNow = new Date();
 const _nextM = new Date(_initNow.getFullYear(), _initNow.getMonth() + 1, 1);
 let curY  = _nextM.getFullYear();
 let curM  = _nextM.getMonth() + 1;  // 対象月（来月をデフォルト）
-let scY   = curY, scM  = curM;            // 日程設定カレンダー月
 let _currentUser = null;                   // ログイン中の管理者情報
 let slotY = curY, slotM = curM;           // 実施日カレンダー月
 let calY  = _initNow.getFullYear(), calM  = _initNow.getMonth() + 1;  // カレンダー表示月（限定PW専用）
 let adminData   = null;
 let adminPhases = [];  // 限定PWフェーズ一覧（getAdminData で取得）
 let currentPhaseIndex = 0; // 現在編集中のフェーズ番号
-let activeKind  = null;  // 'apply'|'deadline'|'open'|null
-let dateEditMode = false;
 let slotMode    = false;
 let slots       = [];    // [{y,m,d,time,interval}]
 let dates       = {apply:null, deadline:null, open:null};
-let datesBak    = null;  // キャンセル用バックアップ
 let popupDay    = null;
 let popupTimes  = [];
 let sheetListData = [];
@@ -62,7 +58,7 @@ async function tryRecoveryLogin() {
     const now = new Date();
     const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     curY = _nm.getFullYear(); curM = _nm.getMonth() + 1;
-    scY = curY; scM = curM; slotY = curY; slotM = curM;
+    slotY = curY; slotM = curM;
     calY = now.getFullYear(); calM = now.getMonth() + 1;
     loadAdminData();
     if (res.daysLeft <= 3) {
@@ -158,7 +154,6 @@ async function _processUserWithGasAuth(u, save) {
   const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   curY = _nm.getFullYear();
   curM = _nm.getMonth() + 1; // 来月をデフォルト
-  scY = curY; scM = curM;
   slotY = curY; slotM = curM;
   calY = now.getFullYear(); calM = now.getMonth() + 1;
   setLoadingStep(3, 'データを読み込み中...');
@@ -318,7 +313,7 @@ function toggleYmDropdown() {
 function applyYmChange() {
   curY = parseInt(document.getElementById('ym-year').value);
   curM = parseInt(document.getElementById('ym-month').value);
-  scY=curY; scM=curM; slotY=curY; slotM=curM;
+  slotY=curY; slotM=curM;
   document.getElementById('ym-dropdown').classList.remove('open');
   loadAdminData();
 }
@@ -368,7 +363,6 @@ function chM(dir) {
   curM += dir;
   if (curM > 12) { curM = 1; curY++; }
   if (curM < 1)  { curM = 12; curY--; }
-  scY = curY; scM = curM;
   slotY = curY; slotM = curM;
   // 通常PW: ローディングオーバーレイを出してデータ再取得
   const isLimited = currentPwType !== 'normal';
@@ -461,13 +455,8 @@ function buildCalGrid(gid, y, m, mode) {
     else if(isDL) cls+=' period-end';
     else if(inPeriod) cls+=' in-period';
     if(hasSlot) cls+=' has-slot'+(mode==='main'&&hasSlot?' slot-picked':'');
-    if(mode==='sched') cls+=' date-mode';
     if(mode==='slot'&&slotMode) cls+=' slm';
     if(mode==='slot'&&hasSlot) cls+=' slot-picked';
-    // 日程設定モード中のハイライト
-    if(mode==='sched'&&isApply&&dateEditMode) cls+=' sel-apply';
-    if(mode==='sched'&&isDL&&dateEditMode) cls+=' sel-deadline';
-    if(mode==='sched'&&isOpen&&dateEditMode) cls+=' sel-open';
     let chips='<div class="cn">'+d+'</div>';
     if(isApply) chips+='<div class="chip apply">申込</div>';
     if(isDL) chips+='<div class="chip deadline">締切</div>';
@@ -479,7 +468,6 @@ function buildCalGrid(gid, y, m, mode) {
     if(isDL) chips+='<div class="period-bar end"></div>';
     let oc='';
     if(mode==='main') oc=`onclick="openDaySelectModal(${y},${m},${d})"`;
-    if(mode==='sched'&&dateEditMode) oc=`onclick="onScClick(${y},${m},${d})"`;
     if(mode==='slot'&&slotMode) oc=`onclick="onSlotClick(${y},${m},${d},this)"`;
     // メインモードでは全日付クリック可能
     if(mode==='main') cls+=' has-slot'; // カーソルpointer
@@ -1010,7 +998,6 @@ async function setDayAs(kind) {
     buildCalScroll();
     savePhases();
   } else {
-    datesBak = JSON.parse(JSON.stringify(dates));
     dates[kind] = {y,m,d};
     closeM('m-day-select');
     updDateViews();
@@ -1397,80 +1384,6 @@ function updDateViews() {
   document.getElementById('dv-apply').innerHTML    = fmtCard(dates.apply);
   document.getElementById('dv-deadline').innerHTML = fmtCard(dates.deadline);
   document.getElementById('dv-open').innerHTML     = fmtCard(dates.open);
-  // 編集表示
-  const fmtE = (obj, id) => {
-    const el=document.getElementById(id);
-    if(!el) return;
-    el.textContent=obj?fmt(obj):'クリックして選択';
-    el.style.color=obj?'var(--ink)':'var(--ink3)';
-  };
-  fmtE(dates.apply,    'de-apply');
-  fmtE(dates.deadline, 'de-deadline');
-  fmtE(dates.open,     'de-open');
-}
-function toggleDateEdit() {
-  if(!dateEditMode){
-    datesBak = JSON.parse(JSON.stringify(dates));
-    dateEditMode=true;
-    document.getElementById('date-view').style.display='none';
-    document.getElementById('date-edit').style.display='block';
-    document.getElementById('date-edit-btn').className='edit-toggle-btn edit-mode';
-    document.getElementById('date-edit-btn').textContent='✕ 閉じる';
-    document.getElementById('sc-lbl').textContent=scY+'年'+scM+'月';
-    buildCalGrid('cg-sched',scY,scM,'sched');
-  } else {
-    cancelDateEdit();
-  }
-}
-function cancelDateEdit() {
-  if(datesBak) dates=JSON.parse(JSON.stringify(datesBak));
-  dateEditMode=false;
-  activeKind=null;
-  document.getElementById('date-view').style.display='block';
-  document.getElementById('date-edit').style.display='none';
-  document.getElementById('date-edit-btn').className='edit-toggle-btn view-mode';
-  document.getElementById('date-edit-btn').textContent='✎ 編集';
-  updDateViews();
-  buildCalScroll();
-}
-function setActiveKind(k) {
-  activeKind=k;
-  document.querySelectorAll('#date-edit-rows .date-row').forEach(el=>el.classList.remove('active'));
-  document.getElementById('dr-'+k).classList.add('active');
-  document.getElementById('dsp-hint').textContent={apply:'申込開始日をカレンダーから選択',deadline:'締切日をカレンダーから選択',open:'シフト公開日をカレンダーから選択'}[k];
-}
-function onScClick(y,m,d) {
-  if(!activeKind) return;
-  dates[activeKind]={y,m,d};
-  updDateViews();
-  buildCalGrid('cg-sched',scY,scM,'sched');
-}
-function chScM(dir){
-  scM+=dir; if(scM>12){scM=1;scY++;} if(scM<1){scM=12;scY--;}
-  document.getElementById('sc-lbl').textContent=scY+'年'+scM+'月';
-  buildCalGrid('cg-sched',scY,scM,'sched');
-}
-let datesChanged = false;
-function updSaveDatesBtn() {
-  const btn = document.getElementById('save-dates-btn');
-  if (!btn) return;
-  btn.disabled = !datesChanged;
-  btn.className = 'save-dates-btn' + (datesChanged ? ' active' : '');
-}
-async function saveDates() {
-  showProc('設定を保存しています...', '少々お待ちください');
-  try {
-    await apiGet('saveDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open });
-    datesChanged = false;
-    updSaveDatesBtn();
-    setProcMsg('再読み込み中...', 'データを更新しています');
-    try { await refreshAdminData(); } catch (e) { console.warn('[refreshAdminData]', e); }
-    hideProc();
-    toast('日程を保存しました', 's');
-  } catch (e) {
-    hideProc();
-    toast('保存に失敗しました: ' + e.message, 'e');
-  }
 }
 
 // ============================================================
@@ -3616,8 +3529,6 @@ async function execMonthly() {
     }
     if (monthlyChecks.shift) await runTask('shift', () => apiGet('createShiftSheet', { year: curY, month: curM }));
 
-    datesChanged = false;
-    updSaveDatesBtn();
     document.getElementById('proc-steps').style.display = 'none';
     setProcMsg('再読み込み中...', '処理が完了しました。データを更新しています');
     try { await refreshAdminData(); } catch (e) { console.warn('[refreshAdminData]', e); }
