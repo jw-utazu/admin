@@ -154,6 +154,15 @@ async function loadInitData() {
       apiGet('getLimitedSlots', {}),
       loadYmList()
     ]);
+    // getWishData の既定月（getCurrentCal＝申込開始日を無視した最新公開月）が、
+    // まだ申込開始日前の先の月を指していることがある（日程だけ先に承認・公開した場合）。
+    // その場合は実際に作業すべき月（作成中・受付中の月）へ補正して取り直す
+    const defYm = computeDefaultYm();
+    if (defYm && curYM && (defYm.year < curYM.year || (defYm.year === curYM.year && defYm.month < curYM.month))) {
+      curYM = defYm;
+      renderYmSelect();
+      await loadWishDataInternal();
+    }
     applyPublishStatus(statusRes);
     // curYM が未確定のまま取ったので、対象年月が決まったところで食い違いを埋める
     await ensurePublishStatusForCurYM();
@@ -200,6 +209,21 @@ function isYmSelectable(c) {
   if (c.shiftPublished) return true;                    // シフト作成完了
   if (c.calPublished && c.applyPassed) return true;      // 日程公開＋申込開始日超え
   return false;
+}
+
+// ログイン直後に表示すべき「実際に作業中の月」を ymList から求める。
+// シフト作成完了済み（確認・公開待ちも含む）か、日程公開かつ申込開始日を
+// 超えている月のうち、一番新しいものを採用する（過去半年分の履歴閲覧用の
+// 許容はここでは使わない＝あくまでデフォルト表示の話なので対象外）
+function computeDefaultYm() {
+  let best = null;
+  ymList.forEach(c => {
+    if (!c.shiftPublished && !(c.calPublished && c.applyPassed)) return;
+    if (!best || c.year > best.year || (c.year === best.year && c.month > best.month)) {
+      best = { year: c.year, month: c.month };
+    }
+  });
+  return best;
 }
 
 function ymKey(o) { return o ? o.year + '.' + o.month : ''; }
