@@ -993,7 +993,7 @@ function switchPhaseInModal(i) {
   if (daySelectTarget) buildDaySelectContent(daySelectTarget.y, daySelectTarget.m, daySelectTarget.d);
 }
 
-function setDayAs(kind) {
+async function setDayAs(kind) {
   if(!daySelectTarget) return;
   const {y,m,d} = daySelectTarget;
   const isLimited = currentPwType !== 'normal';
@@ -1016,8 +1016,7 @@ function setDayAs(kind) {
     updDateViews();
     buildCalScroll();
     buildInfoArea();
-    datesChanged = true;
-    updSaveDatesBtn();
+    await saveNormalDates();
   }
 }
 
@@ -1154,7 +1153,7 @@ async function resetDaySettings() {
     // （実施日だけローカルで消えて保存されず、リロードで復活する状態を避ける）
     showProc('設定をリセットしています...', '少々お待ちください');
     try {
-      await apiGet('updateEventDates',{apply:dates.apply,deadline:dates.deadline,open:dates.open});
+      await postNormalDates();
       await postNormalSlots();
       hideProc();
       toast('設定をリセットしました','s');
@@ -1366,6 +1365,24 @@ async function saveNormalSlots() {
   }
 }
 
+// 日程（通常PW）の送信のみ。実施日の postNormalSlots() と対になる。
+// null は「クリア」としてサーバーに反映される
+async function postNormalDates() {
+  await apiGet('updateEventDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open });
+}
+
+// 日程（通常PW）の都度保存。日付を選んだ時点で保存する
+async function saveNormalDates() {
+  showProc('日程を保存しています...', '少々お待ちください');
+  try {
+    await postNormalDates();
+    hideProc();
+  } catch (e) {
+    hideProc();
+    uiAlert({ type: 'danger', title: '保存に失敗しました', message: '日程の保存に失敗しました。\n\n' + e.message });
+  }
+}
+
 // ============================================================
 // 日程設定
 // ============================================================
@@ -1558,8 +1575,10 @@ async function resetDates(){
     message:'日程一覧（申込開始・締切・シフト公開日）をリセットしますか？', confirmText:'リセットする',
   })) return;
   dates={apply:null,deadline:null,open:null};
-  datesChanged=true;
+  updDateViews();
+  buildCalScroll();
   buildInfoArea();
+  await saveNormalDates();
 }
 // ============================================================
 // シフトフォーム作成（ボタン押下時にデータ取得）
