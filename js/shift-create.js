@@ -2888,11 +2888,16 @@ SC_MOBILE_Q.addEventListener('change', () => {
 // 左パネルリサイズ
 const LP_MIN = 140, LP_MAX = 360;
 let lpCollapsed = false, lpWidth = 196;
+// スマホ幅になったせいで自動的に閉じたのかどうか。
+// PC 幅に戻ったときに開き直してよいのは「自動で閉じた」ときだけで、
+// ユーザーが自分で閉じたものを勝手に開き直してはいけない
+let lpAutoCollapsed = false;
 
 // 開閉は PC・スマホ共通で collapsed の付け外し。違いは CSS 側で、
 // スマホでは開いても枠は幅0のまま、中身だけが本文の上に重なる
 function toggleLp() {
   lpCollapsed = !lpCollapsed;
+  lpAutoCollapsed = false;   // 手動操作なので、以後は幅の変化で戻さない
   setLpCollapsed(lpCollapsed);
 }
 
@@ -2916,10 +2921,17 @@ function syncLpBackdrop() {
   if (bd && w) bd.classList.toggle('on', isScMobile() && !w.classList.contains('collapsed'));
 }
 
-// スマホでは画面の大半を覆ってしまうので、初期状態は閉じておく
+// スマホでは画面の大半を覆ってしまうので、初期状態は閉じておく。
+// PC 幅に戻ったら、そのとき自動で閉じたものは開き直す
+// （戻さないと PC レイアウトのまま幅0になり、トグルが画面左外へ出てしまう）
 function applyLpForWidth() {
-  if (isScMobile()) { if (!lpCollapsed) setLpCollapsed(true); else syncLpBackdrop(); }
-  else syncLpBackdrop();
+  if (isScMobile()) {
+    if (!lpCollapsed) { lpAutoCollapsed = true; setLpCollapsed(true); }
+    else syncLpBackdrop();
+  } else {
+    if (lpCollapsed && lpAutoCollapsed) { lpAutoCollapsed = false; setLpCollapsed(false); }
+    else syncLpBackdrop();
+  }
 }
 applyLpForWidth();
 
