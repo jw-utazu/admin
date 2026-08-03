@@ -1832,26 +1832,30 @@ function renderProgressStrip() {
       + (sub ? `<div class="psub">${sub}</div>` : '') + '</div>';
   }).join('');
 
-  renderCalApprovalBar(ca, calOn, hasDates);
+  renderCalApprovalMini(ca, calOn, hasDates);
 }
 
-// 承認バー。未公開・未承認のときだけストリップの下に出す。
-// 承認は「予定表公開」段の手前にある関門だが、丸ひとつ増やすと
-// 一本道が読みにくくなるので、段ではなく下に添える形にした
-function renderCalApprovalBar(ca, calOn, hasDates) {
-  const bar = document.getElementById('cal-approval-bar');
-  if (!bar) return;
-  // 公開済み・日程未設定・状態未取得のときは出す意味が無い
-  if (calOn || !hasDates || !ca || ca.approved) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
-  bar.style.display = '';
+// 承認の操作口。カレンダーの月の右、限定PWの公開ボタンと同じ位置に置く。
+// 進行状況ストリップの下に帯で出すと、日程・実施日を見ながら承認したいのに
+// 画面上部まで戻ることになるため、月の横に寄せた
+function renderCalApprovalMini(ca, calOn, hasDates) {
+  const btn = document.getElementById('cal-approve-mini');
+  const txt = document.getElementById('cal-approve-mini-text');
+  if (!btn || !txt) return;
+  // 限定PW・公開済み・日程未設定・承認済み・状態未取得のときは出す意味が無い
+  if (currentPwType !== 'normal' || calOn || !hasDates || !ca || ca.approved) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
   const who = ca.required > 0
-    ? ca.approvers.map(a => esc(a.name)).join('・') + ' の承認待ち'
-    : '承認者が未登録のため、どの管理者でも承認できます';
-  // 承認できない人には誰待ちかだけ伝える。押せないボタンを出しても
-  // 「押せない」以上のことが分からない
-  bar.innerHTML = `<span class="cab-ic">🕒</span>`
-    + `<span class="cab-tx">予定表は承認されるまで申込開始日を過ぎても公開されません。${who}</span>`
-    + (ca.canApprove ? `<button class="cab-btn" onclick="approveCal()">承認する</button>` : '');
+    ? ca.approvers.map(a => a.name).join('・') + ' の承認待ちです。'
+    : '承認者が未登録のため、どの管理者でも承認できます。';
+  // 承認できない人にはボタンを押させない。誰待ちかは吹き出しで伝える
+  btn.disabled = !ca.canApprove;
+  btn.classList.toggle('can-approve', !!ca.canApprove);
+  txt.textContent = ca.canApprove ? '🕒 承認する' : '🕒 承認待ち';
+  btn.title = '予定表は承認されるまで申込開始日を過ぎても公開されません。' + who;
 }
 
 // 予定表の承認。承認しても即公開ではなく、申込開始日が来たら自動で公開される。
@@ -2705,9 +2709,9 @@ function renderInboxCounts(c) {
 // 連れて行くだけにする。件数は他の月の分も含むため、どの月を承認するかは
 // 対象年月を切り替えて選んでもらう
 function goCalApproval() {
-  const bar = document.getElementById('cal-approval-bar');
-  if (bar && bar.style.display !== 'none') {
-    bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const btn = document.getElementById('cal-approve-mini');
+  if (btn && btn.style.display !== 'none') {
+    btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } else {
     // 表示中の月は承認待ちではない。件数は別の月の分なので、その旨だけ伝える
     toast('表示中の月は承認待ちではありません。対象年月を切り替えてください');

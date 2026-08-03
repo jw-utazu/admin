@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=34">
+<link rel="stylesheet" href="css/index.css?v=35">
 </head>
 <body>
 
@@ -89,11 +89,18 @@
             <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
             <span class="cal-ym-section-label">シフト管理</span>
           </div>
-          <!-- 限定PWは複数月が同時進行しうるため進行状況ストリップの一本道モデルに乗らない。
-               公開/非公開の操作口をここに残す（通常PWでは非表示、ストリップ側の操作に一本化） -->
-          <button id="cal-pub-mini" class="cal-pub-mini" style="display:none;" onclick="toggleCalPub()">
-            <span id="cal-pub-mini-text"></span>
-          </button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <!-- 予定表の承認。承認待ちで自動公開が止まっていることを月の横で知らせる
+                 （renderCalApprovalMini で表示/非表示と文言を切り替える） -->
+            <button id="cal-approve-mini" class="cal-approve-mini" style="display:none;" onclick="approveCal()">
+              <span id="cal-approve-mini-text"></span>
+            </button>
+            <!-- 限定PWは複数月が同時進行しうるため進行状況ストリップの一本道モデルに乗らない。
+                 公開/非公開の操作口をここに残す（通常PWでは非表示、ストリップ側の操作に一本化） -->
+            <button id="cal-pub-mini" class="cal-pub-mini" style="display:none;" onclick="toggleCalPub()">
+              <span id="cal-pub-mini-text"></span>
+            </button>
+          </div>
         </div>
         <!-- 進行状況ストリップ
              月の作業は「日程設定 → 予定表公開 → 受付 → シフト作成 → 公開」の一本道
@@ -105,9 +112,6 @@
         <div class="prog" id="prog-strip" style="display:none;">
           <div class="prog-steps" id="prog-steps"></div>
         </div>
-        <!-- 承認待ちで自動公開が止まっていることを知らせる帯。
-             承認者本人には承認ボタンも出す（renderCalApprovalBar で生成） -->
-        <div class="cal-approval-bar" id="cal-approval-bar" style="display:none;"></div>
         <!-- 対象年月と公開中の月がズレているときの注意書き -->
         <div class="cal-pub-note" id="cal-pub-note" style="display:none;"></div>
         <!-- カレンダー表示月ナビ（限定PWのみ表示） -->
@@ -737,6 +741,6 @@
 <script src="js/session.js?v=3"></script>
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=51"></script>
+<script src="js/index.js?v=52"></script>
 </body>
 </html>
