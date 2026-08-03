@@ -361,6 +361,17 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .uic.lg{font-size:12px;padding:6px 14px;}
 .uic.dis{opacity:.45;cursor:not-allowed;}
 .uic-row{display:flex;flex-wrap:wrap;gap:6px;}
+
+/* <select> の置き換え（js/picker.js の uiSelHtml）。
+   チップ（丸いピル＝その場で切り替わる）と区別するため、
+   こちらは角丸の四角＋▾ で「押すと候補が出る」ことを形で示す。
+   index.css と同じ定義。変更するときは両方直すこと */
+.uisel{display:inline-flex;align-items:center;justify-content:space-between;gap:6px;max-width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:12px;text-align:left;cursor:pointer;}
+.uisel:hover:not(:disabled){border-color:var(--border2);background:var(--surface2);}
+.uisel:disabled{opacity:.5;cursor:not-allowed;}
+.uisel.empty .uisel-t{color:var(--ink3);}
+.uisel-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.uisel-c{flex-shrink:0;font-size:9px;color:var(--ink3);}
 .cmp-empty{font-size:11px;color:var(--ink3);}
 /* 比較バーは横に伸びるので、チップが増えたら折り返さず横スクロールさせる */
 .cmp-sel-bar .uic-row{flex-wrap:nowrap;overflow-x:auto;}

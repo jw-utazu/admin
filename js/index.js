@@ -298,20 +298,23 @@ function updCalViewLabel() {
 function toggleYmDropdown() {
   const dd = document.getElementById('ym-dropdown');
   if (!dd.classList.contains('open')) {
-    // セレクト初期化
-    const yr = document.getElementById('ym-year');
-    const mo = document.getElementById('ym-month');
-    yr.innerHTML=''; mo.innerHTML='';
-    for(let y=curY-2;y<=curY+3;y++) yr.innerHTML+=`<option value="${y}"${y===curY?' selected':''}>${y}年</option>`;
-    for(let m=1;m<=12;m++) mo.innerHTML+=`<option value="${m}"${m===curM?' selected':''}>${m}月</option>`;
+    // 選択欄を組み直す（開くたびに現在の年月を起点にする）
+    const years = [], months = [];
+    for (let y = curY - 2; y <= curY + 3; y++) years.push({ value: String(y), label: y + '年' });
+    for (let m = 1; m <= 12; m++) months.push({ value: String(m), label: m + '月' });
+    const st = 'font-size:13px;font-weight:700;';
+    document.getElementById('ym-sel-slot').innerHTML =
+        uiSelHtml('ym-year',  { title: '年', items: years,  value: String(curY), style: st })
+      + ' '
+      + uiSelHtml('ym-month', { title: '月', items: months, value: String(curM), style: st });
     dd.classList.add('open');
   } else {
     dd.classList.remove('open');
   }
 }
 function applyYmChange() {
-  curY = parseInt(document.getElementById('ym-year').value);
-  curM = parseInt(document.getElementById('ym-month').value);
+  curY = parseInt(uiSelVal('ym-year'));
+  curM = parseInt(uiSelVal('ym-month'));
   document.getElementById('ym-dropdown').classList.remove('open');
   loadAdminData();
 }
@@ -1048,18 +1051,15 @@ function onPopupTimeChanged(){
 
 function renderPopupModal(y,m,d){
   const area=document.getElementById('m-slot-edit-body');
-  const timeOpts=h=>HOURS_LIST.map(v=>`<option value="${v}"${v===h?' selected':''}>${v}</option>`).join('');
-  const minOpts =mn=>MINS_LIST.map(v=>`<option value="${v}"${v===mn?' selected':''}>${v}</option>`).join('');
-  const intvOpts=i=>INTV_LIST.map(v=>`<option value="${v}"${v===i?' selected':''}>${v}分</option>`).join('');
+  // 時・分・間隔は候補が決まりきっているので検索欄は出さない（search:false）
+  const hourItems=HOURS_LIST.map(v=>({value:v,label:v}));
+  const minItems =MINS_LIST.map(v=>({value:v,label:v}));
+  const intvItems=INTV_LIST.map(v=>({value:String(v),label:v+'分'}));
   const showMap=mappingAvailable();
-  const prevOpts=sel=>{
-    let o=`<option value=""${sel===''?' selected':''}>（引き継がない）</option>`;
-    prevSlotList().forEach(ps=>{
-      const k=prevSlotKeyOf(ps);
-      o+=`<option value="${k}"${k===sel?' selected':''}>${ps.week} ${ps.dateLabel} ${ps.time}</option>`;
-    });
-    return o;
-  };
+  const prevItems=()=>[{value:'',label:'（引き継がない）'}].concat(
+    prevSlotList().map(ps=>({value:prevSlotKeyOf(ps),label:`${ps.week} ${ps.dateLabel} ${ps.time}`})));
+  // 時刻欄は幅を揃える。押すと候補が出ることが分かるよう ▾ ぶんの余白も込みで 56px
+  const tSt='width:56px;padding:5px 6px;font-family:var(--mono);';
   const rowsHtml=popupTimes.map((t,i)=>{
     // 自動対応（prev===null）のときは、その時間帯から決まる相手を選択済みにして見せる。
     // 「自動」という見えない状態を残すより、実際に何が保存されるかを出すほうが直せる
@@ -1067,23 +1067,27 @@ function renderPopupModal(y,m,d){
     const mapRow = !showMap ? '' : `
       <div class="sp-map-row">
         <span class="sp-map-lbl">前月から引き継ぐ枠</span>
-        <select class="fsel sp-map-sel" onchange="popupTimes[${i}].prev=this.value">${prevOpts(sel)}</select>
+        ${uiSelHtml('sp-map-'+i,{title:'前月から引き継ぐ枠',items:prevItems(),value:sel,
+          cls:'sp-map-sel',onPick:v=>{popupTimes[i].prev=v;}})}
       </div>`;
+    const timeSel=(f,items)=>uiSelHtml('sp-'+f+'-'+i,{title:'時刻',items,value:t[f],search:false,
+      style:tSt,onPick:v=>{popupTimes[i][f]=v;onPopupTimeChanged();}});
     return `
     <div class="sp-time-block">
       <div class="sp-time-row">
         <div style="display:flex;gap:2px;">
-          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sh=this.value;onPopupTimeChanged()">${timeOpts(t.sh)}</select>
+          ${timeSel('sh',hourItems)}
           <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
-          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sm=this.value;onPopupTimeChanged()">${minOpts(t.sm)}</select>
+          ${timeSel('sm',minItems)}
         </div>
         <span class="time-wave">〜</span>
         <div style="display:flex;gap:2px;">
-          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].eh=this.value;onPopupTimeChanged()">${timeOpts(t.eh)}</select>
+          ${timeSel('eh',hourItems)}
           <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
-          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].em=this.value;onPopupTimeChanged()">${minOpts(t.em)}</select>
+          ${timeSel('em',minItems)}
         </div>
-        <select class="intv-sel" onchange="popupTimes[${i}].intv=parseInt(this.value)">${intvOpts(t.intv)}</select>
+        ${uiSelHtml('sp-intv-'+i,{title:'区切りの間隔',items:intvItems,value:String(t.intv),search:false,
+          cls:'intv-sel',onPick:v=>{popupTimes[i].intv=parseInt(v);}})}
         <button class="sp-del-btn" onclick="delSpTimeModal(${i})">&#10005;</button>
       </div>
       ${mapRow}
@@ -1596,31 +1600,27 @@ function renderMapReviewModal(){
   if(!body) return;
   const groups={};
   slots.forEach(s=>{const k=s.y+'/'+s.m+'/'+s.d;if(!groups[k])groups[k]={y:s.y,m:s.m,d:s.d,times:[]};groups[k].times.push(s);});
-  const prevOpts=sel=>{
-    let o='<option value=""'+(sel===''?' selected':'')+'>（引き継がない）</option>';
-    prevSlotList().forEach(ps=>{
-      const k=prevSlotKeyOf(ps);
-      o+='<option value="'+esc(k)+'"'+(k===sel?' selected':'')+'>'+esc(ps.week+' '+ps.dateLabel+' '+ps.time)+'</option>';
-    });
-    return o;
-  };
+  const prevItems=[{value:'',label:'（引き継がない）'}].concat(
+    prevSlotList().map(ps=>({value:prevSlotKeyOf(ps),label:ps.week+' '+ps.dateLabel+' '+ps.time})));
   const rows=Object.values(groups).map(g=>{
     const dt=new Date(g.y,g.m-1,g.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];
     return '<div class="map-date-hd">&#128197; '+g.m+'/'+g.d+'（'+dow+'） <span style="font-size:10px;opacity:.7;">第'+getWeekNum(g.y,g.m,g.d)+'週</span></div>'
       + g.times.map(t=>{
           const k=slotKeyOf(t);
           const sel=Object.prototype.hasOwnProperty.call(mapReviewDraft,k)?mapReviewDraft[k]:'';
+          mapReviewDraft[k]=sel; // 触られなかった枠も「引き継がない」として確定させる
           return '<div class="map-row"><div class="map-cur">'+esc(t.time)+'</div><div class="map-arr">&#8592;</div>'
-            + '<select class="fsel map-sel" data-key="'+esc(k)+'" style="font-size:11px;padding:4px 7px;">'+prevOpts(sel)+'</select></div>';
+            + uiSelHtml('map-'+k,{title:'引き継ぐ前月の枠　'+t.time,items:prevItems,value:sel,
+                cls:'map-sel',style:'min-width:0;font-size:11px;padding:4px 7px;',
+                onPick:v=>{mapReviewDraft[k]=v;}})
+            + '</div>';
         }).join('');
   }).join('<div style="height:6px;"></div>');
   body.innerHTML='<p style="font-size:12px;color:var(--ink2);margin-bottom:9px;">奉仕者のフォームに前月の希望を初期値として入れるときの対応です。左が今月の枠、右が引き継ぐ前月の枠です。</p>'+rows;
 }
 
 async function saveMapReview(){
-  document.querySelectorAll('#m-map-review-body .map-sel').forEach(s=>{
-    mapReviewDraft[s.dataset.key]=s.value;
-  });
+  // 選んだ時点で mapReviewDraft に入っている（renderMapReviewModal の onPick）
   slotMapping=Object.assign({},mapReviewDraft);
   closeM('m-map-review');
   showProc('紐づけを保存しています...', '少々お待ちください');
@@ -2196,15 +2196,19 @@ async function refreshProxyModal() {
       apiGet('getProxySettings'), apiGet('getMemberList'), loadAvatars()]);
     _proxyMembers = (memberRes.members || []).filter(m => m.uid);
     const settings = proxyRes.settings || [];
-    const memberOpts = _proxyMembers.map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+    // 41名規模の一覧なので <select> ではなく検索付きピッカー（js/picker.js）
+    const memberItems = _proxyMembers.map(m => ({
+      value: m.uid, label: m.name, sub: m.furigana || '',
+      search: (m.name || '') + ' ' + (m.furigana || ''),
+    }));
     let html = `
       <div style="margin-bottom:14px;">
         <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;">代理設定を追加</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理元（送ってもらう人）</div>
-            <select id="proxy-from-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select></div>
+            ${uiSelHtml('proxy-from', { title: '代理元（送ってもらう人）', placeholder: '選択してください', items: memberItems, style: 'width:100%;' })}</div>
           <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">代理先（代わりに送る人）</div>
-            <select id="proxy-to-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${memberOpts}</select></div>
+            ${uiSelHtml('proxy-to', { title: '代理先（代わりに送る人）', placeholder: '選択してください', items: memberItems, style: 'width:100%;' })}</div>
         </div>
         <button class="btn btn-p" onclick="addProxy()" style="font-size:11px;padding:5px 12px;">追加</button>
       </div>
@@ -2231,8 +2235,8 @@ async function refreshProxyModal() {
   }
 }
 async function addProxy() {
-  const fromUid = document.getElementById('proxy-from-sel').value;
-  const toUid   = document.getElementById('proxy-to-sel').value;
+  const fromUid = uiSelVal('proxy-from');
+  const toUid   = uiSelVal('proxy-to');
   if (!fromUid || !toUid) { toast('両方選択してください', 'e'); return; }
   if (fromUid === toUid)  { toast('同じ人は設定できません', 'e'); return; }
   showProc('代理設定を追加しています...', '少々お待ちください');
@@ -2293,8 +2297,13 @@ async function refreshCoupleModal() {
       surnameCounts[_coupleSurname(m.furigana)] >= 2 && !registeredUids.has(m.uid)
     );
 
-    const husbandOpts = eligible.filter(m => m.gender === 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
-    const wifeOpts    = eligible.filter(m => m.gender !== 'M').map(m => `<option value="${m.uid}">${esc(m.name)}</option>`).join('');
+    // 名字が同じ人を探す操作なので、ふりがなでも検索できるようにする
+    const coupleItem = m => ({
+      value: m.uid, label: m.name, sub: m.furigana || '',
+      search: (m.name || '') + ' ' + (m.furigana || ''),
+    });
+    const husbandItems = eligible.filter(m => m.gender === 'M').map(coupleItem);
+    const wifeItems    = eligible.filter(m => m.gender !== 'M').map(coupleItem);
 
     let html = `
       <div style="margin-bottom:14px;">
@@ -2302,9 +2311,9 @@ async function refreshCoupleModal() {
         <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;line-height:1.6;">追加すると、並び替えで夫が妻の直前に表示され、お互いに代理送信が可能になります。</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">夫</div>
-            <select id="couple-husband-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${husbandOpts}</select></div>
+            ${uiSelHtml('couple-husband', { title: '夫', placeholder: '選択してください', items: husbandItems, style: 'width:100%;' })}</div>
           <div><div style="font-size:10px;color:var(--ink3);margin-bottom:4px;">妻</div>
-            <select id="couple-wife-sel" class="fsel" style="font-size:12px;"><option value="">-- 選択 --</option>${wifeOpts}</select></div>
+            ${uiSelHtml('couple-wife', { title: '妻', placeholder: '選択してください', items: wifeItems, style: 'width:100%;' })}</div>
         </div>
         <button class="btn btn-p" onclick="addCouple()" style="font-size:11px;padding:5px 12px;">追加</button>
       </div>
@@ -2331,8 +2340,8 @@ async function refreshCoupleModal() {
   }
 }
 async function addCouple() {
-  const husbandUid = document.getElementById('couple-husband-sel').value;
-  const wifeUid    = document.getElementById('couple-wife-sel').value;
+  const husbandUid = uiSelVal('couple-husband');
+  const wifeUid    = uiSelVal('couple-wife');
   if (!husbandUid || !wifeUid) { toast('夫と妻を両方選択してください', 'e'); return; }
   if (husbandUid === wifeUid)  { toast('同じ人は設定できません', 'e'); return; }
   showProc('夫婦ペアを追加しています...', '少々お待ちください');
@@ -3450,17 +3459,19 @@ async function loadPhotoMgmtList() {
 
 function buildPhotoYmSelector() {
   // 年月セレクタ（前後6ヶ月）
-  let opts = '';
+  const items = [];
   for (let delta = -3; delta <= 3; delta++) {
     let y = curY, m = curM + delta;
     while (m < 1)  { m += 12; y--; }
     while (m > 12) { m -= 12; y++; }
-    const sel = (y === _photoMgmtYear && m === _photoMgmtMonth) ? ' selected' : '';
-    opts += '<option value="' + y + '_' + m + '"' + sel + '>' + y + '年' + m + '月</option>';
+    items.push({ value: y + '_' + m, label: y + '年' + m + '月' });
   }
   return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
     + '<span style="font-size:12px;color:var(--ink2);font-weight:700;">対象月：</span>'
-    + '<select style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;" onchange="onPhotoYmChange(this.value)">' + opts + '</select>'
+    + uiSelHtml('photo-ym', {
+        title: '対象月', items, value: _photoMgmtYear + '_' + _photoMgmtMonth,
+        style: 'font-size:13px;', onPick: v => onPhotoYmChange(v),
+      })
     + '</div>';
 }
 

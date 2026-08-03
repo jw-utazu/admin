@@ -582,6 +582,41 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .uic.dis{opacity:.45;cursor:not-allowed;}
 .uic.dis:hover{background:var(--surface);color:var(--ink2);}
 .uic-row{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0;}
+
+/* <select> の置き換え（js/picker.js の uiSelHtml）。
+   チップ（丸いピル＝その場で切り替わる）と区別するため、
+   こちらは角丸の四角＋▾ で「押すと候補が出る」ことを形で示す */
+.uisel{display:inline-flex;align-items:center;justify-content:space-between;gap:6px;max-width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:12px;text-align:left;cursor:pointer;}
+.uisel:hover:not(:disabled){border-color:var(--border2);background:var(--surface2);}
+.uisel:disabled{opacity:.5;cursor:not-allowed;}
+.uisel.empty .uisel-t{color:var(--ink3);}
+.uisel-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.uisel-c{flex-shrink:0;font-size:9px;color:var(--ink3);}
+
+/* ピッカー本体（js/picker.js）。shift-create.css と同じ定義を持たせている。
+   片方だけ直すと画面によって見た目が変わるので、変更するときは両方直すこと */
+.pk{display:none;position:fixed;z-index:9500;min-width:250px;max-width:340px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);box-shadow:0 8px 28px rgba(0,0,0,.18);padding:8px;}
+.pk.on{display:block;}
+.pk-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.pk-title{font-size:11px;font-weight:700;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pk-x{flex-shrink:0;border:none;background:none;color:var(--ink3);font-size:12px;cursor:pointer;padding:0 2px;font-family:var(--sans);}
+.pk-search{width:100%;border:1px solid var(--border);border-radius:var(--r);padding:5px 8px;font-size:12px;font-family:var(--sans);outline:none;margin-bottom:6px;}
+.pk-search:focus{border-color:var(--purple);}
+.pk-list{max-height:min(46vh,320px);overflow-y:auto;}
+.pk-grp{position:sticky;top:0;background:var(--surface2);color:var(--ink2);font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;margin:4px 0 2px;}
+.pk-it{display:flex;align-items:center;gap:5px;width:100%;border:none;background:none;padding:5px 6px;border-radius:var(--r);cursor:pointer;font-family:var(--sans);font-size:12px;text-align:left;color:var(--ink);}
+.pk-it:hover:not(.dis),.pk-it.cur{background:var(--purple-l);}
+.pk-it.on{background:var(--green-l);font-weight:700;}
+.pk-it.dis{opacity:.4;cursor:not-allowed;text-decoration:line-through;}
+.pk-body{flex:1;display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0;}
+.pk-cb{flex-shrink:0;font-size:13px;}
+.pk-sub{flex-shrink:0;font-size:10px;color:var(--ink3);}
+.pk-none{color:var(--ink3);}
+.pk-nm{font-weight:700;padding-left:5px;border-left:3px solid transparent;}
+.pk-nm.g-m{border-left-color:#2563eb;}
+.pk-nm.g-f{border-left-color:#be185d;}
+.pk-empty{padding:14px;text-align:center;font-size:11px;color:var(--ink3);}
+.pk-note{font-size:10px;color:var(--ink3);padding:5px 6px 1px;border-top:1px solid var(--border);margin-top:4px;}
 /* 操作は数が多いのでカテゴリでたたむ。
    親（カテゴリ）は「行」、子（操作）は「ピル」。同じ形にすると展開時に見分けがつかない */
 .lf-grp{border-bottom:1px solid var(--border);}

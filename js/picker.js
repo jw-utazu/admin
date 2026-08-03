@@ -14,7 +14,9 @@
 //   opts.onToggle (values[]) => void 複数選択で変わったとき（都度呼ぶ）
 //   opts.onClose  () => void
 //
-// このファイルを変更したら shift-create.html の ?v= を +1 すること
+// ファイル後半に、<select> を置き換えるための uiSelect 系がある。
+//
+// このファイルを変更したら shift-create.html と index.html の ?v= を +1 すること
 // ============================================================
 
 let _pkEl = null;      // ポップオーバー本体
@@ -179,3 +181,87 @@ function _pkKey(e) {
     else if (items.filter(x => !x.disabled).length === 1) _pkChoose(items.find(x => !x.disabled));
   }
 }
+
+// ============================================================
+// uiSelect — <select> の置き換え
+//
+// ボタンを1つ描き、押すと上のピッカーが開く。候補と確定処理は key で
+// 登録しておき、DOM には現在値だけ持たせる（41人ぶんの候補を DOM に
+// 埋め込まない）。HTML を文字列で組み立てている箇所からそのまま使える。
+//
+//   html += uiSelHtml('proxy-from', {
+//     title: '送信元', placeholder: '-- 選択 --',
+//     items: members.map(m => ({ value: m.id, label: m.name, search: m.kana })),
+//     value: '',
+//     onPick: v => { ... },          // <select> の onchange にあたる
+//   });
+//
+//   uiSelVal(key)                 現在値
+//   uiSelSet(key, v)              値だけ差し替える（onPick は呼ばれない）
+//   uiSelReload(key, items, v)    候補ごと入れ替える（連動する2段目など）
+//
+// 値の置き場は DOM（data-val）。同じ HTML を作り直しても値が正しく
+// 戻るようにするため、登録側（_uiSel）には候補と処理だけを置く
+// ============================================================
+
+const _uiSel = {};
+
+function _uiEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+
+function _uiSelHit(key, v) {
+  return ((_uiSel[key] || {}).items || []).find(it => String(it.value) === String(v));
+}
+
+function _uiSelEl(key) { return document.querySelector('[data-uisel="' + key + '"]'); }
+
+function uiSelHtml(key, spec) {
+  _uiSel[key] = spec = spec || {};
+  const v = spec.value == null ? '' : String(spec.value);
+  const hit = _uiSelHit(key, v);
+  return '<button type="button" class="uisel' + (hit ? '' : ' empty') + (spec.cls ? ' ' + spec.cls : '') + '"'
+       + ' data-uisel="' + _uiEsc(key) + '" data-val="' + _uiEsc(v) + '"'
+       + (spec.style ? ' style="' + _uiEsc(spec.style) + '"' : '')
+       + (spec.disabled ? ' disabled' : '')
+       + '><span class="uisel-t">' + _uiEsc(hit ? (hit.label || hit.value) : (spec.placeholder || '選択')) + '</span>'
+       + '<span class="uisel-c">▾</span></button>';
+}
+
+function _uiSelApply(el, key, v) {
+  const val = v == null ? '' : String(v);
+  const hit = _uiSelHit(key, val);
+  el.dataset.val = val;
+  el.querySelector('.uisel-t').textContent = hit ? (hit.label || hit.value) : ((_uiSel[key] || {}).placeholder || '選択');
+  el.classList.toggle('empty', !hit);
+}
+
+function uiSelVal(key) { const el = _uiSelEl(key); return el ? el.dataset.val : ''; }
+
+function uiSelSet(key, v) { const el = _uiSelEl(key); if (el) _uiSelApply(el, key, v); }
+
+function uiSelReload(key, items, v) {
+  const sp = _uiSel[key];
+  if (!sp) return;
+  sp.items = items || [];
+  const el = _uiSelEl(key);
+  if (el) _uiSelApply(el, key, v === undefined ? el.dataset.val : v);
+}
+
+// 候補が多いときだけ検索欄を出す（spec.search で明示もできる）
+document.addEventListener('click', e => {
+  const btn = e.target.closest && e.target.closest('[data-uisel]');
+  if (!btn || btn.disabled) return;
+  const key = btn.dataset.uisel;
+  const sp = _uiSel[key];
+  if (!sp) return;
+  const items = sp.items || [];
+  openPicker(btn, {
+    title: sp.title || '',
+    note: sp.note || '',
+    search: sp.search === undefined ? items.length > 12 : sp.search,
+    value: btn.dataset.val,
+    items,
+    onPick: (v, it) => { _uiSelApply(btn, key, v); if (sp.onPick) sp.onPick(v, it); },
+  });
+});

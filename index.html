@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=37">
+<link rel="stylesheet" href="css/index.css?v=38">
 </head>
 <body>
 
@@ -64,8 +64,8 @@
   <!-- 年月ドロップダウン -->
   <div class="ym-dropdown" id="ym-dropdown">
     <span class="ym-dd-label">対象年月：</span>
-    <select class="ym-dd-sel" id="ym-year"></select>
-    <select class="ym-dd-sel" id="ym-month"></select>
+    <!-- 中身は toggleYmDropdown() が uiSelHtml で組む -->
+    <span id="ym-sel-slot"></span>
     <button class="ym-dd-btn" onclick="applyYmChange()">適用</button>
     <button onclick="toggleYmDropdown()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);background:none;cursor:pointer;font-family:var(--sans);font-size:12px;">閉じる</button>
   </div>
@@ -660,6 +660,7 @@
 <script src="js/session.js?v=3"></script>
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=55"></script>
+<script src="js/picker.js?v=5"></script>
+<script src="js/index.js?v=56"></script>
 </body>
 </html>
