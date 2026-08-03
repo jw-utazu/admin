@@ -38,7 +38,10 @@ body{display:flex;flex-direction:column;overflow:hidden;}
    box-shadow は持たせない（線の下にぼけた帯が出てタブとの接合が濁るため） */
 .hdr{background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:100;}
 .hdr-row1{height:44px;display:flex;align-items:center;padding:0 14px;gap:10px;}
-.hdr-row2{height:36px;display:flex;align-items:center;padding:0 14px;gap:8px;border-top:1px solid var(--border);background:var(--surface2);}
+/* 幅に応じて自動で折り返す。押し出し用の .hdr-spacer は flex:1 のまま残せば、
+   1行に収まる幅では今まで通り右寄せに効き、収まらない幅では自然に0へ縮んで
+   折り返しの邪魔をしない */
+.hdr-row2{height:auto;min-height:36px;display:flex;align-items:center;flex-wrap:wrap;padding:5px 14px;gap:8px;row-gap:6px;border-top:1px solid var(--border);background:var(--surface2);}
 .hdr-logo{width:28px;height:28px;border-radius:7px;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;}
 .hdr-title{font-size:14px;font-weight:700;flex:1;}
 .hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
@@ -605,12 +608,11 @@ body.dnd-on *{cursor:grabbing !important;}
   /* ===== ヘッダー ===== */
   .hdr-row1{height:42px;padding:0 10px;gap:8px;}
   .hdr-title{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* 1行に収まらないので折り返す。押し出し用の空きは折り返しの邪魔になるので消す。
-     背景は白。フォルダタブは「下線の下が白い」ことで下のコンテンツと
-     つながって見える形なので、タブの下に来る領域を白にしておく必要がある
+  /* 折り返し自体は幅を問わず常時有効（.hdr-row2 base 参照）。ここではスマホ幅特有の
+     余白・背景だけ上書きする。背景は白。フォルダタブは「下線の下が白い」ことで
+     下のコンテンツとつながって見える形なので、タブの下に来る領域を白にしておく必要がある
      （PC では下が .main-tabs＝白なので成立している） */
-  .hdr-row2{height:auto;min-height:36px;padding:5px 10px;row-gap:5px;flex-wrap:wrap;
-    background:var(--surface);}
+  .hdr-row2{padding:5px 10px;row-gap:5px;background:var(--surface);}
   .hdr-spacer{display:none;}
   .ym-lbl{display:none;}
   /* PW タブはフォルダ型のまま、常に最上段に固定する。
