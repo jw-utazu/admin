@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=33">
+<link rel="stylesheet" href="css/index.css?v=34">
 </head>
 <body>
 
@@ -96,15 +96,18 @@
           </button>
         </div>
         <!-- 進行状況ストリップ
-             月の作業は「日程設定 → 募集開始 → 受付 → シフト作成 → 公開」の一本道
+             月の作業は「日程設定 → 予定表公開 → 受付 → シフト作成 → 公開」の一本道
              なので、今どこにいて次に何をするかは一意に決まる。それを1か所に出す。
              とくにシフトの作成完了・確認完了はこのアプリのどこにも無く、
              シフト管理アプリを開かないと分からなかった。
-             「募集開始」段は予定表の公開/非公開そのものなので、クリックで
-             toggleCalPub() を呼べるようにし、旧cal-pub-badgeの操作を引き継ぐ -->
+             「予定表公開」段は申込開始日に自動で進むが、承認前だと止まる。
+             クリックすれば toggleCalPub() で手動公開・非公開もできる -->
         <div class="prog" id="prog-strip" style="display:none;">
           <div class="prog-steps" id="prog-steps"></div>
         </div>
+        <!-- 承認待ちで自動公開が止まっていることを知らせる帯。
+             承認者本人には承認ボタンも出す（renderCalApprovalBar で生成） -->
+        <div class="cal-approval-bar" id="cal-approval-bar" style="display:none;"></div>
         <!-- 対象年月と公開中の月がズレているときの注意書き -->
         <div class="cal-pub-note" id="cal-pub-note" style="display:none;"></div>
         <!-- カレンダー表示月ナビ（限定PWのみ表示） -->
@@ -198,6 +201,12 @@
       <div class="sb-sec normal-only">
         <div class="plbl inbox-hd">未対応<span class="inbox-total" id="inbox-total"></span></div>
         <div class="inbox">
+          <!-- 承認が無いまま申込開始日を過ぎ、自動公開が止まっている月の件数。
+               気づかないと当日まで奉仕者に予定表が出ないので先頭に置く -->
+          <button class="ibx" id="ibx-calApproval" onclick="goCalApproval()">
+            <span class="ibx-ic">🕒</span><span class="ibx-n">予定表未承認</span>
+            <span class="ibx-c" id="ibx-c-calApproval">－</span>
+          </button>
           <button class="ibx" id="ibx-recovery" onclick="openRecoveryModal()">
             <span class="ibx-ic">🔑</span><span class="ibx-n">ログイン救済</span>
             <span class="ibx-c" id="ibx-c-recovery">－</span>
@@ -728,6 +737,6 @@
 <script src="js/session.js?v=3"></script>
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=50"></script>
+<script src="js/index.js?v=51"></script>
 </body>
 </html>

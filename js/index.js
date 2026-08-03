@@ -240,6 +240,7 @@ async function loadAdminData() {
   loadCalPubStatus();
   loadPendingCounts();   // サイドバー「未対応」の件数（件数だけを返す軽量API）
   loadShiftStatus();     // 進行状況ストリップ用（シフトの作成完了・確認完了）
+  loadCalApprovalStatus(); // 同上（予定表の承認状態）
   renderProgressStrip(); // 先に日程・公開状態だけで描いておく（シフト状態は後追い）
   // 描画完了後にローディングを非表示・appを表示。
   // requestAnimationFrame はタブが非表示のあいだ発火しないため、
@@ -424,6 +425,7 @@ async function loadAdminDataWithOverlay() {
   renderAll();
   loadCalPubStatus();
   loadShiftStatus();   // シフトの状態は月ごとに違うので、月を切り替えたら取り直す
+  loadCalApprovalStatus();  // 承認状態も月ごとに違う
 }
 
 // ============================================================
@@ -1144,6 +1146,8 @@ async function resetDaySettings() {
       await postNormalSlots();
       hideProc();
       toast('設定をリセットしました','s');
+      renderProgressStrip();
+      afterCalEdit();
     } catch(e) {
       hideProc();
       toast('保存に失敗しました: '+e.message,'e');
@@ -1346,10 +1350,19 @@ async function saveNormalSlots() {
   try {
     await postNormalSlots();
     hideProc();
+    afterCalEdit();
   } catch (e) {
     hideProc();
     uiAlert({ type: 'danger', title: '保存に失敗しました', message: '実施日の保存に失敗しました。\n\n' + e.message });
   }
+}
+
+// 未公開の月の日程・実施日を変えると、サーバー側で承認が自動的に取り消される
+// （承認者が見ていない予定表が自動公開されないようにするため）。
+// 画面の承認表示が古いままだと「承認済みのはず」と誤読するので取り直す
+function afterCalEdit() {
+  loadCalApprovalStatus();
+  loadPendingCounts();
 }
 
 // 日程（通常PW）の送信のみ。実施日の postNormalSlots() と対になる。
@@ -1369,6 +1382,8 @@ async function saveNormalDates() {
   try {
     await postNormalDates();
     hideProc();
+    renderProgressStrip();   // 日程が変われば段の進み具合と添え字も変わる
+    afterCalEdit();
   } catch (e) {
     hideProc();
     uiAlert({ type: 'danger', title: '保存に失敗しました', message: '日程の保存に失敗しました。\n\n' + e.message });
@@ -1693,6 +1708,29 @@ async function loadCalPubStatus() {
 function isCurMonthPublished() { return !!(calPubStatus && calPubYM && calPubYM.y === curY && calPubYM.m === curM); }
 
 // ============================================================
+// 予定表の承認状態
+// ============================================================
+// 予定表は承認されるまで apply_date が来ても自動公開されない。
+// 承認待ちで止まっていることが管理画面から分からないと、当日まで
+// 誰も気づかないので、進行状況ストリップに出す
+let calApproval = null;   // getCalApprovalStatus の結果（対象年月のもの）
+
+// 年月を明示する。省くとサーバーは「今の申込中の月」を返すため、
+// 重なり期間に別の月の承認状態を読んでしまう（loadShiftStatus と同じ理由）
+async function loadCalApprovalStatus() {
+  try {
+    const r = await apiGet('getCalApprovalStatus', { year: curY, month: curM });
+    calApproval = (r && r.ok) ? r : null;
+  } catch (e) { calApproval = null; }
+  renderProgressStrip();
+}
+
+// 取得待ちで前の月のものが残っているときに読み違えない
+function isCalApprovalForCurMonth() {
+  return !!(calApproval && calApproval.year === curY && calApproval.month === curM);
+}
+
+// ============================================================
 // 進行状況ストリップ
 // ============================================================
 // 月の作業は「日程設定 → 募集開始 → 受付 → シフト作成 → 公開」の一本道で、
@@ -1753,18 +1791,27 @@ function renderProgressStrip() {
   // 丸の下に日付を小さく添える。段の名前だけだと「受付はいつまでか」が
   // 結局スクロールしないと分からないため
   const md = o => o ? (o.m + '/' + o.d) : '';
+  // 予定表は apply_date が来れば自動で公開される。手で「募集開始」する
+  // ものではなくなったので、段の名前と添え字を実態に合わせる。
+  // 公開前に承認という関門があり、そこで止まっていることが読めないと
+  // 当日まで気づけないため、承認状態を添え字に出す
+  const ca = isCalApprovalForCurMonth() ? calApproval : null;
+  const calSub = calOn ? md(dates.apply)
+    : !ca ? md(dates.apply)
+    : !ca.approved ? '承認待ち'
+    : (dates.apply ? '✓承認済 ' + md(dates.apply) : '✓承認済');
   const steps = [
-    ['dates',  '日程設定',   ''],
-    ['cal',    '募集開始',   md(dates.apply)],
-    ['apply',  '受付',       dd ? '〜' + md(dates.deadline) : ''],
-    ['create', 'シフト作成', ''],
-    ['open',   '公開',       md(dates.open)],
+    ['dates',  '日程設定',     ''],
+    ['cal',    '予定表公開',   calSub],
+    ['apply',  '受付',         dd ? '〜' + md(dates.deadline) : ''],
+    ['create', 'シフト作成',   ''],
+    ['open',   '公開',         md(dates.open)],
   ];
   // 段そのものを操作口にする。どちらも「その段が表している公開状態」を
   // 切り替えるので、状態表示と操作が同じ場所にまとまる：
-  //   募集開始 … 予定表（カレンダー）の公開/非公開
-  //   公開     … シフトの公開/非公開（カレンダーは公開したまま戻せる）
-  // 「募集開始」段は実際に申込中の月でしか切り替えられない。既に次の月へ申込が
+  //   予定表公開 … 予定表（カレンダー）の公開/非公開
+  //   公開       … シフトの公開/非公開（カレンダーは公開したまま戻せる）
+  // 「予定表公開」段は実際に申込中の月でしか切り替えられない。既に次の月へ申込が
   // 移っている月（calDone だが calOn ではない）は非公開にする対象が無い
   const action = {
     cal:  (calOn || st.cal === 'now') ? 'toggleCalPub()' : '',
@@ -1776,7 +1823,7 @@ function renderProgressStrip() {
     const mark = st[k] === 'done' ? '✓' : (i + 1);
     const act = action[k] || '';
     const tip = !act ? ''
-      : k === 'cal'  ? (st.cal === 'done' ? '予定表を非公開にする' : 'この月の予定表を公開する')
+      : k === 'cal'  ? (st.cal === 'done' ? '予定表を非公開にする' : '申込開始日を待たずに今すぐ公開する')
       : (st.open === 'done' ? 'シフトを非公開にする' : 'シフトの作成完了を取り消す');
     return line + `<div class="pstep ${st[k]}${act ? ' pstep-click' : ''}"`
       + (act ? ` onclick="${act}" title="${tip}"` : '')
@@ -1784,6 +1831,59 @@ function renderProgressStrip() {
       + `<div class="plabel">${label}</div>`
       + (sub ? `<div class="psub">${sub}</div>` : '') + '</div>';
   }).join('');
+
+  renderCalApprovalBar(ca, calOn, hasDates);
+}
+
+// 承認バー。未公開・未承認のときだけストリップの下に出す。
+// 承認は「予定表公開」段の手前にある関門だが、丸ひとつ増やすと
+// 一本道が読みにくくなるので、段ではなく下に添える形にした
+function renderCalApprovalBar(ca, calOn, hasDates) {
+  const bar = document.getElementById('cal-approval-bar');
+  if (!bar) return;
+  // 公開済み・日程未設定・状態未取得のときは出す意味が無い
+  if (calOn || !hasDates || !ca || ca.approved) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  bar.style.display = '';
+  const who = ca.required > 0
+    ? ca.approvers.map(a => esc(a.name)).join('・') + ' の承認待ち'
+    : '承認者が未登録のため、どの管理者でも承認できます';
+  // 承認できない人には誰待ちかだけ伝える。押せないボタンを出しても
+  // 「押せない」以上のことが分からない
+  bar.innerHTML = `<span class="cab-ic">🕒</span>`
+    + `<span class="cab-tx">予定表は承認されるまで申込開始日を過ぎても公開されません。${who}</span>`
+    + (ca.canApprove ? `<button class="cab-btn" onclick="approveCal()">承認する</button>` : '');
+}
+
+// 予定表の承認。承認しても即公開ではなく、申込開始日が来たら自動で公開される。
+// 「承認＝公開」と誤解されると、まだ直したい月を承認できなくなるので明示する
+async function approveCal() {
+  const ca = isCalApprovalForCurMonth() ? calApproval : null;
+  if (!ca) return;
+  const md = s => s || '';
+  if (!await uiConfirm({
+    type: 'info',
+    title: '予定表を承認する',
+    message: `${curY}年${curM}月の予定表を承認しますか？\n\n`
+      + (ca.applyDate
+          ? `承認しても今すぐ公開はされません。申込開始日（${md(ca.applyDate)}）を迎えると自動で公開されます。\n\n`
+          : '承認しても今すぐ公開はされません。申込開始日を迎えると自動で公開されます。\n\n')
+      + '承認後に日程や実施日を変更すると、承認は自動的に取り消されます。',
+    confirmText: '承認する',
+  })) return;
+
+  showProc('予定表を承認しています...', '少々お待ちください');
+  try {
+    const r = await apiGet('approveCalendar', { year: curY, month: curM });
+    if (!r.ok) throw new Error(r.error || '承認に失敗しました');
+    await loadCalApprovalStatus();   // 取得完了後に描き直す（内部で renderProgressStrip する）
+    hideProc();
+    toast('予定表を承認しました', 's');
+    loadPendingCounts();             // サイドバーの未承認バッジを減らす
+  } catch (e) {
+    hideProc();
+    toast('承認に失敗しました: ' + e.message, 'e');
+    loadCalApprovalStatus();
+  }
 }
 
 // 「公開」段のクリック。シフトだけを引っ込める操作。
@@ -2589,14 +2689,29 @@ function setInboxCount(key, n, neutral) {
 }
 
 function renderInboxCounts(c) {
+  setInboxCount('calApproval',  c.calApproval  || 0);
   setInboxCount('recovery',     c.recovery     || 0);
   setInboxCount('requests',     c.requests     || 0);
   setInboxCount('bugs',         c.bugs         || 0);
   setInboxCount('distribution', c.distribution || 0, true);
   // 見出しの合計。配布報告は「対応するもの」ではないので合計に入れない
-  const total = (c.recovery || 0) + (c.requests || 0) + (c.bugs || 0);
+  const total = (c.calApproval || 0) + (c.recovery || 0) + (c.requests || 0) + (c.bugs || 0);
   const el = document.getElementById('inbox-total');
   if (el) el.textContent = total > 0 ? '合計 ' + total + '件' : '';
+}
+
+// 未承認バッジのクリック。専用のモーダルは作らない。
+// 承認は「その月の予定表を見て判断する」ものなので、承認バーまで
+// 連れて行くだけにする。件数は他の月の分も含むため、どの月を承認するかは
+// 対象年月を切り替えて選んでもらう
+function goCalApproval() {
+  const bar = document.getElementById('cal-approval-bar');
+  if (bar && bar.style.display !== 'none') {
+    bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    // 表示中の月は承認待ちではない。件数は別の月の分なので、その旨だけ伝える
+    toast('表示中の月は承認待ちではありません。対象年月を切り替えてください');
+  }
 }
 
 async function loadPendingCounts() {

@@ -89,6 +89,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-pub-mini.unpublished:hover{background:var(--bg);}
 .cal-pub-note{font-size:11px;line-height:1.5;color:#92400e;background:#fffbeb;border-bottom:1px solid #fde68a;padding:6px 14px;}
 .cal-pub-note b{font-weight:700;}
+/* 予定表の承認待ち帯。cal-pub-note と同じ「注意」の色で揃える */
+.cal-approval-bar{display:flex;align-items:center;gap:8px;font-size:11px;line-height:1.5;color:#92400e;background:#fffbeb;border-bottom:1px solid #fde68a;padding:7px 14px;}
+.cal-approval-bar .cab-ic{flex-shrink:0;font-size:13px;}
+.cal-approval-bar .cab-tx{flex:1;}
+.cal-approval-bar .cab-btn{flex-shrink:0;padding:4px 11px;border:1px solid var(--green);border-radius:6px;background:var(--green);color:#fff;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;}
+.cal-approval-bar .cab-btn:hover{filter:brightness(.94);}
 .mini-cal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
 .cal-dows{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface2);border-bottom:1px solid var(--border);}
 .cdow{text-align:center;padding:6px 2px;font-size:10px;font-weight:700;color:var(--ink3);}
