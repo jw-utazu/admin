@@ -1355,7 +1355,12 @@ async function saveNormalSlots() {
 // 日程（通常PW）の送信のみ。実施日の postNormalSlots() と対になる。
 // null は「クリア」としてサーバーに反映される
 async function postNormalDates() {
-  await apiGet('updateEventDates', { apply: dates.apply, deadline: dates.deadline, open: dates.open });
+  // year/month は必須。省かれるとサーバーが nowJstYM()＝今月にフォールバックし、
+  // 画面が編集している月（curY/curM。既定は来月）とは別の行に書いてしまう
+  await apiGet('updateEventDates', {
+    year: curY, month: curM,
+    apply: dates.apply, deadline: dates.deadline, open: dates.open
+  });
 }
 
 // 日程（通常PW）の都度保存。日付を選んだ時点で保存する
