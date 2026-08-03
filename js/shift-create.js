@@ -1696,14 +1696,16 @@ function buildSlotTable(bi, block) {
   });
   html += '</tbody></table></div>';
 
-  // ResizeObserver で cell-wrap の幅を監視して縦横切替
+  // 表の外枠（.tbl-wrap＝表示できる幅そのもの）を監視して縦横を切り替える。
+  // セル自身を測ってはいけない：縦積みにすると列が細くなり、細いから縦のまま……と
+  // 元に戻れなくなる（ウィンドウを広げても縦積みが残る）。
+  // .tbl-wrap は overflow-x:auto なので、幅は中身に左右されない
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const container = document.getElementById('main-content');
     if (!container) return;
-    container.querySelectorAll('.cell-wrap').forEach(el => {
-      applyCellWrapLayout(el);
-      const td = el.closest('td') || el;
-      if (!td._ro) { td._ro = new ResizeObserver(() => applyCellWrapLayout(el)); td._ro.observe(td); }
+    container.querySelectorAll('.tbl-wrap').forEach(wrap => {
+      applyCellWrapLayout(wrap);
+      if (!wrap._ro) { wrap._ro = new ResizeObserver(() => applyCellWrapLayout(wrap)); wrap._ro.observe(wrap); }
     });
   }));
 
@@ -2414,17 +2416,27 @@ async function acceptSyncUpdate(bi) {
   finally { setLoading(false); }
 }
 
-function applyCellWrapLayout(el) {
-  // cell-wrap内の3つのドロップダウンが横並びで各100px以上を確保できるかで縦横を切替
-  // 横並び時: 各100px×3 + gap 4px×2(=8px) = 308px が境界（308px以上で横、未満で縦）
-  const THRESHOLD = 100 * 3 + 4 * 2; // 308px
-  const w = el.clientWidth; // cell-wrapの内容幅(paddingなし)
-  if (w <= 0) return; // 非表示タブ内などサイズ未確定時は判定しない
-  if (w < THRESHOLD) {
-    el.classList.add('vertical');
-  } else {
-    el.classList.remove('vertical');
-  }
+// セル内の3人を横並びにするのに要る1列ぶんの幅：
+// ドロップダウン 100px×3 ＋ 間隔 4px×2 ＝ 308px に、.cell-w の左右パディング
+// （8px×2）と枠線を足したもの
+const CELL_H_MIN = 100 * 3 + 4 * 2 + 8 * 2 + 2; // 326px
+// 左端の時間列（.td-slot-time の min-width 90px ＋ 枠線）
+const TIME_COL_W = 92;
+
+// 表1つぶんの縦横をまとめて決める。引数は .tbl-wrap。
+// 判定材料は「今のセルの幅」ではなく「1列に配れる幅」— セルの実測だと
+// 一度縦積みになった列が二度と横並びに戻らない（列が細いままなので判定が
+// いつまでも「縦」に倒れる）。列ごとにバラバラの向きになるのも防げる
+function applyCellWrapLayout(wrap) {
+  const cells = wrap.querySelectorAll('.cell-wrap');
+  if (!cells.length) return;
+  const avail = wrap.clientWidth;
+  if (avail <= 0) return; // 非表示タブ内などサイズ未確定時は判定しない
+  const firstRow = wrap.querySelector('tbody tr');
+  const cols = firstRow ? firstRow.querySelectorAll('.cell-w').length : 0;
+  if (!cols) return;
+  const vertical = (avail - TIME_COL_W) / cols < CELL_H_MIN;
+  cells.forEach(el => el.classList.toggle('vertical', vertical));
 }
 
 // 担当者が空ならカート番号チップを無効化して値も消す
