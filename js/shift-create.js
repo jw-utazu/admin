@@ -20,6 +20,10 @@ let slotAssignCounts = {}; // UID別：当月のシフト割当回数（1コマ�
 let defaultSlot   = 15;
 let shiftPublished = false;
 let shiftOpenDate  = ''; // 公開予定日（M/D形式）。作成完了していても、この日を迎えるまで奉仕者には見えない
+// 上の shiftPublished / shiftOpenDate / shiftApproval が「どの月の状態か」。
+// 申込中の月とシフトが動いている月はずれるため、表示中の月と一致しているかを
+// 必ず確かめてから使う（さもないと前の月の作成完了フラグ・公開予定日が残る）
+let statusYM = null;
 // シフトの確認（承認）状況。確認者（メンバー管理で「確認者」に指定された管理者）全員が
 // 確認完了にするまで奉仕者へは公開されない。required=0 なら確認者未登録＝確認不要
 // オーナーアカウントは確認を省略して公開できる（approvalSkipped でその旨を表示する）
@@ -150,6 +154,8 @@ async function loadInitData() {
       loadYmList()
     ]);
     applyPublishStatus(statusRes);
+    // curYM が未確定のまま取ったので、対象年月が決まったところで食い違いを埋める
+    await ensurePublishStatusForCurYM();
     pwTypeList = slotsRes.ok ? (slotsRes.slots || []) : [];
     renderPwTabsSc();
     setLoading(false);
@@ -183,8 +189,21 @@ async function loadYmList() {
 
 function ymKey(o) { return o ? o.year + '.' + o.month : ''; }
 function isPublishedYM(o) { return !!(o && publishedYM && publishedYM.year === o.year && publishedYM.month === o.month); }
-// シフトが作成完了になっている月か（申込は次の月に移っていてもシフトは動いていることがある）
+// シフトが作成完了になっている月か（申込は次の月に移っていてもシフトは動いていることがある）。
+// 「作成完了」であって「奉仕者に見えている」ではない。公開操作（取り消し・確認・差し戻し）を
+// 許すかどうかの判定にだけ使う
 function isShiftPubYM(o) { return !!o && shiftPubYMs.some(x => x.year === o.year && x.month === o.month); }
+function ymEntry(o) { return o ? (ymList.find(c => c.year === o.year && c.month === o.month) || null) : null; }
+
+// 年月セレクタと注記の見出し。作成完了しただけの月を「シフト公開中」と書くと、
+// 確認待ち・公開予定日待ちで奉仕者にまだ見えていないことが読めないため段階で書き分ける
+function ymStateTag(c) {
+  if (!c) return '';
+  if (c.shiftVisible)   return '（シフト公開中）';
+  if (c.shiftPublished) return c.shiftApproved ? '（公開待ち）' : '（確認待ち）';
+  if (c.calPublished)   return '（申込中）';
+  return '';
+}
 
 function renderYmSelect() {
   const wrap = document.getElementById('sc-ym-wrap');
@@ -195,7 +214,7 @@ function renderYmSelect() {
   let html = ymList.map(c => {
     const v = c.year + '.' + c.month;
     // 申込中の月とシフトが動いている月は別々になりうるので、それぞれ区別して示す
-    const tag = c.calPublished ? '（申込中）' : c.shiftPublished ? '（シフト公開中）' : '';
+    const tag = ymStateTag(c);
     return `<option value="${v}"${v === cur ? ' selected' : ''}>${c.year}年${c.month}月${tag}</option>`;
   }).join('');
   // 一覧に無い年月（カレンダー未作成の月）を表示している場合も選択肢として残す
@@ -214,11 +233,23 @@ function renderYmNote() {
   if (!note) return;
   if (currentPwType !== 'normal' || !curYM || !ymLoaded) { note.textContent = ''; note.className = 'ym-note'; return; }
   const pubTxt = publishedYM ? publishedYM.year + '年' + publishedYM.month + '月' : '';
-  if (isPublishedYM(curYM)) {
+  const e = ymEntry(curYM);
+  // 申込より先に「シフトがどの段階にいるか」を書く。作成完了しただけの月を
+  // 「公開中」と書いてしまうと、確認待ち・公開予定日待ちで止まっていることに気づけない
+  if (e && e.shiftPublished) {
+    const suffix = (pubTxt && !isPublishedYM(curYM)) ? '（申込は ' + pubTxt + '）' : '';
+    if (e.shiftVisible) {
+      note.textContent = 'この月のシフトが公開中' + suffix;
+      note.className = 'ym-note ok';
+    } else if (e.shiftApproved) {
+      note.textContent = 'この月のシフトは公開待ち（確認済み・公開予定日を待っています）' + suffix;
+      note.className = 'ym-note ok';
+    } else {
+      note.textContent = 'この月のシフトは確認待ち（奉仕者にはまだ見えていません）' + suffix;
+      note.className = 'ym-note warn';
+    }
+  } else if (isPublishedYM(curYM)) {
     note.textContent = 'この月が申込中';
-    note.className = 'ym-note ok';
-  } else if (isShiftPubYM(curYM)) {
-    note.textContent = 'この月のシフトが公開中' + (pubTxt ? '（申込は ' + pubTxt + '）' : '');
     note.className = 'ym-note ok';
   } else if (publishedYM) {
     note.textContent = '申込中は ' + pubTxt + '（表示中の月は未公開）';
@@ -250,6 +281,10 @@ async function onYmChange(val) {
   setYmSwitching(true);
   setLoading(true, y + '年' + m + '月 のデータを読み込み中...');
   try {
+    // 作成完了・確認状況・公開予定日は月ごとに違う。切り替えたら必ず取り直す
+    // （取り直さないと、公開中の月を表示しているのにヘッダーだけ前の月＝未完了のまま残り、
+    //   「シフト作成完了」を押せてしまう）
+    applyPublishStatus(await fetchPublishStatus());
     const wishOn   = splitMode || document.getElementById('tab-wish').classList.contains('on');
     const createOn = splitMode || document.getElementById('tab-create').classList.contains('on');
     if (wishOn) await loadWishDataInternal();
@@ -346,6 +381,8 @@ async function switchPwTypeSc(type) {
     // loadCreateData / loadSettingsData は自前でオーバーレイを表示する
     if (createOn)   await loadCreateData();
     if (settingsOn) await loadSettingsData();
+    // curYM はここまでの読み込みで確定する。取った公開状態がその月のものか確かめる
+    await ensurePublishStatusForCurYM();
   } catch (e) {
     setLoading(false);
     toast('読み込みエラー: ' + e.message, 'e');
@@ -2583,6 +2620,22 @@ async function refreshPublishState() {
   await loadYmList();
 }
 
+// 手に入っている公開状態が表示中の月のものか。
+// 月を切り替えた直後の取得待ちや、curYM が未確定のまま取った初回の状態を
+// 「この月の状態」として読んでしまわないためのガード
+function isStatusForCurYM() {
+  if (!curYM || !statusYM) return true;
+  return statusYM.year === curYM.year && statusYM.month === curYM.month;
+}
+
+// 表示中の月とずれた状態を持っていたら取り直す。
+// 初回ロードとPWタイプ切替は curYM が未確定のまま公開状態を取りに行くため、
+// 対象年月が確定したあとに必ずこれを通す
+async function ensurePublishStatusForCurYM() {
+  if (isStatusForCurYM()) return;
+  applyPublishStatus(await fetchPublishStatus());
+}
+
 // 公開状態＋確認状況を取得する。確認者かどうかの判定にログイン中の管理者UID、
 // オーナー（確認省略可）かどうかの判定にメールアドレスが必要
 function fetchPublishStatus() {
@@ -2594,6 +2647,9 @@ function fetchPublishStatus() {
 
 function applyPublishStatus(res) {
   if (!res || !res.ok) return;
+  // サーバーは「どの月の状態を返したか」を必ず返す。年月を送らずに呼んだ初回は
+  // サーバー既定（申込中の月）が返るため、表示中の月とは限らない
+  statusYM = (res.year && res.month) ? { year: res.year, month: res.month } : null;
   shiftPublished = !!res.published;
   shiftOpenDate  = res.openDate || '';
   shiftApproval = {
@@ -2619,6 +2675,20 @@ function updatePublishBtn() {
   const apprLabel = document.getElementById('publish-approval');
   const openLabel = document.getElementById('publish-open-date');
   const hide = el => { if (el) { el.textContent = ''; el.style.display = 'none'; } };
+
+  // 別の月の状態しか持っていないときは、それをこの月の状態として描かない。
+  // 押せば対象は表示中の月なので、前の月の「未完了」が残っていると
+  // 公開中の月をもう一度作成完了にしてしまう（確認記録がリセットされる）
+  if (!isStatusForCurYM()) {
+    btn.textContent = '✅ シフト作成完了';
+    btn.className = 'hbtn pub';
+    btn.disabled = true;
+    btn.title = '公開状態を取得中です';
+    hide(openLabel);
+    hide(apprLabel);
+    if (rejBtn) rejBtn.style.display = 'none';
+    return;
+  }
 
   // 公開（作成完了）は「申込中の月」か「シフトが作成完了になっている月」に対してのみ行える。
   // それ以外の月を表示しているときに押せてしまうと、まだ準備段階の月のフラグを立ててしまう
@@ -2765,6 +2835,8 @@ function isOffPublishedMonth() {
 //   確認者（メンバー管理で「確認者」に指定された管理者） … 確認完了
 //   それ以外の管理者（作成担当者）                       … 作成完了 / 取り消し
 async function togglePublish() {
+  // 別の月の状態しか無いまま押させない（対象は表示中の月なので取り違えると実害が出る）
+  if (!isStatusForCurYM()) return;
   if (isOffPublishedMonth()) return;
   if (shiftApproval.isApprover) { await approveShift(); return; }
 
@@ -2859,6 +2931,7 @@ async function approveShift(force) {
 
 // 確認者が押す「差し戻す」。作成完了を取り消して作成担当者へ通知する
 async function rejectShift() {
+  if (!isStatusForCurYM()) return;
   if (isOffPublishedMonth() || !shiftApproval.isApprover || !shiftPublished) return;
   const note = prompt('差し戻す理由を入力してください（作成担当者に通知されます）', '');
   if (note === null) return;
