@@ -1731,8 +1731,14 @@ function renderProgressStrip() {
   const approved = !!(ss && ss.approvedAll);   // 確認者全員の確認完了
   const notified = !!(ss && ss.notified);      // 奉仕者へ公開・通知済み
   // 次の月の申込を先に開始すると、シフトがまだ動いている月は「申込中」ではなくなる。
-  // その月の募集・受付は既に済んだものとして読む（さもないと募集開始まで巻き戻って見える）
-  const calDone = calOn || created;
+  // その月の募集・受付は既に済んだものとして読む（さもないと募集開始まで巻き戻って見える）。
+  // 「済んだ」根拠にシフトの作成完了フラグ（created）を使ってはいけない。
+  // シフトの作成完了を取り消しただけで「予定表公開」まで巻き戻って見えてしまう。
+  // 予定表は公開できる月が1つだけで、次の月を公開すると前の月の is_cal_published は
+  // 落ちる（＝この月が公開されたという記録は残らない）ため、代わりに
+  // 「申込中の月がこの月より後へ進んだ」ことを根拠にする
+  const calMoved = !!(calPubYM && (calPubYM.y > curY || (calPubYM.y === curY && calPubYM.m > curM)));
+  const calDone = calOn || calMoved || created;
 
   const st = {
     dates:  hasDates ? 'done' : 'now',
