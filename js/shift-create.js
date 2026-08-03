@@ -2501,10 +2501,12 @@ function applyMergeResult(r) {
   refreshWishAssign();
   if (r.activeConflict) showSyncConflictBanner(activeTimeIdx);
   else if (r.activeChanged) {
-    // 他管理者の変更が入った以上、過去へ巻き戻すと相手の編集まで消してしまう
+    // 他管理者の変更が入った以上、過去へ巻き戻すと相手の編集まで消してしまう。
+    // 黙って消すと「気づいたら Ctrl+Z が効かない」ので、そのことも伝える
+    const hadUndo = _undoStack.length > 0;
     clearUndo();
     renderBlock();
-    toast('他の管理者の変更を反映しました', 's');
+    toast('他の管理者の変更を反映しました' + (hadUndo ? '（元に戻す履歴はリセットされます）' : ''), 's');
   }
 }
 
