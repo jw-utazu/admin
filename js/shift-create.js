@@ -195,6 +195,20 @@ function isPublishedYM(o) { return !!(o && publishedYM && publishedYM.year === o
 function isShiftPubYM(o) { return !!o && shiftPubYMs.some(x => x.year === o.year && x.month === o.month); }
 function ymEntry(o) { return o ? (ymList.find(c => c.year === o.year && c.month === o.month) || null) : null; }
 
+// その月が既に終わっているか（翌月に入ったか）。サーバー側 isCalRolledOver と同じ判定
+function isYmRolledOver(o) {
+  if (!o) return false;
+  const n = new Date(), y = n.getFullYear(), m = n.getMonth() + 1;
+  return o.year < y || (o.year === y && o.month < m);
+}
+
+// 申込が次の月へ進んだあとの、まだ終わっていない月。
+// この月の受付は終わり、シフトの作成・公開だけが残っている段階にいる
+function isShiftPhaseYM(o) {
+  if (!o || !publishedYM || isYmRolledOver(o)) return false;
+  return publishedYM.year > o.year || (publishedYM.year === o.year && publishedYM.month > o.month);
+}
+
 // 年月セレクタと注記の見出し。作成完了しただけの月を「シフト公開中」と書くと、
 // 確認待ち・公開予定日待ちで奉仕者にまだ見えていないことが読めないため段階で書き分ける
 function ymStateTag(c) {
@@ -283,8 +297,10 @@ async function onYmChange(val) {
   try {
     // 作成完了・確認状況・公開予定日は月ごとに違う。切り替えたら必ず取り直す
     // （取り直さないと、公開中の月を表示しているのにヘッダーだけ前の月＝未完了のまま残り、
-    //   「シフト作成完了」を押せてしまう）
-    applyPublishStatus(await fetchPublishStatus());
+    //   「シフト作成完了」を押せてしまう）。
+    // 年月一覧も一緒に取り直す。管理アプリで予定表を公開したのがこの画面を開いたあとだと、
+    // 申込中の月が古いままになり、公開できるはずの月でボタンが押せなくなる
+    await refreshPublishState();
     const wishOn   = splitMode || document.getElementById('tab-wish').classList.contains('on');
     const createOn = splitMode || document.getElementById('tab-create').classList.contains('on');
     if (wishOn) await loadWishDataInternal();
@@ -2696,7 +2712,9 @@ function updatePublishBtn() {
     btn.textContent = '✅ シフト作成完了';
     btn.className = 'hbtn pub';
     btn.disabled = true;
-    btn.title = publishedYM
+    btn.title = isYmRolledOver(curYM)
+      ? '既に終了した月です。シフトの公開操作はできません'
+      : publishedYM
       ? ('申込中カレンダーは ' + publishedYM.year + '年' + publishedYM.month + '月 です。表示中の月は公開操作できません（管理アプリで対象月の予定表を公開してください）')
       : '公開中のカレンダーがありません。管理アプリで予定表を公開してください';
     hide(openLabel);
@@ -2822,13 +2840,16 @@ function closeApprovalModal() {
   if (box) box.classList.remove('on');
 }
 
-// 表示中の月が公開操作の対象外か（限定PW・未取得のうちは制限しない）。
-// 対象になるのは「申込中の月」と「シフトが作成完了になっている月」の両方。
-// 前月のシフトが動いている最中に次月の申込を開始すると前月は申込中ではなくなるが、
-// そのシフトの取り消し・確認完了・差し戻しは引き続きできる必要がある
+// 表示中の月が公開操作の対象外か（限定PW・未取得のうちは制限しない）。対象になるのは
+//   ・申込中の月
+//   ・シフトが作成完了になっている月（取り消し・確認完了・差し戻しができる必要がある）
+//   ・申込が次の月へ進んだあとの、まだ終わっていない月
+// 前月のシフトが動いている最中に次月の申込を開始すると、前月は申込中ではなくなる。
+// 3つ目が無いと、その前月の作成完了を一度取り消した時点で「申込中でもない・
+// 作成完了でもない」月になり、二度と作成完了にできなくなる
 function isOffPublishedMonth() {
   if (currentPwType !== 'normal' || !ymLoaded || !curYM) return false;
-  return !isPublishedYM(curYM) && !isShiftPubYM(curYM);
+  return !isPublishedYM(curYM) && !isShiftPubYM(curYM) && !isShiftPhaseYM(curYM);
 }
 
 // ヘッダーの1つのボタンが、押した人の役割で意味を変える：
