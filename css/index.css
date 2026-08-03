@@ -624,9 +624,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .pk-ym-now:hover{color:var(--blue);}
 
 /* ‹ › の横の年月そのものを押すと年月ピッカーが開く */
-.cal-ym-pick{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid transparent;border-radius:var(--r);background:none;font-family:var(--sans);font-size:inherit;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1.3;cursor:pointer;}
-.cal-ym-pick:hover{border-color:var(--border);background:var(--surface);}
-.cal-ym-pick::after{content:'▾';font-size:11px;font-weight:400;color:var(--ink3);}
+/* ‹ › は枠のみの正方形なので、こちらは常に地色を敷いた「箱」にして
+   別物だと分かるようにする（ホバー待ちにしない） */
+.cal-ym-pick{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);font-family:var(--sans);font-size:inherit;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1.3;cursor:pointer;}
+.cal-ym-pick:hover{border-color:var(--border2);background:var(--bg);}
+.cal-ym-pick::after{content:'▾';font-size:10px;font-weight:400;color:var(--ink2);}
 /* 操作は数が多いのでカテゴリでたたむ。
    親（カテゴリ）は「行」、子（操作）は「ピル」。同じ形にすると展開時に見分けがつかない */
 .lf-grp{border-bottom:1px solid var(--border);}

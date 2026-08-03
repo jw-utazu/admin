@@ -82,8 +82,6 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 /* ヘッダーの対象年月セレクタ。どの月を編集中か・どの月が公開中かを常時明示する */
 .ym-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .ym-lbl{font-size:11px;font-weight:700;color:var(--ink3);white-space:nowrap;}
-.ym-sel{font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:5px 8px;cursor:pointer;}
-.ym-sel:disabled{opacity:.5;cursor:not-allowed;}
 .ym-note{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;}
 .ym-note.ok{background:var(--green-l);color:var(--green);}
 .ym-note.warn{background:#fffbeb;color:#92400e;}
@@ -173,10 +171,11 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cell-wrap .ps-watch-wrap{flex:1;min-width:100px;display:flex;flex-direction:column;gap:3px;}
 .cell-wrap.vertical .ps-watch-wrap{min-width:0;width:100%;max-width:100%;}
 .ps-watch-wrap .cs{width:100%;}
-.watch-label{display:flex;align-items:center;justify-content:center;gap:3px;font-size:9px;color:var(--ink3);cursor:pointer;white-space:nowrap;user-select:none;padding-top:1px;}
-.watch-label input[type="checkbox"]{cursor:pointer;margin:0;width:12px;height:12px;accent-color:var(--ink3);}
-.watch-label input[type="checkbox"]:disabled{cursor:not-allowed;}
-.watch-label:has(input:disabled){opacity:.45;}
+/* 見守りボタン。チップ（丸いピル）と混同しないよう、ここだけ幅いっぱいの
+   小さな四角にする — セル内の3人ぶんの欄の下に収まる密度が優先のため */
+.watch-cb{width:100%;padding:2px 4px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--ink3);font-family:var(--sans);font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.watch-cb.on{background:var(--purple-l,#f5f3ff);border-color:var(--purple);color:var(--purple);}
+.watch-cb:disabled{opacity:.45;cursor:not-allowed;}
 .dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
 .sc-body{display:flex;flex:1;overflow:hidden;}
@@ -251,7 +250,6 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .th-place{font-weight:700;font-size:12px;padding:8px 12px;}
 .cell-w{padding:7px 8px 9px;min-width:120px;}
 .cart-cell{padding:4px 8px;min-width:120px;background:inherit;}
-.cart-sel-place{width:100%;border:1px solid var(--border2);border-radius:5px;padding:4px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);}
 .th-cart-row td{font-size:10px;font-weight:700;color:var(--ink3);padding:3px 8px;background:#f8fafc;border-bottom:2px solid var(--border2);}
 .cs{width:100%;border:1px solid var(--border2);border-radius:5px;padding:4px 6px;font-size:12px;color:var(--ink);font-family:var(--sans);outline:none;cursor:pointer;background:var(--surface);text-align:left;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left-width:3px;border-left-color:var(--border2);}
 .cs:hover{background:var(--surface2);border-color:var(--purple);}
@@ -575,9 +573,6 @@ body.dnd-on *{cursor:grabbing !important;}
 .we-chip.on{border-color:var(--green);background:var(--green-l);color:var(--green);}
 .we-detail{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;}
 .we-sel-item{display:flex;align-items:center;gap:4px;}
-/* セレクトも .add-form select{width:100%} に負けるので打ち消す */
-.add-form select.we-sel{width:auto;font-size:12px;font-family:var(--sans);padding:5px 6px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--ink);}
-.add-form select.we-sel:focus{outline:none;border-color:var(--green);}
 .we-sel-suffix{font-size:11px;color:var(--ink3);}
 .we-warn{font-size:11px;font-weight:700;color:var(--red);margin-top:6px;}
 .add-form textarea.we-other{width:100%;margin-top:8px;font-size:12px;font-family:var(--sans);padding:6px;border:1px solid var(--border2);border-radius:var(--r);resize:vertical;min-height:48px;}
@@ -617,7 +612,6 @@ body.dnd-on *{cursor:grabbing !important;}
     background:var(--surface);}
   .hdr-spacer{display:none;}
   .ym-lbl{display:none;}
-  .ym-sel{padding:5px 6px;}
   /* PW タブはフォルダ型のまま、常に最上段に固定する。
      他の要素と同じ行に混ざると「行の下線に乗る」形が崩れるので、
      order:-1 と flex-basis:100% で必ず独立した1行目に回し、
@@ -694,10 +688,7 @@ body.dnd-on *{cursor:grabbing !important;}
     white-space:normal;line-height:1.3;}
   .shift-tbl .th-slot-time{z-index:7;}
   .th-place{padding:4px 3px;}
-  /* 場所名のドロップダウンは既定だと最長の選択肢の幅（実測 120px 前後）を
-     下限として持ち、これが列幅を決めてしまう。縮められるようにする */
   .th-place>div{min-width:0;}
-  .cart-sel-place{padding:3px;font-size:11px!important;min-width:0;}
   .col-del-btn{font-size:12px;padding:4px 5px;}
   .col-add-m{display:inline-block;}
   .col-ins-zone{display:none;}
@@ -725,10 +716,10 @@ body.dnd-on *{cursor:grabbing !important;}
      枠の大きさは 2・3人目と変わらない）。担当者が居ない欄には出さない */
   .cell-wrap .ps-watch-wrap{position:relative;flex-direction:column;}
   .cell-wrap .ps-watch-wrap .cs{padding-right:24px;}
-  .watch-label{position:absolute;right:5px;top:50%;transform:translateY(-50%);
-    z-index:2;margin:0;padding:0;gap:0;font-size:0;line-height:0;}
-  .watch-label:has(input:disabled){display:none;}
-  .watch-label input[type="checkbox"]{width:16px;height:16px;margin:0;accent-color:var(--purple);}
+  /* 幅を確保できないので文字は消し、色の有無だけで on/off を示す小さな丸に絞る */
+  .watch-cb{position:absolute;right:5px;top:50%;transform:translateY(-50%);
+    z-index:2;width:16px;height:16px;padding:0;border-radius:50%;font-size:0;}
+  .watch-cb:disabled{display:none;}
 
   /* ===== 責任者・カート担当 ===== */
   .resp-area,.cart-area{padding:6px 9px;}

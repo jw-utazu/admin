@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/shift-create.css?v=37">
+<link rel="stylesheet" href="css/shift-create.css?v=38">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
       <div id="pw-tabs" style="display:none;"></div>
       <div class="ym-wrap" id="sc-ym-wrap" style="display:none;">
         <span class="ym-lbl">対象年月</span>
-        <select class="ym-sel" id="sc-ym-sel" onchange="onYmChange(this.value)"></select>
+        <span id="sc-ym-slot"></span>
         <span class="ym-note" id="sc-ym-note"></span>
       </div>
       <div class="hdr-spacer" style="flex:1;"></div>
@@ -159,13 +159,7 @@
         <div class="sec-hd">⏱ デフォルトスロット分数</div>
         <div class="sec-body">
           <div style="display:flex;align-items:center;gap:10px;">
-            <select id="default-slot-sel" style="border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-size:13px;font-family:var(--sans);outline:none;">
-              <option value="10">10分</option>
-              <option value="15" selected>15分</option>
-              <option value="20">20分</option>
-              <option value="30">30分</option>
-              <option value="60">60分</option>
-            </select>
+            <div class="uic-row" id="default-slot-chips" style="padding:0;"></div>
             <button class="s-btn green" onclick="saveDefaultSlot()">💾 保存</button>
           </div>
           <p style="font-size:11px;color:var(--ink3);margin-top:8px;">カレンダーシートで実施日スロット分数を個別指定できます</p>
@@ -286,8 +280,8 @@
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
 <script src="js/validation.js?v=9"></script>
-<script src="js/picker.js?v=6"></script>
+<script src="js/picker.js?v=7"></script>
 <script src="js/dnd.js?v=15"></script>
-<script src="js/shift-create.js?v=46"></script>
+<script src="js/shift-create.js?v=47"></script>
 </body>
 </html>

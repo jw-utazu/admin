@@ -220,23 +220,24 @@ function ymStateTag(c) {
 }
 
 function renderYmSelect() {
-  const wrap = document.getElementById('sc-ym-wrap');
-  const sel  = document.getElementById('sc-ym-sel');
-  if (!wrap || !sel) return;
-  if (currentPwType !== 'normal' || ymList.length === 0) { wrap.style.display = 'none'; return; }
+  const wrap = document.getElementById('sc-ym-slot');
+  if (!wrap) return;
+  if (currentPwType !== 'normal' || ymList.length === 0) { wrap.parentNode.style.display = 'none'; return; }
   const cur = ymKey(curYM);
-  let html = ymList.map(c => {
-    const v = c.year + '.' + c.month;
+  const items = ymList.map(c => ({
+    value: c.year + '.' + c.month,
     // 申込中の月とシフトが動いている月は別々になりうるので、それぞれ区別して示す
-    const tag = ymStateTag(c);
-    return `<option value="${v}"${v === cur ? ' selected' : ''}>${c.year}年${c.month}月${tag}</option>`;
-  }).join('');
+    label: c.year + '年' + c.month + '月' + ymStateTag(c),
+  }));
   // 一覧に無い年月（カレンダー未作成の月）を表示している場合も選択肢として残す
   if (cur && !ymList.some(c => c.year + '.' + c.month === cur)) {
-    html += `<option value="${cur}" selected>${curYM.year}年${curYM.month}月</option>`;
+    items.push({ value: cur, label: curYM.year + '年' + curYM.month + '月' });
   }
-  sel.innerHTML = html;
-  wrap.style.display = 'flex';
+  wrap.innerHTML = uiSelHtml('sc-ym', {
+    title: '対象年月', items, value: cur, onPick: v => onYmChange(v),
+    style: 'font-size:12px;',
+  });
+  wrap.parentNode.style.display = 'flex';
   renderYmNote();
 }
 
@@ -275,7 +276,7 @@ function renderYmNote() {
 }
 
 function setYmSwitching(on) {
-  const sel = document.getElementById('sc-ym-sel');
+  const sel = document.querySelector('[data-uisel="sc-ym"]');
   if (sel) sel.disabled = !!on;
   document.querySelectorAll('.main-tabs .mtab').forEach(b => { b.disabled = !!on; });
   document.querySelectorAll('#pw-tabs .pw-tab-sc').forEach(b => { b.disabled = !!on; });
@@ -498,6 +499,7 @@ function uiChipPick(el) {
   el.classList.add('on');
 }
 function uiChipOn(key) { return !!document.querySelector(`[data-chip="${key}"].on`); }
+function uiChipVal(group) { return document.querySelector(`[data-group="${group}"].on`)?.dataset.val ?? ''; }
 
 // 比較表示の日付・時間帯は選択チップで選ぶ（ドロップダウンから置き換え）。
 // 候補は多くても月内の実施日ぶんなので、開かずに全部見えるほうが速い
@@ -884,10 +886,12 @@ function weRenderNote(st) {
   const types = WE_NOTE_TYPES.filter(t =>
     t.key === 'none' || t.key === 'other' || (t.key === 'partial' ? opts.length >= 2 : opts.length >= 1));
   const sel = (which, cur, suffix, list) =>
-    '<span class="we-sel-item"><select class="we-sel" data-which="' + which + '" onchange="weOnInput(this)">'
-    + '<option value="">--:--</option>'
-    + list.map(o => '<option value="' + o + '"' + (o === cur ? ' selected' : '') + '>' + o + '</option>').join('')
-    + '</select><span class="we-sel-suffix">' + suffix + '</span></span>';
+    '<span class="we-sel-item">' + uiSelHtml('we-' + which, {
+      title: which === 'from' ? '開始時刻' : '終了時刻', placeholder: '--:--',
+      items: [{ value: '', label: '--:--' }].concat(list.map(o => ({ value: o, label: o }))),
+      value: cur || '', search: false,
+      onPick: v => weOnField(which, v),
+    }) + '<span class="we-sel-suffix">' + suffix + '</span></span>';
   const showFrom = st.type === 'late'  || st.type === 'partial';
   const showTo   = st.type === 'early' || st.type === 'partial';
   const fromList = st.type === 'partial' ? opts.slice(0, -1) : opts;
@@ -926,9 +930,9 @@ function weSetType(el) {
   weRenderNote(st);
   if (st.type === 'other') { const ta = document.querySelector('#we-note .we-other'); if (ta) ta.focus(); }
 }
-function weOnInput(el) {
+function weOnField(which, v) {
   const box = document.getElementById('we-note');
-  box.dataset[el.dataset.which === 'from' ? 'nfrom' : 'nto'] = el.value;
+  box.dataset[which === 'from' ? 'nfrom' : 'nto'] = v;
   if (box.dataset.ntype === 'partial') weRenderNote(weReadState());
 }
 
@@ -1534,8 +1538,8 @@ function cartChipLabel(el) {
   const layer = cartLayerOf(el);
   if (layer === 'place') {
     const m = /^pc-(\d+)-(\d+)-/.exec(el.id || '');
-    const sel = m ? document.getElementById(`place-sel-${m[1]}-${m[2]}`) : null;
-    return (sel && sel.value) || '場所未設定の列';
+    const sel = m ? document.querySelector(`[data-uisel="place-sel-${m[1]}-${m[2]}"]`) : null;
+    return (sel && sel.dataset.val) || '場所未設定の列';
   }
   if (!layer) return '';
   const m = /(\d)-\d+$/.exec(el.id || '');
@@ -1611,8 +1615,8 @@ function getColPlaces(bi, block) {
   const cols = [...window._blockCols[key]];
   let synced = false;
   for (let li = 0; li < cols.length; li++) {
-    const dom = document.getElementById(`place-sel-${bi}-${li}`);
-    if (dom !== null) { cols[li] = dom.value; synced = true; }
+    const dom = document.querySelector(`[data-uisel="place-sel-${bi}-${li}"]`);
+    if (dom !== null) { cols[li] = dom.dataset.val; synced = true; }
   }
   if (synced) window._blockCols[key] = [...cols];
   return cols;
@@ -1704,9 +1708,11 @@ function buildSlotTable(bi, block) {
   const colPlaces = [...window._blockCols[bKey(block)]];
 
   function makeLocSel(li, val) {
-    let o = '<option value="">—</option>';
-    allLocs.forEach(n => { o += `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`; });
-    return `<select id="place-sel-${bi}-${li}" class="cart-sel-place" onchange="onPlaceChange(${bi})" style="width:100%;font-weight:700;font-size:12px;">${o}</select>`;
+    const items = [{ value: '', label: '—' }].concat(allLocs.map(n => ({ value: n, label: n })));
+    return uiSelHtml(`place-sel-${bi}-${li}`, {
+      title: '場所', items, value: val || '', style: 'width:100%;font-weight:700;font-size:12px;',
+      onPick: () => onPlaceChange(bi),
+    });
   }
 
   // ヘッダー行（場所名ドロップダウン ＋ 列削除ボタン）
@@ -1786,7 +1792,9 @@ function buildPS(bi, ri, li, pi, val, sa, nm, watchOn, dateKey) {
   const isDisabled = !val;
   const isChecked = !!(watchOn && val);
   // title はスマホで必要。狭い幅では文字を消して 👁 アイコンだけにするため（CSS 側）
-  const cb = `<label class="watch-label" title="見守り"><input type="checkbox" class="watch-cb" id="${cbId}" data-bi="${bi}" data-ri="${ri}" data-li="${li}"${isDisabled ? ' disabled' : ''}${isChecked ? ' checked' : ''} onchange="onWatchChange(this,${bi})"> 見守り</label>`;
+  const cb = `<button type="button" class="watch-cb${isChecked ? ' on' : ''}" id="${cbId}" title="見守り"`
+           + ` data-bi="${bi}" data-ri="${ri}" data-li="${li}"${isDisabled ? ' disabled' : ''}`
+           + ` onclick="onWatchToggle(this,${bi})">見守り</button>`;
   return `<div class="ps-watch-wrap">${sel}${cb}</div>`;
 }
 
@@ -1924,12 +1932,13 @@ function autoWatch(bi, ri, li) {
   if (!cw || !cb || cb.dataset.manual === '1') return;
   const els = [...cw.querySelectorAll('.cs')];
   const n = els.filter(s => s.dataset.value).length;
-  if (n >= 3 && els[0] && els[0].dataset.value) { cb.disabled = false; cb.checked = true; }
-  else if (cb.checked) cb.checked = false;
+  if (n >= 3 && els[0] && els[0].dataset.value) { cb.disabled = false; cb.classList.add('on'); }
+  else if (cb.classList.contains('on')) cb.classList.remove('on');
 }
 
 // 手動で見守りを操作したことを記録する
-function onWatchChange(cb, bi) {
+function onWatchToggle(cb, bi) {
+  cb.classList.toggle('on');
   cb.dataset.manual = '1';
   mu(bi);
 }
@@ -1942,7 +1951,7 @@ function onPs0Change(bi, ri, li) {
     cb.disabled = false;
   } else {
     cb.disabled = true;
-    cb.checked = false;
+    cb.classList.remove('on');
   }
 }
 
@@ -2559,7 +2568,7 @@ function collectBlock(bi) {
       }
       places.push(uids);
       const cb = document.getElementById(`watch-${bi}-${ri}-${li}`);
-      watch.push(cb ? !!cb.checked : !!((slot.watch || [])[li]));
+      watch.push(cb ? cb.classList.contains('on') : !!((slot.watch || [])[li]));
     });
     return { time: slot.time, places, watch };
   });
@@ -3096,7 +3105,7 @@ async function loadSettingsData() {
     settingsCartNumbers  = cr.ok ? cr.cartNumbers  : [];
     defaultSlot  = sr.ok ? sr.defaultSlot  : 15;
     renderLocationList(); renderCartTags(); renderValidationRules();
-    const sel = document.getElementById('default-slot-sel'); if (sel) sel.value = String(defaultSlot);
+    renderDefaultSlotChips();
     settingsLoaded = true; setLoading(false);
   } catch (e) { setLoading(false); toast('設定読み込みエラー: ' + e.message, 'e'); }
 }
@@ -3184,9 +3193,9 @@ function renderLocPwSelect() {
   }
   if (!locForm.linkPwType || !pwTypeList.some(p => p.id === locForm.linkPwType)) locForm.linkPwType = pwTypeList[0].id;
   box.innerHTML = `<label>紐づける限定PW</label>
-    <select id="loc-pw-sel" onchange="locForm.linkPwType=this.value">
-      ${pwTypeList.map(p => `<option value="${esc(p.id)}"${locForm.linkPwType === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}
-    </select>
+    <div class="uic-row">
+      ${pwTypeList.map(p => `<button type="button" class="uic${locForm.linkPwType === p.id ? ' on' : ''}" data-group="loc-pw" data-val="${esc(p.id)}" onclick="uiChipPick(this);locForm.linkPwType=this.dataset.val;">${esc(p.name)}</button>`).join('')}
+    </div>
     <div class="loc-note" style="margin-top:8px;">この場所は選んだ限定PWのシフト作成でのみ表示されます（年月の指定は不要）。設定の編集はこのタブから行えます。</div>`;
 }
 
@@ -3347,8 +3356,17 @@ async function saveCartNumbers() {
 }
 
 
+const DEFAULT_SLOT_OPTS = [10, 15, 20, 30, 60];
+function renderDefaultSlotChips() {
+  const wrap = document.getElementById('default-slot-chips');
+  if (!wrap) return;
+  wrap.innerHTML = DEFAULT_SLOT_OPTS.map(v =>
+    `<button type="button" class="uic${v === defaultSlot ? ' on' : ''}" data-group="default-slot" data-val="${v}" onclick="uiChipPick(this)">${v}分</button>`
+  ).join('');
+}
+
 async function saveDefaultSlot() {
-  const v = parseInt(document.getElementById('default-slot-sel').value);
+  const v = parseInt(uiChipVal('default-slot'));
   try { await apiGet('saveDefaultSlot', { defaultSlot: v }); defaultSlot = v; toast('デフォルトスロット分数を保存しました', 's'); }
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
