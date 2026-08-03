@@ -244,8 +244,10 @@ function renderYmSelect() {
     // 申込中の月とシフトが動いている月は別々になりうるので、それぞれ区別して示す
     label: c.year + '年' + c.month + '月' + ymStateTag(c),
   }));
-  // 一覧に無い年月（カレンダー未作成の月）を表示している場合も選択肢として残す
-  if (cur && !items.some(it => it.value === cur)) {
+  // カレンダー行自体が存在しない月（未作成の月）を表示している場合のみ選択肢として残す。
+  // 行はあるが条件を満たさないだけの月（例：日程公開済みだが申込開始日未到達）は
+  // 一覧から除外したいので、items ではなく ymList 全体の有無で判定する
+  if (cur && !ymList.some(c => c.year + '.' + c.month === cur)) {
     items.push({ value: cur, label: curYM.year + '年' + curYM.month + '月' });
   }
   wrap.innerHTML = uiSelHtml('sc-ym', {
