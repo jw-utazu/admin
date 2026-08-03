@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=40">
+<link rel="stylesheet" href="css/index.css?v=41">
 </head>
 <body>
 
@@ -53,8 +53,9 @@
     <div class="hdr-logo" id="hdr-logo"><img src="logo.png" alt="PW" onerror="this.parentNode.textContent='PW'"></div>
     <span style="font-size:14px;font-weight:700;color:var(--ink);margin-right:auto;padding-left:8px;">PW管理アプリ</span>
     <div style="display:flex;align-items:center;gap:8px;">
-      <div class="av" id="av"></div>
-      <button class="so-btn" onclick="signOut()">ログアウト</button>
+      <!-- アイコンを押すとアカウント切り替えメニューが開く（ログアウトもこの中） -->
+      <div class="av" id="av" role="button" tabindex="0" title="アカウント"
+           onclick="openAccountMenu(this)"></div>
     </div>
   </header>
 
@@ -649,10 +650,10 @@
 
 <!-- フェーズ追加・編集モーダル -->
 
-<script src="js/session.js?v=3"></script>
-<script src="js/api.js?v=8"></script>
+<script src="js/session.js?v=4"></script>
+<script src="js/api.js?v=9"></script>
 <script src="js/confirm.js?v=1"></script>
 <script src="js/picker.js?v=7"></script>
-<script src="js/index.js?v=58"></script>
+<script src="js/index.js?v=59"></script>
 </body>
 </html>

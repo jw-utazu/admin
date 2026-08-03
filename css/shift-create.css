@@ -91,10 +91,6 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .acc-wrap{position:relative;}
 .acc-icon{width:28px;height:28px;border-radius:50%;background:var(--purple-l);border:1px solid #ddd6fe;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;}
 .acc-icon:hover{background:#ede9fe;}
-.acc-menu{display:none;position:absolute;right:0;top:34px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 4px 12px rgba(0,0,0,.12);min-width:140px;z-index:200;}
-.acc-menu.on{display:block;}
-.acc-menu-item{padding:8px 14px;font-size:12px;cursor:pointer;color:var(--ink2);}
-.acc-menu-item:hover{background:var(--bg);color:var(--red);}
 .save-st{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--amber);}
 .save-st.saved{color:var(--green);}
 .save-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
@@ -127,8 +123,16 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;flex:1;display:flex;flex-direction:column;}
 #wish-table-wrap{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
 #wish-table-wrap > div[style]{flex:1;}
-table.wish-tbl{border-collapse:collapse;font-size:12px;white-space:nowrap;}
-table.wish-tbl th,table.wish-tbl td{border:1px solid var(--border);text-align:center;vertical-align:middle;}
+/* 見出しと氏名列を sticky で固定するので border-collapse:collapse は使えない。
+   collapse だと罫線がテーブル側に描かれて sticky セルと一緒に動かず、
+   固定された見出しの上端・左端に 1px の透き間が残る。そこを本文がスクロールで
+   通り抜けて外枠との間がちらついて見える。
+   separate にして各セルに自前の罫線（右・下）を持たせると罫線も一緒に動く。
+   隣接セルで罫線が重ならないよう右下だけに引き、外周は先頭行・氏名列で足す */
+table.wish-tbl{border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap;}
+table.wish-tbl th,table.wish-tbl td{border:0 solid var(--border);border-right-width:1px;border-bottom-width:1px;text-align:center;vertical-align:middle;}
+table.wish-tbl .col-name{border-left-width:1px;}
+table.wish-tbl thead tr:first-child>*{border-top-width:1px;}
 .col-name{position:sticky;left:0;z-index:5;background:var(--surface);min-width:110px;max-width:140px;text-align:left!important;padding:0 8px;font-weight:700;}
 th.col-name{background:var(--green4);color:var(--green-d);font-size:11px;border-right:2px solid var(--border2)!important;z-index:10;}
 td.col-name{border-right:2px solid var(--border2)!important;}
@@ -213,7 +217,9 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 /* 希望確認テーブル */
 .wish-snap-outer{overflow:auto;min-height:412px;}
 .th-date{background:var(--green4);color:var(--green-d);font-weight:700;font-size:11px;padding:6px 10px;position:sticky;top:0;z-index:3;box-shadow:0 1px 0 var(--border);}
-.th-time{background:var(--green3);color:var(--green-d);font-weight:700;font-size:10px;padding:4px 8px;min-width:80px;position:sticky;top:28px;z-index:3;box-shadow:0 2px 0 var(--border);}
+/* 罫線がセル自前になった（border-collapse:separate）ので、見出し下の線は
+   セルの border だけで足りる。影は境目を少し強めるための 1px にとどめる */
+.th-time{background:var(--green3);color:var(--green-d);font-weight:700;font-size:10px;padding:4px 8px;min-width:80px;position:sticky;top:28px;z-index:3;box-shadow:0 1px 0 var(--border);}
 /* 未申込一覧（希望確認タブ） */
 .wish-not-applied-toggle{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);cursor:pointer;user-select:none;font-size:12px;font-weight:700;color:var(--ink2);}
 .wish-not-applied-toggle:hover{background:var(--bg);}

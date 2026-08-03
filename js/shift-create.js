@@ -103,9 +103,11 @@ async function initAuth() {
     } catch (_) { setLoading(false); }
   }
 
-  // 未ログイン・管理者権限なし：共通ログイン画面へ送る
-  // （このアプリ内に認証画面は持たない）
-  pwgwsGoToLogin(shared ? 'noadmin' : '');
+  // ログイン自体は済んでいるが管理者権限が無い場合（アカウント切り替えで
+  // 個人アカウントに変えたときなど）はログアウトさせず、フォームアプリへ送る。
+  // 未ログインのときだけ共通ログイン画面へ（このアプリ内に認証画面は持たない）
+  if (shared) { location.replace(PWGWS_FORM_URL); return; }
+  pwgwsGoToLogin();
 }
 async function tryRecoveryLogin() {
   let token = '';
@@ -635,13 +637,10 @@ function buildCmpBlock(block) {
   html += `</div>`;
   return html;
 }
-function toggleAccMenu() {
-  document.getElementById('acc-menu').classList.toggle('on');
+// アカウント切り替えメニュー（実体は共有の session.js。3アプリで同じ見た目にするため）
+function openAccountMenu(el) {
+  pwgwsOpenAccountMenu(el, { onSignOut: signOut });
 }
-document.addEventListener('click', e => {
-  const wrap = document.querySelector('.acc-wrap');
-  if (wrap && !wrap.contains(e.target)) document.getElementById('acc-menu').classList.remove('on');
-});
 
 // ============================================================
 // TAB1: 希望確認

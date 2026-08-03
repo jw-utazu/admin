@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/shift-create.css?v=40">
+<link rel="stylesheet" href="css/shift-create.css?v=41">
 </head>
 <body>
 
@@ -23,11 +23,10 @@
       <div class="hdr-logo">🗂</div>
       <span class="hdr-title" id="hdr-title">シフト管理アプリ</span>
       <a class="hbtn" href="./manual/manual-admin-shift.html" target="_blank">📖 マニュアル</a>
+      <!-- アイコンを押すとアカウント切り替えメニューが開く（ログアウトもこの中） -->
       <div class="acc-wrap">
-        <div class="acc-icon" id="acc-icon" onclick="toggleAccMenu()">👤</div>
-        <div class="acc-menu" id="acc-menu">
-          <div class="acc-menu-item" onclick="signOut()">🚪 ログアウト</div>
-        </div>
+        <div class="acc-icon" id="acc-icon" role="button" tabindex="0" title="アカウント"
+             onclick="openAccountMenu(this)">👤</div>
       </div>
     </div>
     <div class="hdr-row2">
@@ -276,12 +275,12 @@
 
 <div class="ta" id="ta"></div>
 
-<script src="js/session.js?v=3"></script>
-<script src="js/api.js?v=8"></script>
+<script src="js/session.js?v=4"></script>
+<script src="js/api.js?v=9"></script>
 <script src="js/confirm.js?v=1"></script>
 <script src="js/validation.js?v=9"></script>
 <script src="js/picker.js?v=7"></script>
 <script src="js/dnd.js?v=15"></script>
-<script src="js/shift-create.js?v=52"></script>
+<script src="js/shift-create.js?v=53"></script>
 </body>
 </html>

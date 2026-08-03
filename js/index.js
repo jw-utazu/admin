@@ -154,6 +154,10 @@ async function _processUserWithGasAuth(u, save) {
   setLoadingStep(3, 'データを読み込み中...');
   loadAdminData();
 }
+// アカウント切り替えメニュー（実体は共有の session.js。3アプリで同じ見た目にするため）
+function openAccountMenu(el) {
+  pwgwsOpenAccountMenu(el, { onSignOut: signOut });
+}
 function signOut() {
   try { localStorage.removeItem('adminUser'); } catch(e) {}
   // 共通セッション・救済ログインも併せて破棄する（3アプリ共通のログアウト）
@@ -177,6 +181,15 @@ function setLoadingStep(step, msg) {
 // 認証に関する失敗は共通ログイン画面へ戻して、そこで理由を表示させる。
 // データ読み込み失敗など認証以外の失敗はこの画面上に出す
 function showAuthErr(msg, reason) {
+  if (reason === 'noadmin') {
+    // 管理者権限が無いだけで、本人としては正しくログインできている。
+    // アカウント切り替えで個人アカウントに変えたときがこれにあたるので、
+    // ログアウトさせずにフォームアプリへ送る
+    // （ここで pwgwsClearSession を呼ぶと保存済みアカウントが全部消える）
+    try { localStorage.removeItem('adminUser'); } catch (_) {}
+    location.replace(PWGWS_FORM_URL);
+    return;
+  }
   if (reason) {
     // 誤ったアカウントのセッションが残り続けないよう破棄してから戻す
     try { localStorage.removeItem('adminUser'); } catch (_) {}

@@ -25,6 +25,15 @@ if (typeof pwgwsGetSession !== 'function') {
   // 読み込めなかった以上、強制再ログインの基準時刻も分からない。
   // 誤って全員をログアウトさせないよう、何もしない扱いにする
   window.pwgwsEnforceRelogin        = function () { return false; };
+  // 複数アカウント：切り替えはできないが、押しても何も起きないだけで済むようにする
+  window.PWGWS_FORM_URL             = 'https://jw-utazu.github.io/shift-form/';
+  window.pwgwsGetAccounts           = function () { return []; };
+  window.pwgwsSwitchAccount         = function () { return false; };
+  window.pwgwsRemoveAccount         = function () { return false; };
+  window.pwgwsGoToAddAccount        = function () { window.pwgwsGoToLogin(); };
+  window.pwgwsOpenAccountMenu       = function () {
+    alert('アカウント機能を読み込めませんでした。ページを再読み込みしてください。');
+  };
 }
 
 // ============================================================
