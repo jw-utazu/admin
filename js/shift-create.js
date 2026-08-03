@@ -2367,8 +2367,11 @@ async function reloadCreateData() {
 // 場合は上書きせず競合バナーを出す）。バックエンドは shift-form/js/app.js の
 // checkShiftUpdate と同じ仕組みを流用している。
 // touchShift は「奉仕者に公開済みの月」でしか動かないため、公開前の作成中は
-// touchShiftDraft() が shift_draft_updated_at_<pw_type> を別途更新する。管理者間の
-// 同期監視だけはこちらを見て、公開判定・奉仕者通知には一切影響させない。
+// touchShiftDraft() が shift_draft_events に「どのブロックがいつ変わったか」を
+// ブロック単位で記録する。管理者間の同期監視だけはこちらを見て、公開判定・
+// 奉仕者通知には一切影響させない。
+// 変更を検知したら getChangedShiftBlocks で「前回以降に変わったブロック」だけを
+// 取りに行く（月全体を返す getShiftCreateData は重く、反映まで数秒かかっていた）。
 // 希望（shift_wishes）側は touchWish() が wish_updated_at_<pw_type> を更新し、
 // 同じエンドポイントの wishUpdated で返ってくる。変化があれば希望確認タブと
 // 申込者リストだけを再取得する（シフト作成側のブロックには触れない）。
@@ -2381,23 +2384,28 @@ async function checkShiftCreateUpdate() {
     const wishTs  = res.wishUpdated  || '';
     const draftTs = res.draftUpdated || '';
     // 初回（または再読み込み直後）は基準値を控えるだけで同期処理は走らせない
-    let blockChanged = false;
+    let publishTsChanged = false;
     if (_scKnownTs === null) _scKnownTs = res.lastUpdated;
     else if (res.lastUpdated !== _scKnownTs) {
       _scKnownTs = res.lastUpdated;
       // 作成完了・確認完了・差し戻しも touchShift でタイムスタンプを動かすため、
       // 他の係の操作を待たずにヘッダーの確認状況を追随させる
       await refreshPublishState();
-      blockChanged = true;
+      publishTsChanged = true;
     }
+    // 配置・メモの保存は必ずブロック単位の変更記録を残すので、中身の同期は
+    // 常に軽い差分取得で足りる。月全体の取り直しは、差分に現れない
+    // 構造的な変更（枠の増減・公開状態の変化）が来たときだけに絞る
     if (_scKnownDraftTs === null) _scKnownDraftTs = draftTs;
     else if (draftTs !== _scKnownDraftTs) {
-      // 未公開（作成中）のブロック保存もこちらで検知する。公開済みの
-      // shift_updated_at_ 側の変化とまとめて同じマージ処理に流す
+      const since = _scKnownDraftTs;
       _scKnownDraftTs = draftTs;
-      blockChanged = true;
+      // 基準がまだ無い（この月で誰も保存していなかった）場合は差分の起点を作れない。
+      // 起こるのは最初の1回だけなので、そのときだけ月全体を取り直す
+      if (createLoaded) { if (since) await syncChangedShiftBlocks(since); else await syncShiftCreateData(); }
+    } else if (publishTsChanged && createLoaded) {
+      await syncShiftCreateData();
     }
-    if (blockChanged && createLoaded) await syncShiftCreateData();
     if (_scKnownWishTs === null) _scKnownWishTs = wishTs;
     else if (wishLoaded && wishTs !== _scKnownWishTs) {
       _scKnownWishTs = wishTs;
@@ -2431,20 +2439,18 @@ function startShiftCreateSync() {
   checkShiftCreateUpdate();
 }
 
-// 変更があったブロックだけをマージする。日付タブ構成が変わるような構造的な変更
-// （シフト作成枠の新規作成・削除など）は対象外とし、既存の「🔄 再読み込み」に委ねる。
-async function syncShiftCreateData() {
-  let res;
-  try { res = await apiGet('getShiftCreateData', ymP()); } catch (e) { return; }
-  if (!res || !res.ok) return;
-
+// 受け取ったブロックを画面に取り込む。差分取得・全件取得のどちらから来ても
+// 扱いは同じなので、マージの判断（未保存中は上書きせず競合バナー）はここに集約する。
+// 日付タブ構成が変わるような構造的な変更（シフト作成枠の新規作成・削除など）は
+// 対象外とし、既存の「🔄 再読み込み」に委ねる
+function mergeShiftBlocks(freshBlocks) {
   const activeTab   = (window._dateTabs || [])[activeDateIdx];
   const activeBlock = activeTab ? shiftDates.filter(d => d.date === activeTab.date)[activeTimeIdx] : null;
   const activeKey   = activeBlock ? bKey(activeBlock) : null;
   let activeChanged  = false;
   let activeConflict = false;
 
-  (res.dates || []).forEach(fresh => {
+  (freshBlocks || []).forEach(fresh => {
     const key = bKey(fresh);
     const idx = shiftDates.findIndex(d => bKey(d) === key);
     if (idx === -1) return; // 新規追加された枠は対象外（🔄 再読み込みで反映）
@@ -2461,22 +2467,47 @@ async function syncShiftCreateData() {
       shiftDates[idx] = fresh;
     }
   });
+  return { activeChanged, activeConflict };
+}
 
-  conflictMap = res.conflictMap || conflictMap;
-  memoMap = {};
-  if (res.memoMap) Object.assign(memoMap, res.memoMap);
-  defaultSlot = res.defaultSlot || defaultSlot;
+// マージ結果を画面へ反映する（再描画は変更が表示中ブロックに及んだときだけ）
+function applyMergeResult(r) {
   recalcCounts();
   buildLeftPanel();
   refreshWishAssign();
-
-  if (activeConflict) showSyncConflictBanner(activeTimeIdx);
-  else if (activeChanged) {
+  if (r.activeConflict) showSyncConflictBanner(activeTimeIdx);
+  else if (r.activeChanged) {
     // 他管理者の変更が入った以上、過去へ巻き戻すと相手の編集まで消してしまう
     clearUndo();
     renderBlock();
     toast('他の管理者の変更を反映しました', 's');
   }
+}
+
+// 前回の同期以降に保存されたブロックだけを取りに行く。
+// 月全体を返す getShiftCreateData は重く、変更検知のたびに呼ぶと反映まで数秒かかっていた
+async function syncChangedShiftBlocks(since) {
+  let res;
+  try { res = await apiGet('getChangedShiftBlocks', ymP({ since })); } catch (e) { return; }
+  if (!res || !res.ok) return;
+  const r = mergeShiftBlocks(res.blocks);
+  // メモは対象ブロックぶんだけが返るので、全体を作り直さず該当キーだけ差し替える
+  if (res.memos) Object.assign(memoMap, res.memos);
+  applyMergeResult(r);
+}
+
+// 月全体を取り直す重い同期。差分では追えない変更（公開状態の変化など）だけで使う
+async function syncShiftCreateData() {
+  let res;
+  try { res = await apiGet('getShiftCreateData', ymP()); } catch (e) { return; }
+  if (!res || !res.ok) return;
+
+  const r = mergeShiftBlocks(res.dates);
+  conflictMap = res.conflictMap || conflictMap;
+  memoMap = {};
+  if (res.memoMap) Object.assign(memoMap, res.memoMap);
+  defaultSlot = res.defaultSlot || defaultSlot;
+  applyMergeResult(r);
 }
 
 function showSyncConflictBanner(bi) {
