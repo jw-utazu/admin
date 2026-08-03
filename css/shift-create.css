@@ -465,6 +465,18 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .pf-scope{font-size:11px;font-weight:700;color:var(--ink2);display:list-item;}
 .pf-rules{font-size:10px;color:var(--ink3);line-height:1.5;margin-top:4px;padding-left:14px;}
 .pk-note{font-size:10px;color:var(--ink3);padding:5px 6px 1px;border-top:1px solid var(--border);margin-top:4px;}
+/* 年月ピッカー（openMonthPicker）。.on＝いま選んでいる月／.today＝実際の今月 */
+.pk-ym-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.pk-ym-y{font-size:13px;font-weight:700;color:var(--ink);}
+.pk-ym-nav{width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink2);font-family:var(--sans);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.pk-ym-nav:hover{background:var(--bg);}
+.pk-ym-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.pk-ym-m{padding:9px 0;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;}
+.pk-ym-m:hover{background:var(--purple-l);border-color:var(--purple);}
+.pk-ym-m.today{border-color:var(--blue);color:var(--blue);}
+.pk-ym-m.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+.pk-ym-now{width:100%;margin-top:8px;padding:5px;border:0;background:none;color:var(--ink3);font-family:var(--sans);font-size:11px;cursor:pointer;}
+.pk-ym-now:hover{color:var(--blue);}
 
 /* 左パネルの名前にも性別の縦線を出す（凡例はシフト表と共通） */
 .m-name.g-m{border-left:3px solid #2563eb;padding-left:5px;}

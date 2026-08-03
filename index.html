@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=38">
+<link rel="stylesheet" href="css/index.css?v=39">
 </head>
 <body>
 
@@ -61,15 +61,6 @@
   <!-- PWモード切替タブ（JS で動的レンダリング） -->
   <div class="pw-type-bar" id="pw-type-bar"></div>
 
-  <!-- 年月ドロップダウン -->
-  <div class="ym-dropdown" id="ym-dropdown">
-    <span class="ym-dd-label">対象年月：</span>
-    <!-- 中身は toggleYmDropdown() が uiSelHtml で組む -->
-    <span id="ym-sel-slot"></span>
-    <button class="ym-dd-btn" onclick="applyYmChange()">適用</button>
-    <button onclick="toggleYmDropdown()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);background:none;cursor:pointer;font-family:var(--sans);font-size:12px;">閉じる</button>
-  </div>
-
   <div class="layout">
     <!-- タブ切り替えローディングオーバーレイ -->
     <div id="tab-switch-ov">
@@ -85,7 +76,8 @@
         <div class="cal-ym-header">
           <div id="cal-ym-nav" style="display:flex;align-items:center;gap:8px;">
             <button class="cal-ym-nav-btn" onclick="chM(-1)">&#8249;</button>
-            <span id="cal-ym-label">読み込み中...</span>
+            <!-- 年月そのものを押すと年月ピッカーが開く（遠い月へ一度で飛べる） -->
+            <button class="cal-ym-pick" id="cal-ym-label" onclick="openYmPicker(this)">読み込み中...</button>
             <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
             <span class="cal-ym-section-label">シフト管理</span>
           </div>
@@ -118,7 +110,7 @@
         <div class="cal-view-nav" id="cal-view-nav-bar">
           <span class="cal-view-nav-label">カレンダー</span>
           <button class="cal-ym-nav-btn" onclick="chCalM(-1)">&#8249;</button>
-          <span id="cal-view-label">読み込み中...</span>
+          <button class="cal-ym-pick" id="cal-view-label" onclick="openCalViewPicker(this)">読み込み中...</button>
           <button class="cal-ym-nav-btn" onclick="chCalM(1)">&#8250;</button>
         </div>
         <!-- スクロールエリア -->
@@ -660,7 +652,7 @@
 <script src="js/session.js?v=3"></script>
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/picker.js?v=5"></script>
+<script src="js/picker.js?v=6"></script>
 <script src="js/index.js?v=57"></script>
 </body>
 </html>

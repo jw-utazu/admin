@@ -183,6 +183,63 @@ function _pkKey(e) {
 }
 
 // ============================================================
+// 年月ピッカー
+//
+// openMonthPicker(anchorEl, { title, year, month, note, onPick(y, m) })
+//
+// 年は ‹ › で送り、月は12マスから選ぶ。年と月の <select> を2つ並べる形と
+// 違って「今どの年を見ているか」と「近い月」が同時に見えるので、
+// ‹ › の送りでは遠い月へ行きにくい、という不満に応えられる。
+// ポップオーバーの位置決め・外側タップで閉じる処理は上のものを使い回す
+// ============================================================
+
+let _pkYmY = 0;   // 今めくっている年
+
+function openMonthPicker(anchorEl, opts) {
+  const el = _pkBuild();
+  _pkOpts = opts || {};
+  _pkAnchor = anchorEl;
+  _pkYmY = _pkOpts.year;
+  el.querySelector('.pk-title').textContent = _pkOpts.title || '対象年月';
+  const note = el.querySelector('.pk-note');
+  note.textContent = _pkOpts.note || '';
+  note.style.display = _pkOpts.note ? '' : 'none';
+  el.querySelector('.pk-search').style.display = 'none';
+  el.classList.add('on');
+  _pkRenderYm();
+  _pkPosition(anchorEl);
+}
+
+function _pkRenderYm() {
+  const o = _pkOpts, list = _pkEl.querySelector('.pk-list');
+  const now = new Date(), ty = now.getFullYear(), tm = now.getMonth() + 1;
+  let cells = '';
+  for (let m = 1; m <= 12; m++) {
+    const on    = _pkYmY === o.year && m === o.month;  // 今の対象月
+    const today = _pkYmY === ty && m === tm;           // 実際の今月
+    cells += '<button type="button" class="pk-ym-m' + (on ? ' on' : '') + (today ? ' today' : '')
+           + '" data-m="' + m + '">' + m + '月</button>';
+  }
+  list.innerHTML =
+      '<div class="pk-ym-hd"><button type="button" class="pk-ym-nav" data-y="-1">&#8249;</button>'
+    + '<span class="pk-ym-y">' + _pkYmY + '年</span>'
+    + '<button type="button" class="pk-ym-nav" data-y="1">&#8250;</button></div>'
+    + '<div class="pk-ym-grid">' + cells + '</div>'
+    + '<button type="button" class="pk-ym-now">' + ty + '年' + tm + '月（今月）へ</button>';
+  list.querySelectorAll('.pk-ym-nav').forEach(b =>
+    b.addEventListener('click', () => { _pkYmY += parseInt(b.dataset.y); _pkRenderYm(); }));
+  list.querySelectorAll('.pk-ym-m').forEach(b =>
+    b.addEventListener('click', () => _pkPickYm(_pkYmY, parseInt(b.dataset.m))));
+  list.querySelector('.pk-ym-now').addEventListener('click', () => _pkPickYm(ty, tm));
+}
+
+function _pkPickYm(y, m) {
+  const cb = _pkOpts.onPick;   // closePicker が _pkOpts を捨てるので先に取る
+  closePicker();
+  if (cb) cb(y, m);
+}
+
+// ============================================================
 // uiSelect — <select> の置き換え
 //
 // ボタンを1つ描き、押すと上のピッカーが開く。候補と確定処理は key で

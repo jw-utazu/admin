@@ -295,28 +295,22 @@ function updCalViewLabel() {
   const el = document.getElementById('cal-view-label');
   if(el) el.textContent = calY+'年'+calM+'月';
 }
-function toggleYmDropdown() {
-  const dd = document.getElementById('ym-dropdown');
-  if (!dd.classList.contains('open')) {
-    // 選択欄を組み直す（開くたびに現在の年月を起点にする）
-    const years = [], months = [];
-    for (let y = curY - 2; y <= curY + 3; y++) years.push({ value: String(y), label: y + '年' });
-    for (let m = 1; m <= 12; m++) months.push({ value: String(m), label: m + '月' });
-    const st = 'font-size:13px;font-weight:700;';
-    document.getElementById('ym-sel-slot').innerHTML =
-        uiSelHtml('ym-year',  { title: '年', items: years,  value: String(curY), style: st })
-      + ' '
-      + uiSelHtml('ym-month', { title: '月', items: months, value: String(curM), style: st });
-    dd.classList.add('open');
-  } else {
-    dd.classList.remove('open');
-  }
+// 年月の表示そのものを押して対象年月を選ぶ。
+// ‹ › の送りだけだと数ヶ月先へ行くのに何度も押すことになるため
+function openYmPicker(el) {
+  openMonthPicker(el, {
+    title: '対象年月', year: curY, month: curM,
+    onPick: (y, m) => { if (y !== curY || m !== curM) setYm(y, m); },
+  });
 }
-function applyYmChange() {
-  curY = parseInt(uiSelVal('ym-year'));
-  curM = parseInt(uiSelVal('ym-month'));
-  document.getElementById('ym-dropdown').classList.remove('open');
-  loadAdminData();
+
+// 限定PWのカレンダー表示月（対象年月とは別物。表示を送るだけ）
+function openCalViewPicker(el) {
+  openMonthPicker(el, {
+    title: 'カレンダー表示月', year: calY, month: calM,
+    note: '表示する月を変えるだけで、対象年月は変わりません',
+    onPick: (y, m) => { calY = y; calM = m; buildCalScroll(); },
+  });
 }
 
 // ============================================================
@@ -361,9 +355,15 @@ function prevMonth(y,m){ return m===1?{y:y-1,m:12}:{y,m:m-1}; }
 function nextMonth(y,m){ return m===12?{y:y+1,m:1}:{y,m:m+1}; }
 
 function chM(dir) {
-  curM += dir;
-  if (curM > 12) { curM = 1; curY++; }
-  if (curM < 1)  { curM = 12; curY--; }
+  let y = curY, m = curM + dir;
+  if (m > 12) { m = 1;  y++; }
+  if (m < 1)  { m = 12; y--; }
+  setYm(y, m);
+}
+
+// 対象年月を切り替える。‹ › の送りと年月ピッカーの入口を1本にまとめている
+function setYm(y, m) {
+  curY = y; curM = m;
   // 通常PW: ローディングオーバーレイを出してデータ再取得
   const isLimited = currentPwType !== 'normal';
   if (!isLimited) {
@@ -523,13 +523,6 @@ function renderPwTypeTabs() {
 // ============================================================
 async function switchPwType(type) {
   if (currentPwType === type) return;
-
-  // 年月ドロップダウンは通常PWのみ表示
-  const ymDd = document.getElementById('ym-dropdown');
-  if (ymDd) {
-    ymDd.classList.remove('open');
-    ymDd.style.display = type !== 'normal' ? 'none' : '';
-  }
 
   // ローディングオーバーレイを表示し、タブを全て無効化
   const ov = document.getElementById('tab-switch-ov');
