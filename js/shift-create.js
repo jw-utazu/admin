@@ -43,8 +43,9 @@ let createLoaded  = false;
 let settingsLoaded = false;
 const bs = {};
 window._blockCols = {};
-let _scKnownTs   = null; // シフト作成データのリアルタイム同期用（最終更新タイムスタンプ）
+let _scKnownTs   = null; // シフト作成データのリアルタイム同期用（最終更新タイムスタンプ／公開済みのみ動く）
 let _scKnownWishTs = null; // シフト希望データのリアルタイム同期用（最終更新タイムスタンプ）
+let _scKnownDraftTs = null; // 未公開の作成中でも動く管理者間同期用タイムスタンプ
 let _scPollTimer = null;
 let _scPollListening = false;
 let wishLoaded   = false;
@@ -2349,6 +2350,9 @@ async function reloadCreateData() {
 // 定期チェックし、変化があればブロック単位でマージする（表示中ブロックが未保存編集中の
 // 場合は上書きせず競合バナーを出す）。バックエンドは shift-form/js/app.js の
 // checkShiftUpdate と同じ仕組みを流用している。
+// touchShift は「奉仕者に公開済みの月」でしか動かないため、公開前の作成中は
+// touchShiftDraft() が shift_draft_updated_at_<pw_type> を別途更新する。管理者間の
+// 同期監視だけはこちらを見て、公開判定・奉仕者通知には一切影響させない。
 // 希望（shift_wishes）側は touchWish() が wish_updated_at_<pw_type> を更新し、
 // 同じエンドポイントの wishUpdated で返ってくる。変化があれば希望確認タブと
 // 申込者リストだけを再取得する（シフト作成側のブロックには触れない）。
@@ -2358,16 +2362,26 @@ async function checkShiftCreateUpdate() {
   try {
     const res = await apiGet('getShiftLastUpdated');
     if (!res || !res.ok) return;
-    const wishTs = res.wishUpdated || '';
+    const wishTs  = res.wishUpdated  || '';
+    const draftTs = res.draftUpdated || '';
     // 初回（または再読み込み直後）は基準値を控えるだけで同期処理は走らせない
+    let blockChanged = false;
     if (_scKnownTs === null) _scKnownTs = res.lastUpdated;
     else if (res.lastUpdated !== _scKnownTs) {
       _scKnownTs = res.lastUpdated;
       // 作成完了・確認完了・差し戻しも touchShift でタイムスタンプを動かすため、
       // 他の係の操作を待たずにヘッダーの確認状況を追随させる
       await refreshPublishState();
-      if (createLoaded) await syncShiftCreateData();
+      blockChanged = true;
     }
+    if (_scKnownDraftTs === null) _scKnownDraftTs = draftTs;
+    else if (draftTs !== _scKnownDraftTs) {
+      // 未公開（作成中）のブロック保存もこちらで検知する。公開済みの
+      // shift_updated_at_ 側の変化とまとめて同じマージ処理に流す
+      _scKnownDraftTs = draftTs;
+      blockChanged = true;
+    }
+    if (blockChanged && createLoaded) await syncShiftCreateData();
     if (_scKnownWishTs === null) _scKnownWishTs = wishTs;
     else if (wishLoaded && wishTs !== _scKnownWishTs) {
       _scKnownWishTs = wishTs;
@@ -2392,7 +2406,8 @@ function startShiftCreateSync() {
   clearInterval(_scPollTimer);
   _scKnownTs = null;
   _scKnownWishTs = null;
-  _scPollTimer = setInterval(checkShiftCreateUpdate, 10000);
+  _scKnownDraftTs = null;
+  _scPollTimer = setInterval(checkShiftCreateUpdate, 1000);
   if (!_scPollListening) {
     _scPollListening = true;
     document.addEventListener('visibilitychange', () => { if (!document.hidden) checkShiftCreateUpdate(); });
