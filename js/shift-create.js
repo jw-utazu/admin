@@ -188,6 +188,20 @@ async function loadYmList() {
   updatePublishBtn();
 }
 
+// 対象年月セレクタの候補として出す月かどうか。
+// 条件（いずれか1つでも満たせば候補に出す）:
+//   1. 過去半年分（今月から5ヶ月前まで）
+//   2. シフトが作成完了になっている月（is_shift_published）
+//   3. 日程を公開していて、申込開始日を超えている月
+function isYmSelectable(c) {
+  const n = new Date(), ty = n.getFullYear(), tm = n.getMonth() + 1;
+  const diff = (ty - c.year) * 12 + (tm - c.month);
+  if (diff >= 0 && diff <= 5) return true;             // 過去半年分（今月含む）
+  if (c.shiftPublished) return true;                    // シフト作成完了
+  if (c.calPublished && c.applyPassed) return true;      // 日程公開＋申込開始日超え
+  return false;
+}
+
 function ymKey(o) { return o ? o.year + '.' + o.month : ''; }
 function isPublishedYM(o) { return !!(o && publishedYM && publishedYM.year === o.year && publishedYM.month === o.month); }
 // シフトが作成完了になっている月か（申込は次の月に移っていてもシフトは動いていることがある）。
@@ -225,13 +239,13 @@ function renderYmSelect() {
   if (!wrap) return;
   if (currentPwType !== 'normal' || ymList.length === 0) { wrap.parentNode.style.display = 'none'; return; }
   const cur = ymKey(curYM);
-  const items = ymList.map(c => ({
+  const items = ymList.filter(isYmSelectable).map(c => ({
     value: c.year + '.' + c.month,
     // 申込中の月とシフトが動いている月は別々になりうるので、それぞれ区別して示す
     label: c.year + '年' + c.month + '月' + ymStateTag(c),
   }));
   // 一覧に無い年月（カレンダー未作成の月）を表示している場合も選択肢として残す
-  if (cur && !ymList.some(c => c.year + '.' + c.month === cur)) {
+  if (cur && !items.some(it => it.value === cur)) {
     items.push({ value: cur, label: curYM.year + '年' + curYM.month + '月' });
   }
   wrap.innerHTML = uiSelHtml('sc-ym', {
