@@ -668,8 +668,9 @@ async function loadWishDataInternal() {
   if (flagsRes.ok && Object.keys(memberFlags).length === 0) memberFlags = flagsRes.flags || {};
   document.getElementById('ws-applied').textContent = res.appliedCount || 0;
   document.getElementById('ws-total').textContent   = res.totalMembers || 0;
-  if (!res.members || res.members.length === 0 || !res.slots || res.slots.length === 0) {
-    document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">データがありません。<br>シフト希望シートが作成されているか確認してください。</div>';
+  // 申込が0名でも時間枠は出す（未申込一覧に全員が並ぶ）。実施日そのものが無いときだけ空表示にする
+  if (!res.slots || res.slots.length === 0) {
+    document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">この月の実施日がまだ設定されていません。<br>予定表で日程・実施日を決めてください。</div>';
   } else { buildWishTable(res, shiftRes.ok ? shiftRes : null); }
   wishLoaded = true;
   // 取得直後にローカルの shiftDates（未保存の編集を含む）で割当表示を上書きする
