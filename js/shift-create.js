@@ -1692,12 +1692,14 @@ function insCol(bi, li) {
 
 function insColAt(bi, block, li, isEnd) {
   syncBlockStateFromDom(bi, block);
+  // ここから下はモデルを直接書き換えるので、履歴の前後は自分で押さえる
+  const before = undoSnap(block);
   const pos = isEnd ? block.usedPlaces.length : li;
   block.usedPlaces.splice(pos, 0, '');
   block.placeCart.splice(pos, 0, '');
   (block.slots || []).forEach(s => { s.places.splice(pos, 0, []); s.watch.splice(pos, 0, false); });
   window._blockCols[bKey(block)] = [...block.usedPlaces];
-  mu(bi); renderBlock();
+  mu(bi, { before, after: undoSnap(block) }); renderBlock();
 }
 
 async function delCol(bi, li) {
@@ -1713,11 +1715,12 @@ async function delCol(bi, li) {
     message: `列「${label}」を削除しますか？` + (hasContent ? '\n\n※ この列に配置された奉仕者も削除されます。' : ''),
     confirmText: '削除する',
   })) return;
+  const before = undoSnap(block);
   block.usedPlaces.splice(li, 1);
   block.placeCart.splice(li, 1);
   (block.slots || []).forEach(s => { s.places.splice(li, 1); s.watch.splice(li, 1); });
   window._blockCols[bKey(block)] = [...block.usedPlaces];
-  mu(bi); renderBlock();
+  mu(bi, { before, after: undoSnap(block) }); renderBlock();
 }
 
 function buildPlaceSelectUI(bi, block) {
@@ -1729,9 +1732,11 @@ function onPlaceChange(bi) {
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
   // 中身は列番号で紐づくため、場所名の変更で内容は動かさない（DOM状態を保持したまま同期のみ）
+  // syncBlockStateFromDom が新しい場所名をモデルへ入れるので、その前後で履歴を押さえる
+  const before = undoSnap(block);
   syncBlockStateFromDom(bi, block);
   window._blockCols[bKey(block)] = [...block.usedPlaces];
-  mu(bi); renderBlock();
+  mu(bi, { before, after: undoSnap(block) }); renderBlock();
 }
 
 function buildSlotTable(bi, block) {
@@ -1997,13 +2002,14 @@ function onPs0Change(bi, ri, li) {
   }
 }
 
-function mu(bi) {
+// hist は列操作のようにモデルを先に書き換える呼び出し元だけが渡す（pushUndo 参照）
+function mu(bi, hist) {
   const tab = (window._dateTabs || [])[activeDateIdx];
   const block = shiftDates.filter(d => d.date === tab.date)[bi];
   if (!block) return;
   // この時点の block はまだ変更前の状態（syncCurrentBlock はこのあと）なので、
   // ここで積めば「1操作ぶん戻す」履歴になる
-  pushUndo(bi, block);
+  pushUndo(bi, block, hist);
   bs[bKey(block)] = false;
   const st = document.getElementById('st-' + bi);
   if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
@@ -2023,27 +2029,128 @@ function mu(bi) {
 // ============================================================
 // 元に戻す（Ctrl+Z / Ctrl+Shift+Z）
 //
-// mu() が呼ばれるたびに「変更前」のブロック内容をスナップショットとして積む。
-// メモリ上だけなのでリロードで消える。他管理者の同期マージが入ったら
-// 巻き戻しで相手の変更まで消してしまうためスタックを捨てる。
+// mu() が呼ばれるたびに、その1操作の「変更前」と「変更後」を対で積む。
+// 戻すときは枠をまるごと差し替えず、変わった箇所だけを元の値に戻す。
+// こうすると他の管理者の変更が同じ枠に入っていても、自分が触っていない
+// 箇所はそのまま残せる（枠ごと差し替えると相手の編集まで消えていた）。
+// 相手が同じ箇所を触っていた場合だけ、その箇所は据え置いて件数を知らせる。
+// メモリ上だけなのでリロードで消える。
 // 戻す対象が別のブロックなら自動でタブを切り替え、どこが戻ったかを示す。
 // ============================================================
 const _undoStack = [];
 const _redoStack = [];
 let _undoBusy = false;   // undo適用中に mu() が新しい履歴を積まないようにする
 
-function pushUndo(bi, block) {
-  if (_undoBusy || !block) return;
-  const snap = {
-    key: bKey(block), date: block.date, time: block.time,
-    data: JSON.stringify({
-      responsible: block.responsible, cart: block.cart,
-      slots: block.slots, placeCart: block.placeCart, usedPlaces: block.usedPlaces,
-    }),
+const UNDO_RESP_KEYS = ['r1', 'r2'];
+const UNDO_CART_KEYS = ['ki1', 'kc1', 'ki2', 'kc2', 'ko1', 'oc1', 'ko2', 'oc2'];
+
+// 履歴・比較に使う形は collectBlock の戻り値（DOMの現在値）にそろえる。
+// データモデルは編集のたびに遅れて追従するため、比較の基準はDOM側に置く
+function undoSnap(data) {
+  return JSON.parse(JSON.stringify({
+    responsible: data.responsible || {}, cart: data.cart || {},
+    placeCart: data.placeCart || [], usedPlaces: data.usedPlaces || [],
+    slots: (data.slots || []).map(s => ({ time: s.time, places: s.places || [], watch: s.watch || [] })),
+  }));
+}
+
+function undoGet(o, path) {
+  let c = o;
+  for (const k of path) { if (c === null || c === undefined) return undefined; c = c[k]; }
+  return c;
+}
+
+function undoSet(o, path, val) {
+  let c = o;
+  for (let i = 0; i < path.length - 1; i++) {
+    const k = path[i];
+    if (c[k] === null || c[k] === undefined) c[k] = typeof path[i + 1] === 'number' ? [] : {};
+    c = c[k];
+  }
+  c[path[path.length - 1]] = val;
+}
+
+// 2つの状態の差分を「どこが」「何から何へ」の一覧にする。
+// 位置（列・セル内位置）は添字のまま扱う。変わった添字だけを戻すので
+// 「1番目＝固定枠」の位置関係は崩れない
+function undoDiff(a, b) {
+  const out = [];
+  const cmp = (path, x, y) => {
+    const xv = x === undefined || x === null ? '' : x;
+    const yv = y === undefined || y === null ? '' : y;
+    if (xv !== yv) out.push({ path, from: xv, to: yv });
   };
-  const top = _undoStack[_undoStack.length - 1];
-  if (top && top.key === snap.key && top.data === snap.data) return; // 変化なし
-  _undoStack.push(snap);
+  UNDO_RESP_KEYS.forEach(k => cmp(['responsible', k], (a.responsible || {})[k], (b.responsible || {})[k]));
+  UNDO_CART_KEYS.forEach(k => cmp(['cart', k], (a.cart || {})[k], (b.cart || {})[k]));
+
+  const cols = Math.max(
+    (a.usedPlaces || []).length, (b.usedPlaces || []).length,
+    (a.placeCart  || []).length, (b.placeCart  || []).length);
+  for (let i = 0; i < cols; i++) {
+    cmp(['usedPlaces', i], (a.usedPlaces || [])[i], (b.usedPlaces || [])[i]);
+    cmp(['placeCart',  i], (a.placeCart  || [])[i], (b.placeCart  || [])[i]);
+  }
+
+  const sMax = Math.max((a.slots || []).length, (b.slots || []).length);
+  for (let si = 0; si < sMax; si++) {
+    const sa = (a.slots || [])[si] || {}, sb = (b.slots || [])[si] || {};
+    const lMax = Math.max((sa.places || []).length, (sb.places || []).length,
+                          (sa.watch  || []).length, (sb.watch  || []).length);
+    for (let li = 0; li < lMax; li++) {
+      const pa = (sa.places || [])[li] || [], pb = (sb.places || [])[li] || [];
+      const pMax = Math.max(pa.length, pb.length);
+      for (let pi = 0; pi < pMax; pi++) cmp(['slots', si, 'places', li, pi], pa[pi], pb[pi]);
+      const wa = !!((sa.watch || [])[li]), wb = !!((sb.watch || [])[li]);
+      if (wa !== wb) out.push({ path: ['slots', si, 'watch', li], from: wa, to: wb });
+    }
+  }
+  return out;
+}
+
+// 添字を飛ばして代入すると配列に穴が空き、描画側が undefined を掴む。
+// 穴を空文字で埋め、末尾の空欄は collectBlock と同じように落としておく
+function undoNormalize(d) {
+  const fix = arr => { for (let i = 0; i < arr.length; i++) if (arr[i] === undefined || arr[i] === null) arr[i] = ''; };
+  fix(d.usedPlaces || []);
+  fix(d.placeCart  || []);
+  (d.slots || []).forEach(s => {
+    (s.places || []).forEach(cell => {
+      fix(cell);
+      while (cell.length && !cell[cell.length - 1]) cell.pop();
+    });
+    for (let i = 0; i < (s.watch || []).length; i++) if (s.watch[i] === undefined) s.watch[i] = false;
+  });
+  return d;
+}
+
+// hist を渡さない場合は「DOMを書き換えてから mu() を呼ぶ」呼び出し元を前提に、
+// before をデータモデル（まだ変更前）、after をDOMの現在値として取る。
+// 列の挿入・削除・場所名変更だけはモデルを先に書き換えるため前後が逆になる。
+// その3か所は自分で before / after を作って渡すこと
+// cur を書き換えて、打ち消せた箇所と据え置いた箇所を数える。
+// reverse=true が「元に戻す」（after→before）、false が「やり直す」（before→after）。
+// 判定は「今の値が、自分が入れた値のままか」。違えば他の人が触った箇所なので手を出さない
+function undoResolve(cur, diff, reverse) {
+  let applied = 0, skipped = 0;
+  diff.forEach(({ path, from, to }) => {
+    const want = reverse ? to   : from; // 打ち消す前に入っているべき値（＝自分が入れた値）
+    const next = reverse ? from : to;   // 入れ直す値
+    const now  = undoGet(cur, path);
+    const same = typeof want === 'boolean'
+      ? !!now === want
+      : (now === undefined || now === null ? '' : now) === want;
+    if (same) { undoSet(cur, path, next); applied++; }
+    else skipped++;
+  });
+  return { applied, skipped };
+}
+
+function pushUndo(bi, block, hist) {
+  if (_undoBusy || !block) return;
+  const before = hist ? hist.before : undoSnap(block);
+  const after  = hist ? hist.after  : undoSnap(collectBlock(bi) || block);
+  if (JSON.stringify(before) === JSON.stringify(after)) return; // 変化なし
+  _undoStack.push({ key: bKey(block), date: block.date, time: block.time, before, after });
   _redoStack.length = 0;
   updateUndoBtn();
 }
@@ -2055,56 +2162,71 @@ function updateUndoBtn() {
   if (b) b.disabled = _undoStack.length === 0;
 }
 
-function snapshotOf(block) {
-  return JSON.stringify({
-    responsible: block.responsible, cart: block.cart,
-    slots: block.slots, placeCart: block.placeCart, usedPlaces: block.usedPlaces,
-  });
-}
-
-async function applySnapshot(snap) {
-  const di = (window._dateTabs || []).findIndex(t => t.date === snap.date);
-  if (di < 0) { toast('戻し先の日付が見つかりません', 'e'); return false; }
+// entry の変更を打ち消す（元に戻す＝after→before、やり直す＝before→after）。
+// 差し替えるのは「今の値が自分の変更した値のままである」箇所だけ。
+// 相手が触った箇所は据え置き、その件数を返す
+async function applyUndoEntry(entry, reverse) {
+  const di = (window._dateTabs || []).findIndex(t => t.date === entry.date);
+  if (di < 0) { toast('戻し先の日付が見つかりません', 'e'); return null; }
   if (di !== activeDateIdx) await switchDateTab(di);
-  const bi = shiftDates.filter(d => d.date === snap.date).findIndex(b => b.time === snap.time);
-  if (bi < 0) { toast('戻し先の時間帯が見つかりません', 'e'); return false; }
+  const bi = shiftDates.filter(d => d.date === entry.date).findIndex(b => b.time === entry.time);
+  if (bi < 0) { toast('戻し先の時間帯が見つかりません', 'e'); return null; }
   if (bi !== activeTimeIdx) await switchTimeTab(bi);
-  const block = shiftDates.filter(d => d.date === snap.date)[bi];
-  const d = JSON.parse(snap.data);
-  block.responsible = d.responsible; block.cart = d.cart; block.slots = d.slots;
-  block.placeCart = d.placeCart; block.usedPlaces = d.usedPlaces;
-  window._blockCols[bKey(block)] = [...(d.usedPlaces || [])];
+  const block = shiftDates.filter(d => d.date === entry.date)[bi];
+
+  // 今の状態はDOMから取る（自分の未保存の編集も相手のマージ結果も入っている）
+  const cur = undoSnap(collectBlock(bi) || block);
+  const { applied, skipped } = undoResolve(cur, undoDiff(entry.before, entry.after), reverse);
+  if (applied === 0) return { applied, skipped, bi };
+
+  undoNormalize(cur);
+  block.responsible = cur.responsible; block.cart = cur.cart;
+  block.placeCart = cur.placeCart; block.usedPlaces = cur.usedPlaces;
+  block.slots = cur.slots;
+  block.place = { p1: (cur.usedPlaces || [])[0] || '', p2: (cur.usedPlaces || [])[1] || '' };
+  window._blockCols[bKey(block)] = [...(cur.usedPlaces || [])];
   renderBlock();
   mu(bi);
   const tb = document.getElementById('tb-' + bi);
   if (tb) { tb.classList.add('undo-flash'); setTimeout(() => tb.classList.remove('undo-flash'), 900); }
-  return true;
+  return { applied, skipped, bi };
+}
+
+// 据え置きが出たときは黙って落とさず、何か所が相手の変更で残ったかを伝える
+function undoResultMsg(head, entry, r) {
+  const where = `${entry.date} ${entry.time}`;
+  if (r.applied === 0) return { msg: `${where} は他の管理者が変更済みのため、戻せませんでした`, type: 'e' };
+  return { msg: `${head}：${where}` + (r.skipped ? `（${r.skipped}か所は他の管理者が変更済みのため据え置き）` : ''), type: 's' };
 }
 
 async function doUndo() {
   if (_undoStack.length === 0) { toast('元に戻す操作がありません'); return; }
-  const snap = _undoStack.pop();
+  const entry = _undoStack.pop();
   syncCurrentBlock();
-  const cur = shiftDates.filter(d => d.date === snap.date).find(b => b.time === snap.time);
-  if (cur) _redoStack.push({ key: snap.key, date: snap.date, time: snap.time, data: snapshotOf(cur) });
   _undoBusy = true;
-  const ok = await applySnapshot(snap);
+  const r = await applyUndoEntry(entry, true);
   _undoBusy = false;
+  if (r) {
+    if (r.applied > 0) _redoStack.push(entry);
+    const { msg, type } = undoResultMsg('元に戻しました', entry, r);
+    toast(msg, type);
+  }
   updateUndoBtn();
-  if (ok) toast(`元に戻しました：${snap.date} ${snap.time}`, 's');
 }
 
 async function doRedo() {
   if (_redoStack.length === 0) { toast('やり直す操作がありません'); return; }
-  const snap = _redoStack.pop();
+  const entry = _redoStack.pop();
   syncCurrentBlock();
-  const cur = shiftDates.filter(d => d.date === snap.date).find(b => b.time === snap.time);
-  if (cur) _undoStack.push({ key: snap.key, date: snap.date, time: snap.time, data: snapshotOf(cur) });
   _undoBusy = true;
-  const ok = await applySnapshot(snap);
+  const r = await applyUndoEntry(entry, false);
   _undoBusy = false;
+  if (r) {
+    if (r.applied > 0) _undoStack.push(entry);
+    const { msg, type } = undoResultMsg('やり直しました', entry, r);
+    toast(msg, type);
+  }
   updateUndoBtn();
-  if (ok) toast(`やり直しました：${snap.date} ${snap.time}`, 's');
 }
 
 document.addEventListener('keydown', e => {
@@ -2502,12 +2624,10 @@ function applyMergeResult(r) {
   refreshWishAssign();
   if (r.activeConflict) showSyncConflictBanner(activeTimeIdx);
   else if (r.activeChanged) {
-    // 他管理者の変更が入った以上、過去へ巻き戻すと相手の編集まで消してしまう。
-    // 黙って消すと「気づいたら Ctrl+Z が効かない」ので、そのことも伝える
-    const hadUndo = _undoStack.length > 0;
-    clearUndo();
+    // 履歴は捨てない。元に戻すは変わった箇所だけを戻すので、
+    // 相手の変更が同じ枠に入っていても自分の操作は取り消せる
     renderBlock();
-    toast('他の管理者の変更を反映しました' + (hadUndo ? '（元に戻す履歴はリセットされます）' : ''), 's');
+    toast('他の管理者の変更を反映しました', 's');
   }
 }
 
