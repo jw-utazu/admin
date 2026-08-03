@@ -171,10 +171,11 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cell-wrap .ps-watch-wrap{flex:1;min-width:100px;display:flex;flex-direction:column;gap:3px;}
 .cell-wrap.vertical .ps-watch-wrap{min-width:0;width:100%;max-width:100%;}
 .ps-watch-wrap .cs{width:100%;}
-/* 見守りボタン。チップ（丸いピル）と混同しないよう、ここだけ幅いっぱいの
-   小さな四角にする — セル内の3人ぶんの欄の下に収まる密度が優先のため */
-.watch-cb{width:100%;padding:2px 4px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--ink3);font-family:var(--sans);font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap;}
-.watch-cb.on{background:var(--purple-l,#f5f3ff);border-color:var(--purple);color:var(--purple);}
+/* 見守りボタン。人の欄（.cs）と同じ幅いっぱいの四角にすると、縦積みのとき
+   4人目の欄に見えてしまう。人の欄より明らかに小さい丸ピルにして区別する */
+.ps-watch-wrap{align-items:center;}
+.watch-cb{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:auto;align-self:center;padding:3px 10px;border:1px solid var(--border2);border-radius:999px;background:var(--surface);color:var(--ink3);font-family:var(--sans);font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.watch-cb.on{background:var(--purple);border-color:var(--purple);color:#fff;}
 .watch-cb:disabled{opacity:.45;cursor:not-allowed;}
 .dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
@@ -716,9 +717,12 @@ body.dnd-on *{cursor:grabbing !important;}
      枠の大きさは 2・3人目と変わらない）。担当者が居ない欄には出さない */
   .cell-wrap .ps-watch-wrap{position:relative;flex-direction:column;}
   .cell-wrap .ps-watch-wrap .cs{padding-right:24px;}
-  /* 幅を確保できないので文字は消し、色の有無だけで on/off を示す小さな丸に絞る */
+  /* 幅を確保できないので文字は消す。枠線だけの薄い丸だと見えないので、
+     OFF＝グレーの塗りつぶし／ON＝紫の塗りつぶしと、常に塗りで示す */
   .watch-cb{position:absolute;right:5px;top:50%;transform:translateY(-50%);
-    z-index:2;width:16px;height:16px;padding:0;border-radius:50%;font-size:0;}
+    z-index:2;width:16px;height:16px;padding:0;border:none;border-radius:50%;
+    background:var(--border2);font-size:0;}
+  .watch-cb.on{background:var(--purple);}
   .watch-cb:disabled{display:none;}
 
   /* ===== 責任者・カート担当 ===== */
