@@ -4,6 +4,9 @@
 // API_URL / ANON_KEY / CLIENT_ID は js/api.js（共有通信層）で定義
 // ALLOWED配列は廃止（管理者一覧はサーバー側で判定）
 const DOW7      = ['月','火','水','木','金','土','日'];
+// 日曜始まり。スロットキー（第N週 M/D(曜) HH:MM~HH:MM）はサーバーの
+// _shared.ts の DAY / dateLabel と一字一句そろえないと紐づけが外れる
+const DOW_SUN   = ['日','月','火','水','木','金','土'];
 // 時間の選択肢 0〜23
 const HOURS_LIST = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
 const MINS_LIST  = ['00','15','30','45'];
@@ -29,10 +32,6 @@ let slots       = [];    // [{y,m,d,time,interval}]
 let dates       = {apply:null, deadline:null, open:null};
 let popupDay    = null;
 let popupTimes  = [];
-let sheetListData = [];
-let fcN         = 1;
-let mappingResult = {};
-let fcAdminData = null;  // フォーム作成時に取得したデータ
 
 // ============================================================
 // 認証
@@ -227,6 +226,9 @@ async function loadAdminData() {
   if (d.currentSlots) {
     slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
   }
+  // 保存済みの前月との紐づけ。実施日設定モーダルの既定値として使うので、
+  // 開いた時点で「いま保存されている対応」が出るようにする
+  slotMapping = d.slotMapping || {};
   if (d.limitedSlots) {
     limitedSlots = d.limitedSlots;
   }
@@ -1022,13 +1024,35 @@ function setDayAsSlot() {
   } else {
     exist = slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
   }
-  popupTimes = exist.length>0
-    ? exist.map(s=>parseTimeStr(s.time,s.interval))
-    : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
+  popupTimes = buildPopupTimes(exist);
   const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
   document.getElementById('m-slot-edit-title').textContent=m+'/'+d+'（'+dow+'）第'+wn+'週 実施日設定';
   renderPopupModal(y,m,d);
   openM('m-slot-edit');
+}
+
+// popupTimes の1行から時間帯文字列を作る（スロットキーの一部になる）
+function popupTimeStr(t){ return parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em; }
+
+// 実施日設定モーダルで使う行データ。既存スロットの前月対応も持ち込む。
+// prev は null＝自動対応にまかせる / ''＝対応なしを明示 / 文字列＝前月の枠を指定
+function buildPopupTimes(exist){
+  if(exist.length===0) return [{sh:'07',sm:'00',eh:'08',em:'30',intv:15,prev:null}];
+  return exist.map(s=>{
+    const t=parseTimeStr(s.time,s.interval);
+    const k=slotKeyOf(s);
+    t.prev=Object.prototype.hasOwnProperty.call(slotMapping,k)?slotMapping[k]:null;
+    return t;
+  });
+}
+
+// 紐づけを出すのは通常PWで前月の枠があるときだけ。限定PWはフェーズ単位で
+// 動くので前月の概念に乗らない
+function mappingAvailable(){ return currentPwType==='normal' && prevSlotList().length>0; }
+
+// 時間帯を変えると自動対応の相手も変わるので、選択欄を追従させるため描き直す
+function onPopupTimeChanged(){
+  if(popupDay && mappingAvailable()) renderPopupModal(popupDay.y,popupDay.m,popupDay.d);
 }
 
 function renderPopupModal(y,m,d){
@@ -1036,24 +1060,49 @@ function renderPopupModal(y,m,d){
   const timeOpts=h=>HOURS_LIST.map(v=>`<option value="${v}"${v===h?' selected':''}>${v}</option>`).join('');
   const minOpts =mn=>MINS_LIST.map(v=>`<option value="${v}"${v===mn?' selected':''}>${v}</option>`).join('');
   const intvOpts=i=>INTV_LIST.map(v=>`<option value="${v}"${v===i?' selected':''}>${v}分</option>`).join('');
-  const rowsHtml=popupTimes.map((t,i)=>`
-    <div class="sp-time-row">
-      <div style="display:flex;gap:2px;">
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sh=this.value">${timeOpts(t.sh)}</select>
-        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sm=this.value">${minOpts(t.sm)}</select>
+  const showMap=mappingAvailable();
+  const prevOpts=sel=>{
+    let o=`<option value=""${sel===''?' selected':''}>（引き継がない）</option>`;
+    prevSlotList().forEach(ps=>{
+      const k=prevSlotKeyOf(ps);
+      o+=`<option value="${k}"${k===sel?' selected':''}>${ps.week} ${ps.dateLabel} ${ps.time}</option>`;
+    });
+    return o;
+  };
+  const rowsHtml=popupTimes.map((t,i)=>{
+    // 自動対応（prev===null）のときは、その時間帯から決まる相手を選択済みにして見せる。
+    // 「自動」という見えない状態を残すより、実際に何が保存されるかを出すほうが直せる
+    const sel = (t.prev===null||t.prev===undefined) ? autoPrevKeyFor({y,m,d,time:popupTimeStr(t)}) : t.prev;
+    const mapRow = !showMap ? '' : `
+      <div class="sp-map-row">
+        <span class="sp-map-lbl">前月から引き継ぐ枠</span>
+        <select class="fsel sp-map-sel" onchange="popupTimes[${i}].prev=this.value">${prevOpts(sel)}</select>
+      </div>`;
+    return `
+    <div class="sp-time-block">
+      <div class="sp-time-row">
+        <div style="display:flex;gap:2px;">
+          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sh=this.value;onPopupTimeChanged()">${timeOpts(t.sh)}</select>
+          <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
+          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].sm=this.value;onPopupTimeChanged()">${minOpts(t.sm)}</select>
+        </div>
+        <span class="time-wave">〜</span>
+        <div style="display:flex;gap:2px;">
+          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].eh=this.value;onPopupTimeChanged()">${timeOpts(t.eh)}</select>
+          <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
+          <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].em=this.value;onPopupTimeChanged()">${minOpts(t.em)}</select>
+        </div>
+        <select class="intv-sel" onchange="popupTimes[${i}].intv=parseInt(this.value)">${intvOpts(t.intv)}</select>
+        <button class="sp-del-btn" onclick="delSpTimeModal(${i})">&#10005;</button>
       </div>
-      <span class="time-wave">〜</span>
-      <div style="display:flex;gap:2px;">
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].eh=this.value">${timeOpts(t.eh)}</select>
-        <span style="padding:0 2px;font-size:13px;color:var(--ink3);display:flex;align-items:center;">:</span>
-        <select class="time-sel" style="width:50px;" onchange="popupTimes[${i}].em=this.value">${minOpts(t.em)}</select>
-      </div>
-      <select class="intv-sel" onchange="popupTimes[${i}].intv=parseInt(this.value)">${intvOpts(t.intv)}</select>
-      <button class="sp-del-btn" onclick="delSpTimeModal(${i})">&#10005;</button>
-    </div>`).join('');
+      ${mapRow}
+    </div>`;
+  }).join('');
+  const mapHint = !showMap ? '' :
+    `<div class="sp-map-hint">奉仕者のフォームには前月の希望が初期値として入ります。時間帯が同じ枠を既定で選んでいるので、実施日をずらした月だけ直してください。</div>`;
   area.innerHTML=`<div class="sp-wrap">
     <div class="sp-body">${rowsHtml}</div>
+    ${mapHint}
     <div style="padding:6px 12px;">
       <button class="sp-add-btn" onclick="addSpTimeModal()">&#65291; 時間帯を追加</button>
     </div>
@@ -1065,12 +1114,12 @@ function renderPopupModal(y,m,d){
   </div>`;
 }
 function addSpTimeModal(){
-  popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
+  popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15,prev:null});
   renderPopupModal(popupDay.y,popupDay.m,popupDay.d);
 }
 function delSpTimeModal(i){
   popupTimes.splice(i,1);
-  if(popupTimes.length===0)popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15});
+  if(popupTimes.length===0)popupTimes.push({sh:'07',sm:'00',eh:'08',em:'30',intv:15,prev:null});
   renderPopupModal(popupDay.y,popupDay.m,popupDay.d);
 }
 function closeSlotEditModal(){closeM('m-slot-edit');popupDay=null;}
@@ -1080,8 +1129,12 @@ async function confirmSlotModal(){
   // global slots に反映（カレンダー表示共通）
   slots=slots.filter(s=>!(s.y===y&&s.m===m&&s.d===d));
   popupTimes.forEach(t=>{
-    const time=parseInt(t.sh)+':'+t.sm+'~'+parseInt(t.eh)+':'+t.em;
-    slots.push({y,m,d,time,interval:parseInt(t.intv)||15});
+    const time=popupTimeStr(t);
+    const slot={y,m,d,time,interval:parseInt(t.intv)||15};
+    slots.push(slot);
+    // モーダルで選んだ前月の枠を覚える。触っていない行（prev が null）は
+    // 自動対応にまかせるので、ここでは何も書かない（保存時に埋まる）
+    if(t.prev!==null&&t.prev!==undefined) slotMapping[slotKeyOf(slot)]=t.prev;
   });
   popupDay=null;
   closeM('m-slot-edit');
@@ -1199,6 +1252,8 @@ function buildInfoArea() {
   }
   // フェーズ管理カード（限定PW のみ）
   buildPhaseManageArea(isLimited);
+  // 前月との紐づけを見直す入口（通常PWで前月の枠があるときだけ）
+  renderMapReviewBtn();
 }
 
 // ============================================================
@@ -1342,6 +1397,10 @@ async function postNormalSlots() {
     slots: slots.map(s => ({ y: s.y, m: s.m, d: s.d, time: s.time, interval: parseInt(s.interval) || 15 }))
   });
   if (!res.ok) throw new Error(res.error || '保存失敗');
+  // 実施日と前月との紐づけは一体のもの（枠が変われば対応も変わる）なので同時に保存する。
+  // 実施日だけ保存して紐づけが古いままだと、奉仕者のフォームに前月の希望が
+  // 入らない・別の枠から入る、という分かりにくい形で表に出る
+  if (currentPwType === 'normal') await postSlotMapping();
 }
 
 // 実施日（通常PW）の都度保存。確定・削除のたびに呼ばれる
@@ -1374,6 +1433,61 @@ async function postNormalDates() {
     year: curY, month: curM,
     apply: dates.apply, deadline: dates.deadline, open: dates.open
   });
+}
+
+// ============================================================
+// 前月との紐づけ（スロットマッピング）
+// ============================================================
+// 奉仕者のフォームには前月の希望が初期値として入る。そのとき「今月のこの枠は
+// 前月のどの枠の続きか」を決めるのがこのマッピング（settings.slot_mapping_<type>）。
+// 既定は「時間帯が同じものへ自動対応」で、サーバー側も未設定の枠は自動対応に
+// フォールバックする（handlers_form.ts の buildLastMonthData）。
+// 実施日をずらした月だけ手で直せばよい、という位置づけ。
+//
+// 実施日を決める場面と紐づけを決める場面は本来同じなので、実施日設定モーダルの
+// 中で選べるようにしてある。あとから直せるように、実施日一覧にも現在の対応を
+// 出し、まとめて見直すモーダルも用意した
+let slotMapping = {};   // { 今月のスロットキー: 前月のスロットキー }（''＝対応なし）
+
+// キーはサーバーの csToSlot と同形式にする
+function slotKeyOf(s) {
+  const dt = new Date(s.y, s.m - 1, s.d);
+  const dl = s.m + '/' + s.d + '(' + DOW_SUN[dt.getDay()] + ')';
+  return '第' + getWeekNum(s.y, s.m, s.d) + '週 ' + dl + ' ' + s.time;
+}
+function prevSlotKeyOf(ps) { return ps.week + ' ' + ps.dateLabel + ' ' + ps.time; }
+function prevSlotList() { return (adminData && adminData.prevSlots) || []; }
+
+// 既定の相手。サーバーの buildLastMonthData と同じ優先順で選ぶ
+// （まず「第N週＋時間帯」が一致するもの、無ければ時間帯だけ一致するもの）。
+// ここがずれると、画面に出ている対応と実際に適用される対応が食い違う
+function autoPrevKeyFor(slot) {
+  const wk = '第' + getWeekNum(slot.y, slot.m, slot.d) + '週';
+  const list = prevSlotList();
+  const m = list.find(ps => ps.week === wk && ps.time === slot.time)
+         || list.find(ps => ps.time === slot.time);
+  return m ? prevSlotKeyOf(m) : '';
+}
+
+// slots（今月の実施日）を正として作り直す。実施日を消したり時間を変えたりすると
+// 古いキーが残るので、毎回ここで棚卸しする
+function rebuildSlotMapping() {
+  const next = {};
+  slots.forEach(s => {
+    const k = slotKeyOf(s);
+    next[k] = Object.prototype.hasOwnProperty.call(slotMapping, k) ? slotMapping[k] : autoPrevKeyFor(s);
+  });
+  slotMapping = next;
+}
+
+// 紐づけの保存。サーバーは丸ごと置き換えるので、常に今月の全枠分を送る
+async function postSlotMapping() {
+  // 前月の枠が無い月は紐づける相手がいない。空の対応を送ると全枠に
+  // 「引き継がない」を明示したことになり、サーバー側の自動対応まで
+  // 潰してしまうので何もしない（データ未取得のときも同じ）
+  if (prevSlotList().length === 0) return;
+  rebuildSlotMapping();
+  await apiGet('createFormSheet', { year: curY, month: curM, mapping: slotMapping });
 }
 
 // 日程（通常PW）の都度保存。日付を選んだ時点で保存する
@@ -1432,9 +1546,7 @@ function onSlotClick(y,m,d,el) {
   if(!slotMode) return;
   popupDay={y,m,d};
   const exist=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
-  popupTimes=exist.length>0
-    ? exist.map(s=>parseTimeStr(s.time,s.interval))
-    : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
+  popupTimes=buildPopupTimes(exist);
   const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
   document.getElementById('m-slot-edit-title').textContent=m+'/'+d+'（'+dow+'）第'+wn+'週 実施日設定';
   renderPopupModal(y,m,d);
@@ -1459,8 +1571,23 @@ function buildSlotSetList(){
         <button onclick="editSlotFromList(${g.y},${g.m},${g.d})" style="padding:2px 7px;border:1px solid var(--blue);border-radius:4px;background:var(--blue-l);color:var(--blue);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);">✏ 編集</button>
       </div>
       <div class="sdg-times">${g.times.map((t,i)=>`<span class="stime">${t.time}</span><span class="sintv">${t.interval}分</span><button class="sdel" onclick="delSlot('${k}',${i})">✕</button>`).join('')}</div>
+      ${slotMapLines(g.times)}
     </div>`;
   }).join('');
+}
+
+// 実施日一覧に前月との対応を添える。間違って紐づけたときは、
+// ここに出ていれば気づけるし、そのまま「✏ 編集」で直せる
+function slotMapLines(times){
+  if(!mappingAvailable()) return '';
+  return `<div class="sdg-maps">${times.map(t=>{
+    const k=slotKeyOf(t);
+    const prev=Object.prototype.hasOwnProperty.call(slotMapping,k)?slotMapping[k]:autoPrevKeyFor(t);
+    const label=prev?esc(prev.replace(/^第\d+週\s*/,'')):'引き継がない';
+    return `<div class="sdg-map"><span class="sdg-map-cur">${esc(t.time)}</span>`
+      + `<span class="sdg-map-arr">←</span>`
+      + `<span class="sdg-map-prev${prev?'':' none'}">${label}</span></div>`;
+  }).join('')}</div>`;
 }
 async function delSlot(key,idx){
   const[y,m,d]=key.split('/').map(Number);
@@ -1472,9 +1599,7 @@ async function delSlot(key,idx){
 function editSlotFromList(y,m,d){
   popupDay={y,m,d};
   const exist=slots.filter(s=>s.y===y&&s.m===m&&s.d===d);
-  popupTimes=exist.length>0
-    ? exist.map(s=>parseTimeStr(s.time,s.interval))
-    : [{sh:'07',sm:'00',eh:'08',em:'30',intv:15}];
+  popupTimes=buildPopupTimes(exist);
   const dt=new Date(y,m-1,d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1],wn=getWeekNum(y,m,d);
   document.getElementById('m-slot-edit-title').textContent=m+'/'+d+'（'+dow+'）第'+wn+'週 実施日設定';
   renderPopupModal(y,m,d);
@@ -1514,171 +1639,66 @@ async function resetDates(){
   await saveNormalDates();
 }
 // ============================================================
-// シフトフォーム作成（ボタン押下時にデータ取得）
+// 前月との紐づけの見直し
 // ============================================================
-async function openFormModal(){
-  openM('m-form');
-  document.getElementById('m-form-body').innerHTML='<div class="loading-row"><div class="spin"></div>データを読み込み中...</div>';
-  document.getElementById('m-form-ft').innerHTML='<button class="btn btn-g" onclick="closeM(\'m-form\')">閉じる</button>';
-  try {
-    const d = await apiGet('adminData', { year: curY, month: curM });
-    fcAdminData = d;
-    fcN=1;
-    renderFormModal(d);
-  } catch(e){ document.getElementById('m-form-body').innerHTML='<div style="color:var(--red);font-size:12px;">読み込みに失敗しました: '+e.message+'</div>'; }
-}
-function renderFormModal(d){
-  // 対象月選択
-  let ymOpts='';
-  for(let y=curY-1;y<=curY+2;y++) for(let m=1;m<=12;m++){
-    const sel=(y===curY&&m===curM);
-    ymOpts+=`<option value="${y}-${m}"${sel?' selected':''}>${y}年${m}月</option>`;
-  }
-  // 紐付けUI
-  const curSlots=d.currentSlots||[], prevSlots=d.prevSlots||[];
-  const groups={};
-  curSlots.forEach(s=>{const k=s.dateLabel;if(!groups[k])groups[k]={dl:s.dateLabel,wk:s.week,times:[]};groups[k].times.push(s.time);});
-  const prevGroups={};
-  prevSlots.forEach(s=>{const k=s.dateLabel;if(!prevGroups[k])prevGroups[k]={dl:s.dateLabel,wk:s.week,times:[]};prevGroups[k].times.push(s.time);});
-  mappingResult={};
-  curSlots.forEach(cs=>{
-    const key=cs.week+' '+cs.dateLabel+' '+cs.time;
-    const matched=prevSlots.find(ps=>ps.time===cs.time);
-    mappingResult[key]=matched?matched.week+' '+matched.dateLabel+' '+matched.time:'';
-  });
-  let mapHtml='';
-  if(prevSlots.length===0){
-    // 前月データなくても手動入力エリアを提供
-    mapHtml='<div style="color:var(--ink2);font-size:12px;padding:8px 10px;background:var(--amber-l);border:1px solid #fcd34d;border-radius:var(--r);margin-bottom:8px;">前月のシートが見つかりませんでした。紐付けは不要です。</div>';
-  } else {
-    Object.values(groups).forEach(g=>{
-      mapHtml+=`<div class="map-date-hd">&#128197; ${g.dl} <span style="font-size:10px;opacity:.7;">${g.wk}</span></div>`;
-      g.times.forEach(time=>{
-        const key=g.wk+' '+g.dl+' '+time;
-        const def=mappingResult[key]||'';
-        let opts='<option value="">（なし）</option>';
-        Object.values(prevGroups).forEach(pg=>{
-          opts+=`<optgroup label="${pg.wk}　${pg.dl}">`;
-          pg.times.forEach(pt=>{const pk=pg.wk+' '+pg.dl+' '+pt;opts+=`<option value="${pk}"${pk===def?' selected':''}>${pg.dl}　${pt}</option>`;});
-          opts+='</optgroup>';
-        });
-        mapHtml+=`<div class="map-row"><div class="map-cur">${time}</div><div class="map-arr">&#8594;</div><select class="fsel map-sel" data-key="${key}" style="font-size:11px;padding:4px 7px;">${opts}</select></div>`;
-      });
-      mapHtml+='<div style="height:6px;"></div>';
-    });
-  }
-  // シート配置
-  const newName=curY+'.'+String(curM).padStart(2,'0')+'シフト希望';
-  const existing=(d.sheetNames||[]).filter(n=>n!==newName);
-  const pos=Math.min(3,existing.length+1);
-  sheetListData=[...existing]; sheetListData.splice(pos-1,0,{name:newName,isNew:true});
-  // スロット一覧
-  const slotSummary=slots.length>0
-    ? slots.map(s=>`<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;border-bottom:1px solid var(--border);"><span style="font-family:var(--mono);">${s.m}/${s.d} ${s.time}</span><span style="color:var(--ink3);">${parseInt(s.interval)||15}分</span></div>`).join('')
-    : '<div style="color:var(--ink3);font-size:11px;">実施日が設定されていません</div>';
+// 紐づけは実施日設定モーダルの中で決めるのが基本。ここは月全体を一覧で
+// 見直して直すための入口（取り違えに後から気づいたとき用）
+let mapReviewDraft = {};
 
-  document.getElementById('m-form-body').innerHTML=`
-    <div class="steps">
-      <div class="si"><div class="sc on" id="s1">1</div><div class="sl on" id="sl1">年月</div></div>
-      <div class="sln" id="ln1"></div>
-      <div class="si"><div class="sc" id="s2">2</div><div class="sl" id="sl2">紐付け</div></div>
-      <div class="sln" id="ln2"></div>
-      <div class="si"><div class="sc" id="s3">3</div><div class="sl" id="sl3">確認</div></div>
-    </div>
-    <div id="p1">
-      <div class="fg"><label class="fl">対象年月</label><select class="fsel" id="fc-ym-sel">${ymOpts}</select></div>
-    </div>
-    <div id="p2" style="display:none;">
-      <p style="font-size:12px;color:var(--ink2);margin-bottom:9px;">各日付・時間帯と前月の対応スロットを紐付けてください。</p>
-      ${mapHtml}
-    </div>
-    <div id="p3" style="display:none;">
-      <div class="sumbox">
-        <div class="sumrow"><span class="sumk">対象月</span><span class="sumv" id="fc-s-ym">--</span></div>
-        <div class="sumrow"><span class="sumk">紐付け</span><span class="sumv" id="fc-s-map">--</span></div>
-      </div>
-      <div class="fg">
-        <label class="fl">実施日一覧</label>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;max-height:120px;overflow-y:auto;">${slotSummary}</div>
-      </div>
-      <div class="exec-st" id="fc-st"><div class="spin"></div>処理中...</div>
-      <div class="done-box" id="fc-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">作成完了</div><div class="done-sub" id="fc-done-sub"></div></div>
-    </div>`;
-  document.getElementById('m-form-ft').innerHTML=`
-    <button class="btn btn-g" id="fc-bk" style="display:none;" onclick="fcStep(-1)">戻る</button>
-    <button class="btn btn-g" onclick="closeMReset('m-form','resetFC')">キャンセル</button>
-    <button class="btn btn-p" id="fc-nx" onclick="fcStep(1)">次へ</button>`;
-  renderSheetPlace();
-  updFcSteps();
+function renderMapReviewBtn(){
+  const b=document.getElementById('map-review-btn');
+  if(b) b.style.display = (mappingAvailable() && slots.length>0) ? '' : 'none';
 }
-function renderSheetPlace(){
-  const el=document.getElementById('sheet-place-list'); if(!el) return;
-  el.innerHTML=sheetListData.map((o,i)=>{
-    const nm=typeof o==='string'?o:o.name, isNew=o.isNew||false;
-    return `<div style="display:flex;align-items:center;gap:7px;padding:7px 10px;border:${isNew?'1.5px solid var(--blue)':'1px solid var(--border)'};border-radius:var(--r);font-size:12px;background:${isNew?'var(--blue-l)':'var(--surface2)'};${isNew?'font-weight:700;color:var(--blue)':''};">
-      <span style="font-size:10px;color:${isNew?'var(--blue)':'var(--ink3)'};width:38px;text-align:right;">${i+1}番目</span>
-      <span style="flex:1;">${nm}</span>
-      ${isNew?`<span style="font-size:10px;background:var(--blue);color:#fff;padding:1px 7px;border-radius:10px;">新規</span>`:''}
-      ${isNew?`<div style="display:flex;flex-direction:column;gap:2px;">
-        <button onclick="moveSheet(-1)" style="width:20px;height:18px;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;font-size:10px;"${i===0?' disabled':''}>&#9650;</button>
-        <button onclick="moveSheet(1)" style="width:20px;height:18px;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;font-size:10px;"${i===sheetListData.length-1?' disabled':''}>&#9660;</button>
-      </div>`:''}
-    </div>`;
-  }).join('');
+
+function openMapReviewModal(){
+  if(!mappingAvailable()) return;
+  rebuildSlotMapping();
+  mapReviewDraft=Object.assign({},slotMapping);
+  renderMapReviewModal();
+  openM('m-map-review');
 }
-function moveSheet(dir){
-  const idx=sheetListData.findIndex(o=>o.isNew);
-  const t=idx+dir; if(t<0||t>=sheetListData.length) return;
-  const tmp=sheetListData[idx]; sheetListData[idx]=sheetListData[t]; sheetListData[t]=tmp;
-  renderSheetPlace();
+
+function renderMapReviewModal(){
+  const body=document.getElementById('m-map-review-body');
+  if(!body) return;
+  const groups={};
+  slots.forEach(s=>{const k=s.y+'/'+s.m+'/'+s.d;if(!groups[k])groups[k]={y:s.y,m:s.m,d:s.d,times:[]};groups[k].times.push(s);});
+  const prevOpts=sel=>{
+    let o='<option value=""'+(sel===''?' selected':'')+'>（引き継がない）</option>';
+    prevSlotList().forEach(ps=>{
+      const k=prevSlotKeyOf(ps);
+      o+='<option value="'+esc(k)+'"'+(k===sel?' selected':'')+'>'+esc(ps.week+' '+ps.dateLabel+' '+ps.time)+'</option>';
+    });
+    return o;
+  };
+  const rows=Object.values(groups).map(g=>{
+    const dt=new Date(g.y,g.m-1,g.d),dow=DOW7[dt.getDay()===0?6:dt.getDay()-1];
+    return '<div class="map-date-hd">&#128197; '+g.m+'/'+g.d+'（'+dow+'） <span style="font-size:10px;opacity:.7;">第'+getWeekNum(g.y,g.m,g.d)+'週</span></div>'
+      + g.times.map(t=>{
+          const k=slotKeyOf(t);
+          const sel=Object.prototype.hasOwnProperty.call(mapReviewDraft,k)?mapReviewDraft[k]:'';
+          return '<div class="map-row"><div class="map-cur">'+esc(t.time)+'</div><div class="map-arr">&#8592;</div>'
+            + '<select class="fsel map-sel" data-key="'+esc(k)+'" style="font-size:11px;padding:4px 7px;">'+prevOpts(sel)+'</select></div>';
+        }).join('');
+  }).join('<div style="height:6px;"></div>');
+  body.innerHTML='<p style="font-size:12px;color:var(--ink2);margin-bottom:9px;">奉仕者のフォームに前月の希望を初期値として入れるときの対応です。左が今月の枠、右が引き継ぐ前月の枠です。</p>'+rows;
 }
-function fcStep(dir){
-  if(dir===1&&fcN===3){execFormCreate();return;}
-  if(dir===1&&fcN===2){
-    document.querySelectorAll('.map-sel').forEach(s=>{mappingResult[s.dataset.key]=s.value;});
-    const ymVal=document.getElementById('fc-ym-sel')?.value||curY+'-'+curM;
-    const[fy,fm]=ymVal.split('-').map(Number);
-    const cnt=Object.values(mappingResult).filter(v=>v).length;
-    document.getElementById('fc-s-ym').textContent=fy+'年'+fm+'月';
-    document.getElementById('fc-s-map').textContent=cnt+'件';
-  }
-  fcN=Math.min(3,Math.max(1,fcN+dir));
-  updFcSteps();
-}
-function updFcSteps(){
-  for(let i=1;i<=3;i++){
-    const p=document.getElementById('p'+i); if(p) p.style.display=i===fcN?'block':'none';
-    const c=document.getElementById('s'+i),l=document.getElementById('sl'+i);
-    if(c){c.className='sc'+(i<fcN?' dn':i===fcN?' on':'');c.innerHTML=i<fcN?'&#10003;':i;}
-    if(l) l.className='sl'+(i===fcN?' on':'');
-    if(i<3){const ln=document.getElementById('ln'+i);if(ln)ln.className='sln'+(i<fcN?' dn':'');}
-  }
-  const nx=document.getElementById('fc-nx'),bk=document.getElementById('fc-bk');
-  if(nx){nx.textContent=fcN===3?'作成する':'次へ';nx.className='btn '+(fcN===3?'btn-d':'btn-p');}
-  if(bk) bk.style.display=fcN>1?'inline-flex':'none';
-}
-function resetFC(){ fcN=1; }
-async function execFormCreate(){
-  const ymVal=document.getElementById('fc-ym-sel')?.value||curY+'-'+curM;
-  const[fy,fm]=ymVal.split('-').map(Number);
-  const nx=document.getElementById('fc-nx'),bk=document.getElementById('fc-bk');
-  if(nx) nx.disabled=true;
-  if(bk) bk.style.display='none';
-  document.getElementById('fc-st').classList.add('show');
+
+async function saveMapReview(){
+  document.querySelectorAll('#m-map-review-body .map-sel').forEach(s=>{
+    mapReviewDraft[s.dataset.key]=s.value;
+  });
+  slotMapping=Object.assign({},mapReviewDraft);
+  closeM('m-map-review');
+  showProc('紐づけを保存しています...', '少々お待ちください');
   try{
-    await apiGet('createForm',{mapping:mappingResult,year:fy,month:fm});
-    document.getElementById('fc-st').classList.remove('show');
-    document.getElementById('fc-done').style.display='block';
-    document.getElementById('fc-done-sub').textContent=fy+'年'+fm+'月のフォームを作成しました。';
-    document.getElementById('m-form-ft').innerHTML=`
-      <button class="btn btn-g" onclick="closeMReset('m-form','resetFC')">閉じる</button>
-      <button class="btn btn-d" onclick="execFormCreate()">再作成</button>`;
-    toast('フォームを作成しました','s');
+    await postSlotMapping();
+    hideProc();
+    buildSlotSetList();
+    toast('前月との紐づけを保存しました','s');
   }catch(e){
-    document.getElementById('fc-st').classList.remove('show');
-    if(nx){nx.disabled=false;}
-    if(bk) bk.style.display='inline-flex';
-    toast('作成に失敗しました: '+e.message,'e');
+    hideProc();
+    uiAlert({type:'danger',title:'保存に失敗しました',message:'紐づけの保存に失敗しました。\n\n'+e.message});
   }
 }
 
@@ -2052,7 +2072,6 @@ async function execCalPub(){
 // ============================================================
 function openM(id){ document.getElementById(id).classList.add('open'); }
 function closeM(id){ document.getElementById(id).classList.remove('open'); }
-function closeMReset(id, resetFn){ closeM(id); if(resetFn==='resetFC') resetFC(); }
 // オーバーレイクリックで閉じる
 document.addEventListener('click', e => {
   if(e.target.classList.contains('ov')) closeM(e.target.id);
@@ -4372,6 +4391,7 @@ async function refreshAdminData() {
     dates.open     = toObj(d.eventDates['シフト公開']);
   }
   if (d.currentSlots) slots = d.currentSlots.map(s => ({ y: s.y || curY, m: s.m || curM, d: s.d, time: s.time, interval: parseInt(s.interval) || 15 }));
+  slotMapping = d.slotMapping || {};
   if (d.phases) {
     adminPhases = d.phases;
     currentPhaseIndex = 0;

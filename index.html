@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=35">
+<link rel="stylesheet" href="css/index.css?v=36">
 </head>
 <body>
 
@@ -163,6 +163,9 @@
           <div style="margin-top:10px;" id="info-slots-card">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
               <span style="font-size:12px;font-weight:700;color:var(--ink2);">実施日一覧</span>
+              <!-- 紐づけは実施日設定の中で決めるが、月全体を一覧で見直したいときの入口。
+                   通常PWで前月の枠があるときだけ renderMapReviewBtn が出す -->
+              <button id="map-review-btn" style="display:none;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--ink2);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);" onclick="openMapReviewModal()">🔗 前月との紐づけを見直す</button>
             </div>
             <div class="slot-set-card">
               <div class="slot-set-list" id="slot-set-list">
@@ -667,15 +670,15 @@
   </div>
 </div>
 
-<!-- シフトフォーム作成 -->
-<div class="ov" id="m-form">
+<!-- 前月との紐づけの見直し。決めるのは実施日設定モーダルの中だが、
+     月全体をまとめて確認・修正したいときのための一覧 -->
+<div class="ov" id="m-map-review">
   <div class="modal">
-    <div class="mhd"><span class="mt">&#128221; シフトフォーム作成</span><button class="mx" onclick="closeMReset('m-form','resetFC')">&#10005;</button></div>
-    <div class="mbd" id="m-form-body">
-      <div class="loading-row"><div class="spin"></div>データを読み込み中...</div>
-    </div>
-    <div class="mft" id="m-form-ft">
-      <button class="btn btn-g" onclick="closeMReset('m-form','resetFC')">閉じる</button>
+    <div class="mhd"><span class="mt">&#128279; 前月との紐づけ</span><button class="mx" onclick="closeM('m-map-review')">&#10005;</button></div>
+    <div class="mbd" id="m-map-review-body"></div>
+    <div class="mft" id="m-map-review-ft">
+      <button class="btn btn-g" onclick="closeM('m-map-review')">閉じる</button>
+      <button class="btn btn-p" onclick="saveMapReview()">保存</button>
     </div>
   </div>
 </div>
@@ -741,6 +744,6 @@
 <script src="js/session.js?v=3"></script>
 <script src="js/api.js?v=8"></script>
 <script src="js/confirm.js?v=1"></script>
-<script src="js/index.js?v=52"></script>
+<script src="js/index.js?v=53"></script>
 </body>
 </html>

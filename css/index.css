@@ -183,6 +183,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .sp-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
 /* 時間帯行（ドロップダウン版） */
 .sp-time-row{display:grid;grid-template-columns:1fr 14px 1fr auto auto;align-items:center;gap:6px;}
+/* 時間帯と、その枠が前月のどこを引き継ぐかを1組として扱う */
+.sp-time-block{padding:7px 0;border-bottom:1px dashed var(--border);}
+.sp-time-block:last-child{border-bottom:none;}
+.sp-map-row{display:flex;align-items:center;gap:6px;margin-top:5px;padding-left:2px;}
+.sp-map-lbl{font-size:10px;font-weight:700;color:var(--ink3);flex-shrink:0;}
+.sp-map-sel{flex:1;font-size:11px;padding:4px 7px;min-width:0;}
+.sp-map-hint{font-size:10px;line-height:1.5;color:var(--ink3);padding:0 12px 6px;}
 .time-sel{border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--surface);outline:none;appearance:none;text-align:center;-webkit-appearance:none;width:100%;}
 .time-sel:focus{border-color:var(--blue);}
 .time-wave{text-align:center;color:var(--ink3);font-size:12px;}
@@ -199,6 +206,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .sdg-date{font-size:12px;font-weight:700;color:var(--purple);}
 .sdg-wk{font-size:10px;color:var(--purple);background:var(--purple-l);padding:1px 6px;border-radius:10px;font-weight:700;}
 .sdg-times{padding:5px 12px;display:flex;flex-wrap:wrap;gap:4px;}
+/* 前月との対応。取り違えに気づけるよう一覧に併記する */
+.sdg-maps{padding:0 12px 6px;display:flex;flex-direction:column;gap:2px;}
+.sdg-map{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--ink3);}
+.sdg-map-cur{font-family:var(--mono);flex-shrink:0;}
+.sdg-map-arr{color:var(--ink3);flex-shrink:0;}
+.sdg-map-prev{font-family:var(--mono);color:var(--ink2);}
+.sdg-map-prev.none{font-family:var(--sans);color:var(--ink3);font-style:italic;}
 .stime{font-family:var(--mono);font-size:11px;background:var(--purple-l);color:var(--purple);padding:2px 7px;border-radius:4px;}
 .sintv{font-size:10px;color:var(--ink3);margin-left:2px;}
 .sdel{border:none;background:none;cursor:pointer;color:var(--ink3);font-size:11px;padding:2px 4px;}
