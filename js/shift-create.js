@@ -95,7 +95,7 @@ async function initAuth() {
       setLoading(false);
       if (d.ok && d.isAdmin) {
         adminUser = { email: shared.email, name: d.name || shared.name || shared.email,
-                      uid: d.uid || '', isAdmin: true, picture: shared.picture || '' };
+                      uid: d.uid || '', isAdmin: true, picture: shared.picture || '', avatar: d.avatar || '' };
         localStorage.setItem('adminUser', JSON.stringify(adminUser));
         showApp();
         return;
@@ -132,9 +132,10 @@ function showApp() {
 
   document.getElementById('app-screen').style.display = 'flex';
   const icon = document.getElementById('acc-icon');
-  if (icon && adminUser && adminUser.picture) {
+  const iconSrc = adminUser && (adminUser.avatar || adminUser.picture);
+  if (icon && iconSrc) {
     const img = document.createElement('img');
-    img.src = adminUser.picture;
+    img.src = iconSrc;
     img.style.cssText = 'width:26px;height:26px;border-radius:50%;object-fit:cover;';
     img.setAttribute('referrerpolicy', 'no-referrer');
     img.onerror = () => { icon.innerHTML = '👤'; };

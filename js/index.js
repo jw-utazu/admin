@@ -131,14 +131,16 @@ async function _processUserWithGasAuth(u, save) {
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
   // ログイン情報をlocalStorageに保存（次回自動ログイン用）
   if (save) {
-    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, isAdmin: true })); } catch(e) {}
+    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, avatar: res.avatar || '', isAdmin: true })); } catch(e) {}
     // 他の2アプリでもログイン済みとして扱えるよう共通セッションにも保存する
     pwgwsSaveSession(u.email, u.name, u.picture);
   }
   const av = document.getElementById('av');
-  if (u.picture) {
+  // フォームアプリで設定したアバター（res.avatar）を優先し、未設定ならGoogle写真にフォールバック
+  const avSrc = res.avatar || u.picture;
+  if (avSrc) {
     const img = document.createElement('img');
-    img.src = u.picture;
+    img.src = avSrc;
     img.alt = '';
     img.onerror = () => { av.innerHTML = ''; av.textContent = ([...u.name||u.email][0]||'?').toUpperCase(); };
     av.innerHTML = '';
