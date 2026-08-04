@@ -112,6 +112,10 @@ async function _processUserWithGasAuth(u, save) {
     document.getElementById('loading').classList.add('show');
   }
   setLoadingStep(2, '管理者権限を確認中...');
+  // 認証応答は try の外（アイコン表示・localStorage 保存）でも使うので、
+  // try の中で const 宣言してはいけない。ブロックスコープから漏れて
+  // ReferenceError になり、しかも catch の外なので権限確認のまま止まる
+  let auth = null;
   try {
     // fetch方式（リダイレクト追従対応・Android Chrome対応）
     const url = API_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email);
@@ -126,18 +130,19 @@ async function _processUserWithGasAuth(u, save) {
       });
     if (!res.ok) { showAuthErr('', 'unauthorized'); return; }
     if (!res.isAdmin) { showAuthErr('', 'noadmin'); return; }
+    auth = res;
     // ログインユーザー情報を保持（uid空＝オーナーアカウント）
     _currentUser = { uid: res.uid || '', name: u.name, email: u.email };
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
   // ログイン情報をlocalStorageに保存（次回自動ログイン用）
   if (save) {
-    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, avatar: res.avatar || '', isAdmin: true })); } catch(e) {}
+    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, avatar: (auth && auth.avatar) || '', isAdmin: true })); } catch(e) {}
     // 他の2アプリでもログイン済みとして扱えるよう共通セッションにも保存する
     pwgwsSaveSession(u.email, u.name, u.picture);
   }
   const av = document.getElementById('av');
-  // フォームアプリで設定したアバター（res.avatar）を優先し、未設定ならGoogle写真にフォールバック
-  const avSrc = res.avatar || u.picture;
+  // フォームアプリで設定したアバター（auth.avatar）を優先し、未設定ならGoogle写真にフォールバック
+  const avSrc = (auth && auth.avatar) || u.picture;
   if (avSrc) {
     const img = document.createElement('img');
     img.src = avSrc;
