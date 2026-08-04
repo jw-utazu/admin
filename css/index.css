@@ -70,11 +70,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-pub-mini.unpublished:hover{background:var(--bg);}
 .cal-pub-note{font-size:11px;line-height:1.5;color:#92400e;background:#fffbeb;border-bottom:1px solid #fde68a;padding:6px 14px;}
 .cal-pub-note b{font-weight:700;}
-/* 予定表の承認ボタン。月の右、cal-pub-mini と並ぶので同じピル型に揃える。
-   承認待ちは「注意」の色、押せるときは操作を促す緑にする */
+/* 予定表の状態に応じた操作ボタン。月の右、cal-pub-mini と並ぶので同じピル型に揃える。
+   4状態（設定中→承認待ち→承認済み・公開待ち→公開中）を calStageInfo() が1操作に決め、
+   この4色で見分ける：緑＝前に進める操作、黄＝注意（承認待ちの表示専用）、
+   グレー＝取り消し系（設定中に戻す）、赤＝公開を止める操作（非公開に戻す） */
 .cal-approve-mini{display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid #fde68a;border-radius:20px;background:#fffbeb;font-family:var(--sans);font-size:11px;font-weight:700;color:#92400e;cursor:default;transition:all .15s;line-height:1;white-space:nowrap;}
 .cal-approve-mini.can-approve{border-color:var(--green);background:var(--green);color:#fff;cursor:pointer;}
 .cal-approve-mini.can-approve:hover{filter:brightness(.94);}
+.cal-approve-mini.cal-stage-secondary{border-color:var(--border2);background:var(--surface2);color:var(--ink2);cursor:pointer;}
+.cal-approve-mini.cal-stage-secondary:hover{background:var(--bg);}
+.cal-approve-mini.cal-stage-danger{border-color:var(--red);background:var(--red-l);color:var(--red);cursor:pointer;}
+.cal-approve-mini.cal-stage-danger:hover{filter:brightness(.96);}
+/* 主操作（cal-approve-mini）の脇に添える控えめな補助リンク。ピル型の主操作と
+   並べても「同格の2つのボタン」に見えないよう、下線つきの小さい文字リンクにする */
+.cal-stage-secondary-link{background:none;border:none;padding:2px 4px;font-family:var(--sans);font-size:10.5px;font-weight:700;color:var(--ink3);cursor:pointer;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;}
+.cal-stage-secondary-link:hover{color:var(--ink2);}
 .mini-cal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
 .cal-dows{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface2);border-bottom:1px solid var(--border);}
 .cdow{text-align:center;padding:6px 2px;font-size:10px;font-weight:700;color:var(--ink3);}
@@ -241,6 +251,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   font-family:var(--sans);text-align:left;transition:background .12s;}
 .ibx:last-child{border-bottom:none;}
 .ibx:hover{background:var(--surface);}
+/* 件数表示に専念させた行（クリック操作なし）。カーソル・ホバーを操作可能な
+   行と区別する。操作の入口は「今月の作業」側の1か所に一本化してある */
+.ibx.ibx-static{cursor:default;}
+.ibx.ibx-static:hover{background:var(--surface2);}
 .ibx-ic{font-size:13px;flex-shrink:0;line-height:1;}
 .ibx-n{flex:1;font-size:12px;font-weight:700;color:var(--ink2);}
 /* 件数。0件のときは「－」を薄く出すだけにして、あるときだけ赤く目立たせる */
@@ -326,6 +340,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .sumrow{display:flex;align-items:center;gap:8px;font-size:12px;}
 .sumk{color:var(--ink2);width:76px;flex-shrink:0;}
 .sumv{font-weight:700;}
+/* 承認画面：前回承認した内容からの変更点（C-3）。取り消し線＝旧い値、緑＝新しい値 */
+.cal-diff-box{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:8px;}
+.cal-diff-row{padding:7px 11px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.cal-diff-row:last-child{border-bottom:none;}
+.cal-diff-label{font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:2px;}
+.cal-diff-vals{display:flex;align-items:center;gap:6px;font-size:12.5px;flex-wrap:wrap;}
+.cal-diff-before{color:var(--red);text-decoration:line-through;}
+.cal-diff-arrow{color:var(--ink3);}
+.cal-diff-after{color:var(--green);font-weight:700;}
 
 /* 警告 */
 .warn{background:var(--amber-l);border:1px solid #fcd34d;border-radius:var(--r);padding:8px 11px;font-size:12px;color:var(--amber);margin-bottom:10px;}

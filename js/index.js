@@ -1722,8 +1722,9 @@ function isShiftStatusForCurMonth() {
 function renderProgressStrip() {
   const wrap = document.getElementById('prog-strip');
   if (!wrap) return;
-  // 限定PWは複数月が同時に走りうるので一本道にならない。ここでは扱わない
-  if (currentPwType !== 'normal') { wrap.style.display = 'none'; return; }
+  // 限定PWは複数月が同時に走りうるので一本道にならない。ここでは扱わない。
+  // ミニボタンも隠す（calStageInfo は currentPwType!=='normal' で null を返す）
+  if (currentPwType !== 'normal') { wrap.style.display = 'none'; renderCalStageMini(); return; }
   wrap.style.display = '';
 
   const toDate = o => (o && o.y && o.m && o.d) ? new Date(o.y, o.m - 1, o.d) : null;
@@ -1765,6 +1766,7 @@ function renderProgressStrip() {
   const ca = isCalApprovalForCurMonth() ? calApproval : null;
   const calSub = calOn ? md(dates.apply)
     : !ca ? md(dates.apply)
+    : !ca.ready ? '設定中'
     : !ca.approved ? '承認待ち'
     : (dates.apply ? '✓承認済 ' + md(dates.apply) : '✓承認済');
   const steps = [
@@ -1776,12 +1778,12 @@ function renderProgressStrip() {
   ];
   // 段そのものを操作口にする。どちらも「その段が表している公開状態」を
   // 切り替えるので、状態表示と操作が同じ場所にまとまる：
-  //   予定表公開 … 予定表（カレンダー）の公開/非公開
+  //   予定表公開 … 状態に応じた1操作（設定完了して承認を依頼／承認する／
+  //               設定中に戻す／今すぐ公開／非公開に戻す。calStageInfo() が1つに決める）
   //   公開       … シフトの公開/非公開（カレンダーは公開したまま戻せる）
-  // 「予定表公開」段は実際に申込中の月でしか切り替えられない。既に次の月へ申込が
-  // 移っている月（calDone だが calOn ではない）は非公開にする対象が無い
+  const calInfo = calStageInfo();
   const action = {
-    cal:  (calOn || st.cal === 'now') ? 'toggleCalPub()' : '',
+    cal:  calInfo ? 'calStageAction()' : '',
     open: st.open !== 'todo' ? 'toggleShiftPub()' : '',
   };
   document.getElementById('prog-steps').innerHTML = steps.map(([k, label, sub], i) => {
@@ -1790,7 +1792,7 @@ function renderProgressStrip() {
     const mark = st[k] === 'done' ? '✓' : (i + 1);
     const act = action[k] || '';
     const tip = !act ? ''
-      : k === 'cal'  ? (st.cal === 'done' ? '予定表を非公開にする' : '申込開始日を待たずに今すぐ公開する')
+      : k === 'cal'  ? (calInfo ? calInfo.title : '')
       : (st.open === 'done' ? 'シフトを非公開にする' : 'シフトの作成完了を取り消す');
     return line + `<div class="pstep ${st[k]}${act ? ' pstep-click' : ''}"`
       + (act ? ` onclick="${act}" title="${tip}"` : '')
@@ -1799,49 +1801,219 @@ function renderProgressStrip() {
       + (sub ? `<div class="psub">${sub}</div>` : '') + '</div>';
   }).join('');
 
-  renderCalApprovalMini(ca, calOn, hasDates);
+  renderCalStageMini();
+}
+
+// ============================================================
+// 予定表の状態に応じた「今できる操作」を1つに決める
+// ============================================================
+// 4状態（① 設定中 → ② 承認待ち → ③ 承認済み・公開待ち → ④ 公開中）に
+// 押せるボタンは原則1つ。月の右のミニボタンと、進行状況ストリップの
+// 「予定表公開」段は同じ状態を別の場所に出しているだけなので、ここを
+// 唯一の判定にして両方から参照する（実行される操作を必ず一致させる）
+function calStageInfo() {
+  if (currentPwType !== 'normal') return null;
+
+  // 公開中かどうかは日程の有無と無関係に判定できる。日程ガードより先に見ないと、
+  // 公開中の月で日程を丸ごとリセット（resetDates の一括リセットなど）しただけで
+  // 「非公開に戻す」の導線がミニボタン・ストリップの両方から消えてしまう
+  // （cal-pub-mini は通常PWでは常に非表示なので、代わりの導線が無くなる）
+  const calOn = isCurMonthPublished();
+  if (calOn) {
+    return {
+      text: '📅 非公開に戻す',
+      title: '予定表を非公開にします。奉仕者はカレンダー情報（日程・実施日）を確認できなくなります。',
+      cls: 'cal-stage-danger', fn: toggleCalPub,
+    };
+  }
+
+  const toDate = o => (o && o.y && o.m && o.d) ? new Date(o.y, o.m - 1, o.d) : null;
+  if (!(toDate(dates.apply) && toDate(dates.deadline) && toDate(dates.open))) return null;
+
+  // 次の月へ申込が先に進んでいる、またはこの月のシフトが作成完了しているなら、
+  // この月の予定表の作業はもう終わっている（この時点で calOn は必ず false）
+  const calMoved = !!(calPubYM && (calPubYM.y > curY || (calPubYM.y === curY && calPubYM.m > curM)));
+  const ss = isShiftStatusForCurMonth() ? shiftStatus : null;
+  const created = !!(ss && ss.published);
+  if (calMoved || created) return null;
+
+  const ca = isCalApprovalForCurMonth() ? calApproval : null;
+  if (!ca) return null;
+
+  if (!ca.ready) {
+    const who = ca.required > 0
+      ? ca.approvers.map(a => a.name).join('・') + ' へ承認の通知が届きます。'
+      : '承認者が未登録のため、設定完了と同時に承認済みになります。';
+    return { text: '📮 設定完了して承認を依頼', title: who, cls: 'can-approve', fn: setCalReady };
+  }
+  if (!ca.approved) {
+    if (ca.canApprove) {
+      return {
+        text: '🕒 承認する',
+        title: '予定表は承認されるまで申込開始日を過ぎても公開されません。',
+        cls: 'can-approve', fn: approveCal,
+      };
+    }
+    const who = ca.required > 0 ? ca.approvers.map(a => a.name).join('・') + ' の承認待ちです。' : '';
+    // approvedSnapshot は承認のたびに上書きされ、hUnsetCalReady でも消えない
+    // （承認フィールドだけ消す作り）ので、「過去に一度でも承認されたか」の目印になる。
+    // 承認済みの月を修正した直後はここに来る（自動では承認外れの通知が飛ばないため、
+    // 区域係が明示的に再依頼するまで奉仕監督には伝わらない）
+    if (ca.approvedSnapshot) {
+      return {
+        text: '📮 承認を再依頼',
+        title: who + '修正内容を承認者に再確認してもらいます。',
+        cls: 'can-approve', fn: setCalReady,
+        // 主操作（再依頼）の脇に、取り消し系の導線も残す。1状態＝主要ボタン1つは
+        // 保ったまま、押せる操作を完全に失わせない（控えめな補助リンクとして出す）
+        secondary: { text: '↩ 設定中に戻す', title: '設定中に戻します（承認待ちの記録は消えます）', fn: unsetCalReady },
+      };
+    }
+    return {
+      text: '↩ 設定中に戻す',
+      title: who + 'まだ直したいときは設定中に戻せます。',
+      cls: 'cal-stage-secondary', fn: unsetCalReady,
+    };
+  }
+  // 承認済み・公開待ち：申込開始日を待てば自動公開される。即時公開はオーナーのみ
+  // （手動公開の権限は hPublishCalendar 側でもオーナーのみに制限されている。
+  //   そもそもボタンを出さないことで、押しても拒否される事態を避ける）
+  if (ca.isOwner) {
+    return {
+      text: '🚀 今すぐ公開',
+      title: '申込開始日を待たずに今すぐ公開します。',
+      cls: 'can-approve', fn: openCalPubModal,
+    };
+  }
+  return null;
+}
+
+function calStageAction() {
+  const info = calStageInfo();
+  if (info && info.fn) info.fn();
+}
+
+// 主操作の脇に添える控えめな補助操作（今は「承認を再依頼」の隣の「設定中に戻す」だけ）
+function calStageSecondaryAction() {
+  const info = calStageInfo();
+  if (info && info.secondary && info.secondary.fn) info.secondary.fn();
 }
 
 // 承認の操作口。カレンダーの月の右、限定PWの公開ボタンと同じ位置に置く。
-// 進行状況ストリップの下に帯で出すと、日程・実施日を見ながら承認したいのに
+// 進行状況ストリップの下に帯で出すと、日程・実施日を見ながら操作したいのに
 // 画面上部まで戻ることになるため、月の横に寄せた
-function renderCalApprovalMini(ca, calOn, hasDates) {
+function renderCalStageMini() {
   const btn = document.getElementById('cal-approve-mini');
   const txt = document.getElementById('cal-approve-mini-text');
+  const sub = document.getElementById('cal-stage-secondary');
   if (!btn || !txt) return;
-  // 限定PW・公開済み・日程未設定・承認済み・状態未取得のときは出す意味が無い
-  if (currentPwType !== 'normal' || calOn || !hasDates || !ca || ca.approved) {
+  const info = calStageInfo();
+  if (!info) {
     btn.style.display = 'none';
+    if (sub) sub.style.display = 'none';
     return;
   }
   btn.style.display = '';
-  const who = ca.required > 0
-    ? ca.approvers.map(a => a.name).join('・') + ' の承認待ちです。'
-    : '承認者が未登録のため、どの管理者でも承認できます。';
-  // 承認できない人にはボタンを押させない。誰待ちかは吹き出しで伝える
-  btn.disabled = !ca.canApprove;
-  btn.classList.toggle('can-approve', !!ca.canApprove);
-  txt.textContent = ca.canApprove ? '🕒 承認する' : '🕒 承認待ち';
-  btn.title = '予定表は承認されるまで申込開始日を過ぎても公開されません。' + who;
+  btn.disabled = false;
+  btn.className = 'cal-approve-mini ' + info.cls;
+  txt.textContent = info.text;
+  btn.title = info.title;
+  if (sub) {
+    if (info.secondary) {
+      sub.style.display = '';
+      sub.textContent = info.secondary.text;
+      sub.title = info.secondary.title || '';
+    } else {
+      sub.style.display = 'none';
+    }
+  }
+}
+
+// ============================================================
+// 承認スナップショットとの突き合わせ（承認後に変わった箇所を出す）
+// ============================================================
+// cal_approved_snapshot の日付は calDatesJson と同じ ISO 文字列、実施日は
+// csToSlot と同じ形で返ってくる。画面側の dates/slots は {y,m,d} オブジェクト・
+// 配列なので、比較できる形にそろえてから突き合わせる
+function isoToYMD(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+}
+function ymdEq(a, b) { return (!a && !b) || (!!a && !!b && a.y === b.y && a.m === b.m && a.d === b.d); }
+function ymdLabel(o) { return o ? (o.m + '/' + o.d) : '未設定'; }
+
+// 前回承認した内容（snapshot）と、いま画面にある内容（dates/slots）を突き合わせ、
+// 変わった項目だけの一覧を返す
+function buildCalDiff(snapshot) {
+  const diffs = [];
+  if (!snapshot) return diffs;
+  const sd = snapshot.dates || {};
+  [
+    ['申込開始',   isoToYMD(sd.apply),    dates.apply],
+    ['締切',       isoToYMD(sd.deadline), dates.deadline],
+    ['シフト公開', isoToYMD(sd.open),     dates.open],
+  ].forEach(([label, before, after]) => {
+    if (!ymdEq(before, after)) diffs.push({ label, before: ymdLabel(before), after: ymdLabel(after) });
+  });
+
+  const slotKey   = s => s.y + '-' + s.m + '-' + s.d + ' ' + s.time;
+  const slotLabel = s => s ? (s.m + '/' + s.d + ' ' + s.time + '（' + (s.interval || 15) + '分刻み）') : 'なし';
+  const before = {}; (snapshot.slots || []).forEach(s => { before[slotKey(s)] = s; });
+  const after  = {}; slots.forEach(s => { after[slotKey(s)] = s; });
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  keys.forEach(k => {
+    const b = before[k], a = after[k];
+    if (!b) diffs.push({ label: '実施日の追加', before: 'なし', after: slotLabel(a) });
+    else if (!a) diffs.push({ label: '実施日の削除', before: slotLabel(b), after: 'なし' });
+    else if ((b.interval || 15) !== (a.interval || 15)) {
+      diffs.push({ label: '実施日 ' + a.m + '/' + a.d + ' ' + a.time,
+        before: (b.interval || 15) + '分刻み', after: (a.interval || 15) + '分刻み' });
+    }
+  });
+  return diffs;
 }
 
 // 予定表の承認。承認しても即公開ではなく、申込開始日が来たら自動で公開される。
-// 「承認＝公開」と誤解されると、まだ直したい月を承認できなくなるので明示する
-async function approveCal() {
+// 「承認＝公開」と誤解されると、まだ直したい月を承認できなくなるので明示する。
+// 前回承認した内容から変わった箇所があれば、承認前に並べて見せる
+function approveCal() {
   const ca = isCalApprovalForCurMonth() ? calApproval : null;
   if (!ca) return;
-  const md = s => s || '';
-  if (!await uiConfirm({
-    type: 'info',
-    title: '予定表を承認する',
-    message: `${curY}年${curM}月の予定表を承認しますか？\n\n`
-      + (ca.applyDate
-          ? `承認しても今すぐ公開はされません。申込開始日（${md(ca.applyDate)}）を迎えると自動で公開されます。\n\n`
-          : '承認しても今すぐ公開はされません。申込開始日を迎えると自動で公開されます。\n\n')
-      + '承認後に日程や実施日を変更すると、承認は自動的に取り消されます。',
-    confirmText: '承認する',
-  })) return;
+  const diffs = (ca.changedSinceApproval && ca.approvedSnapshot) ? buildCalDiff(ca.approvedSnapshot) : [];
+  const who = ca.required > 0
+    ? ca.approvers.map(a => a.name).join('・') + ' の承認待ちです。'
+    : '承認者が未登録のため、どの管理者でも承認できます。';
+  const diffHtml = diffs.length ? `
+    <div class="fg">
+      <label class="fl">⚠ 前回承認した内容からの変更点（${diffs.length}件）</label>
+      <div class="cal-diff-box">
+        ${diffs.map(d => `
+          <div class="cal-diff-row">
+            <div class="cal-diff-label">${esc(d.label)}</div>
+            <div class="cal-diff-vals"><span class="cal-diff-before">${esc(d.before)}</span><span class="cal-diff-arrow">→</span><span class="cal-diff-after">${esc(d.after)}</span></div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+  openM('m-cal-approve');
+  document.getElementById('m-ca-body').innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px;">
+      <span style="background:var(--blue-l);color:var(--blue);padding:3px 10px;border-radius:20px;">${curY}年${curM}月</span> の予定表を承認します
+    </div>
+    <div style="font-size:12px;line-height:1.7;color:var(--ink2);margin-bottom:10px;">
+      承認しても今すぐ公開はされません。${ca.applyDate ? '申込開始日（' + esc(ca.applyDate) + '）' : '申込開始日'}を迎えると自動で公開されます。<br>
+      承認後に日程や実施日を変更すると、承認は自動的に取り消され、再承認が必要になります。
+    </div>
+    ${diffHtml}
+    <div style="font-size:11px;color:var(--ink3);">${esc(who)}</div>`;
+  document.getElementById('m-ca-ft').innerHTML = `
+    <button class="btn btn-g" onclick="closeM('m-cal-approve')">キャンセル</button>
+    <button class="btn btn-s" onclick="execApproveCal()">承認する</button>`;
+}
 
+async function execApproveCal() {
+  closeM('m-cal-approve');
   showProc('予定表を承認しています...', '少々お待ちください');
   try {
     const r = await apiGet('approveCalendar', { year: curY, month: curM });
@@ -1853,6 +2025,75 @@ async function approveCal() {
   } catch (e) {
     hideProc();
     toast('承認に失敗しました: ' + e.message, 'e');
+    loadCalApprovalStatus();
+  }
+}
+
+// 「設定完了して承認を依頼」／「承認を再依頼」。承認者（奉仕監督）が登録されていれば
+// プッシュ通知が届く。未登録なら hSetCalReady 側で即承認済みになる。
+// 承認済みの月を修正すると承認だけ自動的に外れる（is_cal_ready は true のまま残る）ので、
+// 確認ダイアログの文言は呼び出し前の ca.ready（is_cal_ready の現在値）で
+// 初回の依頼か再依頼かを見分ける（サーバー判定と同じ根拠）。
+// 実行後のトーストは、サーバーが実際にどちらとして扱ったか（reRequested）を使う。
+// 通知は自動では飛ばさない（日程を連続で直すたびに通知が飛ぶと迷惑になるため）。
+// 区域係がこのボタンを押した時だけ、その時点の内容で承認者へ通知が飛ぶ
+async function setCalReady() {
+  const ca = isCalApprovalForCurMonth() ? calApproval : null;
+  if (!ca) return;
+  const isReapproval = !!ca.ready;
+  const who = ca.required > 0
+    ? ca.approvers.map(a => a.name).join('・') + (isReapproval ? ' へ再確認の通知が届きます。' : ' へ承認の通知が届きます。')
+    : '承認者が未登録のため、そのまま承認済みになります。';
+  const title = isReapproval ? '承認を再依頼' : '設定完了して承認を依頼';
+  const message = isReapproval
+    ? `${curY}年${curM}月の修正内容を、承認者に再確認してもらいますか？\n\n${who}`
+    : `${curY}年${curM}月の日程・実施日の設定を完了し、承認を依頼しますか？\n\n${who}\n\n完了後もそのまま修正できます。`;
+  if (!await uiConfirm({
+    type: 'info', title, message,
+    confirmText: isReapproval ? '再依頼する' : '設定完了する',
+  })) return;
+
+  showProc(isReapproval ? '再依頼しています...' : '設定完了にしています...', '少々お待ちください');
+  try {
+    const r = await apiGet('setCalReady', { year: curY, month: curM });
+    if (!r.ok) throw new Error(r.error || '失敗しました');
+    await loadCalApprovalStatus();
+    hideProc();
+    // どちらとして扱われたかはサーバー（is_cal_ready の現在値）が判定した r.reRequested を使う。
+    // 確認ダイアログ表示時点の isReapproval とは理屈上ズレないはずだが、実行結果の文言は
+    // 常にサーバーの判定を正とする
+    toast(r.approved
+      ? (r.reRequested ? '承認者未登録のため、そのまま承認済みになりました' : '設定完了にしました（承認者未登録のため承認済みです）')
+      : (r.reRequested ? '承認を再依頼しました' : '設定完了にし、承認を依頼しました'), 's');
+    loadPendingCounts();
+  } catch (e) {
+    hideProc();
+    toast('エラー: ' + e.message, 'e');
+    loadCalApprovalStatus();
+  }
+}
+
+// 「設定中に戻す」。承認待ち・承認済みのいずれからも①設定中へ戻す
+async function unsetCalReady() {
+  const ca = isCalApprovalForCurMonth() ? calApproval : null;
+  if (!ca) return;
+  if (!await uiConfirm({
+    type: 'warn', title: '設定中に戻す',
+    message: `${curY}年${curM}月の予定表を「設定中」に戻しますか？\n\n承認待ち・承認済みの記録は消え、改めて設定完了の操作が必要になります。`,
+    confirmText: '設定中に戻す',
+  })) return;
+
+  showProc('設定中に戻しています...', '少々お待ちください');
+  try {
+    const r = await apiGet('unsetCalReady', { year: curY, month: curM });
+    if (!r.ok) throw new Error(r.error || '失敗しました');
+    await loadCalApprovalStatus();
+    hideProc();
+    toast('設定中に戻しました', 's');
+    loadPendingCounts();
+  } catch (e) {
+    hideProc();
+    toast('エラー: ' + e.message, 'e');
     loadCalApprovalStatus();
   }
 }
@@ -2679,18 +2920,20 @@ function renderInboxCounts(c) {
   if (el) el.textContent = total > 0 ? '合計 ' + total + '件' : '';
 }
 
-// 未承認バッジのクリック。専用のモーダルは作らない。
-// 承認は「その月の予定表を見て判断する」ものなので、承認バーまで
-// 連れて行くだけにする。件数は他の月の分も含むため、どの月を承認するかは
-// 対象年月を切り替えて選んでもらう
+// 「今月の作業」の予定表カードのクリック。専用のモーダルは作らず、
+// 予定表は「その月を見ながら判断する」ものなので、月の右の操作ボタン
+// （cal-approve-mini。状態に応じて設定完了/承認/公開の操作が出る）まで連れて行く。
+// サイドバーの「未対応」バッジは件数表示に専念させたため、入口はここ1つ
 function goCalApproval() {
   const btn = document.getElementById('cal-approve-mini');
   if (btn && btn.style.display !== 'none') {
     btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  } else {
-    // 表示中の月は承認待ちではない。件数は別の月の分なので、その旨だけ伝える
-    toast('表示中の月は承認待ちではありません。対象年月を切り替えてください');
+    return;
   }
+  // ボタンが出ていない（日程未設定・限定PW・既に次の月へ進んだ月など）ときは、
+  // 日程設定エリアへ連れて行く
+  const card = document.getElementById('info-dates-card');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function loadPendingCounts() {

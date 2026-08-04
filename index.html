@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=41">
+<link rel="stylesheet" href="css/index.css?v=43">
 </head>
 <body>
 
@@ -83,11 +83,16 @@
             <span class="cal-ym-section-label">シフト管理</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <!-- 予定表の承認。承認待ちで自動公開が止まっていることを月の横で知らせる
-                 （renderCalApprovalMini で表示/非表示と文言を切り替える） -->
-            <button id="cal-approve-mini" class="cal-approve-mini" style="display:none;" onclick="approveCal()">
+            <!-- 予定表の状態に応じた操作ボタン（設定完了して承認を依頼／承認する／
+                 設定中に戻す／今すぐ公開／非公開に戻す）。1状態＝1ボタンになるよう
+                 calStageInfo() が状態から操作を1つに決め、renderCalStageMini() が
+                 表示/非表示と文言を切り替える。クリックは calStageAction() -->
+            <button id="cal-approve-mini" class="cal-approve-mini" style="display:none;" onclick="calStageAction()">
               <span id="cal-approve-mini-text"></span>
             </button>
+            <!-- 主操作の脇に添える控えめな補助リンク（例：「承認を再依頼」の隣の「設定中に戻す」）。
+                 1状態＝主要ボタン1つは保ったまま、取り消し系の導線を完全には失わせない -->
+            <button id="cal-stage-secondary" class="cal-stage-secondary-link" style="display:none;" onclick="calStageSecondaryAction()"></button>
             <!-- 限定PWは複数月が同時進行しうるため進行状況ストリップの一本道モデルに乗らない。
                  公開/非公開の操作口をここに残す（通常PWでは非表示、ストリップ側の操作に一本化） -->
             <button id="cal-pub-mini" class="cal-pub-mini" style="display:none;" onclick="toggleCalPub()">
@@ -204,12 +209,15 @@
       <div class="sb-sec normal-only">
         <div class="plbl inbox-hd">未対応<span class="inbox-total" id="inbox-total"></span></div>
         <div class="inbox">
-          <!-- 承認が無いまま申込開始日を過ぎ、自動公開が止まっている月の件数。
-               気づかないと当日まで奉仕者に予定表が出ないので先頭に置く -->
-          <button class="ibx" id="ibx-calApproval" onclick="goCalApproval()">
-            <span class="ibx-ic">🕒</span><span class="ibx-n">予定表未承認</span>
+          <!-- 承認が無いまま申込開始日を過ぎた月・設定未完了のまま公開が止まっている月の件数
+               （getPendingCounts の calApproval に両方含まれる）。
+               気づかないと当日まで奉仕者に予定表が出ないので先頭に置く。
+               操作の入口は「今月の作業」の予定表カード（goCalApproval()）に一本化したため、
+               ここは件数表示に専念させる（クリックしても何も起きない） -->
+          <div class="ibx ibx-static" id="ibx-calApproval">
+            <span class="ibx-ic">🕒</span><span class="ibx-n">予定表の対応待ち</span>
             <span class="ibx-c" id="ibx-c-calApproval">－</span>
-          </button>
+          </div>
           <button class="ibx" id="ibx-recovery" onclick="openRecoveryModal()">
             <span class="ibx-ic">🔑</span><span class="ibx-n">ログイン救済</span>
             <span class="ibx-c" id="ibx-c-recovery">－</span>
@@ -606,6 +614,15 @@
   </div>
 </div>
 
+<!-- 予定表承認（前回承認した内容からの変更点があれば並べて出す） -->
+<div class="ov" id="m-cal-approve">
+  <div class="modal">
+    <div class="mhd"><span class="mt">🕒 予定表を承認</span><button class="mx" onclick="closeM('m-cal-approve')">&#10005;</button></div>
+    <div class="mbd" id="m-ca-body"></div>
+    <div class="mft" id="m-ca-ft"></div>
+  </div>
+</div>
+
 
 <!-- スロット保存確認 -->
 
@@ -654,6 +671,6 @@
 <script src="js/api.js?v=9"></script>
 <script src="js/confirm.js?v=1"></script>
 <script src="js/picker.js?v=7"></script>
-<script src="js/index.js?v=60"></script>
+<script src="js/index.js?v=64"></script>
 </body>
 </html>
