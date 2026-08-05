@@ -1753,68 +1753,92 @@ function renderProgressStrip() {
   // 「申込中の月がこの月より後へ進んだ」ことを根拠にする
   const calMoved = !!(calPubYM && (calPubYM.y > curY || (calPubYM.y === curY && calPubYM.m > curM)));
   const calDone = calOn || calMoved || created;
-  // 公開前に承認という関門があり、そこで止まっていることが読めないと
-  // 当日まで気づけないため、承認状態を添え字に出す
   const ca = isCalApprovalForCurMonth() ? calApproval : null;
-  // 「予定表公開」段は承認待ちと承認済み・自動公開待ちを見た目でも区別する
-  // （どちらも旧実装では同じ青の "now" だった。2026-08-05 のフィードバックで追加）
-  const calStage = !hasDates ? 'todo'
-    : calDone ? 'done'
-    : (!ca || !ca.ready) ? 'now'
-    : !ca.approved ? 'waiting'   // 承認待ち
-    : 'pending';                 // 承認済み・自動公開待ち
+  // 「予定表公開」「シフト作成」は、それぞれ内部に「作成完了→承認済み→公開済み」の
+  // 3段階を持つ。以前はこれを1段に詰め込んで色だけで見分けさせていたが、
+  // 色もマークも同じでは判別できない、という2026-08-05 のフィードバックを受けて
+  // 独立した段に分けた（横スクロール対応済みのため段数が増えても収まる）
+  const calReadyDone   = calDone || !!(ca && ca.ready);
+  const calApproveDone = calDone || !!(ca && ca.approved);
 
   const st = {
-    dates:  hasDates ? 'done' : 'now',
-    cal:    calStage,
-    apply:  !calDone ? 'todo' : (deadlinePassed ? 'done' : 'now'),
-    create: !calDone ? 'todo' : (approved ? 'done' : (deadlinePassed || created ? 'now' : 'todo')),
-    open:   notified ? 'done' : (approved ? 'now' : 'todo'),
+    dates:        hasDates ? 'done' : 'now',
+    calReady:     !hasDates ? 'todo' : (calReadyDone ? 'done' : 'now'),
+    calApprove:   !calReadyDone ? 'todo' : (calApproveDone ? 'done' : 'waiting'),   // 承認待ち
+    calPublish:   !calApproveDone ? 'todo' : (calDone ? 'done' : 'pending'),        // 承認済み・自動公開待ち
+    apply:        !calDone ? 'todo' : (deadlinePassed ? 'done' : 'now'),
+    shiftCreate:  !calDone ? 'todo' : (created ? 'done' : (deadlinePassed ? 'now' : 'todo')),
+    shiftApprove: !created ? 'todo' : (approved ? 'done' : 'waiting'),             // 確認待ち
+    shiftPublish: !approved ? 'todo' : (notified ? 'done' : 'pending'),            // 確認済み・自動公開待ち
   };
   // 丸の下に日付を小さく添える。段の名前だけだと「受付はいつまでか」が
   // 結局スクロールしないと分からないため
   const md = o => o ? (o.m + '/' + o.d) : '';
-  // 予定表は apply_date が来れば自動で公開される。手で「募集開始」する
-  // ものではなくなったので、段の名前と添え字を実態に合わせる。
-  const calSub = calOn ? md(dates.apply)
-    : !ca ? md(dates.apply)
-    : !ca.ready ? '設定中'
-    : !ca.approved ? '承認待ち'
-    : (dates.apply ? '✓承認済み ' + md(dates.apply) : '✓承認済み');
+  const calApproveSub   = st.calApprove === 'waiting' ? '承認待ち' : '';
+  const calPublishSub   = st.calPublish === 'pending' ? (dates.apply ? md(dates.apply) + '自動公開' : '公開待ち')
+    : st.calPublish === 'done' ? md(dates.apply) : '';
+  const shiftApproveSub = st.shiftApprove === 'waiting' ? '確認待ち' : '';
+  const shiftPublishSub = st.shiftPublish === 'pending' ? (dates.open ? md(dates.open) + '自動公開' : '公開待ち')
+    : st.shiftPublish === 'done' ? md(dates.open) : '';
   const steps = [
-    ['dates',  '日程設定',     ''],
-    ['cal',    '予定表公開',   calSub],
-    ['apply',  '受付',         dd ? '〜' + md(dates.deadline) : ''],
-    ['create', 'シフト作成',   ''],
-    ['open',   '公開',         md(dates.open)],
+    ['dates',        '日程設定',     ''],
+    ['calReady',     '設定完了',     ''],
+    ['calApprove',   '承認',         calApproveSub],
+    ['calPublish',   '予定表公開',   calPublishSub],
+    ['apply',        '受付',         dd ? '〜' + md(dates.deadline) : ''],
+    ['shiftCreate',  'シフト作成',   ''],
+    ['shiftApprove', '確認',         shiftApproveSub],
+    ['shiftPublish', 'シフト公開',   shiftPublishSub],
   ];
-  // 段そのものを操作口にする。どちらも「その段が表している公開状態」を
-  // 切り替えるので、状態表示と操作が同じ場所にまとまる：
-  //   予定表公開 … 状態に応じた1操作（設定完了して承認を依頼／承認する／
-  //               設定中に戻す／今すぐ公開／非公開に戻す。calStageInfo() が1つに決める）
-  //   公開       … シフトの公開/非公開（カレンダーは公開したまま戻せる）
+  // 段そのものを操作口にする。calStageInfo() が決める「今できる1操作」
+  // （設定完了して依頼／承認する／設定中に戻す／今すぐ公開／非公開に戻す）を、
+  // 状態遷移的に対応する段へ割り当てる
   const calInfo = calStageInfo();
-  // 承認済み・自動公開待ちのときは、クリックすると「いつ・誰が承認したか」の
-  // 詳細を見せる（今まではここに何も出なかった）。それ以外は従来どおり
-  // calStageInfo() が決めた1操作（設定完了して依頼／承認する／非公開に戻す等）
+  const calActionStep =
+    st.calPublish === 'done'   ? 'calPublish'   // 公開中 → 非公開に戻す
+    : st.calReady === 'now'    ? 'calReady'     // 未依頼 → 設定完了して依頼
+    : st.calApprove === 'waiting' ? 'calApprove' // 承認待ち → 承認する/再依頼/設定中に戻す
+    : null;                                      // pending（承認済み・自動公開待ち）は下で別処理
   const action = {
-    cal:  st.cal === 'pending' ? 'openCalApprovalDetail()' : (calInfo ? 'calStageAction()' : ''),
-    open: st.open !== 'todo' ? 'toggleShiftPub()' : '',
+    shiftPublish: st.shiftPublish !== 'todo' ? 'toggleShiftPub()' : '',
   };
+  if (st.calPublish === 'pending') {
+    action.calPublish = 'openCalApprovalDetail()';
+  } else if (calActionStep && calInfo) {
+    action[calActionStep] = 'calStageAction()';
+  }
   document.getElementById('prog-steps').innerHTML = steps.map(([k, label, sub], i) => {
     // 連結線は「手前の段が済んでいれば緑」。線をたどれば進み具合が読める
     const line = i ? `<div class="pline${st[steps[i - 1][0]] === 'done' ? ' done' : ''}"></div>` : '';
-    const mark = (st[k] === 'done' || st[k] === 'pending') ? '✓' : (i + 1);
+    // pending（承認済み・自動公開待ち）は done（実際に公開済み）と紛らわしいので、
+    // 色だけでなくマークの形でも区別する
+    const mark = st[k] === 'done' ? '✓' : st[k] === 'pending' ? '⏳' : (i + 1);
     const act = action[k] || '';
     const tip = !act ? ''
-      : k === 'cal'  ? (st.cal === 'pending' ? 'クリックで承認状況を確認' : (calInfo ? calInfo.title : ''))
-      : (st.open === 'done' ? 'シフトを非公開にする' : 'シフトの作成完了を取り消す');
+      : k === 'calPublish'   ? (st.calPublish === 'pending' ? 'クリックで承認状況を確認' : (calInfo ? calInfo.title : ''))
+      : (k === 'calReady' || k === 'calApprove') ? (calInfo ? calInfo.title : '')
+      : k === 'shiftPublish' ? (st.shiftPublish === 'done' ? 'シフトを非公開にする' : 'シフトの作成完了を取り消す')
+      : '';
     return line + `<div class="pstep ${st[k]}${act ? ' pstep-click' : ''}"`
       + (act ? ` onclick="${act}" title="${tip}"` : '')
       + `><div class="pdot">${mark}</div>`
       + `<div class="plabel">${label}</div>`
       + (sub ? `<div class="psub">${sub}</div>` : '') + '</div>';
   }).join('');
+
+  // 8段は画面幅によっては横に収まりきらない（.prog に overflow-x:auto を設定済み）。
+  // 収まらないときは「今どこにいるか」が画面外に隠れないよう、進行中の段
+  // （無ければ最後の段＝終わっている）を中央付近までスクロールする。
+  // 予定表公開が済んだあとはシフト作成側の状態のほうが気になるはずなので、
+  // 常に「一番進んでいる、まだ終わっていない段」を優先する
+  const curIdx = steps.findIndex(([k]) => st[k] === 'now' || st[k] === 'waiting' || st[k] === 'pending');
+  const targetIdx = curIdx >= 0 ? curIdx : steps.length - 1;
+  const targetEl = wrap.querySelectorAll('.pstep')[targetIdx];
+  if (targetEl) {
+    const wrapRect = wrap.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+    wrap.scrollLeft += (targetRect.left + targetRect.width / 2) - (wrapRect.left + wrapRect.width / 2);
+  }
 
   renderCalStageMini();
 }

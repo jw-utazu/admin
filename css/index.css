@@ -219,7 +219,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 /* 月の作業は一本道なので、読み込み画面（.ld-steps）と同じ「丸＋連結線」で
    現在地を示す。連結線は flex:1 で伸ばし、幅いっぱいに均等へ広げる
    （固定幅にすると段どうしが詰まって、順序が読み取りにくくなる） */
-.prog{padding:12px 18px 13px;background:var(--surface);border-bottom:1px solid var(--border);}
+/* 添え字（承認済・M/D公開 等）が長くなると5段が画面幅に収まりきらないことが
+   あるため、はみ出す場合は折り返さず横スクロールにする（2026-08-05 のフィードバック）。
+   JS側（renderProgressStrip）が現在地の段を中央付近へ自動でスクロールする */
+.prog{padding:12px 18px 13px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;}
 .prog-steps{display:flex;align-items:flex-start;}
 /* 幅を固定するのが肝。可変にするとボックスの幅がラベルの文字数で決まり、
    丸はその中央に来るので「シフト作成」では線と丸の間が空き、「公開」では
