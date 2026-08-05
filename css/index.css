@@ -68,8 +68,17 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-pub-mini{display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;background:var(--surface);font-family:var(--sans);font-size:11px;font-weight:700;color:var(--ink3);cursor:pointer;transition:all .15s;line-height:1;}
 .cal-pub-mini.published{color:var(--green);border-color:var(--green);background:var(--green-l);}
 .cal-pub-mini.unpublished:hover{background:var(--bg);}
-.cal-pub-note{font-size:11px;line-height:1.5;color:#92400e;background:#fffbeb;border-bottom:1px solid #fde68a;padding:6px 14px;}
-.cal-pub-note b{font-weight:700;}
+.cal-pub-note{font-size:11px;color:#92400e;background:#fffbeb;border-bottom:1px solid #fde68a;}
+.cal-pub-note .cpn-head{display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;user-select:none;}
+.cal-pub-note .cpn-ico{flex-shrink:0;}
+.cal-pub-note .cpn-txt{flex:1;font-weight:700;}
+.cal-pub-note .cpn-car{flex-shrink:0;font-size:10px;transition:transform .15s;color:#b45309;}
+.cal-pub-note.open .cpn-car{transform:rotate(90deg);}
+.cal-pub-note .cpn-body{max-height:0;overflow:hidden;transition:max-height .18s ease;}
+.cal-pub-note.open .cpn-body{max-height:200px;}
+.cal-pub-note .cpn-body-in{padding:0 14px 10px 30px;line-height:1.7;}
+.cal-pub-note .cpn-body-in b{font-weight:700;}
+.cal-pub-note .cpn-ok{display:flex;align-items:center;gap:5px;margin-top:5px;color:#166534;font-weight:700;}
 /* 予定表の状態に応じた操作ボタン。月の右、cal-pub-mini と並ぶので同じピル型に揃える。
    4状態（設定中→承認待ち→承認済み・公開待ち→公開中）を calStageInfo() が1操作に決め、
    この4色で見分ける：緑＝前に進める操作、黄＝注意（承認待ちの表示専用）、
@@ -233,6 +242,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .pline{flex:1;min-width:12px;height:2px;background:var(--border2);margin-top:14px;
   transition:background .4s;}
 .pline.done{background:var(--green);}
+/* 承認待ち（黄）／承認済み・自動公開待ち（紫）。旧実装ではどちらも .now の
+   青一色で区別が付かなかった（2026-08-05 のフィードバックで追加） */
+.pstep.waiting .pdot{border-color:var(--amber);background:var(--amber-l);color:var(--amber);}
+.pstep.waiting .plabel,.pstep.waiting .psub{color:var(--amber);}
+.pstep.pending .pdot{border-color:var(--purple);background:var(--purple-l);color:var(--purple);}
+.pstep.pending .plabel,.pstep.pending .psub{color:var(--purple);}
 /* 「募集開始」段は予定表の公開/非公開の切替ボタンを兼ねる */
 .pstep-click{cursor:pointer;}
 .pstep-click:hover .pdot{filter:brightness(.92);}

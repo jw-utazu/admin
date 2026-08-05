@@ -1753,10 +1753,20 @@ function renderProgressStrip() {
   // 「申込中の月がこの月より後へ進んだ」ことを根拠にする
   const calMoved = !!(calPubYM && (calPubYM.y > curY || (calPubYM.y === curY && calPubYM.m > curM)));
   const calDone = calOn || calMoved || created;
+  // 公開前に承認という関門があり、そこで止まっていることが読めないと
+  // 当日まで気づけないため、承認状態を添え字に出す
+  const ca = isCalApprovalForCurMonth() ? calApproval : null;
+  // 「予定表公開」段は承認待ちと承認済み・自動公開待ちを見た目でも区別する
+  // （どちらも旧実装では同じ青の "now" だった。2026-08-05 のフィードバックで追加）
+  const calStage = !hasDates ? 'todo'
+    : calDone ? 'done'
+    : (!ca || !ca.ready) ? 'now'
+    : !ca.approved ? 'waiting'   // 承認待ち
+    : 'pending';                 // 承認済み・自動公開待ち
 
   const st = {
     dates:  hasDates ? 'done' : 'now',
-    cal:    !hasDates ? 'todo' : (calDone ? 'done' : 'now'),
+    cal:    calStage,
     apply:  !calDone ? 'todo' : (deadlinePassed ? 'done' : 'now'),
     create: !calDone ? 'todo' : (approved ? 'done' : (deadlinePassed || created ? 'now' : 'todo')),
     open:   notified ? 'done' : (approved ? 'now' : 'todo'),
@@ -1766,14 +1776,11 @@ function renderProgressStrip() {
   const md = o => o ? (o.m + '/' + o.d) : '';
   // 予定表は apply_date が来れば自動で公開される。手で「募集開始」する
   // ものではなくなったので、段の名前と添え字を実態に合わせる。
-  // 公開前に承認という関門があり、そこで止まっていることが読めないと
-  // 当日まで気づけないため、承認状態を添え字に出す
-  const ca = isCalApprovalForCurMonth() ? calApproval : null;
   const calSub = calOn ? md(dates.apply)
     : !ca ? md(dates.apply)
     : !ca.ready ? '設定中'
     : !ca.approved ? '承認待ち'
-    : (dates.apply ? '✓承認済 ' + md(dates.apply) : '✓承認済');
+    : (dates.apply ? '✓承認済み ' + md(dates.apply) : '✓承認済み');
   const steps = [
     ['dates',  '日程設定',     ''],
     ['cal',    '予定表公開',   calSub],
@@ -1787,17 +1794,20 @@ function renderProgressStrip() {
   //               設定中に戻す／今すぐ公開／非公開に戻す。calStageInfo() が1つに決める）
   //   公開       … シフトの公開/非公開（カレンダーは公開したまま戻せる）
   const calInfo = calStageInfo();
+  // 承認済み・自動公開待ちのときは、クリックすると「いつ・誰が承認したか」の
+  // 詳細を見せる（今まではここに何も出なかった）。それ以外は従来どおり
+  // calStageInfo() が決めた1操作（設定完了して依頼／承認する／非公開に戻す等）
   const action = {
-    cal:  calInfo ? 'calStageAction()' : '',
+    cal:  st.cal === 'pending' ? 'openCalApprovalDetail()' : (calInfo ? 'calStageAction()' : ''),
     open: st.open !== 'todo' ? 'toggleShiftPub()' : '',
   };
   document.getElementById('prog-steps').innerHTML = steps.map(([k, label, sub], i) => {
     // 連結線は「手前の段が済んでいれば緑」。線をたどれば進み具合が読める
     const line = i ? `<div class="pline${st[steps[i - 1][0]] === 'done' ? ' done' : ''}"></div>` : '';
-    const mark = st[k] === 'done' ? '✓' : (i + 1);
+    const mark = (st[k] === 'done' || st[k] === 'pending') ? '✓' : (i + 1);
     const act = action[k] || '';
     const tip = !act ? ''
-      : k === 'cal'  ? (calInfo ? calInfo.title : '')
+      : k === 'cal'  ? (st.cal === 'pending' ? 'クリックで承認状況を確認' : (calInfo ? calInfo.title : ''))
       : (st.open === 'done' ? 'シフトを非公開にする' : 'シフトの作成完了を取り消す');
     return line + `<div class="pstep ${st[k]}${act ? ' pstep-click' : ''}"`
       + (act ? ` onclick="${act}" title="${tip}"` : '')
@@ -1896,6 +1906,38 @@ function calStageInfo() {
 function calStageAction() {
   const info = calStageInfo();
   if (info && info.fn) info.fn();
+}
+
+// 「表示中の月がズレている」通知の開閉。普段は1行だけにして、
+// 詳細はクリックしたときだけ見せる（常時表示され続けるのが不安の原因だった）
+function toggleCalPubNote() {
+  const note = document.getElementById('cal-pub-note');
+  if (note) note.classList.toggle('open');
+}
+
+// 「予定表公開」段が承認済み・自動公開待ちのときにクリックすると開く詳細。
+// 承認者名・承認日時はサーバーに既にある（cal_approved_by_name/cal_approved_at）のに
+// 今まで画面のどこにも出していなかった（2026-08-05 のフィードバック）
+function openCalApprovalDetail() {
+  const ca = isCalApprovalForCurMonth() ? calApproval : null;
+  if (!ca) return;
+  // 申込開始日が未設定のままここに来ると自動公開は起きない。「未設定になると
+  // 自動公開される」という逆の意味に読める文にしてはいけない
+  const publishNote = ca.applyDate
+    ? (ca.applyDate + ' になると自動的に奉仕者へ公開されます。')
+    : '申込開始日が未設定のため、自動公開されません。日程を設定してください。';
+  const msg = '承認者: ' + (ca.approvedByName || '不明') + '\n'
+    + '承認日時: ' + (ca.approvedAt || '不明') + '\n\n'
+    + publishNote;
+  const title = curY + '年' + curM + '月の予定表　承認状況';
+  if (ca.isOwner) {
+    uiConfirm({
+      type: 'info', title, message: msg,
+      confirmText: '今すぐ公開する', cancelText: '閉じる',
+    }).then(ok => { if (ok) openCalPubModal(); });
+  } else {
+    uiAlert({ type: 'info', title, message: msg });
+  }
 }
 
 // 主操作の脇に添える控えめな補助操作（今は「承認を再依頼」の隣の「設定中に戻す」だけ）
@@ -2164,12 +2206,19 @@ function updCalPubState() {
   const note = document.getElementById('cal-pub-note');
   if (!note) return;
   if (currentPwType === 'normal' && calPubStatus && calPubYM && !isCurMonthPublished()) {
-    note.innerHTML = '表示中の <b>' + curY + '年' + curM + '月</b> は未公開です。奉仕者とシフト作成アプリに出ているのは <b>'
-      + calPubYM.y + '年' + calPubYM.m + '月</b> です（公開できる月は1つだけ。この月を公開すると '
-      + calPubYM.y + '年' + calPubYM.m + '月 は自動的に非公開になります）';
+    document.getElementById('cal-pub-note-txt').textContent =
+      '表示中の' + curY + '年' + curM + '月は未公開（申込受付中は' + calPubYM.y + '年' + calPubYM.m + '月）';
+    // 「自動的に非公開になります」だけだと、シフト表自体が消えるように読めて
+    // 不安の原因になっていた（2026-08-05 のフィードバック）。申込受付フラグの話であり、
+    // 実施中のシフト表（is_shift_published）には影響しないことを明示する
+    document.getElementById('cal-pub-note-detail').innerHTML =
+      '申込を受け付けられる月は1つだけです。' + curY + '年' + curM + '月を公開すると、'
+      + calPubYM.y + '年' + calPubYM.m + '月の申込受付は終了します。<br>'
+      + '<span class="cpn-ok">✓ ' + calPubYM.y + '年' + calPubYM.m + '月のシフト表は、引き続き奉仕者に見えます（影響しません）</span>';
     note.style.display = '';
   } else {
     note.style.display = 'none';
+    note.classList.remove('open'); // 次に出すときは閉じた状態から始める
   }
 }
 

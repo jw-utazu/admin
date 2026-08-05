@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=43">
+<link rel="stylesheet" href="css/index.css?v=44">
 </head>
 <body>
 
@@ -110,8 +110,17 @@
         <div class="prog" id="prog-strip" style="display:none;">
           <div class="prog-steps" id="prog-steps"></div>
         </div>
-        <!-- 対象年月と公開中の月がズレているときの注意書き -->
-        <div class="cal-pub-note" id="cal-pub-note" style="display:none;"></div>
+        <!-- 対象年月と公開中の月がズレているときの注意書き。
+             常時表示され続けると不安の原因になる（2026-08-05 のフィードバック）ため、
+             普段は1行だけの見出しにして、クリックで詳細を開く -->
+        <div class="cal-pub-note" id="cal-pub-note" style="display:none;">
+          <div class="cpn-head" onclick="toggleCalPubNote()">
+            <span class="cpn-ico">🔒</span>
+            <span class="cpn-txt" id="cal-pub-note-txt"></span>
+            <span class="cpn-car">&#9656;</span>
+          </div>
+          <div class="cpn-body"><div class="cpn-body-in" id="cal-pub-note-detail"></div></div>
+        </div>
         <!-- カレンダー表示月ナビ（限定PWのみ表示） -->
         <div class="cal-view-nav" id="cal-view-nav-bar">
           <span class="cal-view-nav-label">カレンダー</span>
@@ -671,6 +680,6 @@
 <script src="js/api.js?v=9"></script>
 <script src="js/confirm.js?v=1"></script>
 <script src="js/picker.js?v=7"></script>
-<script src="js/index.js?v=66"></script>
+<script src="js/index.js?v=67"></script>
 </body>
 </html>

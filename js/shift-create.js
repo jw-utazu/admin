@@ -82,7 +82,15 @@ async function initAuth() {
     pwgwsGoToLogin();
     return;
   }
-  try { const u = JSON.parse(localStorage.getItem('adminUser') || 'null'); if (u && u.isAdmin) { adminUser = u; showApp(); return; } } catch (_) {}
+  try {
+    const u = JSON.parse(localStorage.getItem('adminUser') || 'null');
+    if (u && u.isAdmin) {
+      adminUser = u;
+      showApp();
+      refreshAdminAvatar(u.email); // 表示はキャッシュのまま即座に、裏で最新のアバターだけ取り直す
+      return;
+    }
+  } catch (_) {}
   // Googleアカウントが使えない管理者のための救済セッション（有効期限はサーバー側で検証）
   if (await tryRecoveryLogin()) return;
 
@@ -131,9 +139,14 @@ function signOut() {
 function showApp() {
 
   document.getElementById('app-screen').style.display = 'flex';
+  renderAccIcon();
+  loadInitData();
+}
+function renderAccIcon() {
   const icon = document.getElementById('acc-icon');
+  if (!icon) return;
   const iconSrc = adminUser && (adminUser.avatar || adminUser.picture);
-  if (icon && iconSrc) {
+  if (iconSrc) {
     const img = document.createElement('img');
     img.src = iconSrc;
     img.style.cssText = 'width:26px;height:26px;border-radius:50%;object-fit:cover;';
@@ -141,8 +154,29 @@ function showApp() {
     img.onerror = () => { icon.innerHTML = '👤'; };
     icon.innerHTML = '';
     icon.appendChild(img);
+  } else {
+    icon.innerHTML = '👤';
   }
-  loadInitData();
+}
+// ログインキャッシュ（adminUser）は本人確認だけの目的で使い回すため、フォームアプリ側で
+// アバターを変更・リセットしても、次にこのキャッシュが更新されるまで反映されなかった
+// （2026-08-05 に発覚。index.js は毎回サーバーへ問い合わせて最新化しているが、
+// こちらはキャッシュがあればそれっきりだった）。表示速度は落とさず、裏で最新化する。
+// uid も一緒に補い直す。index.js が保存する adminUser には uid が入っておらず、
+// index.html でログイン後にこの画面を開くとキャッシュ復元経路では uid が空のままになる
+// （管理ログの実行者記録が氏名側にしか残らず、uid で絞り込むとその操作が抜け落ちる）
+async function refreshAdminAvatar(email) {
+  if (!email) return;
+  try {
+    const d = await apiAuthGet(email, 'admin');
+    if (!d.ok || !d.isAdmin) return;
+    const newAvatar = d.avatar || '';
+    const newUid = d.uid || '';
+    if (newAvatar === (adminUser.avatar || '') && newUid === (adminUser.uid || '')) return;
+    adminUser = Object.assign({}, adminUser, { avatar: newAvatar, uid: newUid });
+    localStorage.setItem('adminUser', JSON.stringify(adminUser));
+    renderAccIcon();
+  } catch (_) { /* 最新化に失敗しても現在の表示のままでよい */ }
 }
 
 // ============================================================
