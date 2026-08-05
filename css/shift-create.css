@@ -226,7 +226,13 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .wish-not-applied-arrow{font-size:9px;transition:transform .15s;}
 .wish-not-applied-toggle.open .wish-not-applied-arrow{transform:rotate(90deg);}
 .wish-not-applied-body{display:none;padding:8px 14px;background:var(--surface);border-top:1px solid var(--border);}
-.wish-snap-outer-na{overflow:auto;max-height:320px;}
+.wish-not-applied-body.open{display:block;}
+/* 縦の高さを制限してはいけない。max-height を付けるとこの枠自体が縦スクロール
+   領域になり、画面下端に見出しだけが覗いている状態（スマホでよく起きる）で
+   そこを指でなぞると、外側（#wish-table-wrap）ではなく画面外にあるこの枠の
+   中身が動く。見えている物は何も動かないので「スクロールできない」ことになる。
+   縦は外側の1つに任せ、ここは日付列の横スクロールだけを担当させる */
+.wish-snap-outer-na{overflow:auto;}
 .rm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
 .rm{overflow-y:auto;padding:14px;background:var(--bg);flex:1;}
 .tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}

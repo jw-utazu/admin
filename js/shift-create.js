@@ -1090,13 +1090,13 @@ async function refreshApplicantsForCreate() {
 }
 function toggleWishApplied() { if (wishEditCtx) submitWishChange(!wishEditCtx.applied); }
 function saveWishComment()   { submitWishChange(true); }
+// 開閉はクラスで行う。インラインスタイル（style="display:block"）で開くと
+// style 属性が付き、CSS の `#wish-table-wrap > div[style]` に不意に一致して
+// flex:1（flex-basis:0）が当たってしまう。見出しと本体で同じ .open を使う
 function toggleWishNotApplied(el) {
   el.classList.toggle('open');
   const body = el.nextElementSibling;
-  if (body) {
-    const isHidden = getComputedStyle(body).display === 'none';
-    body.style.display = isHidden ? 'block' : 'none';
-  }
+  if (body) body.classList.toggle('open', el.classList.contains('open'));
 }
 
 // ============================================================
