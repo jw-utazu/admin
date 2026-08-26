@@ -162,7 +162,7 @@ function _pkRender() {
     if (_pkOpts.multi) {
       const check = document.createElement('span');
       check.className = 'pk-cb';
-      check.innerHTML = on ? ic('square-check', { color: '#15803D' }) : ic('square');
+      check.innerHTML = on ? ic('square-check', { color: '#15803D' }) : ic('square', { color: '#A1A1AA' });
       button.appendChild(check);
     }
     const body = document.createElement('span');

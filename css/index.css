@@ -215,7 +215,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .abtn{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);cursor:pointer;text-align:left;width:100%;font-family:var(--sans);transition:all .12s;text-decoration:none;}
 .abtn:hover{border-color:var(--border2);background:var(--surface);}
 .ab-ic{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.ic-g{background:var(--green-l);}.ic-a{background:var(--amber-l);}.ic-p{background:var(--purple-l);}.ic-t{background:var(--teal-l);}
+.ic-g{background:var(--green-l);color:#15803d;}.ic-a{background:var(--amber-l);color:var(--amber);}.ic-p{background:var(--purple-l);color:var(--purple);}.ic-t{background:var(--teal-l);color:var(--teal);}
 .ab-tx{flex:1;}
 .ab-n{font-size:12px;font-weight:700;color:var(--ink);display:block;}
 .ab-d{font-size:10px;color:var(--ink2);display:block;margin-top:1px;}

@@ -988,7 +988,7 @@ function buildDaySelectContent(y,m,d) {
       <div class="ab-tx"><span class="ab-n" style="color:var(--green);">申込開始日</span><span class="ab-d">${isApply?ic('check',{color:'#15803D'})+' 設定済み':'この日を申込開始日にする'}</span></div>
     </button>
     <button class="abtn" onclick="setDayAs('deadline')" style="border-color:${isDeadline?'var(--red)':'var(--border)'};background:${isDeadline?'var(--red-l)':''};">
-      <div class="ab-ic" style="background:var(--red-l);">${ic('hourglass')}</div>
+      <div class="ab-ic" style="background:var(--red-l);color:#DC2626;">${ic('hourglass')}</div>
       <div class="ab-tx"><span class="ab-n" style="color:var(--red);">締切日</span><span class="ab-d">${isDeadline?ic('check',{color:'#15803D'})+' 設定済み':'この日を締切日にする'}</span></div>
     </button>
     <button class="abtn" onclick="setDayAs('open')" style="border-color:${isOpen?'var(--blue)':'var(--border)'};background:${isOpen?'var(--blue-l)':''};">
