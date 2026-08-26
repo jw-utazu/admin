@@ -171,7 +171,7 @@ function dndShowDropBar() {
   if (!(typeof isScMobile === 'function' && isScMobile())) return;
   const el = dndDropBarEl();
   const isCancel = !_dnd.fromEl;
-  el.textContent = isCancel ? '✕ ここへ離すと取り消し' : '🗑 ここへ離すと外します';
+  el.innerHTML = isCancel ? (ic('x') + ' ここへ離すと取り消し') : (ic('trash-2') + ' ここへ離すと外します');
   el.classList.toggle('cancel', isCancel);
   el.classList.remove('hot');
   el.classList.add('on');
@@ -660,7 +660,7 @@ function dndApplyCart(fromEl, targetEl) {
   setCartDom(fromEl, dst);
   mu(+targetEl.dataset.bi);
   const a = cartChipLabel(fromEl), b = cartChipLabel(targetEl);
-  toast(dst ? `${cartLabel(src)} と ${cartLabel(dst)} を入れ替えました（${a} ⇄ ${b}）`
+  toast(dst ? `${cartLabel(src)} と ${cartLabel(dst)} を入れ替えました（${a} ${ic('arrow-left-right')} ${b}）`
             : `${cartLabel(src)} を ${a} から ${b} へ移しました`, 's');
 }
 

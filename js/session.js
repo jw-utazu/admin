@@ -342,15 +342,15 @@ function pwgwsOpenAccountMenu(anchorEl, opts) {
               '<span class="pwgws-acc-em">' + esc(a.email) + '</span>' +
             '</span>' +
             (a.current
-              ? '<span class="pwgws-acc-ck">✓</span>'
+              ? '<span class="pwgws-acc-ck">' + ic('check') + '</span>'
               : '<button class="pwgws-acc-rm" data-remove="' + esc(a.email) + '" ' +
-                'title="この端末から削除">✕</button>') +
+                'title="この端末から削除">' + ic('x') + '</button>') +
             '</div>';
   });
   html += '<div class="pwgws-acc-sep"></div>';
   html += '<button class="pwgws-acc-it" data-act="add"><span class="pwgws-acc-ic">＋</span>' +
           '<span class="pwgws-acc-tx"><span class="pwgws-acc-nm">別のアカウントを追加</span></span></button>';
-  html += '<button class="pwgws-acc-it" data-act="signout"><span class="pwgws-acc-ic">⏻</span>' +
+  html += '<button class="pwgws-acc-it" data-act="signout"><span class="pwgws-acc-ic">' + ic('log-out') + '</span>' +
           '<span class="pwgws-acc-tx"><span class="pwgws-acc-nm">ログアウト</span>' +
           '<span class="pwgws-acc-em">すべてのアカウントからログアウトします</span></span></button>';
 

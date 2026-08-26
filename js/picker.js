@@ -33,7 +33,7 @@ function _pkBuild() {
   if (_pkEl) return _pkEl;
   const d = document.createElement('div');
   d.className = 'pk';
-  d.innerHTML = '<div class="pk-hd"><span class="pk-title"></span><button class="pk-x" type="button">✕</button></div>'
+  d.innerHTML = '<div class="pk-hd"><span class="pk-title"></span><button class="pk-x" type="button">' + ic('x') + '</button></div>'
               + '<input class="pk-search" type="text" placeholder="名前で検索（ふりがな可）">'
               + '<div class="pk-list"></div>'
               + '<div class="pk-note"></div>';
@@ -162,7 +162,7 @@ function _pkRender() {
     if (_pkOpts.multi) {
       const check = document.createElement('span');
       check.className = 'pk-cb';
-      check.textContent = on ? '☑' : '☐';
+      check.innerHTML = on ? ic('square-check', { color: '#15803D' }) : ic('square');
       button.appendChild(check);
     }
     const body = document.createElement('span');

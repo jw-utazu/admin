@@ -516,7 +516,7 @@ function renderPwTypeTabs() {
 
   limitedSlots.forEach((slot, idx) => {
     const isActive = currentPwType === slot.id;
-    html += `<button type="button" class="pw-type-tab${isActive ? ' active' : ''}" data-pw-type="${escHtml(slot.id)}">${escHtml(slot.name)}<span class="lt-edit-ic" data-edit-pw="${escHtml(slot.id)}">✏</span></button>`;
+    html += `<button type="button" class="pw-type-tab${isActive ? ' active' : ''}" data-pw-type="${escHtml(slot.id)}">${escHtml(slot.name)}<span class="lt-edit-ic" data-edit-pw="${escHtml(slot.id)}">${ic('pencil')}</span></button>`;
   });
 
   html += '<button type="button" class="pw-type-tab pw-tab-add" data-add-pw>＋</button>';
@@ -579,7 +579,7 @@ async function openLimitedMembersModal() {
   // モーダルタイトルを現在の限定PWスロット名に更新
   const slot = limitedSlots.find(s => s.id === currentPwType);
   const title = document.querySelector('#m-limited-members .mt');
-  if (title) title.textContent = `🔐 ${slot ? slot.name : '限定PW'} 対象メンバー管理`;
+  if (title) title.innerHTML = `${ic('lock')} ${slot ? slot.name : '限定PW'} 対象メンバー管理`;
   openM('m-limited-members');
   await refreshLimitedMemberList();
 }
@@ -734,8 +734,8 @@ async function confirmAddLimitedSlot() {
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
 
   const selectedMembers = [..._addSlotSelectedMembers.values()];
-  const tasks = [{ id: 'slot', label: `🔐 限定PW「${name}」を作成` }];
-  if (selectedMembers.length > 0) tasks.push({ id: 'members', label: `👥 メンバー設定（${selectedMembers.length}名）` });
+  const tasks = [{ id: 'slot', label: `${ic('lock')} 限定PW「${name}」を作成` }];
+  if (selectedMembers.length > 0) tasks.push({ id: 'members', label: `${ic('users')} メンバー設定（${selectedMembers.length}名）` });
 
   closeM('m-add-limited-slot');
   showProc('限定PW を追加しています', '完了までそのままお待ちください');
@@ -984,20 +984,20 @@ function buildDaySelectContent(y,m,d) {
 
   document.getElementById('m-day-select-btns').innerHTML = phaseTabs + `
     <button class="abtn" onclick="setDayAs('apply')" style="border-color:${isApply?'var(--green)':'var(--border)'};background:${isApply?'var(--green-l)':''};">
-      <div class="ab-ic ic-g">&#128203;</div>
-      <div class="ab-tx"><span class="ab-n" style="color:var(--green);">申込開始日</span><span class="ab-d">${isApply?'✓ 設定済み':'この日を申込開始日にする'}</span></div>
+      <div class="ab-ic ic-g">${ic('clipboard')}</div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--green);">申込開始日</span><span class="ab-d">${isApply?ic('check',{color:'#15803D'})+' 設定済み':'この日を申込開始日にする'}</span></div>
     </button>
     <button class="abtn" onclick="setDayAs('deadline')" style="border-color:${isDeadline?'var(--red)':'var(--border)'};background:${isDeadline?'var(--red-l)':''};">
-      <div class="ab-ic" style="background:var(--red-l);">&#9203;</div>
-      <div class="ab-tx"><span class="ab-n" style="color:var(--red);">締切日</span><span class="ab-d">${isDeadline?'✓ 設定済み':'この日を締切日にする'}</span></div>
+      <div class="ab-ic" style="background:var(--red-l);">${ic('hourglass')}</div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--red);">締切日</span><span class="ab-d">${isDeadline?ic('check',{color:'#15803D'})+' 設定済み':'この日を締切日にする'}</span></div>
     </button>
     <button class="abtn" onclick="setDayAs('open')" style="border-color:${isOpen?'var(--blue)':'var(--border)'};background:${isOpen?'var(--blue-l)':''};">
-      <div class="ab-ic ic-p">&#128226;</div>
-      <div class="ab-tx"><span class="ab-n" style="color:var(--blue);">シフト公開日</span><span class="ab-d">${isOpen?'✓ 設定済み':'この日をシフト公開日にする'}</span></div>
+      <div class="ab-ic ic-p">${ic('megaphone')}</div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--blue);">シフト公開日</span><span class="ab-d">${isOpen?ic('check',{color:'#15803D'})+' 設定済み':'この日をシフト公開日にする'}</span></div>
     </button>
     <button class="abtn" onclick="setDayAsSlot()" style="border-color:${hasSlot?'var(--purple)':'var(--border)'};background:${hasSlot?'var(--purple-l)':''};">
       <div class="ab-ic ic-t">&#127775;</div>
-      <div class="ab-tx"><span class="ab-n" style="color:var(--purple);">実施日</span><span class="ab-d">${hasSlot?'✓ 設定済み（クリックで時間帯編集）':'この日を実施日にする'}</span></div>
+      <div class="ab-tx"><span class="ab-n" style="color:var(--purple);">実施日</span><span class="ab-d">${hasSlot?ic('check',{color:'#15803D'})+' 設定済み（クリックで時間帯編集）':'この日を実施日にする'}</span></div>
     </button>`;
 }
 
@@ -1117,7 +1117,7 @@ function renderPopupModal(y,m,d){
         </div>
         ${uiSelHtml('sp-intv-'+i,{title:'区切りの間隔',items:intvItems,value:String(t.intv),search:false,
           cls:'intv-sel',onPick:v=>{popupTimes[i].intv=parseInt(v);}})}
-        <button class="sp-del-btn" onclick="delSpTimeModal(${i})">&#10005;</button>
+        <button class="sp-del-btn" onclick="delSpTimeModal(${i})">${ic('x')}</button>
       </div>
       ${mapRow}
     </div>`;
@@ -1132,7 +1132,7 @@ function renderPopupModal(y,m,d){
     </div>
     <div class="sp-ft">
       <button class="btn btn-g" onclick="closeSlotEditModal()" style="font-size:11px;padding:5px 12px;">キャンセル</button>
-      <button class="btn" onclick="deleteSlotDay()" style="font-size:11px;padding:5px 12px;border-color:var(--red);background:var(--red-l);color:var(--red);">🗑 削除</button>
+      <button class="btn" onclick="deleteSlotDay()" style="font-size:11px;padding:5px 12px;border-color:var(--red);background:var(--red-l);color:var(--red);">${ic('trash-2')} 削除</button>
       <button class="btn btn-p" onclick="confirmSlotModal()" style="font-size:11px;padding:5px 12px;">確定</button>
     </div>
   </div>`;
@@ -1307,7 +1307,7 @@ function buildPhaseManageArea(isLimited) {
     }
     if (phases.length > 1) {
       contentHtml += `<div style="padding:6px 12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
-        <button onclick="deleteCurPhase()" style="padding:3px 9px;border:1px solid var(--red-l);border-radius:5px;background:var(--red-l);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">🗑 このフェーズを削除</button>
+        <button onclick="deleteCurPhase()" style="padding:3px 9px;border:1px solid var(--red-l);border-radius:5px;background:var(--red-l);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">${ic('trash-2')} このフェーズを削除</button>
       </div>`;
     }
   }
@@ -1534,9 +1534,9 @@ function buildSlotSetList(){
     return `<div class="sdg">
       <div class="sdg-hd" style="display:flex;align-items:center;justify-content:space-between;">
         <span><span class="sdg-date">${g.m}/${g.d}（${dow}）</span><span class="sdg-wk">第${wn}週</span></span>
-        <button onclick="editSlotFromList(${g.y},${g.m},${g.d})" style="padding:2px 7px;border:1px solid var(--blue);border-radius:4px;background:var(--blue-l);color:var(--blue);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);">✏ 編集</button>
+        <button onclick="editSlotFromList(${g.y},${g.m},${g.d})" style="padding:2px 7px;border:1px solid var(--blue);border-radius:4px;background:var(--blue-l);color:var(--blue);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);">${ic('pencil')} 編集</button>
       </div>
-      <div class="sdg-times">${g.times.map((t,i)=>`<span class="stime">${t.time}</span><span class="sintv">${t.interval}分</span><button class="sdel" onclick="delSlot('${k}',${i})">✕</button>`).join('')}</div>
+      <div class="sdg-times">${g.times.map((t,i)=>`<span class="stime">${t.time}</span><span class="sintv">${t.interval}分</span><button class="sdel" onclick="delSlot('${k}',${i})">${ic('x')}</button>`).join('')}</div>
       ${slotMapLines(g.times)}
     </div>`;
   }).join('');
@@ -1551,7 +1551,7 @@ function slotMapLines(times){
     const prev=Object.prototype.hasOwnProperty.call(slotMapping,k)?slotMapping[k]:autoPrevKeyFor(t);
     const label=prev?esc(prev.replace(/^第\d+週\s*/,'')):'引き継がない';
     return `<div class="sdg-map"><span class="sdg-map-cur">${esc(t.time)}</span>`
-      + `<span class="sdg-map-arr">←</span>`
+      + `<span class="sdg-map-arr">${ic('arrow-left')}</span>`
       + `<span class="sdg-map-prev${prev?'':' none'}">${label}</span></div>`;
   }).join('')}</div>`;
 }
@@ -1862,7 +1862,7 @@ function renderProgressStrip() {
     const line = i ? `<div class="pline${st[steps[i - 1][0]] === 'done' ? ' done' : ''}"></div>` : '';
     // pending（承認済み・自動公開待ち）は done（実際に公開済み）と紛らわしいので、
     // 色だけでなくマークの形でも区別する
-    const mark = st[k] === 'done' ? '✓' : st[k] === 'pending' ? '⏳' : (i + 1);
+    const mark = st[k] === 'done' ? ic('check', { color: '#15803D' }) : st[k] === 'pending' ? ic('hourglass') : (i + 1);
     const act = action[k] || '';
     const tip = !act ? ''
       : k === 'calPublish'   ? (st.calPublish === 'pending' ? 'クリックで承認状況を確認' : (calInfo ? calInfo.title : ''))
@@ -1910,7 +1910,7 @@ function calStageInfo() {
   const calOn = isCurMonthPublished();
   if (calOn) {
     return {
-      text: '📅 非公開に戻す',
+      text: `${ic('calendar')} 非公開に戻す`,
       title: '予定表を非公開にします。奉仕者はカレンダー情報（日程・実施日）を確認できなくなります。',
       cls: 'cal-stage-danger', fn: toggleCalPub,
     };
@@ -1933,12 +1933,12 @@ function calStageInfo() {
     const who = ca.required > 0
       ? ca.approvers.map(a => a.name).join('・') + ' へ承認の通知が届きます。'
       : '承認者が未登録のため、設定完了と同時に承認済みになります。';
-    return { text: '📮 設定完了して承認を依頼', title: who, cls: 'can-approve', fn: setCalReady };
+    return { text: `${ic('send')} 設定完了して承認を依頼`, title: who, cls: 'can-approve', fn: setCalReady };
   }
   if (!ca.approved) {
     if (ca.canApprove) {
       return {
-        text: '🕒 承認する',
+        text: `${ic('clock')} 承認する`,
         title: '予定表は承認されるまで申込開始日を過ぎても公開されません。',
         cls: 'can-approve', fn: approveCal,
       };
@@ -1950,16 +1950,16 @@ function calStageInfo() {
     // 区域係が明示的に再依頼するまで奉仕監督には伝わらない）
     if (ca.approvedSnapshot) {
       return {
-        text: '📮 承認を再依頼',
+        text: `${ic('send')} 承認を再依頼`,
         title: who + '修正内容を承認者に再確認してもらいます。',
         cls: 'can-approve', fn: setCalReady,
         // 主操作（再依頼）の脇に、取り消し系の導線も残す。1状態＝主要ボタン1つは
         // 保ったまま、押せる操作を完全に失わせない（控えめな補助リンクとして出す）
-        secondary: { text: '↩ 設定中に戻す', title: '設定中に戻します（承認待ちの記録は消えます）', fn: unsetCalReady },
+        secondary: { text: `${ic('undo-2')} 設定中に戻す`, title: '設定中に戻します（承認待ちの記録は消えます）', fn: unsetCalReady },
       };
     }
     return {
-      text: '↩ 設定中に戻す',
+      text: `${ic('undo-2')} 設定中に戻す`,
       title: who + 'まだ直したいときは設定中に戻せます。',
       cls: 'cal-stage-secondary', fn: unsetCalReady,
     };
@@ -1969,7 +1969,7 @@ function calStageInfo() {
   //   そもそもボタンを出さないことで、押しても拒否される事態を避ける）
   if (ca.isOwner) {
     return {
-      text: '🚀 今すぐ公開',
+      text: `${ic('zap')} 今すぐ公開`,
       title: '申込開始日を待たずに今すぐ公開します。',
       cls: 'can-approve', fn: openCalPubModal,
     };
@@ -2037,12 +2037,12 @@ function renderCalStageMini() {
   setVisible(btn, true);
   btn.disabled = false;
   btn.className = 'cal-approve-mini ' + info.cls;
-  txt.textContent = info.text;
+  txt.innerHTML = info.text;
   btn.title = info.title;
   if (sub) {
     if (info.secondary) {
       setVisible(sub, true);
-      sub.textContent = info.secondary.text;
+      sub.innerHTML = info.secondary.text;
       sub.title = info.secondary.title || '';
     } else {
       setVisible(sub, false);
@@ -2108,7 +2108,7 @@ function approveCal() {
     : '承認者が未登録のため、どの管理者でも承認できます。';
   const diffHtml = diffs.length ? `
     <div class="fg">
-      <label class="fl">⚠ 前回承認した内容からの変更点（${diffs.length}件）</label>
+      <label class="fl">${ic('triangle-alert', { color: '#B45309' })} 前回承認した内容からの変更点（${diffs.length}件）</label>
       <div class="cal-diff-box">
         ${diffs.map(d => `
           <div class="cal-diff-row">
@@ -2270,7 +2270,7 @@ function updCalPubState() {
     } else {
       setVisible(mini, true);
       mini.className = 'cal-pub-mini' + (isCurMonthPublished() ? ' published' : ' unpublished');
-      miniText.textContent = isCurMonthPublished() ? '📅 公開中' : '🔒 未公開';
+      miniText.innerHTML = isCurMonthPublished() ? (ic('calendar') + ' 公開中') : (ic('lock') + ' 未公開');
     }
   }
   const note = document.getElementById('cal-pub-note');
@@ -2284,7 +2284,7 @@ function updCalPubState() {
     document.getElementById('cal-pub-note-detail').innerHTML =
       '申込を受け付けられる月は1つだけです。' + curY + '年' + curM + '月を公開すると、'
       + calPubYM.y + '年' + calPubYM.m + '月の申込受付は終了します。<br>'
-      + '<span class="cpn-ok">✓ ' + calPubYM.y + '年' + calPubYM.m + '月のシフト表は、引き続き奉仕者に見えます（影響しません）</span>';
+      + '<span class="cpn-ok">' + ic('check', { color: '#15803D' }) + ' ' + calPubYM.y + '年' + calPubYM.m + '月のシフト表は、引き続き奉仕者に見えます（影響しません）</span>';
     setVisible(note, true);
   } else {
     setVisible(note, false);
@@ -2351,7 +2351,7 @@ async function openCalPubModal(){
       </div>
     </div>
     <div class="exec-st" id="cp-st"><div class="spin"></div>予定表公開中...</div>
-    <div class="done-box is-hidden" id="cp-done"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div></div>`;
+    <div class="done-box is-hidden" id="cp-done"><div class="done-icon">${ic('check', { color: '#15803D' })}</div><div class="done-title">公開完了</div></div>`;
   document.getElementById('m-cp-ft').innerHTML=`
     <button class="btn btn-g" onclick="closeM('m-cal-pub')">キャンセル</button>
     <button class="btn btn-s" id="cp-exec-btn" onclick="execCalPub()">${curY}年${curM}月を公開する</button>`;
@@ -2397,7 +2397,7 @@ function toast(msg,type){
   const a=document.getElementById('ta');
   const el=document.createElement('div');
   el.className='toast'+(type?' '+type:'');
-  el.textContent=(type==='s'?'✓ ':type==='e'?'⚠ ':'')+msg;
+  el.innerHTML=(type==='s'?ic('check',{color:'#15803D'})+' ':type==='e'?ic('triangle-alert',{color:'#B45309'})+' ':'')+msg;
   a.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);
 }
@@ -2712,9 +2712,9 @@ async function refreshCoupleModal() {
         const contextIndex = _coupleDeleteContexts.push({ husbandUid: String(c.husbandUid || ''), wifeUid: String(c.wifeUid || '') }) - 1;
         return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span style="font-size:12px;display:flex;align-items:center;gap:6px;min-width:0;">
-            ${avatarHtml(c.husbandUid, hm ? hm.name : '', 22)}👨 ${esc(hm ? hm.name : c.husbandUid)}
+            ${avatarHtml(c.husbandUid, hm ? hm.name : '', 22)}${ic('mars')} ${esc(hm ? hm.name : c.husbandUid)}
             <span style="color:var(--ink3);">＆</span>
-            ${avatarHtml(c.wifeUid, wm ? wm.name : '', 22)}👩 ${esc(wm ? wm.name : c.wifeUid)}
+            ${avatarHtml(c.wifeUid, wm ? wm.name : '', 22)}${ic('venus')} ${esc(wm ? wm.name : c.wifeUid)}
           </span>
           <button class="btn btn-d" data-delete-couple="${contextIndex}" style="font-size:10px;padding:3px 8px;flex-shrink:0;">解除</button>
         </div>`;
@@ -2783,10 +2783,10 @@ async function refreshRequestModal() {
     setInboxCount('requests', pending.length);
     let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">未対応: ${pending.length}件 / 対応済み: ${done.length}件</div>`;
     if (pending.length === 0 && done.length === 0) {
-      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">要望はありません 🎉</div>';
+      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">要望はありません ' + ic('party-popper') + '</div>';
     } else {
       if (pending.length === 0) {
-        html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:12px;">未対応の要望はありません 🎉</div>';
+        html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:12px;">未対応の要望はありません ' + ic('party-popper') + '</div>';
       } else {
         html += pending.map(r => `
         <div style="border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--surface);">
@@ -2844,7 +2844,7 @@ async function refreshBugReportModal() {
     setInboxCount('bugs', pending.length);   // サイドバーの件数もそろえる
     let html = `<div style="font-size:11px;color:var(--ink3);margin-bottom:10px;">未対応: ${pending.length}件 / 対応済み: ${done.length}件</div>`;
     if (pending.length === 0 && done.length === 0) {
-      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">バグ報告はありません 🎉</div>';
+      html += '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">バグ報告はありません ' + ic('party-popper') + '</div>';
     } else {
       if (pending.length > 0) {
         html += '<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px;">未対応</div>';
@@ -2940,7 +2940,7 @@ async function loadRecoveryRequests() {
 
     html += '<div class="rec-note">承認したら、パスコードを<b>本人と確実に連絡が取れる手段</b>'
              + '（電話・LINEなど、普段その人とやりとりしている連絡先）でお伝えください。<br>'
-             + '⚠️ <b>申請フォームに入力されたメールアドレス宛には送らないでください。</b>'
+             + ic('triangle-alert', { color: '#B45309' }) + ' <b>申請フォームに入力されたメールアドレス宛には送らないでください。</b>'
              + 'そのアドレスは申請者が自由に入力できるため、本人確認になりません。<br>'
              + '合言葉を知っていることも本人確認にはなりません。心当たりのない申請は却下してください。</div>';
 
@@ -2958,8 +2958,8 @@ async function loadRecoveryRequests() {
           </div>
           <div class="rec-card-mail">${esc(r.email || '(メールアドレス未入力)')}</div>
           ${r.matched
-            ? `<div class="rec-tag rec-tag-ok">✅ メンバーと一致（${esc(recScopeLabel(r.role_scope))}）</div>`
-            : '<div class="rec-tag rec-tag-ng">⚠️ 一致するメンバーが見つかりません。心当たりがなければ却下してください</div>'}
+            ? `<div class="rec-tag rec-tag-ok">${ic('circle-check-big', { color: '#15803D' })} メンバーと一致（${esc(recScopeLabel(r.role_scope))}）</div>`
+            : `<div class="rec-tag rec-tag-ng">${ic('triangle-alert', { color: '#B45309' })} 一致するメンバーが見つかりません。心当たりがなければ却下してください</div>`}
           <div class="rec-card-actions">
             ${r.matched
               ? `<button class="btn btn-p" onclick="approveRecoveryRequest(${r.id})">承認してパスコードを発行</button>`
@@ -2985,8 +2985,8 @@ async function loadRecoveryRequests() {
             <span class="rec-otp-inline-code">${esc(r.otp_plain)}</span>
             <button class="btn btn-g" onclick="copyRecoveryOtp('${esc(r.otp_plain)}')">コピー</button>
           </div>
-          <div class="rec-tag">⏳ 本人の入力待ち　有効期限: ${esc(fmtRecTime(r.otp_expires_at))}まで</div>`
-          : '<div class="rec-tag">⏳ 本人がパスコードを入力するのを待っています</div>'}
+          <div class="rec-tag">${ic('hourglass')} 本人の入力待ち　有効期限: ${esc(fmtRecTime(r.otp_expires_at))}まで</div>`
+          : `<div class="rec-tag">${ic('hourglass')} 本人がパスコードを入力するのを待っています</div>`}
           <div class="rec-card-actions">
             <button class="btn btn-g" onclick="rejectRecoveryRequest(${r.id})">取り消す</button>
           </div>
@@ -3132,7 +3132,7 @@ async function approveRecoveryRequest(id) {
        <div class="rec-note">
          このパスコードは <b>${Math.round(res.expiresInMin / 60)}時間</b> 有効です。<br>
          電話・LINEなど、<b>普段その方とやりとりしている連絡先</b>にお伝えください。<br>
-         ⚠️ 申請フォームに入力されたメールアドレス宛には送らないでください。<br>
+         ${ic('triangle-alert', { color: '#B45309' })} 申請フォームに入力されたメールアドレス宛には送らないでください。<br>
          この画面を閉じても、一覧の「パスコード発行済み」からいつでも確認できます。
        </div>`;
     openM('m-recovery-otp');
@@ -3730,7 +3730,7 @@ function logPurgeBoxHtml() {
       [3, 6, 12, 24].map(m => uiChip(m < 12 ? m + 'ヶ月' : (m / 12) + '年',
         logState.purgeMonths === m, `setLogPurgeMonths(${m})`)).join('') + `
         <span>より前のものを削除</span>
-        <button class="btn btn-d" onclick="purgeAccessLogs()">🗑 整理する</button>
+        <button class="btn btn-d" onclick="purgeAccessLogs()">${ic('trash-2')} 整理する</button>
       </div>
     </div>`;
 }
@@ -3810,7 +3810,7 @@ async function openPhotoMgmtModal(category) {
   _photoMgmtYear  = curY;
   _photoMgmtMonth = curM;
   const titleEl = document.getElementById('m-photo-mgmt-title');
-  titleEl.textContent = category === 'road' ? '🗺 道路許可書写真管理' : '🖼 展示内容写真管理';
+  titleEl.innerHTML = category === 'road' ? (ic('map') + ' 道路許可書写真管理') : (ic('image') + ' 展示内容写真管理');
   // ファイル入力リセット
   const inp = document.getElementById('photo-upload-input');
   if (inp) inp.value = '';
@@ -3836,7 +3836,7 @@ async function loadPhotoMgmtList() {
       grid += '<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#f9fafb;">'
         + '<img src="' + p.url + '" alt="' + p.fileName + '" style="width:100%;height:100px;object-fit:cover;display:block;" loading="lazy">'
         + '<div style="padding:4px 6px;font-size:11px;color:var(--ink3);word-break:break-all;">' + p.fileName + '</div>'
-        + '<button onclick="deletePhoto(\'' + p.fileId + '\')" style="position:absolute;top:4px;right:4px;background:rgba(239,68,68,0.85);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;">✕</button>'
+        + '<button onclick="deletePhoto(\'' + p.fileId + '\')" style="position:absolute;top:4px;right:4px;background:rgba(239,68,68,0.85);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;">' + ic('x') + '</button>'
         + '</div>';
     });
     grid += '</div>';
@@ -3876,7 +3876,7 @@ async function onPhotoYmChange(val) {
 function buildPhotoScopeLabel() {
   const slot = limitedSlots.find(s => s.id === currentPwType);
   return '<div style="font-size:12px;color:var(--ink2);font-weight:700;margin-bottom:4px;">'
-    + '🔐 ' + esc(slot ? slot.name : '限定PW') + ' の写真（他の限定PW・通常PWとは別に保存されます）'
+    + ic('lock') + ' ' + esc(slot ? slot.name : '限定PW') + ' の写真（他の限定PW・通常PWとは別に保存されます）'
     + '</div>';
 }
 
@@ -4007,7 +4007,7 @@ function renderPositionEditor() {
             <input class="mf-inp" style="flex:1;" type="text" value="${esc(p.name || '')}"
               placeholder="立ち位置の名前" oninput="_posEdit[${i}].name=this.value">
             <button class="btn" style="font-size:11px;padding:5px 10px;border-color:var(--red);background:var(--red-l);color:var(--red);"
-              onclick="removePositionRow(${i})">🗑</button>
+              onclick="removePositionRow(${i})">${ic('trash-2')}</button>
           </div>
           <div class="uic-row">
             ${POS_CAPS.map(c => `<button type="button" class="uic${p[c.key] ? ' on' : ''}"
@@ -4018,7 +4018,7 @@ function renderPositionEditor() {
     <button class="sp-add-btn" style="margin-top:10px;" onclick="addPositionRow()">&#65291; 立ち位置を追加</button>`;
 
   document.getElementById('m-position-ft').innerHTML = `
-    <button class="btn btn-g" onclick="openPositionSyncPreview()" title="個別設定を外して、全員の権限を立ち位置から決め直します">⚖ 権限を立ち位置から再計算</button>
+    <button class="btn btn-g" onclick="openPositionSyncPreview()" title="個別設定を外して、全員の権限を立ち位置から決め直します">${ic('refresh-cw')} 権限を立ち位置から再計算</button>
     <button class="btn btn-g" onclick="closeM('m-position')">閉じる</button>
     <button class="btn btn-p" onclick="savePositions()">保存</button>`;
 }
@@ -4210,8 +4210,8 @@ function renderMemberList() {
     return s;
   };
 
-  html += renderSection(valid, '✅ 有効メンバー', 'var(--green)');
-  html += renderSection(invalid, '⛔ 無効メンバー', 'var(--ink3)');
+  html += renderSection(valid, ic('circle-check-big', { color: '#15803D' }) + ' 有効メンバー', 'var(--green)');
+  html += renderSection(invalid, ic('ban', { color: '#DC2626' }) + ' 無効メンバー', 'var(--ink3)');
   document.getElementById('m-member-body').innerHTML = html;
 }
 
@@ -4292,7 +4292,7 @@ function buildMemberForm(m, isOwner) {
 
   return `
   <div style="padding:14px 16px;">
-    <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px;">${isEdit ? '✏️ メンバー編集' : '➕ メンバー追加'}</div>
+    <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px;">${isEdit ? (ic('pencil') + ' メンバー編集') : (ic('plus') + ' メンバー追加')}</div>
     ${avBlock}
     <div style="display:flex;flex-direction:column;gap:10px;">
       <div class="mf-row">
@@ -4351,7 +4351,7 @@ function buildMemberForm(m, isOwner) {
         ${uiPickChips('mf-valid',
           [{ value: '1', label: '有効' }, { value: '0', label: '無効' }],
           m.valid ? '1' : '0')}
-        ${m.valid ? '<div style="font-size:11px;color:var(--amber);line-height:1.6;">⚠️ 無効にすると、この方に関する代理送信設定・管理者権限・会計者権限は自動的に削除されます。</div>' : ''}
+        ${m.valid ? `<div style="font-size:11px;color:var(--amber);line-height:1.6;">${ic('triangle-alert', { color: '#B45309' })} 無効にすると、この方に関する代理送信設定・管理者権限・会計者権限は自動的に削除されます。</div>` : ''}
       </div>` : ''}
       <div id="mf-err" class="is-hidden" style="color:var(--red);font-size:12px;padding:6px 10px;background:var(--red-l);border-radius:var(--r);"></div>
     </div>
@@ -4485,17 +4485,17 @@ function setProcMsg(title, sub) {
 function showProcSteps(tasks) {
   const el = document.getElementById('proc-steps');
   el.innerHTML = tasks.map(t =>
-    `<div class="proc-step-row"><span class="proc-step-ic" id="psic-${t.id}">⏸</span><span class="proc-step-lbl">${t.label}</span><span class="proc-step-st" id="psst-${t.id}">待機中</span></div>`
+    `<div class="proc-step-row"><span class="proc-step-ic" id="psic-${t.id}">${ic('pause')}</span><span class="proc-step-lbl">${t.label}</span><span class="proc-step-st" id="psst-${t.id}">待機中</span></div>`
   ).join('');
   setVisible(el, true);
 }
 function setProcStep(id, state, errMsg) {
-  const ic = document.getElementById('psic-' + id);
+  const icEl = document.getElementById('psic-' + id);
   const st = document.getElementById('psst-' + id);
-  if (!ic || !st) return;
-  if (state === 'running') { ic.textContent = '⏳'; st.textContent = '実行中...'; st.className = 'proc-step-st running'; }
-  else if (state === 'done') { ic.textContent = '✅'; st.textContent = '完了'; st.className = 'proc-step-st done'; }
-  else if (state === 'err') { ic.textContent = '❌'; st.textContent = errMsg || 'エラー'; st.className = 'proc-step-st err'; }
+  if (!icEl || !st) return;
+  if (state === 'running') { icEl.innerHTML = ic('hourglass'); st.textContent = '実行中...'; st.className = 'proc-step-st running'; }
+  else if (state === 'done') { icEl.innerHTML = ic('circle-check-big', { color: '#15803D' }); st.textContent = '完了'; st.className = 'proc-step-st done'; }
+  else if (state === 'err') { icEl.innerHTML = ic('circle-x', { color: '#DC2626' }); st.textContent = errMsg || 'エラー'; st.className = 'proc-step-st err'; }
 }
 async function refreshAdminData() {
   return loadAdminData({ year: curY, month: curM, type: currentPwType, rethrow: true });

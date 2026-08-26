@@ -2,6 +2,10 @@
 *{scrollbar-width:none;}
 *::-webkit-scrollbar{display:none;}
 .is-hidden{display:none!important;}
+/* Lucideアイコン（js/icons.js の ic()）は絵文字の代わりに使うインラインSVG。
+   幅・高さの明示が無いとブラウザ既定の300x150で描画されてしまうため、
+   周囲のフォントサイズに揃えて縦中央に来るよう全体に既定値を与える */
+svg[viewBox="0 0 24 24"]{width:1em;height:1em;display:inline-block;vertical-align:-0.15em;flex-shrink:0;}
 :root{
   --ink:#18181b;--ink2:#52525b;--ink3:#71717a;
   --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
@@ -319,6 +323,28 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
    有効範囲は「常時有効／期間指定／限定PWに紐づけ」の3択。期間指定のときだけ
    年月ピッカー（.ymp）を開き、開始〜終了の範囲を月グリッド上でハイライトする */
 .popup-box.wide{max-width:380px;}
+
+/* ===== AI原案（確認画面・差分表示）=====
+   縦スクロールはモーダル自体（.popup-box）1箇所に集約する。内側に
+   max-height+overflow の入れ子スクロール枠は作らない（CLAUDE.md） */
+.ai-modal-box{max-width:720px;max-height:86vh;overflow-y:auto;}
+.ai-warn{font-size:11.5px;line-height:1.7;color:var(--red-d,#b91c1c);background:var(--red-l,#fef2f2);border:1px solid var(--red,#dc2626);border-radius:var(--r);padding:8px 10px;margin-bottom:10px;}
+.ai-note{font-size:11.5px;color:var(--ink3);line-height:1.6;margin-bottom:10px;}
+.ai-block{border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 12px;margin-bottom:10px;background:var(--surface2);}
+.ai-block-hd{font-size:12.5px;font-weight:700;color:var(--green-d);margin-bottom:6px;}
+.ai-block-line{font-size:11.5px;color:var(--ink2);line-height:1.7;}
+.ai-block-line.ai-drop{color:var(--red-d,#b91c1c);}
+.ai-rule-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.ai-rule-lbl{font-size:11.5px;font-weight:700;color:var(--ink2);white-space:nowrap;}
+.ai-diff-grid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:8px 0;font-size:11px;}
+.ai-diff-h{background:var(--surface2);padding:5px 6px;font-weight:700;text-align:center;}
+.ai-diff-t{background:var(--surface2);padding:5px 6px;color:var(--ink3);white-space:nowrap;}
+.ai-diff-c{background:var(--surface);padding:5px 6px;line-height:1.5;word-break:break-word;}
+.ai-diff-c.changed{background:var(--purple-l,#f3e8ff);font-weight:700;}
+@media (max-width:480px){
+  .ai-modal-box{max-height:92dvh;}
+  .ai-diff-grid{font-size:10px;}
+}
 .seg{display:flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;background:var(--surface2);}
 .seg button{flex:1;padding:8px 4px;font-size:11px;font-weight:700;font-family:var(--sans);border:none;background:none;color:var(--ink2);cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;}
 .seg button+button{border-left:1px solid var(--border);}

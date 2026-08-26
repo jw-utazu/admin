@@ -2,6 +2,10 @@
 *{scrollbar-width:none;}
 *::-webkit-scrollbar{display:none;}
 .is-hidden{display:none!important;}
+/* Lucideアイコン（js/icons.js の ic()）は絵文字の代わりに使うインラインSVG。
+   幅・高さの明示が無いとブラウザ既定の300x150で描画されてしまうため、
+   周囲のフォントサイズに揃えて縦中央に来るよう全体に既定値を与える */
+svg[viewBox="0 0 24 24"]{width:1em;height:1em;display:inline-block;vertical-align:-0.15em;flex-shrink:0;}
 :root{
   --ink:#18181b;--ink2:#52525b;--ink3:#a1a1aa;
   --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;

@@ -153,11 +153,11 @@ function renderAccIcon() {
     img.src = iconSrc;
     img.style.cssText = 'width:26px;height:26px;border-radius:50%;object-fit:cover;';
     img.setAttribute('referrerpolicy', 'no-referrer');
-    img.onerror = () => { icon.innerHTML = '👤'; };
+    img.onerror = () => { icon.innerHTML = ic('user'); };
     icon.innerHTML = '';
     icon.appendChild(img);
   } else {
-    icon.innerHTML = '👤';
+    icon.innerHTML = ic('user');
   }
 }
 // ログインキャッシュ（adminUser）は本人確認だけの目的で使い回すため、フォームアプリ側で
@@ -541,7 +541,7 @@ async function switchMainTab(name, btn) {
     splitMode = false;
     document.getElementById('content-wrapper').classList.remove('split');
     const sb = document.getElementById('split-btn');
-    if (sb) { sb.classList.remove('on'); sb.textContent = '⬛ 分割表示'; }
+    if (sb) { sb.classList.remove('on'); sb.innerHTML = ic('__square_filled__') + ' 分割表示'; }
   }
   document.querySelectorAll('.main-tabs .mtab').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
@@ -587,7 +587,7 @@ async function toggleSplitView() {
   } else {
     wrapper.classList.remove('split');
     btn.classList.remove('on');
-    btn.textContent = '⬛ 分割表示';
+    btn.innerHTML = ic('__square_filled__') + ' 分割表示';
     setVisible(rsz, false);
     document.getElementById('tab-wish').style.flex = '';
     document.getElementById('tab-create').style.flex = '';
@@ -610,7 +610,7 @@ function toggleCompareMode() {
   } else {
     panel.classList.remove('on');
     setVisible(rsz, false);
-    btn.textContent = '⬜ 比較';
+    btn.innerHTML = ic('square') + ' 比較';
     btn.style.cssText = 'border-color:var(--teal);color:var(--teal);white-space:nowrap;';
     const rmWrap = document.querySelector('#tab-create .rm-wrap');
     if (rmWrap) rmWrap.style.flex = '';
@@ -813,7 +813,7 @@ function wishCellClass(applied, isAssigned) {
 }
 function wishCellInner(applied, isAssigned, hasComment) {
   if (!applied && !isAssigned) return '';
-  return `<span class="check-mark">〇</span>${applied && hasComment ? '<span class="note-mark">📝</span>' : ''}`;
+  return `<span class="check-mark">〇</span>${applied && hasComment ? `<span class="note-mark">${ic('square-pen')}</span>` : ''}`;
 }
 
 let _wishCellContexts = [];
@@ -1243,7 +1243,7 @@ function applyCreateDataBundle(bundle) {
   buildLeftPanel();
   refreshWishAssign();
   if (shiftDates.length > 0) { activeDateIdx = 0; activeTimeIdx = 0; buildTimeTabs(); }
-  else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「🗂 シフト作成準備」を実行してください。</div>'; }
+  else { document.getElementById('main-content').innerHTML = `<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「${ic('folder')} シフト作成準備」を実行してください。</div>`; }
   createLoaded = true;
   startShiftCreateSync();
 }
@@ -1275,7 +1275,7 @@ function buildCreateTabs() {
   // 全ブロックを描き直して書き戻すため、押すと未編集のブロックまで更新扱いになり、
   // 他の管理者側で無用な同期が走るという副作用の方が大きかった
   // 並びは「… 保存ステータス → 再読み込み」。再読み込みは右端に固定する
-  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><div class="save-st is-hidden" id="gst" style="margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button>';
+  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><div class="save-st is-hidden" id="gst" style="margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="white-space:nowrap;" onclick="reloadCreateData()">' + ic('refresh-cw') + ' 再読み込み</button>';
   if (compareMode) populateCmpDateSel();
 }
 
@@ -1438,8 +1438,8 @@ function buildLeftPanel() {
       wishSlotMatchesBlock(typeof s === 'object' ? s.slot : s, tab.date, blockTime)) : null;
     const cartNg = slotObj && typeof slotObj === 'object' ? slotObj.cartNg : false;
     const note   = slotObj && typeof slotObj === 'object' ? slotObj.note   : '';
-    const cartNgHtml = cartNg ? `<span style="font-size:10px;color:var(--red);font-weight:700;">🚫カート不可</span>` : '';
-    const noteHtml   = note   ? `<span style="font-size:10px;color:var(--ink2);">📝${esc(note)}</span>` : '';
+    const cartNgHtml = cartNg ? `<span style="font-size:10px;color:var(--red);font-weight:700;">${ic('circle-slash', { color: '#DC2626' })}カート不可</span>` : '';
+    const noteHtml   = note   ? `<span style="font-size:10px;color:var(--ink2);">${ic('square-pen')}${esc(note)}</span>` : '';
     const commentHtml = (cartNg || note) ? `<div style="display:flex;flex-wrap:wrap;gap:3px;padding:1px 0 3px 14px;">${cartNgHtml}${noteHtml}</div>` : '';
     const bothBadge = a.sameDayBoth ? `<span class="badge-both" title="同日の通常PWにも申込があります。どちらか一方のシフトにしか入れません。">両方</span>` : '';
     const dotClass = assignedUids.has(a.uid) ? 'd-on' : 'd-off';
@@ -1475,7 +1475,7 @@ function buildBlock(block, bi) {
       </div>
     </div>
     <div class="sc-sync-banner is-hidden" id="sync-banner-${bi}">
-      <span>⚠️ 他の管理者がこの時間帯を更新しました。保存すると上書きされます。</span>
+      <span>${ic('triangle-alert', { color: '#B45309' })} 他の管理者がこの時間帯を更新しました。保存すると上書きされます。</span>
       <button class="tb-btn" onclick="acceptSyncUpdate(${bi})">最新を確認</button>
     </div>
     <div class="v-bar" id="v-bar-${bi}"></div>
@@ -1568,7 +1568,7 @@ function ghostHtml(bi, role, targetId, cur) {
   const c = list[0];
   const why = c.reason ? c.reason : `月${c.count}回`;
   return `<span class="ghost">候補：<span class="ghost-name">${esc(c.name)}</span><span>（${esc(why)}）</span>`
-       + `<button type="button" class="ghost-btn" onclick="applyGhost('${esc(targetId)}','${esc(c.uid)}',${bi})">✓ 採用</button></span>`;
+       + `<button type="button" class="ghost-btn" onclick="applyGhost('${esc(targetId)}','${esc(c.uid)}',${bi})">${ic('check', { color: '#15803D' })} 採用</button></span>`;
 }
 
 function applyGhost(targetId, uid, bi) {
@@ -1951,7 +1951,7 @@ function buildSlotTable(bi, block) {
     }
     html += `<div style="display:flex;align-items:center;gap:3px;">`;
     html += makeLocSel(li, loc);
-    html += `<button class="col-del-btn" onclick="delCol(${bi},${li})" title="この列を削除">✕</button>`;
+    html += `<button class="col-del-btn" onclick="delCol(${bi},${li})" title="この列を削除">${ic('x')}</button>`;
     // スマホ用。指ではホバーできず .col-ins-zone の ＋ が出せないので、
     // 「この列の右に1列足す」ボタンを見出しに常設する（CSS で PC 幅では隠す）
     html += `<button class="col-add-m" onclick="insCol(${bi},${li + 1})" title="右に列を追加">＋</button>`;
@@ -2054,8 +2054,8 @@ function openMemberPicker(el) {
                  + (c.cartFlag ? '<span class="pk-b b-k">カ</span>' : '')
                  + `<span class="pk-b b-w">割${c.count}</span>`
                  + (c.count === 0 ? '<span class="pk-b b-p">優先</span>' : '')
-                 + (c.cartNg ? '<span class="pk-b b-n">🚫カート不可</span>' : '')
-                 + (c.noteNg ? '<span class="pk-b b-n">📝時間外</span>' : '')
+                 + (c.cartNg ? `<span class="pk-b b-n">${ic('circle-slash', { color: '#DC2626' })}カート不可</span>` : '')
+                 + (c.noteNg ? `<span class="pk-b b-n">${ic('square-pen')}時間外</span>` : '')
                  + (c.fixedNg ? '<span class="pk-b b-n">固定枠は兄弟のみ</span>' : '');
     items.push({
       value: c.uid,
@@ -2446,9 +2446,9 @@ function refreshValidationUI() {
 
 function vFlagHtml(x) {
   return `<div class="v-flag v-${x.level}" title="${esc(x.label)}">`
-       + `<span>${x.level === 'error' ? '⛔' : '⚠️'}</span>`
+       + `<span>${x.level === 'error' ? ic('ban', { color: '#DC2626' }) : ic('triangle-alert', { color: '#B45309' })}</span>`
        + `<span class="v-msg">${esc(x.msg)}</span>`
-       + `<button class="v-ack" onclick="ackIssue(${x._i})" title="意図的な配置として、この警告を出さないようにする">✓</button>`
+       + `<button class="v-ack" onclick="ackIssue(${x._i})" title="意図的な配置として、この警告を出さないようにする">${ic('check', { color: '#15803D' })}</button>`
        + `</div>`;
 }
 
@@ -2490,7 +2490,7 @@ function vCount(list) {
 }
 function vBadgeHtml(c) {
   if (!c.err && !c.warn) return '';
-  const txt = (c.err ? '⛔' + c.err : '') + (c.err && c.warn ? ' ' : '') + (c.warn ? '⚠' + c.warn : '');
+  const txt = (c.err ? ic('ban', { color: '#DC2626' }) + c.err : '') + (c.err && c.warn ? ' ' : '') + (c.warn ? ic('triangle-alert', { color: '#B45309' }) + c.warn : '');
   return `<span class="v-badge${c.err ? ' v-err' : ''}">${txt}</span>`;
 }
 function vLive(block) { return (_vResult.byBlock[bKey(block)] || []).filter(x => x.scope === 'live'); }
@@ -2554,8 +2554,8 @@ function openPreflight() {
   const c = vCount(_vResult.issues);
   const nAck = (_vResult.acked || []).length;
   document.getElementById('pf-summary').innerHTML = (_vResult.issues.length === 0
-    ? '<span style="color:var(--green);font-weight:700;">✅ 指摘はありません</span>'
-    : `⛔ エラー ${c.err} 件／⚠️ 警告 ${c.warn} 件`)
+    ? `<span style="color:var(--green);font-weight:700;">${ic('circle-check-big', { color: '#15803D' })} 指摘はありません</span>`
+    : `${ic('ban', { color: '#DC2626' })} エラー ${c.err} 件／${ic('triangle-alert', { color: '#B45309' })} 警告 ${c.warn} 件`)
     + (nAck ? `<span style="color:var(--ink3);font-weight:500;">（確認済み ${nAck} 件）</span>` : '');
 
   const grouped = {};
@@ -2573,8 +2573,8 @@ function openPreflight() {
         : '';
       const btn = x.acked
         ? `<button class="pf-jump" onclick="unackIssue(${x._i})">解除</button>`
-        : `<button class="pf-jump" onclick="ackIssue(${x._i})" title="意図的な配置として、この警告を出さないようにする">✓ 確認済み</button>`;
-      html += `<div class="pf-row${x.acked ? ' acked' : ''}"><span class="pf-ico">${x.level === 'error' ? '⛔' : '⚠️'}</span>`
+        : `<button class="pf-jump" onclick="ackIssue(${x._i})" title="意図的な配置として、この警告を出さないようにする">${ic('check', { color: '#15803D' })} 確認済み</button>`;
+      html += `<div class="pf-row${x.acked ? ' acked' : ''}"><span class="pf-ico">${x.level === 'error' ? ic('ban', { color: '#DC2626' }) : ic('triangle-alert', { color: '#B45309' })}</span>`
            +  `<span class="pf-msg">${esc(x.msg)}<span class="pf-rule">${esc(x.label)}${meta}</span></span>${btn}</div>`;
     });
   });
@@ -2595,12 +2595,12 @@ function openPreflight() {
   // 確認者は「確認完了」、作成担当者は「作成完了」をこのパネルからも実行できる
   if (shiftApproval.isApprover) {
     setVisible(pubBtn, shiftPublished && !shiftApproval.approvedByMe);
-    pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま確認完了にする' : '☑️ 確認完了にする';
+    pubBtn.innerHTML = c.err > 0 ? (ic('triangle-alert', { color: '#B45309' }) + ' エラーのまま確認完了にする') : (ic('square-check', { color: '#15803D' }) + ' 確認完了にする');
     pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
     pubBtn.onclick = () => { closePreflight(); approveShift(true); };
   } else {
     setVisible(pubBtn, !shiftPublished);
-    pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま公開する' : '📣 シフトを公開する';
+    pubBtn.innerHTML = c.err > 0 ? (ic('triangle-alert', { color: '#B45309' }) + ' エラーのまま公開する') : (ic('megaphone') + ' シフトを公開する');
     pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
     pubBtn.onclick = () => doPublish();
   }
@@ -2682,9 +2682,9 @@ function showSnapshotStatus(snapshot, state, error) {
   st.className = 'tb-st';
   st.style.cursor = '';
   if (state === 'saving') st.textContent = '保存中...';
-  else if (state === 'saved') { st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; }
+  else if (state === 'saved') { st.innerHTML = ic('check', { color: '#15803D' }) + ' 保存済み'; st.className = 'tb-st saved'; }
   else if (state === 'error') {
-    st.textContent = '⚠ 保存失敗（タップで再試行）';
+    st.innerHTML = ic('triangle-alert', { color: '#B45309' }) + ' 保存失敗（タップで再試行）';
     st.className = 'tb-st err';
     st.style.cursor = 'pointer';
     st.onclick = () => retryLatestSave(snapshot.key);
@@ -2830,7 +2830,7 @@ window.addEventListener('beforeunload', (e) => {
 
 function markSaved(bi) {
   const st = document.getElementById('st-' + bi);
-  if (st) { setVisible(st, true); st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; st.onclick = null; st.style.cursor = ''; }
+  if (st) { setVisible(st, true); st.innerHTML = ic('check', { color: '#15803D' }) + ' 保存済み'; st.className = 'tb-st saved'; st.onclick = null; st.style.cursor = ''; }
 }
 function ug() {
   const u = Object.values(bs).some(v => !v);
@@ -3221,7 +3221,7 @@ function updatePublishBtn() {
   // 押せば対象は表示中の月なので、前の月の「未完了」が残っていると
   // 公開中の月をもう一度作成完了にしてしまう（確認記録がリセットされる）
   if (!isStatusForCurYM()) {
-    btn.textContent = '✅ シフト作成完了';
+    btn.innerHTML = ic('circle-check-big', { color: '#15803D' }) + ' シフト作成完了';
     btn.className = 'hbtn pub';
     btn.disabled = true;
     btn.title = '公開状態を取得中です';
@@ -3234,7 +3234,7 @@ function updatePublishBtn() {
   // 公開（作成完了）は「申込中の月」か「シフトが作成完了になっている月」に対してのみ行える。
   // それ以外の月を表示しているときに押せてしまうと、まだ準備段階の月のフラグを立ててしまう
   if (isOffPublishedMonth()) {
-    btn.textContent = '✅ シフト作成完了';
+    btn.innerHTML = ic('circle-check-big', { color: '#15803D' }) + ' シフト作成完了';
     btn.className = 'hbtn pub';
     btn.disabled = true;
     btn.title = isYmRolledOver(curYM)
@@ -3255,17 +3255,17 @@ function updatePublishBtn() {
   if (a.isApprover) {
     // 確認者：作成完了を押すのは作成担当者。確認者は「確認完了」と「差し戻し」だけを行う
     if (!shiftPublished) {
-      btn.textContent = '☑️ 確認完了にする';
+      btn.innerHTML = ic('square-check', { color: '#15803D' }) + ' 確認完了にする';
       btn.className = 'hbtn appr';
       btn.disabled = true;
       btn.title = '作成担当者が「シフト作成完了」にすると確認できます';
     } else if (a.approvedByMe) {
-      btn.textContent = '✅ 確認済み';
+      btn.innerHTML = ic('circle-check-big', { color: '#15803D' }) + ' 確認済み';
       btn.className = 'hbtn appr';
       btn.disabled = true;
       btn.title = 'あなたの確認は完了しています';
     } else {
-      btn.textContent = '☑️ 確認完了にする';
+      btn.innerHTML = ic('square-check', { color: '#15803D' }) + ' 確認完了にする';
       btn.className = 'hbtn appr';
       btn.title = 'シフト内容を確認し、公開を承認します';
     }
@@ -3278,10 +3278,10 @@ function updatePublishBtn() {
     // 作成担当者（およびオーナー）
     setVisible(rejBtn, false);
     if (shiftPublished) {
-      btn.textContent = '↩️ 作成完了を取り消す';
+      btn.innerHTML = ic('undo-2') + ' 作成完了を取り消す';
       btn.className = 'hbtn pub-off';
     } else {
-      btn.textContent = '✅ シフト作成完了';
+      btn.innerHTML = ic('circle-check-big', { color: '#15803D' }) + ' シフト作成完了';
       btn.className = 'hbtn pub';
     }
   }
@@ -3289,21 +3289,21 @@ function updatePublishBtn() {
   // 確認状況・差し戻し状況の表示
   if (apprLabel) {
     if (a.rejected && !shiftPublished) {
-      apprLabel.textContent = '⚠️ 差し戻し（' + (a.rejected.by || '確認者') + ' ' + (a.rejected.at || '') + '）';
+      apprLabel.innerHTML = ic('triangle-alert', { color: '#B45309' }) + ' 差し戻し（' + (a.rejected.by || '確認者') + ' ' + (a.rejected.at || '') + '）';
       apprLabel.style.color = 'var(--red)';
       apprLabel.title = a.rejected.note ? '理由: ' + a.rejected.note : '理由の記入はありません';
       setVisible(apprLabel, true);
     } else if (a.approvalSkipped && shiftPublished) {
-      apprLabel.textContent = '⚠️ 確認省略（オーナー）';
+      apprLabel.innerHTML = ic('triangle-alert', { color: '#B45309' }) + ' 確認省略（オーナー）';
       apprLabel.style.color = 'var(--amber)';
       apprLabel.title = 'オーナーアカウントが確認者の確認を省略して公開しました\n確認者: '
         + (a.approvers.map(x => x.name).join('・') || 'なし');
       setVisible(apprLabel, true);
     } else if (a.required > 0 && shiftPublished) {
       const detail = a.approvers.map(x => (x.approved ? '✅ ' : '⬜ ') + x.name + (x.at ? '（' + x.at + '）' : '')).join('\n');
-      apprLabel.textContent = a.approvedAll
-        ? ('✅ 確認完了 ' + a.approvedCount + '/' + a.required + (a.notified ? '・公開済み' : ''))
-        : ('⏳ 確認 ' + a.approvedCount + '/' + a.required);
+      apprLabel.innerHTML = a.approvedAll
+        ? (ic('circle-check-big', { color: '#15803D' }) + ' 確認完了 ' + a.approvedCount + '/' + a.required + (a.notified ? '・公開済み' : ''))
+        : (ic('hourglass') + ' 確認 ' + a.approvedCount + '/' + a.required);
       apprLabel.style.color = a.approvedAll ? 'var(--green)' : 'var(--amber)';
       apprLabel.title = '確認状況\n' + detail + '\n\nクリックで詳細を表示';
       setVisible(apprLabel, true);
@@ -3334,12 +3334,12 @@ function openApprovalModal() {
 
   let html = '';
   if (a.rejected && !shiftPublished) {
-    html += '<div class="apv-note rej">⚠️ ' + esc(a.rejected.by || '確認者') + ' さんが差し戻しました'
+    html += '<div class="apv-note rej">' + ic('triangle-alert', { color: '#B45309' }) + ' ' + esc(a.rejected.by || '確認者') + ' さんが差し戻しました'
          + (a.rejected.at ? '（' + esc(a.rejected.at) + '）' : '')
          + '<br>理由: ' + esc(a.rejected.note || '（記入なし）') + '</div>';
   }
   if (a.approvalSkipped && shiftPublished) {
-    html += '<div class="apv-note warn">⚠️ オーナーアカウントが確認者の確認を省略して作成完了にしました。'
+    html += '<div class="apv-note warn">' + ic('triangle-alert', { color: '#B45309' }) + ' オーナーアカウントが確認者の確認を省略して作成完了にしました。'
          + '下記の確認者には確認依頼が送られていません。</div>';
   }
   if (a.required === 0) {
@@ -3349,7 +3349,7 @@ function openApprovalModal() {
     html += a.approvers.map(x => {
       const at = x.approved ? esc(x.at || '') : (shiftPublished ? '確認待ち' : '—');
       return '<div class="apv-row' + (x.approved ? ' done' : '') + '">'
-        + '<span class="apv-ico">' + (x.approved ? '✅' : '⬜') + '</span>'
+        + '<span class="apv-ico">' + (x.approved ? ic('circle-check-big', { color: '#15803D' }) : ic('square')) + '</span>'
         + '<span class="apv-name">' + esc(x.name) + '</span>'
         + '<span class="apv-at' + (x.approved ? '' : ' wait') + '">' + at + '</span></div>';
     }).join('');
@@ -3655,9 +3655,9 @@ function ymLabel(ym) { const m = /^(\d{4})[.\-/](\d{1,2})$/.exec(String(ym || ''
 
 function locScopeHtml(loc) {
   const mode = locMode(loc);
-  if (mode === 'pw')     return `<span class="loc-badge pw">🎯 ${esc(pwTypeName(loc.linkPwType))} 専用</span>`;
-  if (mode === 'period') return `<span class="loc-badge period">📅 ${ymLabel(loc.startYM) || '開始未指定'} 〜 ${ymLabel(loc.endYM) || 'ずっと'}</span>`;
-  return '<span class="loc-badge always">🔁 常時有効</span>';
+  if (mode === 'pw')     return `<span class="loc-badge pw">${ic('filter', { color: '#9333ea' })} ${esc(pwTypeName(loc.linkPwType))} 専用</span>`;
+  if (mode === 'period') return `<span class="loc-badge period">${ic('calendar')} ${ymLabel(loc.startYM) || '開始未指定'} 〜 ${ymLabel(loc.endYM) || 'ずっと'}</span>`;
+  return `<span class="loc-badge always">${ic('infinity')} 常時有効</span>`;
 }
 
 function renderLocationList() {
@@ -3690,7 +3690,7 @@ let _ympYear   = 0;     // 年月ピッカーが表示している年
 function openLocModal(i) {
   const src = i >= 0 ? settingsLocations[i] : { name: '', startYM: '', endYM: '', linkPwType: '' };
   locForm = { idx: i, name: src.name || '', mode: locMode(src), startYM: src.startYM || '', endYM: src.endYM || '', linkPwType: src.linkPwType || '' };
-  document.getElementById('loc-modal-title').textContent = i >= 0 ? '📍 場所を編集' : '📍 場所を追加';
+  document.getElementById('loc-modal-title').innerHTML = i >= 0 ? (ic('map-pin') + ' 場所を編集') : (ic('map-pin') + ' 場所を追加');
   document.getElementById('loc-save-btn').textContent    = i >= 0 ? '保存' : '追加';
   document.getElementById('loc-name').value = locForm.name;
   // 限定PWタブで編集中の場所は、既にその限定PW専用。さらに別の限定PWへ
@@ -3833,9 +3833,9 @@ function renderValidationRules() {
       <div class="vr-main"><div class="vr-label">${esc(def.label)}</div><div class="vr-meta">${scope}</div></div>
       <div class="uic-row vr-level">
         <button type="button" class="uic${cur.level === 'error' ? ' on' : ''}" data-rule="${id}" data-f="level" data-val="error"
-          onclick="uiChipPick(this);onVRuleChange(this)">⛔ エラー</button>
+          onclick="uiChipPick(this);onVRuleChange(this)">${ic('ban', { color: '#DC2626' })} エラー</button>
         <button type="button" class="uic${cur.level === 'warn' ? ' on' : ''}" data-rule="${id}" data-f="level" data-val="warn"
-          onclick="uiChipPick(this);onVRuleChange(this)">⚠️ 警告</button>
+          onclick="uiChipPick(this);onVRuleChange(this)">${ic('triangle-alert', { color: '#B45309' })} 警告</button>
       </div>
     </div>`;
   }).join('');
@@ -3910,7 +3910,229 @@ function setLoading(on, msg) {
   if (msg) document.getElementById('lo-msg').textContent = msg;
   if (overlay) overlay.classList.toggle('on', !!on);
 }
-function toast(msg, type) { const ta = document.getElementById('ta'), t = document.createElement('div'); t.className = 'toast' + (type ? ' ' + type : ''); t.textContent = msg; ta.appendChild(t); setTimeout(() => t.remove(), 2800); }
+function toast(msg, type) { const ta = document.getElementById('ta'), t = document.createElement('div'); t.className = 'toast' + (type ? ' ' + type : ''); t.innerHTML = msg; ta.appendChild(t); setTimeout(() => t.remove(), 2800); }
 function esc(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ============================================================
+// AI原案 — ① 確認画面 → 生成ループ → ② 差分表示 → 既存の保存経路で反映
+// 事前計算・生成ループ本体は js/shift-ai.js。ここは画面の組み立てだけを持つ
+// ============================================================
+let _aiState = null; // { blocks, plan, winOf, rules, cartWarn, unreadNotes, prevInfo }
+
+function _aiName(uid) { return (memberFlags[uid] || {}).name || uid; }
+function _aiYmKey() { return curYM ? (curYM.year + '-' + curYM.month) : ''; }
+
+async function _aiRecompute() {
+  const ym = _aiYmKey();
+  const blocks = scAiBuildBlocks(shiftDates, _aiState.rules, ym);
+  const { plan, cartWarn, unreadNotes, winOf } = scAiBuildPlan(
+    blocks, applicants, memberFlags, _aiState.couples, _aiState.prevInfo.count, _aiState.prevInfo.loaded);
+  _aiState.blocks = blocks; _aiState.plan = plan; _aiState.winOf = winOf;
+  _aiState.cartWarn = cartWarn; _aiState.unreadNotes = unreadNotes;
+}
+
+async function openAiDraftModal() {
+  if (!createLoaded || !shiftDates.length) { toast('シフト作成タブを読み込んでから使ってください', 'e'); return; }
+  const box = document.getElementById('ai-confirm-modal');
+  document.getElementById('ai-confirm-body').innerHTML = '<div class="empty-msg">計算中...</div>';
+  box.classList.add('on');
+  setLoading(true, 'AI原案の準備をしています…');
+  try {
+    const ym = _aiYmKey();
+    const [coupleRes, ruleRes, prevInfo] = await Promise.all([
+      apiGet('getCoupleList', {}).catch(() => ({ ok: false })),
+      apiGet('getShiftRules', { type: currentPwType }).catch(() => ({ ok: false })),
+      scAiLoadPrevMonthCount(currentPwType, curYM.year, curYM.month),
+    ]);
+    const couples = coupleRes.ok ? (coupleRes.couples || []).map(c => [c.husbandUid, c.wifeUid]) : [];
+    const rules = ruleRes.ok ? (ruleRes.rules || {}) : { global: {}, pw: {}, month: {}, block: {} };
+    _aiState = { rules, couples, prevInfo, ym };
+    await _aiRecompute();
+    _aiRenderConfirm();
+  } catch (e) {
+    toast('準備に失敗しました: ' + e.message, 'e');
+    box.classList.remove('on');
+  } finally { setLoading(false); }
+}
+
+function closeAiConfirmModal() { document.getElementById('ai-confirm-modal').classList.remove('on'); }
+function closeAiDiffModal() { document.getElementById('ai-diff-modal').classList.remove('on'); }
+
+let _aiSavingRule = false;
+async function _aiSaveRule(scope, values, blockKey) {
+  if (_aiSavingRule) return; // 連打による保存レース（後着の応答で state が巻き戻る）を防ぐ
+  _aiSavingRule = true;
+  setLoading(true, 'ルールを保存しています…');
+  try {
+    const payload = { type: currentPwType, scope, values };
+    if (scope === 'month') payload.month = _aiState.ym;
+    if (scope === 'block') payload.blockKey = blockKey;
+    const res = await apiGet('saveShiftRules', payload);
+    if (!res || !res.ok) throw new Error((res && res.error) || '保存に失敗しました');
+    _aiState.rules = res.rules;
+    await _aiRecompute();
+    _aiRenderConfirm();
+  } catch (e) {
+    toast('ルールの保存に失敗しました: ' + e.message, 'e');
+  } finally {
+    _aiSavingRule = false;
+    setLoading(false);
+  }
+}
+
+function _aiGlobalRuleRow(key, label, options) {
+  const cur = scAiResolveRules(_aiState.rules, _aiState.ym, null)[key];
+  const chips = options.map(o =>
+    `<button type="button" class="uic${String(o.value) === String(cur) ? ' on' : ''}"
+       onclick="_aiSaveRule('global',{${key}:${o.value}})">${esc(o.label)}</button>`
+  ).join('');
+  return `<div class="ai-rule-row"><span class="ai-rule-lbl">${esc(label)}（全体）</span><div class="uic-row">${chips}</div></div>`;
+}
+
+function _aiBlockCycleRow(b) {
+  const n = b.slotTimes.length;
+  const divisors = []; for (let d = 1; d <= n; d++) if (n % d === 0) divisors.push(d);
+  const auto = scAiAutoCycle(n);
+  const blockRules = (_aiState.rules.block || {})[b.blockKey] || {};
+  const overridden = Number.isInteger(blockRules.cycle);
+  const chips = divisors.map(d => {
+    const isAuto = !overridden && d === auto;
+    const on = overridden ? d === blockRules.cycle : isAuto;
+    return `<button type="button" class="uic${on ? ' on' : ''}" onclick="_aiSaveRule('block',{cycle:${d}},'${b.blockKey}')">`
+      + `周期${d}${isAuto ? '（自動）' : ''}</button>`;
+  }).join('');
+  return `<div class="ai-rule-row"><span class="ai-rule-lbl">周期を変える</span><div class="uic-row">${chips}</div></div>`;
+}
+
+function _aiRenderConfirm() {
+  const s = _aiState;
+  let html = '';
+  if (s.unreadNotes.length) {
+    html += '<div class="ai-warn">⚠️ 解釈できなかった備考（時間制約として扱っていません）<br>'
+      + s.unreadNotes.map(t => esc(t)).join('<br>') + '</div>';
+  }
+  if (s.cartWarn.length) {
+    html += '<div class="ai-warn">⚠️ ' + s.cartWarn.map(t => esc(t)).join('<br>⚠️ ') + '</div>';
+  }
+  html += '<div class="ai-note">前月実績: ' + (s.prevInfo.loaded
+    ? (s.prevInfo.year + '年' + s.prevInfo.month + '月の公開中シフトから取得')
+    : '公開中のシフトが対象の前月と一致しないため使用していません（今回は前月実績を割当順に使いません）') + '</div>';
+
+  html += _aiGlobalRuleRow('cellTarget', '1セルの目標人数', [{ value: 2, label: '2名' }, { value: 3, label: '3名' }, { value: 4, label: '4名' }]);
+  html += _aiGlobalRuleRow('cellMin', '1セルの下限人数', [{ value: 1, label: '1名' }, { value: 2, label: '2名' }, { value: 3, label: '3名' }]);
+
+  s.blocks.forEach(b => {
+    const pl = s.plan[b.label];
+    const ct = pl.cart;
+    html += '<div class="ai-block">';
+    html += '<div class="ai-block-hd">' + esc(b.label) + '</div>';
+    html += '<div class="ai-block-line">周期' + b.cyc + ' → ' + b.reps + '周 / 定員 兄弟' + (b.cyc * b.cols)
+      + '・姉妹' + (pl.subs.length) + '（1周あたり最大' + (b.cyc * b.cols * b.cellTarget) + '席）</div>';
+    html += '<div class="ai-block-line">兄弟' + pl.heads.length + '名: ' + pl.heads.map(_aiName).map(esc).join('、') + '</div>';
+    html += '<div class="ai-block-line">姉妹' + pl.subs.length + '名: ' + pl.subs.map(_aiName).map(esc).join('、') + '</div>';
+    if (pl.extras.length) html += '<div class="ai-block-line">例外' + pl.extras.length + '名: ' + pl.extras.map(e => esc(_aiName(e.uid))).join('、') + '</div>';
+    if (pl.dropped.length) html += '<div class="ai-block-line ai-drop">落選' + pl.dropped.length + '名: ' + pl.dropped.map(u => esc(_aiName(u)) + (pl.droppedWives.indexOf(u) >= 0 ? '（夫の落選に連動）' : '')).join('、') + '</div>';
+    html += '<div class="ai-block-line">カート' + ct.need + '台 → 持ち込み: ' + (ct.bring.map(_aiName).map(esc).join('＋') || 'なし')
+      + ' / 持ち帰り: ' + (ct.take.map(_aiName).map(esc).join('＋') || 'なし') + ' / 責任者: ' + esc(ct.r1 ? _aiName(ct.r1) : 'なし') + '</div>';
+    html += _aiBlockCycleRow(b);
+    html += '</div>';
+  });
+
+  document.getElementById('ai-confirm-body').innerHTML = html;
+}
+
+async function startAiGeneration() {
+  closeAiConfirmModal();
+  const box = document.getElementById('ai-diff-modal');
+  document.getElementById('ai-diff-body').innerHTML = '<div class="empty-msg">生成中...</div>';
+  document.getElementById('ai-diff-apply').disabled = true;
+  box.classList.add('on');
+  setLoading(true, 'AI原案を生成中…');
+  try {
+    const s = _aiState;
+    const best = await scAiRunGenerationLoop(s.blocks, s.plan, s.winOf, applicants, memberFlags, s.couples, conflictMap, {
+      maxLoop: 5,
+      onProgress: (loop, maxLoop, text) => setLoading(true, text + '（15〜120秒かかることがあります）'),
+    });
+    s.best = best;
+    _aiRenderDiff();
+    document.getElementById('ai-diff-apply').disabled = false;
+  } catch (e) {
+    document.getElementById('ai-diff-body').innerHTML = '<div class="empty-msg">生成に失敗しました: ' + esc(e.message) + '</div>';
+    toast('AI原案の生成に失敗しました: ' + e.message, 'e');
+  } finally { setLoading(false); }
+}
+
+function _aiCellChanged(curBlock, sdBlock, si, ci) {
+  const a = ((curBlock.slots || [])[si] || {}).places || [];
+  const b = ((sdBlock.slots || [])[si] || {}).places || [];
+  const av = (a[ci] || []).slice().sort().join(',');
+  const bv = (b[ci] || []).slice().sort().join(',');
+  return av !== bv;
+}
+
+function _aiRenderDiff() {
+  const s = _aiState, best = s.best;
+  let html = '<div class="ai-note">' + best.loop + '回目の案（error ' + best.errs + '件 / warn ' + best.warns
+    + '件 / 選好 ' + best.score + '点' + (best.modelUsed ? ' / ' + esc(best.modelUsed) : '') + '）</div>';
+  if (best.issues && best.issues.length) {
+    html += '<div class="ai-warn">' + best.issues.slice(0, 15).map(i =>
+      '[' + esc(i.level) + '] ' + esc(i.rule) + ': ' + esc(i.msg || '')).join('<br>') + '</div>';
+  }
+
+  s.blocks.forEach((b, bi) => {
+    const curBlock = shiftDates[bi];
+    const sdBlock = best.sd[bi];
+    html += '<div class="ai-block"><div class="ai-block-hd">' + esc(b.label) + '</div>';
+    html += '<div class="ai-diff-grid" style="grid-template-columns:80px repeat(' + b.cols + ',1fr);">';
+    html += '<div class="ai-diff-h"></div>' + b.places.map(p => '<div class="ai-diff-h">' + esc(p || '') + '</div>').join('');
+    b.slotTimes.forEach((st, si) => {
+      html += '<div class="ai-diff-t">' + esc(st) + '</div>';
+      for (let ci = 0; ci < b.cols; ci++) {
+        const names = ((sdBlock.slots[si] || {}).places[ci] || []).map(_aiName).map(esc).join('、');
+        const changed = _aiCellChanged(curBlock, sdBlock, si, ci);
+        html += '<div class="ai-diff-c' + (changed ? ' changed' : '') + '">' + (names || '－') + '</div>';
+      }
+    });
+    html += '</div>';
+    html += '<div class="ai-block-line">責任者: ' + esc(sdBlock.responsible.r1 ? _aiName(sdBlock.responsible.r1) : 'なし')
+      + ' / 持ち込み: ' + esc([sdBlock.cart.ki1, sdBlock.cart.ki2].filter(Boolean).map(_aiName).join('＋') || 'なし')
+      + ' / 持ち帰り: ' + esc([sdBlock.cart.ko1, sdBlock.cart.ko2].filter(Boolean).map(_aiName).join('＋') || 'なし') + '</div>';
+    html += '</div>';
+  });
+  document.getElementById('ai-diff-body').innerHTML = html;
+}
+
+async function applyAiDraft() {
+  const s = _aiState, best = s && s.best;
+  if (!best) return;
+  if (!await uiConfirm({ title: 'AI原案で置き換える', message: '表示中の内容をこの案で上書きします。よろしいですか？', confirmText: '置き換える', type: 'warn' })) return;
+  setLoading(true, 'AI原案を反映しています…');
+  try {
+    for (let bi = 0; bi < s.blocks.length; bi++) {
+      const b = s.blocks[bi];
+      const curBlock = shiftDates.find(x => x.date === b.dateKey && x.time === b.time);
+      if (!curBlock) continue;
+      const payload = undoSnap(scAiMergePayload(curBlock, best.sd[bi]));
+      const base = { type: currentPwType, year: curYM.year, month: curYM.month, date: b.dateKey, time: b.time };
+      const key = saveQueueKey(base);
+      const revision = (_saveLatestRevision[key] || 0) + 1;
+      _saveLatestRevision[key] = revision;
+      const snapshot = deepFreeze(Object.assign({}, base, { key, revision, payload }));
+      _saveLatestSnaps[key] = snapshot;
+      await enqueueSaveSnapshot(snapshot);
+    }
+    closeAiDiffModal();
+    // persistBlockSnapshot は shiftDates の該当ブロックを更新するだけで、
+    // 表示中のスロット表（DOM）までは作り直さない。作り直さないと、次にセルを
+    // 1つ触っただけで DOM 側の旧配置が読み直されて AI 原案が黙って消える。
+    // syncCurrentBlock() は逆に「DOM→shiftDates」なのでここでは呼ばない
+    buildTimeTabs();
+    renderBlock();
+    toast('AI原案を反映しました', 's');
+  } catch (e) {
+    toast('反映中にエラーが発生しました: ' + e.message, 'e');
+  } finally { setLoading(false); }
+}
 
 initAuth();

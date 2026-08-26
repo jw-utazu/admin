@@ -39,6 +39,7 @@
       '@keyframes uic-in{from{opacity:0;transform:translateY(10px) scale(.98);}}',
       '.uic-hd{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 0;}',
       '.uic-ic{font-size:20px;line-height:1.2;flex-shrink:0;}',
+      '.uic-ic svg{width:22px;height:22px;display:block;}',
       '.uic-tt{font-size:14px;font-weight:700;line-height:1.5;padding-top:1px;}',
       '.uic-bd{padding:9px 18px 16px 46px;font-size:12.5px;line-height:1.75;color:var(--ink2,#52525b);',
       '  white-space:pre-wrap;word-break:break-word;}',
@@ -98,10 +99,10 @@
 
   // 種類ごとの見た目。危険な操作ほど赤く、既定ボタンの色で取り返しのつかなさを示す
   var TYPES = {
-    danger:  { icon: '⚠️', okClass: 'danger' },  // 削除・取り消しなど元に戻せない操作
-    warn:    { icon: '❓', okClass: 'warn'   },  // 影響が大きいが復旧できる操作
+    danger:  { icon: ic('triangle-alert', { color: '#B45309' }), okClass: 'danger' },  // 削除・取り消しなど元に戻せない操作
+    warn:    { icon: ic('circle-help'), okClass: 'warn'   },  // 影響が大きいが復旧できる操作
     info:    { icon: 'ℹ️', okClass: ''       },  // 単なる確認
-    success: { icon: '✅', okClass: ''       },
+    success: { icon: ic('circle-check-big', { color: '#15803D' }), okClass: ''       },
   };
 
   /**
@@ -122,7 +123,7 @@
     // 表示中に別のダイアログを開こうとした場合、前のものはキャンセル扱いで閉じる
     if (_resolve) done(false);
     _prevFocus = document.activeElement;
-    ov.querySelector('#uic-ic').textContent = t.icon;
+    ov.querySelector('#uic-ic').innerHTML = t.icon;
     ov.querySelector('#uic-tt').textContent = opt.title || '確認';
     ov.querySelector('#uic-bd').textContent = opt.message || '';
     ov.querySelector('#uic-bd').classList.toggle('uic-hidden', !opt.message);
@@ -151,7 +152,7 @@
     var ov = build();
     if (_resolve) done(false);
     _prevFocus = document.activeElement;
-    ov.querySelector('#uic-ic').textContent = t.icon;
+    ov.querySelector('#uic-ic').innerHTML = t.icon;
     ov.querySelector('#uic-tt').textContent = opt.title || 'お知らせ';
     ov.querySelector('#uic-bd').textContent = opt.message || '';
     ov.querySelector('#uic-bd').classList.toggle('uic-hidden', !opt.message);
