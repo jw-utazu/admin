@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=45">
+<link rel="stylesheet" href="css/index.css?v=46">
 </head>
 <body>
 
@@ -21,7 +21,7 @@
 <div id="loading">
   <div class="ld-topbar"></div>
   <div class="ld-body">
-    <div class="ld-logo"><img src="logo.png" alt="PW" onerror="this.style.display='none';this.parentNode.style.background='var(--blue)'"></div>
+    <div class="ld-logo"><img src="logo.png" alt="PW" onerror="this.classList.add('is-hidden');this.parentNode.style.background='var(--blue)'"></div>
     <div class="ld-name">PW管理アプリ</div>
     <div class="ld-status" id="ld-status">準備中...</div>
     <div class="ld-steps">
@@ -42,12 +42,12 @@
     </div>
     <div class="ld-bar-bg"><div class="ld-bar" id="ld-bar"></div></div>
     <!-- データ読み込み失敗など、認証以外のエラーの表示先 -->
-    <div class="load-err" id="load-err" style="display:none;"></div>
+    <div class="load-err is-hidden" id="load-err"></div>
   </div>
 </div>
 
 <!-- APP -->
-<div id="app">
+<div id="app" class="is-hidden">
   <!-- HEADER -->
   <header class="hdr">
     <div class="hdr-logo" id="hdr-logo"><img src="logo.png" alt="PW" onerror="this.parentNode.textContent='PW'"></div>
@@ -87,15 +87,15 @@
                  設定中に戻す／今すぐ公開／非公開に戻す）。1状態＝1ボタンになるよう
                  calStageInfo() が状態から操作を1つに決め、renderCalStageMini() が
                  表示/非表示と文言を切り替える。クリックは calStageAction() -->
-            <button id="cal-approve-mini" class="cal-approve-mini" style="display:none;" onclick="calStageAction()">
+            <button id="cal-approve-mini" class="cal-approve-mini is-hidden" onclick="calStageAction()">
               <span id="cal-approve-mini-text"></span>
             </button>
             <!-- 主操作の脇に添える控えめな補助リンク（例：「承認を再依頼」の隣の「設定中に戻す」）。
                  1状態＝主要ボタン1つは保ったまま、取り消し系の導線を完全には失わせない -->
-            <button id="cal-stage-secondary" class="cal-stage-secondary-link" style="display:none;" onclick="calStageSecondaryAction()"></button>
+            <button id="cal-stage-secondary" class="cal-stage-secondary-link is-hidden" onclick="calStageSecondaryAction()"></button>
             <!-- 限定PWは複数月が同時進行しうるため進行状況ストリップの一本道モデルに乗らない。
                  公開/非公開の操作口をここに残す（通常PWでは非表示、ストリップ側の操作に一本化） -->
-            <button id="cal-pub-mini" class="cal-pub-mini" style="display:none;" onclick="toggleCalPub()">
+            <button id="cal-pub-mini" class="cal-pub-mini is-hidden" onclick="toggleCalPub()">
               <span id="cal-pub-mini-text"></span>
             </button>
           </div>
@@ -107,13 +107,13 @@
              シフト管理アプリを開かないと分からなかった。
              「予定表公開」段は申込開始日に自動で進むが、承認前だと止まる。
              クリックすれば toggleCalPub() で手動公開・非公開もできる -->
-        <div class="prog" id="prog-strip" style="display:none;">
+        <div class="prog is-hidden" id="prog-strip">
           <div class="prog-steps" id="prog-steps"></div>
         </div>
         <!-- 対象年月と公開中の月がズレているときの注意書き。
              常時表示され続けると不安の原因になる（2026-08-05 のフィードバック）ため、
              普段は1行だけの見出しにして、クリックで詳細を開く -->
-        <div class="cal-pub-note" id="cal-pub-note" style="display:none;">
+        <div class="cal-pub-note is-hidden" id="cal-pub-note">
           <div class="cpn-head" onclick="toggleCalPubNote()">
             <span class="cpn-ico">🔒</span>
             <span class="cpn-txt" id="cal-pub-note-txt"></span>
@@ -172,7 +172,7 @@
               <span style="font-size:12px;font-weight:700;color:var(--ink2);">実施日一覧</span>
               <!-- 紐づけは実施日設定の中で決めるが、月全体を一覧で見直したいときの入口。
                    通常PWで前月の枠があるときだけ renderMapReviewBtn が出す -->
-              <button id="map-review-btn" style="display:none;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--ink2);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);" onclick="openMapReviewModal()">🔗 前月との紐づけを見直す</button>
+              <button id="map-review-btn" class="is-hidden" style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--ink2);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--sans);" onclick="openMapReviewModal()">🔗 前月との紐づけを見直す</button>
             </div>
             <div class="slot-set-card">
               <div class="slot-set-list" id="slot-set-list">
@@ -181,7 +181,7 @@
             </div>
           </div>
           <!-- フェーズ管理カード（限定PW のみ） -->
-          <div id="phase-manage-card" style="display:none;margin-top:10px;">
+          <div id="phase-manage-card" class="is-hidden" style="margin-top:10px;">
             <!-- buildPhaseManageArea() で動的に生成 -->
           </div>
         </div>
@@ -271,7 +271,7 @@
           <button class="tool normal-only" onclick="openCoupleModal()" title="夫婦ペアの追加・削除">
             <span class="tool-ic" style="background:#fdf2f8;color:#be185d;">💍</span><span class="tool-n">夫婦</span>
           </button>
-          <button class="tool" id="btn-limited-members" style="display:none;" onclick="openLimitedMembersModal()" title="限定PW対象メンバーの追加・削除">
+          <button class="tool is-hidden" id="btn-limited-members" onclick="openLimitedMembersModal()" title="限定PW対象メンバーの追加・削除">
             <span class="tool-ic" style="background:#f0f9ff;color:#0369a1;">👥</span><span class="tool-n">メンバー</span>
           </button>
           <button class="tool normal-only" onclick="openLogModal()" title="管理者の操作履歴・希望提出・ログイン履歴の確認">
@@ -308,7 +308,7 @@
         <input type="text" id="lm-label-input" class="mf-inp" placeholder="例：2026年6月特別PW" style="flex:1;" />
         <button class="btn btn-p" onclick="saveLimitedLabel()">保存</button>
       </div>
-      <div id="lm-member-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);">
+      <div id="lm-member-list" style="border:1px solid var(--border);border-radius:var(--r);">
         <div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>
       </div>
     </div>
@@ -331,7 +331,7 @@
       <div class="fg" style="margin-top:12px;">
         <label class="fl">対象メンバー（任意）</label>
         <input type="text" id="add-slot-member-search" class="finp" placeholder="氏名で絞り込み..." oninput="filterAddSlotPicker()" style="margin-bottom:6px;" />
-        <div id="add-slot-picker-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;"></div>
+        <div id="add-slot-picker-list" style="border:1px solid var(--border);border-radius:6px;"></div>
         <div id="add-slot-selected-count" style="margin-top:6px;font-size:12px;color:var(--ink3);"></div>
       </div>
     </div>
@@ -364,7 +364,7 @@
     <div class="mhd"><span class="mt">メンバーを選択</span><button class="mx" onclick="closeM('m-limited-add')">&#10005;</button></div>
     <div class="mbd" style="padding:8px;">
       <input type="text" id="lm-search" class="mf-inp" placeholder="氏名で絞り込み..." oninput="filterLimitedPicker()" style="margin-bottom:8px;" />
-      <div id="lm-picker-list" style="max-height:320px;overflow-y:auto;"></div>
+      <div id="lm-picker-list"></div>
     </div>
     <div class="mft"><button class="btn btn-g" onclick="closeM('m-limited-add')">閉じる</button></div>
   </div>
@@ -396,7 +396,7 @@
     <div class="mft" id="m-photo-mgmt-ft">
       <button class="btn btn-g" onclick="closeM('m-photo-mgmt')">閉じる</button>
       <label class="btn btn-p" style="cursor:pointer;">📤 写真を追加
-        <input type="file" id="photo-upload-input" accept="image/*" multiple style="display:none;" onchange="onPhotoFilesSelected(event)">
+        <input type="file" id="photo-upload-input" class="is-hidden" accept="image/*" multiple onchange="onPhotoFilesSelected(event)">
       </label>
     </div>
   </div>
@@ -471,7 +471,7 @@
           <span class="log-filter-lbl">〜</span>
           <input type="date" id="log-to">
         </div>
-        <div class="log-fg-note" id="log-date-note" style="display:none;">このログには日時が記録されていないため、期間では絞り込めません</div>
+        <div class="log-fg-note is-hidden" id="log-date-note">このログには日時が記録されていないため、期間では絞り込めません</div>
       </div>
       <div class="log-fg">
         <div class="log-fg-t">名前・操作の文字</div>
@@ -561,7 +561,7 @@
   <div class="modal sm">
     <div class="mhd"><span class="mt">📲 ホーム画面に追加</span><button class="mx" onclick="closeM('m-pwa')">&#10005;</button></div>
     <div class="mbd">
-      <div id="pwa-auto-section" style="display:none;margin-bottom:14px;">
+      <div id="pwa-auto-section" class="is-hidden" style="margin-bottom:14px;">
         <p style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:8px;">✓ このブラウザはワンタップでインストールできます</p>
         <button onclick="pwaTriggerInstall()" style="width:100%;padding:11px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;">インストールする</button>
         <hr style="margin:14px 0;border:none;border-top:1px solid var(--border);">
@@ -631,7 +631,7 @@
     </div>
     <div class="mft">
       <button class="btn btn-g" onclick="closeM('m-day-select')">キャンセル</button>
-      <button class="btn btn-d" id="m-day-reset-btn" onclick="resetDaySettings()" style="display:none;">リセット</button>
+      <button class="btn btn-d is-hidden" id="m-day-reset-btn" onclick="resetDaySettings()">リセット</button>
     </div>
   </div>
 </div>
@@ -649,22 +649,22 @@
 
 <!-- 処理中フルスクリーンオーバーレイ -->
 <div id="proc-ov">
-  <div class="proc-logo"><img src="logo.png" alt="PW" onerror="this.style.display='none'"></div>
+  <div class="proc-logo"><img src="logo.png" alt="PW" onerror="this.classList.add('is-hidden')"></div>
   <div class="proc-spin" id="proc-spin"></div>
   <div class="proc-title" id="proc-title">処理しています...</div>
   <div class="proc-sub" id="proc-sub">少々お待ちください</div>
-  <div class="proc-steps" id="proc-steps" style="display:none;"></div>
-  <button id="proc-close-btn" onclick="hideProc()" style="display:none;margin-top:4px;padding:8px 24px;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);background:var(--surface2);color:var(--ink2);">閉じる</button>
+  <div class="proc-steps is-hidden" id="proc-steps"></div>
+  <button id="proc-close-btn" class="is-hidden" onclick="hideProc()" style="margin-top:4px;padding:8px 24px;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--border);background:var(--surface2);color:var(--ink2);">閉じる</button>
 </div>
 
 <div class="ta" id="ta"></div>
 
 <!-- フェーズ追加・編集モーダル -->
 
-<script src="js/session.js?v=4"></script>
-<script src="js/api.js?v=9"></script>
-<script src="js/confirm.js?v=1"></script>
-<script src="js/picker.js?v=7"></script>
-<script src="js/index.js?v=68"></script>
+<script src="js/session.js?v=5"></script>
+<script src="js/api.js?v=10"></script>
+<script src="js/confirm.js?v=2"></script>
+<script src="js/picker.js?v=8"></script>
+<script src="js/index.js?v=70"></script>
 </body>
 </html>

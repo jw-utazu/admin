@@ -45,7 +45,7 @@ async function tryRecoveryLogin() {
   try { token = localStorage.getItem('pwgws_recovery_session') || ''; } catch (_) {}
   if (!token) return false;
   try {
-    const res = await apiPost({ action: 'validateRecoverySession', sessionToken: token });
+    const res = await apiPost({ action: 'validateRecoverySession' });
     if (!res.ok || !res.isAdmin) return false;
     _currentUser = { uid: res.uid || '', name: res.name, email: '', isRecoverySession: true };
     document.getElementById('loading').classList.add('show');
@@ -56,7 +56,7 @@ async function tryRecoveryLogin() {
     const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     curY = _nm.getFullYear(); curM = _nm.getMonth() + 1;
     calY = now.getFullYear(); calM = now.getMonth() + 1;
-    loadAdminData();
+    await loadAdminData({ initial: true });
     if (res.daysLeft <= 3) {
       setTimeout(() => uiAlert({
         type: 'warn', title: '一時ログインの期限が近づいています',
@@ -81,22 +81,13 @@ async function tryAutoLogin() {
   // Googleアカウントが使えない管理者のための救済セッションを最優先で確認
   if (await tryRecoveryLogin()) return;
 
-  // まずlocalStorageに保存済みユーザーがあれば即復元
-  try {
-    const saved = localStorage.getItem('adminUser');
-    if (saved) {
-      const u = JSON.parse(saved);
-      if (u && u.email) {
-        processUser(u, false); // 保存しなおさない
-        return;
-      }
-    }
-  } catch(e) { console.warn('[auto-login]', e); }
-
-  // 共通ログイン画面でログイン済みなら引き継ぐ（管理者権限は processUser 内で
-  // サーバーに問い合わせて確認するため、ここでは本人確認だけを引き継ぐ）
+  // 共通セッションの不透明tokenがある場合だけ復元する。adminUser は表示用キャッシュであり、
+  // 本人確認・権限確認には使わない。
   const shared = pwgwsGetSession();
-  if (shared) { processUser({ email: shared.email, name: shared.name, picture: shared.picture }); return; }
+  if (shared && pwgwsGetSessionToken()) {
+    processUser({ email: shared.email, name: shared.name, picture: shared.picture }, false);
+    return;
+  }
 
   // 未ログイン：共通ログイン画面へ送る（このアプリ内に認証画面は持たない）
   pwgwsGoToLogin();
@@ -117,28 +108,18 @@ async function _processUserWithGasAuth(u, save) {
   // ReferenceError になり、しかも catch の外なので権限確認のまま止まる
   let auth = null;
   try {
-    // fetch方式（リダイレクト追従対応・Android Chrome対応）
-    const url = API_URL + '?action=auth&source=admin&email=' + encodeURIComponent(u.email);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-    const res = await fetch(url, { redirect: 'follow', signal: controller.signal, headers: { 'Authorization': 'Bearer ' + ANON_KEY } })
-      .then(r => { clearTimeout(timer); return r.json(); })
-      .catch(err => {
-        clearTimeout(timer);
-        if (err.name === 'AbortError') throw new Error('タイムアウト');
-        throw new Error('通信エラー');
-      });
+    const res = await apiAuthGet(u.email, 'admin');
     if (!res.ok) { showAuthErr('', 'unauthorized'); return; }
     if (!res.isAdmin) { showAuthErr('', 'noadmin'); return; }
     auth = res;
     // ログインユーザー情報を保持（uid空＝オーナーアカウント）
-    _currentUser = { uid: res.uid || '', name: u.name, email: u.email };
+    _currentUser = { uid: res.uid || '', name: res.name || '', email: res.email || '' };
   } catch(e) { showAuthErr('認証に失敗しました: ' + e.message); return; }
   // ログイン情報をlocalStorageに保存（次回自動ログイン用）
   if (save) {
-    try { localStorage.setItem('adminUser', JSON.stringify({ email: u.email, name: u.name, picture: u.picture, avatar: (auth && auth.avatar) || '', isAdmin: true })); } catch(e) {}
+    try { localStorage.setItem('adminUser', JSON.stringify({ email: auth.email, name: auth.name, picture: u.picture, avatar: auth.avatar || '', isAdmin: true })); } catch(e) {}
     // 他の2アプリでもログイン済みとして扱えるよう共通セッションにも保存する
-    pwgwsSaveSession(u.email, u.name, u.picture);
+    pwgwsSaveSession(auth.email, auth.name, u.picture);
   }
   const av = document.getElementById('av');
   // フォームアプリで設定したアバター（auth.avatar）を優先し、未設定ならGoogle写真にフォールバック
@@ -159,7 +140,7 @@ async function _processUserWithGasAuth(u, save) {
   curM = _nm.getMonth() + 1; // 来月をデフォルト
   calY = now.getFullYear(); calM = now.getMonth() + 1;
   setLoadingStep(3, 'データを読み込み中...');
-  loadAdminData();
+  await loadAdminData({ initial: true });
 }
 // アカウント切り替えメニュー（実体は共有の session.js。3アプリで同じ見た目にするため）
 function openAccountMenu(el) {
@@ -207,7 +188,7 @@ function showAuthErr(msg, reason) {
   document.getElementById('loading').classList.remove('show');
   const el = document.getElementById('load-err');
   el.textContent = msg;
-  el.style.display = 'block';
+  setVisible(el, true);
 }
 
 // apiGet は js/api.js（共有通信層）で定義
@@ -215,66 +196,117 @@ function showAuthErr(msg, reason) {
 // ============================================================
 // データ読み込み
 // ============================================================
-async function loadAdminData() {
-  updYmTitle();
-  apiGet('setupTriggers').catch(() => {});
-  let d;
-  try {
-    d = await apiGet('adminData', { year: curY, month: curM });
-  } catch(e) {
-    // 認証は済んでいるので、ローディング画面上にエラーを表示する
-    showAuthErr('データの読み込みに失敗しました: ' + e.message);
-    return;
+let _adminLoadGeneration = 0;
+let _adminSwitching = false;
+
+function parseEventDate(value, targetYear, targetMonth) {
+  if (!value) return null;
+  let y, m, d;
+  if (typeof value === 'object') {
+    y = Number(value.y ?? value.year);
+    m = Number(value.m ?? value.month);
+    d = Number(value.d ?? value.day);
+  } else {
+    const text = String(value).trim();
+    let hit = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(text);
+    if (hit) {
+      y = Number(hit[1]); m = Number(hit[2]); d = Number(hit[3]);
+    } else {
+      // 旧APIの M/D だけは移行中の表示を壊さないため受ける。年は対象月に
+      // 最も近い候補を選び、1月分の申込開始日=前年12月も正しく扱う。
+      hit = /^(\d{1,2})\/(\d{1,2})$/.exec(text);
+      if (!hit) return null;
+      m = Number(hit[1]); d = Number(hit[2]);
+      const base = Number(targetYear) * 12 + Number(targetMonth) - 1;
+      y = [Number(targetYear) - 1, Number(targetYear), Number(targetYear) + 1]
+        .sort((a, b) => Math.abs(a * 12 + m - 1 - base) - Math.abs(b * 12 + m - 1 - base))[0];
+    }
   }
-  adminData = d;
-  // サーバーから対象月の年月を取得（ただしUI上の対象月はcurY/curMを使う）
-  // slots・datesはサーバーから読み取る
-  if (d.eventDates) {
-    const toObj = str => {
-      if (!str) return null;
-      const p = str.split('/');
-      return p.length===2 ? {y:curY, m:parseInt(p[0]), d:parseInt(p[1])} : null;
-    };
-    dates.apply    = toObj(d.eventDates['申込開始']);
-    dates.deadline = toObj(d.eventDates['締切']);
-    dates.open     = toObj(d.eventDates['シフト公開']);
-  }
-  if (d.currentSlots) {
-    slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
-  }
-  // 保存済みの前月との紐づけ。実施日設定モーダルの既定値として使うので、
-  // 開いた時点で「いま保存されている対応」が出るようにする
-  slotMapping = d.slotMapping || {};
-  if (d.limitedSlots) {
-    limitedSlots = d.limitedSlots;
-  }
-  if (d.phases) {
-    adminPhases = d.phases;
-    currentPhaseIndex = 0;
-    if (currentPwType !== 'normal') syncSlotsFromPhases();
-  }
-  renderPwTypeTabs();
-  renderAll();
-  loadCalPubStatus();
-  loadPendingCounts();   // サイドバー「未対応」の件数（件数だけを返す軽量API）
-  loadShiftStatus();     // 進行状況ストリップ用（シフトの作成完了・確認完了）
-  loadCalApprovalStatus(); // 同上（予定表の承認状態）
-  renderProgressStrip(); // 先に日程・公開状態だけで描いておく（シフト状態は後追い）
-  // 描画完了後にローディングを非表示・appを表示。
-  // requestAnimationFrame はタブが非表示のあいだ発火しないため、
-  // バックグラウンドで開かれた場合に備えてタイマーでも必ず実行する
-  let _appShown = false;
-  const showAppNow = () => {
-    if (_appShown) return;
-    _appShown = true;
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d) || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const check = new Date(y, m - 1, d);
+  return check.getFullYear() === y && check.getMonth() + 1 === m && check.getDate() === d ? { y, m, d } : null;
+}
+
+function applyEventDates(eventDates, targetYear, targetMonth) {
+  const src = eventDates || {};
+  dates.apply    = parseEventDate(src['申込開始'], targetYear, targetMonth);
+  dates.deadline = parseEventDate(src['締切'], targetYear, targetMonth);
+  dates.open     = parseEventDate(src['シフト公開'], targetYear, targetMonth);
+}
+
+async function fetchAdminMonthBundle(year, month, type) {
+  const target = { year, month, type };
+  const [data, calStatus, shiftStatusResult, calApprovalResult] = await Promise.all([
+    apiGet('adminData', target),
+    apiGet('getCalPubStatus', { type }),
+    apiGet('getShiftPublishStatus', target),
+    apiGet('getCalApprovalStatus', target),
+  ]);
+  if (!data || data.ok === false) throw new Error((data && data.error) || '管理データの取得に失敗しました');
+  [calStatus, shiftStatusResult, calApprovalResult].forEach(result => {
+    if (result && result.ok === false) throw new Error(result.error || '公開・承認状態の取得に失敗しました');
+  });
+  return { data, calStatus, shiftStatusResult, calApprovalResult };
+}
+
+function showInitialApp() {
+  let shown = false;
+  const show = () => {
+    if (shown) return;
+    shown = true;
     document.getElementById('ld-bar').style.width = '100%';
     setTimeout(() => {
       document.getElementById('loading').classList.remove('show');
-      document.getElementById('app').style.display = 'flex';
+      setVisible(document.getElementById('app'), true);
     }, 400);
   };
-  requestAnimationFrame(() => requestAnimationFrame(showAppNow));
-  setTimeout(showAppNow, 1000);
+  requestAnimationFrame(() => requestAnimationFrame(show));
+  setTimeout(show, 1000);
+}
+
+async function loadAdminData(options) {
+  const opts = options || {};
+  const targetYear = Number(opts.year || curY);
+  const targetMonth = Number(opts.month || curM);
+  const targetType = opts.type || currentPwType;
+  const generation = ++_adminLoadGeneration;
+  try {
+    const bundle = await fetchAdminMonthBundle(targetYear, targetMonth, targetType);
+    if (generation !== _adminLoadGeneration) return false;
+    const d = bundle.data;
+
+    // 取得が全部成功してから対象年月・PWとDOMを一度に更新する。
+    curY = targetYear; curM = targetMonth; currentPwType = targetType;
+    if (targetType !== 'normal') { calY = targetYear; calM = targetMonth; }
+    adminData = d;
+    applyEventDates(d.eventDates, targetYear, targetMonth);
+    slots = (d.currentSlots || []).map(s => ({
+      y: Number(s.y || targetYear), m: Number(s.m || targetMonth), d: Number(s.d),
+      time: s.time, interval: parseInt(s.interval) || 15,
+    }));
+    // 保存済みの前月との紐づけ。実施日設定モーダルの既定値として使う。
+    slotMapping = d.slotMapping || {};
+    if (d.limitedSlots) limitedSlots = d.limitedSlots;
+    adminPhases = d.phases || [];
+    currentPhaseIndex = 0;
+    if (currentPwType !== 'normal') syncSlotsFromPhases();
+
+    applyCalPubStatus(bundle.calStatus);
+    applyShiftStatus(bundle.shiftStatusResult, targetYear, targetMonth);
+    applyCalApprovalStatus(bundle.calApprovalResult, targetYear, targetMonth);
+    renderPwTypeTabs();
+    renderAll();
+    renderProgressStrip();
+    if (currentPwType === 'normal') loadPendingCounts();
+    if (opts.initial) showInitialApp();
+    return true;
+  } catch(e) {
+    if (generation !== _adminLoadGeneration) return false;
+    if (opts.initial) showAuthErr('データの読み込みに失敗しました: ' + e.message);
+    if (opts.rethrow) throw e;
+    if (!opts.initial) toast('データの読み込みに失敗しました: ' + e.message, 'e');
+    return false;
+  }
 }
 
 function renderAll() {
@@ -283,15 +315,15 @@ function renderAll() {
   const nav = document.getElementById('cal-ym-nav');
   if (nav) nav.style.visibility = isLimited ? 'hidden' : 'visible';
   const slotsArea = document.getElementById('info-slots-card');
-  if (slotsArea) slotsArea.style.display = isLimited ? 'none' : '';
+  setVisible(slotsArea, !isLimited);
   const datesArea = document.getElementById('info-dates-card');
-  if (datesArea) datesArea.style.display = isLimited ? 'none' : '';
+  setVisible(datesArea, !isLimited);
   // 限定PWでもカレンダーエリアを表示
   const calArea = document.getElementById('cal-scroll-area');
-  if (calArea) calArea.style.display = '';
+  setVisible(calArea, true);
   // cal-view-nav は限定PWのみ表示（通常PWは前月+管理月の2ヶ月固定のため不要）
   const calViewNavBar = document.getElementById('cal-view-nav-bar');
-  if (calViewNavBar) calViewNavBar.style.display = isLimited ? '' : 'none';
+  setVisible(calViewNavBar, isLimited);
   updYmTitle();
   updDateViews();
   buildCalScroll();
@@ -382,23 +414,20 @@ function chM(dir) {
 }
 
 // 対象年月を切り替える。‹ › の送りと年月ピッカーの入口を1本にまとめている
-function setYm(y, m) {
-  curY = y; curM = m;
-  // 通常PW: ローディングオーバーレイを出してデータ再取得
-  const isLimited = currentPwType !== 'normal';
-  if (!isLimited) {
-    const ov = document.getElementById('tab-switch-ov');
-    const txtEl = document.getElementById('tab-sw-text');
-    if (txtEl) txtEl.textContent = curY + '年' + curM + '月のデータを読み込み中...';
-    if (ov) ov.classList.add('show');
-    loadAdminDataWithOverlay().finally(() => {
-      if (ov) ov.classList.remove('show');
-    });
-  } else {
-    calY = curY; calM = curM;
-    updYmTitle();
-    buildCalScroll();
-    buildInfoArea();
+async function setYm(y, m) {
+  const targetYear = Number(y), targetMonth = Number(m);
+  if (_adminSwitching || !targetYear || !targetMonth || (targetYear === curY && targetMonth === curM)) return;
+  _adminSwitching = true;
+  setAdminSwitching(true);
+  showProc(targetYear + '年' + targetMonth + '月のデータを読み込んでいます...', '保存済みの画面は読み込みが完了するまで保持されます');
+  try {
+    await loadAdminData({ year: targetYear, month: targetMonth, type: currentPwType, rethrow: true });
+  } catch (e) {
+    toast('年月の切り替えを中止しました: ' + e.message, 'e');
+  } finally {
+    hideProc();
+    setAdminSwitching(false);
+    _adminSwitching = false;
   }
 }
 function chCalM(dir) {
@@ -408,43 +437,9 @@ function chCalM(dir) {
   buildCalScroll();
 }
 
-async function loadAdminDataWithOverlay() {
-  updYmTitle();
-  apiGet('setupTriggers').catch(() => {});
-  let d;
-  try {
-    d = await apiGet('adminData', { year: curY, month: curM });
-  } catch(e) {
-    toast('データの読み込みに失敗しました: ' + e.message, 'e');
-    return;
-  }
-  adminData = d;
-  if (d.eventDates) {
-    const toObj = str => {
-      if (!str) return null;
-      const p = str.split('/');
-      return p.length===2 ? {y:curY, m:parseInt(p[0]), d:parseInt(p[1])} : null;
-    };
-    dates.apply    = toObj(d.eventDates['申込開始']);
-    dates.deadline = toObj(d.eventDates['締切']);
-    dates.open     = toObj(d.eventDates['シフト公開']);
-  } else {
-    dates.apply = dates.deadline = dates.open = null;
-  }
-  if (d.currentSlots) {
-    slots = d.currentSlots.map(s=>({y:s.y||curY,m:s.m||curM,d:s.d,time:s.time,interval:parseInt(s.interval)||15}));
-  } else {
-    slots = [];
-  }
-  if (d.phases) {
-    adminPhases = d.phases;
-    currentPhaseIndex = 0;
-    if (currentPwType !== 'normal') syncSlotsFromPhases();
-  }
-  renderAll();
-  loadCalPubStatus();
-  loadShiftStatus();   // シフトの状態は月ごとに違うので、月を切り替えたら取り直す
-  loadCalApprovalStatus();  // 承認状態も月ごとに違う
+function setAdminSwitching(on) {
+  document.querySelectorAll('#cal-ym-nav button, #cal-view-nav-bar button, #pw-type-bar button')
+    .forEach(button => { button.disabled = !!on; });
 }
 
 // ============================================================
@@ -505,32 +500,45 @@ function swTab(id,btn){
 // PW タブ描画
 // ============================================================
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  })[c]);
 }
 // esc は escHtml の別名（旧実装同様 null/undefined/0/false/'' は '' として扱う）
 function esc(s) { return escHtml(s || ''); }
+function setVisible(el, on) { if (el) el.classList.toggle('is-hidden', !on); }
 
 function renderPwTypeTabs() {
   const bar = document.getElementById('pw-type-bar');
   if (!bar) return;
   const isNormal = currentPwType === 'normal';
-  let html = `<button class="pw-type-tab pw-tab-first${isNormal ? ' active normal-tab' : ''}" onclick="switchPwType('normal')">通常PW</button>`;
+  let html = `<button type="button" class="pw-type-tab pw-tab-first${isNormal ? ' active normal-tab' : ''}" data-pw-type="normal">通常PW</button>`;
 
   limitedSlots.forEach((slot, idx) => {
     const isActive = currentPwType === slot.id;
-    html += `<button class="pw-type-tab${isActive ? ' active' : ''}" onclick="switchPwType('${escHtml(slot.id)}')">${escHtml(slot.name)}<span class="lt-edit-ic" onclick="openEditLimitedSlotModal('${escHtml(slot.id)}');event.stopPropagation()">✏</span></button>`;
+    html += `<button type="button" class="pw-type-tab${isActive ? ' active' : ''}" data-pw-type="${escHtml(slot.id)}">${escHtml(slot.name)}<span class="lt-edit-ic" data-edit-pw="${escHtml(slot.id)}">✏</span></button>`;
   });
 
-  html += `<button class="pw-type-tab pw-tab-add" onclick="openAddLimitedSlotModal()">＋</button>`;
+  html += '<button type="button" class="pw-type-tab pw-tab-add" data-add-pw>＋</button>';
   bar.innerHTML = html;
+  bar.querySelectorAll('[data-pw-type]').forEach(button => {
+    button.addEventListener('click', () => switchPwType(button.dataset.pwType || 'normal'));
+  });
+  bar.querySelectorAll('[data-edit-pw]').forEach(button => {
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      openEditLimitedSlotModal(button.dataset.editPw || '');
+    });
+  });
+  bar.querySelector('[data-add-pw]')?.addEventListener('click', openAddLimitedSlotModal);
 
   // 限定PW 対象メンバー管理ボタンの表示切り替え
   const btnLm = document.getElementById('btn-limited-members');
-  if (btnLm) btnLm.style.display = currentPwType !== 'normal' ? '' : 'none';
+  setVisible(btnLm, currentPwType !== 'normal');
 
   // 通常PW専用要素（メンバー管理・お知らせ・要望・バグ報告・代理・夫婦・未対応セクションなど）の表示切り替え
   document.querySelectorAll('.normal-only').forEach(b => {
-    b.style.display = currentPwType === 'normal' ? '' : 'none';
+    setVisible(b, currentPwType === 'normal');
   });
 
   // シフト管理アプリへのリンクに現在のPWタイプを引き継ぐ
@@ -542,34 +550,22 @@ function renderPwTypeTabs() {
 // PW モード切り替え
 // ============================================================
 async function switchPwType(type) {
-  if (currentPwType === type) return;
-
-  // ローディングオーバーレイを表示し、タブを全て無効化
-  const ov = document.getElementById('tab-switch-ov');
-  const txtEl = document.getElementById('tab-sw-text');
+  if (_adminSwitching || currentPwType === type) return;
   const label = type === 'normal' ? '通常PW' : (limitedSlots.find(s => s.id === type)?.name || '限定PW');
-  if (txtEl) txtEl.textContent = `${label} のデータを読み込み中...`;
-  if (ov) ov.classList.add('show');
-  document.querySelectorAll('#pw-type-bar .pw-type-tab').forEach(btn => btn.disabled = true);
-
-  // currentPwType を更新（apiGet の type パラメータに使用）
-  const prevType = currentPwType;
-  currentPwType = type;
-  currentPhaseIndex = 0;
-
+  _adminSwitching = true;
+  setAdminSwitching(true);
+  showProc(`${label} のデータを読み込んでいます...`, '現在の画面は読み込みが完了するまで保持されます');
   try {
-    // データ取得完了後に画面を切り替える（loadAdminData 内で renderPwTypeTabs/renderAll が呼ばれる）
-    await loadAdminData();
+    // type も取得条件として渡し、取得が全て成功した後だけ global/DOM を切り替える。
+    await loadAdminData({ year: curY, month: curM, type, rethrow: true });
     const slotName = limitedSlots.find(s => s.id === type);
     toast(type === 'normal' ? '通常PWモードに切り替えました' : `${slotName ? slotName.name : '限定PW'}モードに切り替えました`, 's');
   } catch (e) {
-    currentPwType = prevType;
-    renderPwTypeTabs();
-    toast('データ読み込みエラー: ' + e.message, 'e');
+    toast('PW切り替えを中止しました: ' + e.message, 'e');
   } finally {
-    if (ov) ov.classList.remove('show');
-    // renderPwTypeTabs で再描画されるが、エラー時のために念のため解除
-    document.querySelectorAll('#pw-type-bar .pw-type-tab').forEach(btn => btn.disabled = false);
+    hideProc();
+    setAdminSwitching(false);
+    _adminSwitching = false;
   }
 }
 
@@ -600,16 +596,22 @@ async function refreshLimitedMemberList() {
       listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px;">対象メンバーが登録されていません</div>';
       return;
     }
-    listEl.innerHTML = _limitedMembersCache.map(m =>
+    listEl.innerHTML = _limitedMembersCache.map((m, index) =>
       `<div class="lm-row">
-        <span class="lm-uid">${m.uid}</span>
-        <span class="lm-name">${m.name}</span>
-        <span class="lm-date">${m.addedAt}</span>
-        <button class="lm-del" onclick="removeLimitedMember('${m.uid}')">削除</button>
+        <span class="lm-uid">${esc(m.uid)}</span>
+        <span class="lm-name">${esc(m.name)}</span>
+        <span class="lm-date">${esc(m.addedAt)}</span>
+        <button type="button" class="lm-del" data-remove-limited="${index}">削除</button>
       </div>`
     ).join('');
+    listEl.querySelectorAll('[data-remove-limited]').forEach(button => {
+      button.addEventListener('click', () => {
+        const member = _limitedMembersCache[Number(button.dataset.removeLimited)];
+        if (member) removeLimitedMember(member.uid);
+      });
+    });
   } catch (e) {
-    listEl.innerHTML = `<div style="padding:16px;color:var(--red);font-size:12px;">エラー: ${e.message}</div>`;
+    listEl.innerHTML = `<div style="padding:16px;color:var(--red);font-size:12px;">エラー: ${esc(e.message)}</div>`;
   }
 }
 
@@ -682,7 +684,7 @@ async function _loadAddSlotMembers() {
     }
     renderAddSlotPicker(_allMembersForPicker);
   } catch (e) {
-    pickerEl.innerHTML = `<div style="padding:10px;color:var(--red);font-size:12px;">エラー: ${e.message}</div>`;
+    pickerEl.innerHTML = `<div style="padding:10px;color:var(--red);font-size:12px;">エラー: ${esc(e.message)}</div>`;
   }
 }
 
@@ -693,18 +695,25 @@ function filterAddSlotPicker() {
 }
 
 function renderAddSlotPicker(members) {
-  const html = members.map(m => {
+  const html = members.map((m, index) => {
     const selected = _addSlotSelectedMembers.has(m.uid);
     return `<div class="lm-row">
-      <span class="lm-uid">${m.uid}</span>
-      <span class="lm-name">${m.name}</span>
+      <span class="lm-uid">${esc(m.uid)}</span>
+      <span class="lm-name">${esc(m.name)}</span>
       ${selected
-        ? `<button class="lm-del" onclick="toggleAddSlotMember('${m.uid}','${m.name.replace(/'/g,"\\'")}')">解除</button>`
-        : `<button class="btn btn-p" style="padding:2px 8px;font-size:11px;" onclick="toggleAddSlotMember('${m.uid}','${m.name.replace(/'/g,"\\'")}')">追加</button>`
+        ? `<button type="button" class="lm-del" data-toggle-slot-member="${index}">解除</button>`
+        : `<button type="button" class="btn btn-p" style="padding:2px 8px;font-size:11px;" data-toggle-slot-member="${index}">追加</button>`
       }
     </div>`;
   }).join('') || '<div style="padding:10px;color:var(--ink3);font-size:13px;">該当なし</div>';
-  document.getElementById('add-slot-picker-list').innerHTML = html;
+  const list = document.getElementById('add-slot-picker-list');
+  list.innerHTML = html;
+  list.querySelectorAll('[data-toggle-slot-member]').forEach(button => {
+    button.addEventListener('click', () => {
+      const member = members[Number(button.dataset.toggleSlotMember)];
+      if (member) toggleAddSlotMember(member.uid, member.name);
+    });
+  });
   const count = _addSlotSelectedMembers.size;
   document.getElementById('add-slot-selected-count').textContent = count > 0 ? `選択中: ${count}名` : '';
 }
@@ -782,7 +791,7 @@ function openEditLimitedSlotModal(id) {
   const slot = limitedSlots.find(s => s.id === id);
   if (!slot) return;
   document.getElementById('edit-slot-name').value = slot.name;
-  document.getElementById('edit-slot-delete-btn').style.display = '';
+  setVisible(document.getElementById('edit-slot-delete-btn'), true);
   openM('m-edit-limited-slot');
 }
 
@@ -861,7 +870,7 @@ async function openAddLimitedMemberPicker() {
     }
     renderLimitedPicker(_allMembersForPicker);
   } catch (e) {
-    pickerEl.innerHTML = `<div style="padding:12px;color:var(--red);font-size:12px;">エラー: ${e.message}</div>`;
+    pickerEl.innerHTML = `<div style="padding:12px;color:var(--red);font-size:12px;">エラー: ${esc(e.message)}</div>`;
   }
 }
 
@@ -873,18 +882,25 @@ function filterLimitedPicker() {
 
 function renderLimitedPicker(members) {
   const existingUids = new Set((_limitedMembersCache||[]).map(m => m.uid));
-  const html = members.map(m => {
+  const html = members.map((m, index) => {
     const already = existingUids.has(m.uid);
     return `<div class="lm-row">
-      <span class="lm-uid">${m.uid}</span>
-      <span class="lm-name">${m.name}</span>
+      <span class="lm-uid">${esc(m.uid)}</span>
+      <span class="lm-name">${esc(m.name)}</span>
       ${already
         ? '<span style="font-size:11px;color:var(--ink3);">登録済</span>'
-        : `<button class="btn btn-p" style="padding:2px 8px;font-size:11px;" onclick="addLimitedMember('${m.uid}','${m.name.replace(/'/g,"\\'")}')">追加</button>`
+        : `<button type="button" class="btn btn-p" style="padding:2px 8px;font-size:11px;" data-add-limited-member="${index}">追加</button>`
       }
     </div>`;
   }).join('') || '<div style="padding:12px;color:var(--ink3);font-size:13px;">該当なし</div>';
-  document.getElementById('lm-picker-list').innerHTML = html;
+  const list = document.getElementById('lm-picker-list');
+  list.innerHTML = html;
+  list.querySelectorAll('[data-add-limited-member]').forEach(button => {
+    button.addEventListener('click', () => {
+      const member = members[Number(button.dataset.addLimitedMember)];
+      if (member) addLimitedMember(member.uid, member.name);
+    });
+  });
 }
 
 async function addLimitedMember(uid, name) {
@@ -952,7 +968,7 @@ function buildDaySelectContent(y,m,d) {
     hasSlot    = slots.some(s=>s.y===y&&s.m===m&&s.d===d);
   }
   const hasAny = isApply||isDeadline||isOpen||hasSlot;
-  document.getElementById('m-day-reset-btn').style.display = hasAny ? 'inline-flex' : 'none';
+  setVisible(document.getElementById('m-day-reset-btn'), hasAny);
 
   let phaseTabs = '';
   if (isLimited) {
@@ -1225,10 +1241,10 @@ function buildInfoArea() {
   // （以前は存在しない info-dates-rows を条件に入れていたため、この分岐ごと
   //   空振りして限定PWでもカードが出たままだった）
   const datesCard = document.getElementById('info-dates-card');
-  if (datesCard) datesCard.style.display = isLimited ? 'none' : 'block';
+  setVisible(datesCard, !isLimited);
   // 実施日一覧カード（通常PW のみ）。中身は buildSlotSetList が描く
   const slotsCard = document.getElementById('info-slots-card');
-  if (slotsCard) slotsCard.style.display = isLimited ? 'none' : (slots.length > 0 ? 'block' : 'none');
+  setVisible(slotsCard, !isLimited && slots.length > 0);
   // フェーズ管理カード（限定PW のみ）
   buildPhaseManageArea(isLimited);
   // 前月との紐づけを見直す入口（通常PWで前月の枠があるときだけ）
@@ -1246,8 +1262,8 @@ function syncSlotsFromPhases() {
 function buildPhaseManageArea(isLimited) {
   const card = document.getElementById('phase-manage-card');
   if (!card) return;
-  if (!isLimited) { card.style.display = 'none'; return; }
-  card.style.display = 'block';
+  if (!isLimited) { setVisible(card, false); return; }
+  setVisible(card, true);
 
   const phases = adminPhases || [];
   if (currentPhaseIndex >= phases.length) currentPhaseIndex = Math.max(0, phases.length - 1);
@@ -1342,7 +1358,7 @@ async function deleteCurPhase() {
 async function savePhases() {
   const ov = document.getElementById('tab-switch-ov');
   const ovTxt = document.getElementById('tab-sw-text');
-  if (ov) { ov.style.display = 'flex'; if (ovTxt) ovTxt.textContent = 'フェーズを保存中...'; }
+  if (ov) { ov.classList.add('show'); if (ovTxt) ovTxt.textContent = 'フェーズを保存中...'; }
   try {
     const toYMD = obj => obj ? `${obj.y}/${String(obj.m).padStart(2,'0')}/${String(obj.d).padStart(2,'0')}` : '';
     const phasesForGas = adminPhases.map(p => ({
@@ -1363,7 +1379,7 @@ async function savePhases() {
   } catch (e) {
     uiAlert({ type: 'danger', title: '保存に失敗しました', message: 'フェーズの保存に失敗しました。\n\n' + e.message });
   } finally {
-    if (ov) ov.style.display = 'none';
+    if (ov) ov.classList.remove('show');
   }
 }
 
@@ -1597,7 +1613,7 @@ let mapReviewDraft = {};
 
 function renderMapReviewBtn(){
   const b=document.getElementById('map-review-btn');
-  if(b) b.style.display = (mappingAvailable() && slots.length>0) ? '' : 'none';
+  setVisible(b, mappingAvailable() && slots.length > 0);
 }
 
 function openMapReviewModal(){
@@ -1654,19 +1670,27 @@ async function saveMapReview(){
 let calPubStatus = null;
 let calPubYM     = null;  // 実際に公開中のカレンダーの年月 {y,m}（公開できるのは常に1ヶ月だけ）
 
-async function loadCalPubStatus() {
-  try {
-    const r = await apiGet('getCalPubStatus');
-    calPubStatus = r.published;
-    calPubYM = null;
-    if (r.published && r.publishedYM) {
-      const [py, pm] = r.publishedYM.split('.').map(Number);
-      if (py && pm) calPubYM = { y: py, m: pm };
-    }
-  } catch(e) {
-    calPubStatus = null; calPubYM = null;
+function applyCalPubStatus(r) {
+  calPubStatus = r && r.ok !== false ? !!r.published : null;
+  calPubYM = null;
+  if (calPubStatus && r.publishedYM) {
+    const [py, pm] = String(r.publishedYM).split('.').map(Number);
+    if (py && pm) calPubYM = { y: py, m: pm };
   }
   updCalPubState();
+}
+
+async function loadCalPubStatus() {
+  const requestType = currentPwType;
+  try {
+    const r = await apiGet('getCalPubStatus', { type: requestType });
+    if (requestType !== currentPwType) return;
+    applyCalPubStatus(r);
+  } catch(e) {
+    if (requestType !== currentPwType) return;
+    calPubStatus = null; calPubYM = null;
+    updCalPubState();
+  }
 }
 
 // 表示中の「対象年月」と「実際に公開中の月」がズレていることが一目で分かるようにする。
@@ -1681,14 +1705,27 @@ function isCurMonthPublished() { return !!(calPubStatus && calPubYM && calPubYM.
 // 誰も気づかないので、進行状況ストリップに出す
 let calApproval = null;   // getCalApprovalStatus の結果（対象年月のもの）
 
+function applyCalApprovalStatus(r, expectedYear, expectedMonth) {
+  if (expectedYear !== curY || expectedMonth !== curM) return;
+  calApproval = (r && r.ok) ? Object.assign({}, r, {
+    year: Number(r.year || expectedYear), month: Number(r.month || expectedMonth),
+  }) : null;
+  renderProgressStrip();
+}
+
 // 年月を明示する。省くとサーバーは「今の申込中の月」を返すため、
 // 重なり期間に別の月の承認状態を読んでしまう（loadShiftStatus と同じ理由）
 async function loadCalApprovalStatus() {
+  const requestYear = curY, requestMonth = curM, requestType = currentPwType;
   try {
-    const r = await apiGet('getCalApprovalStatus', { year: curY, month: curM });
-    calApproval = (r && r.ok) ? r : null;
-  } catch (e) { calApproval = null; }
-  renderProgressStrip();
+    const r = await apiGet('getCalApprovalStatus', { year: requestYear, month: requestMonth, type: requestType });
+    if (requestType !== currentPwType) return;
+    applyCalApprovalStatus(r, requestYear, requestMonth);
+  } catch (e) {
+    if (requestYear !== curY || requestMonth !== curM || requestType !== currentPwType) return;
+    calApproval = null;
+    renderProgressStrip();
+  }
 }
 
 // 取得待ちで前の月のものが残っているときに読み違えない
@@ -1708,15 +1745,28 @@ function isCalApprovalForCurMonth() {
 // と散っていたので、1か所にまとめる。
 let shiftStatus = null;   // getShiftPublishStatus の結果（表示中の対象年月のもの）
 
+function applyShiftStatus(r, expectedYear, expectedMonth) {
+  if (expectedYear !== curY || expectedMonth !== curM) return;
+  shiftStatus = (r && r.ok) ? Object.assign({}, r, {
+    year: Number(r.year || expectedYear), month: Number(r.month || expectedMonth),
+  }) : null;
+  renderProgressStrip();
+}
+
 // 対象年月を明示して取得する。前月のシフトが動いている最中に次月の申込を開始できるため、
 // 年月を送らないとサーバーは常に「申込中の月」の状態を返してしまい、
 // 重なり期間に前月の進行状況ストリップが読めなくなる
 async function loadShiftStatus() {
+  const requestYear = curY, requestMonth = curM, requestType = currentPwType;
   try {
-    const r = await apiGet('getShiftPublishStatus', { year: curY, month: curM });
-    shiftStatus = (r && r.ok) ? r : null;
-  } catch (e) { shiftStatus = null; }
-  renderProgressStrip();
+    const r = await apiGet('getShiftPublishStatus', { year: requestYear, month: requestMonth, type: requestType });
+    if (requestType !== currentPwType) return;
+    applyShiftStatus(r, requestYear, requestMonth);
+  } catch (e) {
+    if (requestYear !== curY || requestMonth !== curM || requestType !== currentPwType) return;
+    shiftStatus = null;
+    renderProgressStrip();
+  }
 }
 
 // shiftStatus が表示中の対象年月のものか（月を切り替えた直後の取得待ちで取り違えない）
@@ -1729,8 +1779,8 @@ function renderProgressStrip() {
   if (!wrap) return;
   // 限定PWは複数月が同時に走りうるので一本道にならない。ここでは扱わない。
   // ミニボタンも隠す（calStageInfo は currentPwType!=='normal' で null を返す）
-  if (currentPwType !== 'normal') { wrap.style.display = 'none'; renderCalStageMini(); return; }
-  wrap.style.display = '';
+  if (currentPwType !== 'normal') { setVisible(wrap, false); renderCalStageMini(); return; }
+  setVisible(wrap, true);
 
   const toDate = o => (o && o.y && o.m && o.d) ? new Date(o.y, o.m - 1, o.d) : null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -1980,22 +2030,22 @@ function renderCalStageMini() {
   if (!btn || !txt) return;
   const info = calStageInfo();
   if (!info) {
-    btn.style.display = 'none';
-    if (sub) sub.style.display = 'none';
+    setVisible(btn, false);
+    setVisible(sub, false);
     return;
   }
-  btn.style.display = '';
+  setVisible(btn, true);
   btn.disabled = false;
   btn.className = 'cal-approve-mini ' + info.cls;
   txt.textContent = info.text;
   btn.title = info.title;
   if (sub) {
     if (info.secondary) {
-      sub.style.display = '';
+      setVisible(sub, true);
       sub.textContent = info.secondary.text;
       sub.title = info.secondary.title || '';
     } else {
-      sub.style.display = 'none';
+      setVisible(sub, false);
     }
   }
 }
@@ -2194,12 +2244,8 @@ async function toggleShiftPub() {
 
   showProc(notified ? 'シフトを非公開にしています...' : '作成完了を取り消しています...', '少々お待ちください');
   try {
-    // apiGet は type しか自動付与しないので、管理ログ用の実行者情報は明示的に渡す。
-    // 年月も明示する（省略するとサーバーは申込中の月を対象にしてしまう）
-    const r = await apiGet('unpublishShift', {
-      year: curY, month: curM,
-      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
-    });
+    // 実行者はセッションからサーバーが確定する。表示中の年月だけを送る。
+    const r = await apiGet('unpublishShift', { year: curY, month: curM });
     if (!r.ok) throw new Error(r.error || '失敗しました');
     await loadShiftStatus();   // 取得完了後に描き直す（内部で renderProgressStrip する）
     hideProc();
@@ -2220,9 +2266,9 @@ function updCalPubState() {
   const miniText = document.getElementById('cal-pub-mini-text');
   if (mini && miniText) {
     if (currentPwType === 'normal') {
-      mini.style.display = 'none';
+      setVisible(mini, false);
     } else {
-      mini.style.display = '';
+      setVisible(mini, true);
       mini.className = 'cal-pub-mini' + (isCurMonthPublished() ? ' published' : ' unpublished');
       miniText.textContent = isCurMonthPublished() ? '📅 公開中' : '🔒 未公開';
     }
@@ -2239,9 +2285,9 @@ function updCalPubState() {
       '申込を受け付けられる月は1つだけです。' + curY + '年' + curM + '月を公開すると、'
       + calPubYM.y + '年' + calPubYM.m + '月の申込受付は終了します。<br>'
       + '<span class="cpn-ok">✓ ' + calPubYM.y + '年' + calPubYM.m + '月のシフト表は、引き続き奉仕者に見えます（影響しません）</span>';
-    note.style.display = '';
+    setVisible(note, true);
   } else {
-    note.style.display = 'none';
+    setVisible(note, false);
     note.classList.remove('open'); // 次に出すときは閉じた状態から始める
   }
 }
@@ -2261,10 +2307,7 @@ async function toggleCalPub() {
       // 年月を明示して「表示中の月だけ」を非公開にする。省略すると API 側は
       // その pw_type の公開中カレンダーを全て落とすため、複数月が同時に走りうる
       // 限定PWで、確認文が示した月以外まで巻き込んでしまう
-      await apiGet('unpublishCalendar', {
-        year: curY, month: curM,
-        adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
-      });
+      await apiGet('unpublishCalendar', { year: curY, month: curM });
       calPubStatus = false; calPubYM = null;
       updCalPubState();
       hideProc();
@@ -2308,7 +2351,7 @@ async function openCalPubModal(){
       </div>
     </div>
     <div class="exec-st" id="cp-st"><div class="spin"></div>予定表公開中...</div>
-    <div class="done-box" id="cp-done" style="display:none;"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div></div>`;
+    <div class="done-box is-hidden" id="cp-done"><div class="done-icon">&#10003;</div><div class="done-title">公開完了</div></div>`;
   document.getElementById('m-cp-ft').innerHTML=`
     <button class="btn btn-g" onclick="closeM('m-cal-pub')">キャンセル</button>
     <button class="btn btn-s" id="cp-exec-btn" onclick="execCalPub()">${curY}年${curM}月を公開する</button>`;
@@ -2317,12 +2360,9 @@ async function execCalPub(){
   document.getElementById('cp-exec-btn').disabled=true;
   document.getElementById('cp-st').classList.add('show');
   try{
-    await apiGet('publishCalendar',{
-      year:curY, month:curM,
-      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
-    });
+    await apiGet('publishCalendar', { year: curY, month: curM });
     document.getElementById('cp-st').classList.remove('show');
-    document.getElementById('cp-done').style.display='block';
+    setVisible(document.getElementById('cp-done'), true);
     document.getElementById('m-cp-ft').innerHTML=`<button class="btn btn-p" onclick="closeM('m-cal-pub')">閉じる</button>`;
     toast(curY+'年'+curM+'月の予定表を公開しました','s');
     loadCalPubStatus();
@@ -2365,17 +2405,17 @@ function toast(msg,type){
   // インストール済み（ホーム画面から起動）なら「ホームに追加」ボタン自体を隠す。
   // 以前は早期 return だけで openPwaModal が未定義のままボタンが残り、押しても無反応だった。
   if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true){
-    const b=document.getElementById('btn-pwa-install'); if(b) b.style.display='none';
+    setVisible(document.getElementById('btn-pwa-install'), false);
     return;
   }
   let deferredPrompt=null;
   window.addEventListener('beforeinstallprompt', e=>{
     e.preventDefault(); deferredPrompt=e;
-    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display='block';
+    setVisible(document.getElementById('pwa-auto-section'), true);
   });
   window.addEventListener('appinstalled', ()=>{ deferredPrompt=null; toast('インストールしました!','s'); closeM('m-pwa'); });
   window.openPwaModal=function(){
-    const s=document.getElementById('pwa-auto-section'); if(s) s.style.display=deferredPrompt?'block':'none';
+    setVisible(document.getElementById('pwa-auto-section'), !!deferredPrompt);
     openM('m-pwa');
   };
   window.pwaTriggerInstall=async function(){
@@ -2518,6 +2558,7 @@ async function toggleNotice(id) {
 // 代理送信設定
 // ============================================================
 let _proxyMembers = [];
+let _proxyDeleteContexts = [];
 async function openProxyModal() {
   openM('m-proxy');
   await refreshProxyModal();
@@ -2529,6 +2570,7 @@ async function refreshProxyModal() {
       apiGet('getProxySettings'), apiGet('getMemberList'), loadAvatars()]);
     _proxyMembers = (memberRes.members || []).filter(m => m.uid);
     const settings = proxyRes.settings || [];
+    _proxyDeleteContexts = [];
     // 41名規模の一覧なので <select> ではなく検索付きピッカー（js/picker.js）
     const memberItems = _proxyMembers.map(m => ({
       value: m.uid, label: m.name, sub: m.furigana || '',
@@ -2552,19 +2594,27 @@ async function refreshProxyModal() {
       html += settings.map(s => {
         const fromM = _proxyMembers.find(m => m.uid === s.fromUid);
         const toM   = _proxyMembers.find(m => m.uid === s.toUid);
+        const contextIndex = _proxyDeleteContexts.push({ fromUid: String(s.fromUid || ''), toUid: String(s.toUid || '') }) - 1;
         return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span style="font-size:12px;display:flex;align-items:center;gap:6px;min-width:0;">
             ${avatarHtml(s.fromUid, fromM ? fromM.name : '', 22)}${esc(fromM?fromM.name:s.fromUid)}
             <span style="color:var(--ink3);">→</span>
             ${avatarHtml(s.toUid, toM ? toM.name : '', 22)}${esc(toM?toM.name:s.toUid)}
           </span>
-          <button class="btn btn-d" onclick="deleteProxy('${esc(s.fromUid)}','${esc(s.toUid)}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;">解除</button>
+          <button class="btn btn-d" data-delete-proxy="${contextIndex}" style="font-size:10px;padding:3px 8px;flex-shrink:0;">解除</button>
         </div>`;
       }).join('');
     }
-    document.getElementById('m-proxy-body').innerHTML = html;
+    const body = document.getElementById('m-proxy-body');
+    body.innerHTML = html;
+    body.querySelectorAll('[data-delete-proxy]').forEach(button => {
+      button.addEventListener('click', () => {
+        const context = _proxyDeleteContexts[Number(button.dataset.deleteProxy)];
+        if (context) deleteProxy(context.fromUid, context.toUid);
+      });
+    });
   } catch (e) {
-    document.getElementById('m-proxy-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
+    document.getElementById('m-proxy-body').innerHTML = `<div style="color:var(--red);">エラー: ${esc(e.message)}</div>`;
   }
 }
 async function addProxy() {
@@ -2600,6 +2650,7 @@ async function deleteProxy(fromUid, toUid) {
 // 夫婦設定
 // ============================================================
 let _coupleMembers = [];
+let _coupleDeleteContexts = [];
 function _coupleSurname(furigana) {
   const idx = furigana.search(/[ 　]/); // 半角・全角スペース両対応
   return idx > 0 ? furigana.substring(0, idx) : furigana;
@@ -2615,6 +2666,7 @@ async function refreshCoupleModal() {
       apiGet('getCoupleList'), apiGet('getMemberList'), loadAvatars()]);
     _coupleMembers = (memberRes.members || []).filter(m => m.uid);
     const couples  = coupleRes.couples || [];
+    _coupleDeleteContexts = [];
 
     // 登録済みのUIDを除外対象に
     const registeredUids = new Set();
@@ -2657,19 +2709,27 @@ async function refreshCoupleModal() {
       html += couples.map(c => {
         const hm = _coupleMembers.find(m => m.uid === c.husbandUid);
         const wm = _coupleMembers.find(m => m.uid === c.wifeUid);
+        const contextIndex = _coupleDeleteContexts.push({ husbandUid: String(c.husbandUid || ''), wifeUid: String(c.wifeUid || '') }) - 1;
         return `<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span style="font-size:12px;display:flex;align-items:center;gap:6px;min-width:0;">
             ${avatarHtml(c.husbandUid, hm ? hm.name : '', 22)}👨 ${esc(hm ? hm.name : c.husbandUid)}
             <span style="color:var(--ink3);">＆</span>
             ${avatarHtml(c.wifeUid, wm ? wm.name : '', 22)}👩 ${esc(wm ? wm.name : c.wifeUid)}
           </span>
-          <button class="btn btn-d" onclick="deleteCouple('${esc(c.husbandUid)}','${esc(c.wifeUid)}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;">解除</button>
+          <button class="btn btn-d" data-delete-couple="${contextIndex}" style="font-size:10px;padding:3px 8px;flex-shrink:0;">解除</button>
         </div>`;
       }).join('');
     }
-    document.getElementById('m-couple-body').innerHTML = html;
+    const body = document.getElementById('m-couple-body');
+    body.innerHTML = html;
+    body.querySelectorAll('[data-delete-couple]').forEach(button => {
+      button.addEventListener('click', () => {
+        const context = _coupleDeleteContexts[Number(button.dataset.deleteCouple)];
+        if (context) deleteCouple(context.husbandUid, context.wifeUid);
+      });
+    });
   } catch (e) {
-    document.getElementById('m-couple-body').innerHTML = `<div style="color:var(--red);">エラー: ${e.message}</div>`;
+    document.getElementById('m-couple-body').innerHTML = `<div style="color:var(--red);">エラー: ${esc(e.message)}</div>`;
   }
 }
 async function addCouple() {
@@ -3004,7 +3064,7 @@ function renderInboxCounts(c) {
 // サイドバーの「未対応」バッジは件数表示に専念させたため、入口はここ1つ
 function goCalApproval() {
   const btn = document.getElementById('cal-approve-mini');
-  if (btn && btn.style.display !== 'none') {
+  if (btn && !btn.classList.contains('is-hidden')) {
     btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
@@ -3229,7 +3289,7 @@ function openLogModal() {
   document.getElementById('log-filter-more').textContent = '▾ 条件で絞り込む';
   document.getElementById('log-filter-groups').innerHTML = '';
   document.getElementById('log-content').innerHTML = '';
-  document.getElementById('log-date-note').style.display = 'none';
+  setVisible(document.getElementById('log-date-note'), false);
   updateLogFilterSummary();
   document.querySelectorAll('#log-tabs .log-tab').forEach(b => {
     b.classList.toggle('on', b.dataset.kind === 'admin');
@@ -3282,8 +3342,6 @@ async function loadLogs(reset) {
       withOptions: !logState.options[logState.kind],
       limit:  LOG_PAGE,
       offset: logState.offset,
-      adminUid:   _currentUser ? _currentUser.uid   : '',
-      adminEmail: _currentUser ? _currentUser.email : '',
     });
     if (!d.ok) throw new Error(d.error === 'unauthorized' ? '権限がありません' : (d.error || '取得に失敗しました'));
     if (d.options) { logState.options[logState.kind] = d.options; renderLogFilterPanel(); }
@@ -3295,7 +3353,7 @@ async function loadLogs(reset) {
     logState.hasDate = d.hasDate !== false;
     document.getElementById('log-from').disabled = !logState.hasDate;
     document.getElementById('log-to').disabled   = !logState.hasDate;
-    document.getElementById('log-date-note').style.display = logState.hasDate ? 'none' : '';
+    setVisible(document.getElementById('log-date-note'), !logState.hasDate);
     updateLogFilterSummary();
     renderLogs();
   } catch (e) {
@@ -3577,11 +3635,7 @@ async function toggleLogDetail(id) {
   if (logState.details[key] !== undefined) return;
 
   try {
-    const d = await apiGet('getLogDetail', {
-      kind, id,
-      adminUid:   _currentUser ? _currentUser.uid   : '',
-      adminEmail: _currentUser ? _currentUser.email : '',
-    });
+    const d = await apiGet('getLogDetail', { kind, id });
     if (!d.ok) throw new Error(d.error || '取得に失敗しました');
     logState.details[key] = d.detail;
   } catch (e) {
@@ -3993,10 +4047,7 @@ async function removePositionRow(i) {
 async function savePositions() {
   showProc('立ち位置を保存しています...', '権限を計算し直しています');
   try {
-    const res = await apiGet('savePositions', {
-      positions: _posEdit,
-      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
-    });
+    const res = await apiGet('savePositions', { positions: _posEdit });
     if (!res.ok) throw new Error(res.error || '保存失敗');
     const re = await apiGet('getPositions');
     _positions = (re && re.ok) ? (re.positions || []) : [];
@@ -4045,9 +4096,7 @@ async function openPositionSyncPreview() {
 
   showProc('権限を計算し直しています...', '少々お待ちください');
   try {
-    const res = await apiGet('applyPositionSync', {
-      adminUid: _currentUser?.uid || '', adminName: _currentUser?.name || '',
-    });
+    const res = await apiGet('applyPositionSync');
     if (!res.ok) throw new Error(res.error || '実行失敗');
     hideProc();
     toast('権限を立ち位置から再計算しました', 's');
@@ -4091,7 +4140,7 @@ function capDiffBadges(m) {
 async function openMemberModal() {
   openM('m-member');
   document.getElementById('m-member-body').innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);">読み込み中...</div>';
-  document.getElementById('m-member-add-btn').style.display = '';
+  setVisible(document.getElementById('m-member-add-btn'), true);
   try {
     const [res, posRes] = await Promise.all([apiGet('getMemberListAll'), apiGet('getPositions'), loadAvatars()]);
     if (!res.ok) throw new Error(res.error || '取得失敗');
@@ -4123,14 +4172,14 @@ function avatarHtml(uid, name, px) {
   const size = px || 26;
   const img  = uid ? _avatars[uid] : '';
   const st   = `width:${size}px;height:${size}px;`;
-  if (img) return `<img class="mav" src="${img}" alt="" style="${st}">`;
+  if (img) return `<img class="mav" src="${escHtml(img)}" alt="" style="${st}">`;
   const ch = (name || '?').trim().charAt(0);
   return `<span class="mav mav-none" style="${st}font-size:${Math.round(size * 0.45)}px;">${esc(ch)}</span>`;
 }
 
 function renderMemberList() {
   _memberEditRowIndex = null;
-  document.getElementById('m-member-add-btn').style.display = '';
+  setVisible(document.getElementById('m-member-add-btn'), true);
   const valid   = _memberList.filter(m => m.valid);
   const invalid = _memberList.filter(m => !m.valid);
 
@@ -4148,7 +4197,7 @@ function renderMemberList() {
           <span class="member-kana">${esc(m.furigana)}</span>
           <span class="member-gender-badge ${m.gender === 'M' ? 'mgb-m' : 'mgb-f'}">${m.gender === 'M' ? '男' : '女'}</span>
           ${m.isResponsible ? '<span class="role-badge rb-resp">責任者</span>' : ''}
-          ${m.isCart        ? '<span class="role-badge rb-cart">カート</span>' : ''}
+          ${m.isCart        ? `<span class="role-badge rb-cart">カート${(m.cartCapacity ?? 2)}台</span>` : ''}
           ${positionName(m.positionId) ? '<span class="role-badge rb-pos">' + esc(positionName(m.positionId)) + '</span>' : ''}
           ${capDiffBadges(m)}
         </div>
@@ -4168,7 +4217,7 @@ function renderMemberList() {
 
 function openMemberAddForm() {
   _memberEditRowIndex = null;
-  document.getElementById('m-member-add-btn').style.display = 'none';
+  setVisible(document.getElementById('m-member-add-btn'), false);
   const isOwner = !_currentUser?.uid; // uidが空＝オーナーアカウント
   _mfMember = null; _mfIsOwner = isOwner;
   document.getElementById('m-member-body').innerHTML = buildMemberForm(null, isOwner);
@@ -4177,7 +4226,7 @@ function openMemberAddForm() {
 
 function openMemberEditForm(rowIndex) {
   _memberEditRowIndex = rowIndex;
-  document.getElementById('m-member-add-btn').style.display = 'none';
+  setVisible(document.getElementById('m-member-add-btn'), false);
   const m = _memberList.find(x => x.rowIndex === rowIndex);
   if (!m) return;
   const isOwner = !_currentUser?.uid;
@@ -4272,9 +4321,16 @@ function buildMemberForm(m, isOwner) {
       <div class="mf-row">
         <label class="mf-lbl">役割</label>
         <div class="uic-row">
-          ${uiCheckChip('mf-resp', '責任者',     !!m?.isResponsible)}
-          ${uiCheckChip('mf-cart', 'カート担当', !!m?.isCart)}
+          ${uiCheckChip('mf-resp', '責任者', !!m?.isResponsible)}
         </div>
+      </div>
+      <div class="mf-row">
+        <label class="mf-lbl">カートを運べる台数
+          <span style="font-size:10px;color:var(--ink3);font-weight:400;margin-left:4px;">（1つの場所に2台。持ち込み・持ち帰りの担当を決めるのに使います）</span>
+        </label>
+        ${uiPickChips('mf-cartcap',
+          [{ value: '0', label: '運ばない' }, { value: '2', label: '2台' }, { value: '4', label: '4台' }],
+          String(m?.cartCapacity ?? (m?.isCart ? 2 : 0)))}
       </div>
       <div class="mf-row">
         <label class="mf-lbl">立ち位置
@@ -4297,7 +4353,7 @@ function buildMemberForm(m, isOwner) {
           m.valid ? '1' : '0')}
         ${m.valid ? '<div style="font-size:11px;color:var(--amber);line-height:1.6;">⚠️ 無効にすると、この方に関する代理送信設定・管理者権限・会計者権限は自動的に削除されます。</div>' : ''}
       </div>` : ''}
-      <div id="mf-err" style="display:none;color:var(--red);font-size:12px;padding:6px 10px;background:var(--red-l);border-radius:var(--r);"></div>
+      <div id="mf-err" class="is-hidden" style="color:var(--red);font-size:12px;padding:6px 10px;background:var(--red-l);border-radius:var(--r);"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
       <button class="btn btn-g" onclick="renderMemberList()">キャンセル</button>
@@ -4312,7 +4368,9 @@ async function saveMemberForm(isEdit, isOwner) {
   const gender   = uiChipVal('mf-gender');
   const email    = (document.getElementById('mf-email')?.value || '').trim();
   const isResp   = uiChipOn('mf-resp');
-  const isCart   = uiChipOn('mf-cart');
+  // カートは台数で持つ。旧来の isCart は「0より大きいか」としてサーバー側で同期する
+  const cartCap  = uiChipVal('mf-cartcap') || '0';
+  const isCart   = cartCap !== '0';
   // 立ち位置と、能力ごとの個別設定（'' 立ち位置に従う ／ '1' 付与 ／ '0' 外す）
   const perm = {
     positionId:        uiChipVal('mf-pos'),
@@ -4327,14 +4385,11 @@ async function saveMemberForm(isEdit, isOwner) {
 
   const errEl = document.getElementById('mf-err');
   if (!name || !furigana || !gender) {
-    errEl.style.display = '';
+    setVisible(errEl, true);
     errEl.textContent = '名前・フリガナ・性別は必須です。';
     return;
   }
-  errEl.style.display = 'none';
-
-  const adminUid  = _currentUser?.uid  || '';
-  const adminName = _currentUser?.name || '';
+  setVisible(errEl, false);
 
   showProc(isEdit ? 'メンバー情報を更新しています...' : 'メンバーを追加しています...', '少々お待ちください');
   try {
@@ -4345,22 +4400,23 @@ async function saveMemberForm(isEdit, isOwner) {
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
         isCart: isCart ? '1' : '',
+        cartCapacity: cartCap,
         ...perm,
-        valid: valid ? '1' : '0',
-        isOwner: isOwner ? '1' : '',
-        adminUid, adminName
+        valid: valid ? '1' : '0'
       });
     } else {
       res = await apiGet('addMember', {
         name, furigana, gender, email,
         isResponsible: isResp ? '1' : '',
         isCart: isCart ? '1' : '',
-        ...perm,
-        isOwner: isOwner ? '1' : '',
-        adminUid, adminName
+        cartCapacity: cartCap,
+        ...perm
       });
     }
     if (!res.ok) throw new Error(res.error || '保存失敗');
+    // メンバー追加・更新後は限定PW用pickerの候補キャッシュを破棄する。
+    // 次回表示時に名称・ふりがな・有効状態をサーバーから取り直す。
+    _allMembersForPicker = [];
     // 一覧を再取得して再描画
     const listRes = await apiGet('getMemberListAll');
     if (listRes.ok) {
@@ -4371,7 +4427,7 @@ async function saveMemberForm(isEdit, isOwner) {
     toast(isEdit ? 'メンバー情報を更新しました' : 'メンバーを追加しました', 's');
   } catch(e) {
     hideProc();
-    errEl.style.display = '';
+    setVisible(errEl, true);
     errEl.textContent = 'エラー: ' + e.message;
   }
 }
@@ -4389,12 +4445,11 @@ async function confirmDeleteMember(rowIndex) {
     confirmText: '削除する',
   })) return;
 
-  const adminUid  = _currentUser?.uid  || '';
-  const adminName = _currentUser?.name || '';
   showProc('メンバーを削除しています...', '少々お待ちください');
   try {
-    const res = await apiGet('deleteMember', { rowIndex, adminUid, adminName });
+    const res = await apiGet('deleteMember', { rowIndex });
     if (!res.ok) throw new Error(res.error || '削除失敗');
+    _allMembersForPicker = [];
     const listRes = await apiGet('getMemberListAll');
     if (listRes.ok) {
       _memberList = listRes.members || [];
@@ -4414,10 +4469,10 @@ async function confirmDeleteMember(rowIndex) {
 function showProc(title, sub) {
   document.getElementById('proc-title').textContent = title || '処理しています...';
   document.getElementById('proc-sub').textContent = sub !== undefined ? sub : '少々お待ちください';
-  document.getElementById('proc-spin').style.display = '';
-  document.getElementById('proc-steps').style.display = 'none';
+  setVisible(document.getElementById('proc-spin'), true);
+  setVisible(document.getElementById('proc-steps'), false);
   document.getElementById('proc-steps').innerHTML = '';
-  document.getElementById('proc-close-btn').style.display = 'none';
+  setVisible(document.getElementById('proc-close-btn'), false);
   document.getElementById('proc-ov').classList.add('show');
 }
 function hideProc() {
@@ -4432,7 +4487,7 @@ function showProcSteps(tasks) {
   el.innerHTML = tasks.map(t =>
     `<div class="proc-step-row"><span class="proc-step-ic" id="psic-${t.id}">⏸</span><span class="proc-step-lbl">${t.label}</span><span class="proc-step-st" id="psst-${t.id}">待機中</span></div>`
   ).join('');
-  el.style.display = 'flex';
+  setVisible(el, true);
 }
 function setProcStep(id, state, errMsg) {
   const ic = document.getElementById('psic-' + id);
@@ -4443,22 +4498,6 @@ function setProcStep(id, state, errMsg) {
   else if (state === 'err') { ic.textContent = '❌'; st.textContent = errMsg || 'エラー'; st.className = 'proc-step-st err'; }
 }
 async function refreshAdminData() {
-  const d = await apiGet('adminData');
-  adminData = d;
-  if (d.eventDates) {
-    const toObj = str => { if (!str) return null; const p = str.split('/'); return p.length === 2 ? { y: curY, m: parseInt(p[0]), d: parseInt(p[1]) } : null; };
-    dates.apply    = toObj(d.eventDates['申込開始']);
-    dates.deadline = toObj(d.eventDates['締切']);
-    dates.open     = toObj(d.eventDates['シフト公開']);
-  }
-  if (d.currentSlots) slots = d.currentSlots.map(s => ({ y: s.y || curY, m: s.m || curM, d: s.d, time: s.time, interval: parseInt(s.interval) || 15 }));
-  slotMapping = d.slotMapping || {};
-  if (d.phases) {
-    adminPhases = d.phases;
-    currentPhaseIndex = 0;
-    if (currentPwType !== 'normal') syncSlotsFromPhases();
-  }
-  renderAll();
-  loadCalPubStatus();
+  return loadAdminData({ year: curY, month: curM, type: currentPwType, rethrow: true });
 }
 

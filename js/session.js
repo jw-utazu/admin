@@ -3,7 +3,7 @@
 //
 // admin / shift-form / shift-create はすべて同一オリジン
 // （jw-utazu.github.io）のため localStorage を共有できる。
-// ここに保存するのは「誰でログインしたか」だけで、権限は保存しない。
+// ここには「誰でログインしたか」とサーバー発行の不透明なセッショントークンを保存する。
 // 権限は各アプリが起動時にサーバー（action=auth）へ必ず問い合わせて取得する
 // —— localStorage は利用者が書き換えられるため、権限を信用してはいけない。
 //
@@ -17,7 +17,7 @@ const PWGWS_LOGIN_URL    = 'https://jw-utazu.github.io/shift-form/login.html';
 
 // 複数アカウント：一度ログインを通ったアカウントを配列で覚えておき、
 // pwgws_session（＝現在の指し先）を差し替えることで切り替える。
-// 保存するのは email / name / picture だけで、権限は入れない
+// 保存するのは email / name / picture / token / expiresAt だけで、権限は入れない
 // （権限は各アプリが切り替えのたびにサーバーへ問い合わせて取り直す）。
 // admin と shift-form は同一オリジンで localStorage を共有しているため、
 // 片方で切り替えるともう片方も切り替わる。これは意図した動作
@@ -70,9 +70,15 @@ function pwgwsGetSession() {
   } catch (_) { return null; }
 }
 
-function pwgwsSaveSession(email, name, picture) {
+function pwgwsSaveSession(email, name, picture, token, expiresAt) {
   try {
-    const acc = { email: email, name: name || '', picture: picture || '', savedAt: Date.now() };
+    email = String(email || '').trim().toLowerCase();
+    if (!email) return;
+    const previous = pwgwsGetAccounts().filter(a => a.email === email)[0] || {};
+    const acc = {
+      email: email, name: name || previous.name || '', picture: picture || previous.picture || '',
+      token: token || previous.token || '', expiresAt: expiresAt || previous.expiresAt || '', savedAt: Date.now()
+    };
     // 一覧を先に読む。指し先を書き換えてから読むと、複数アカウント対応より前から
     // ログインしていた人の「今のアカウント」が新しい方に上書きされて拾えなくなり、
     // 追加したつもりが乗っ取りになってしまう
@@ -80,6 +86,7 @@ function pwgwsSaveSession(email, name, picture) {
     list.push(acc);
     localStorage.setItem(PWGWS_ACCOUNTS_KEY, JSON.stringify(list));
     localStorage.setItem(PWGWS_SESSION_KEY, JSON.stringify(acc));
+    localStorage.removeItem(PWGWS_RECOVERY_KEY);
     // 強制再ログインはここまで来て初めて「完了」とする。
     // ログイン画面で離脱した人には次回もう一度求めることになる
     localStorage.setItem(PWGWS_RELOGIN_FLAG, '1');
@@ -90,7 +97,8 @@ function pwgwsSaveSession(email, name, picture) {
 // 保存するときは落とす（保存すると古い印が残って一覧の✓がずれる）
 function pwgwsStripCurrent(list) {
   return list.map(a => ({
-    email: a.email, name: a.name || '', picture: a.picture || '', savedAt: a.savedAt || 0
+    email: a.email, name: a.name || '', picture: a.picture || '', token: a.token || '',
+    expiresAt: a.expiresAt || '', savedAt: a.savedAt || 0
   }));
 }
 
@@ -116,7 +124,7 @@ function pwgwsSwitchAccount(email) {
   try {
     localStorage.setItem(PWGWS_SESSION_KEY, JSON.stringify({
       email: target.email, name: target.name || '', picture: target.picture || '',
-      savedAt: Date.now()
+      token: target.token || '', expiresAt: target.expiresAt || '', savedAt: Date.now()
     }));
   } catch (_) { return false; }
   // 各アプリのログインキャッシュを消さないと前のアカウントで復元されてしまう
@@ -168,6 +176,61 @@ function pwgwsGoToAddAccount() {
 function pwgwsGetRecoveryToken() {
   try { return localStorage.getItem(PWGWS_RECOVERY_KEY) || ''; } catch (_) { return ''; }
 }
+
+// 通常ログインと救済ログインは同時に有効にしない。救済ログインへ切り替えたら、
+// Google セッションの現在ポインタとアプリ固有キャッシュを消す。
+function pwgwsSaveRecoveryToken(token) {
+  try {
+    localStorage.removeItem(PWGWS_SESSION_KEY);
+    localStorage.setItem(PWGWS_RECOVERY_KEY, token || '');
+  } catch (_) {}
+  pwgwsClearAppSessions();
+}
+
+function pwgwsGetSessionToken() {
+  const recovery = pwgwsGetRecoveryToken();
+  if (recovery) return recovery;
+  const s = pwgwsGetSession();
+  return s && s.token ? s.token : '';
+}
+
+// 401 を受けたトークンだけを無効化する。403 は権限不足でありログアウト理由ではない。
+function pwgwsInvalidateCurrentToken() {
+  try {
+    if (localStorage.getItem(PWGWS_RECOVERY_KEY)) {
+      localStorage.removeItem(PWGWS_RECOVERY_KEY);
+    } else {
+      const cur = pwgwsGetSession();
+      if (cur) {
+        cur.token = '';
+        cur.expiresAt = '';
+        localStorage.setItem(PWGWS_SESSION_KEY, JSON.stringify(cur));
+        const list = pwgwsStripCurrent(pwgwsGetAccounts()).map(a => {
+          if (a.email === cur.email) { a.token = ''; a.expiresAt = ''; }
+          return a;
+        });
+        localStorage.setItem(PWGWS_ACCOUNTS_KEY, JSON.stringify(list));
+      }
+    }
+  } catch (_) {}
+  pwgwsClearAppSessions();
+}
+
+// 別タブでログイン先・トークンが切り替わったら、古い principal の画面を残さない。
+const PWGWS_INITIAL_IDENTITY = (function() {
+  const s = pwgwsGetSession();
+  return pwgwsGetRecoveryToken() || (s ? s.email + ':' + (s.token || '') : '');
+})();
+let pwgwsStorageReloading = false;
+window.addEventListener('storage', function(e) {
+  if (pwgwsStorageReloading || [PWGWS_SESSION_KEY, PWGWS_RECOVERY_KEY].indexOf(e.key) < 0) return;
+  const s = pwgwsGetSession();
+  const now = pwgwsGetRecoveryToken() || (s ? s.email + ':' + (s.token || '') : '');
+  if (now !== PWGWS_INITIAL_IDENTITY) {
+    pwgwsStorageReloading = true;
+    location.reload();
+  }
+});
 
 // 共通ログイン画面へ送る。戻り先を渡して、ログイン後に元のアプリへ戻す
 function pwgwsGoToLogin(reason) {
@@ -237,7 +300,7 @@ function pwgwsAccIconHtml(a) {
   // 画像が読めなかったらイニシャルに落とす（Googleの写真URLは期限切れになることがある）
   return a.picture
     ? '<span class="pwgws-acc-ic"><img src="' + esc(a.picture) + '" alt="" ' +
-      'onerror="this.parentNode.textContent=\'' + esc(initial) + '\'"></span>'
+      'data-fallback-initial="' + esc(initial) + '"></span>'
     : '<span class="pwgws-acc-ic">' + esc(initial) + '</span>';
 }
 
@@ -282,6 +345,14 @@ function pwgwsOpenAccountMenu(anchorEl, opts) {
   menu.className = 'pwgws-acc';
   menu.id = 'pwgws-acc-menu';
   menu.innerHTML = html;
+  // initial を inline JavaScript に埋め込まない。HTML entity は属性のパース後に
+  // 復号されるため、氏名先頭が引用符の場合に onerror 文字列を壊しうる。
+  menu.querySelectorAll('.pwgws-acc-ic img[data-fallback-initial]').forEach(img => {
+    img.addEventListener('error', () => {
+      const holder = img.parentElement;
+      if (holder) holder.textContent = img.dataset.fallbackInitial || '?';
+    }, { once: true });
+  });
   document.body.appendChild(back);
   document.body.appendChild(menu);
 

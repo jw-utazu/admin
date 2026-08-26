@@ -294,9 +294,9 @@ function dndRerenderBlock() {
 function dndHitTest(x, y) {
   // 受け皿バーは他のどの落とし先より優先する（画面下端に重ねてあるため）
   if (dndOverDropBar(x, y)) return _dnd.fromEl ? { kind: 'remove', dropBar: true } : { kind: 'cancel' };
-  if (_dnd && _dnd.ghost) _dnd.ghost.style.display = 'none';
+  if (_dnd && _dnd.ghost) _dnd.ghost.classList.add('is-hidden');
   const el = document.elementFromPoint(x, y);
-  if (_dnd && _dnd.ghost) _dnd.ghost.style.display = '';
+  if (_dnd && _dnd.ghost) _dnd.ghost.classList.remove('is-hidden');
   if (!el || !el.closest) return null;
 
   if (_dnd.kind === 'cart') return dndCartHit(el);

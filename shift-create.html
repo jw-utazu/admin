@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/shift-create.css?v=42">
+<link rel="stylesheet" href="css/shift-create.css?v=43">
 </head>
 <body>
 
@@ -17,7 +17,7 @@
 </div>
 
 <!-- アプリ本体 -->
-<div id="app-screen" style="display:none;flex-direction:column;height:100%;">
+<div id="app-screen" class="is-hidden">
   <div class="hdr">
     <div class="hdr-row1">
       <div class="hdr-logo">🗂</div>
@@ -30,16 +30,16 @@
       </div>
     </div>
     <div class="hdr-row2">
-      <div id="pw-tabs" style="display:none;"></div>
-      <div class="ym-wrap" id="sc-ym-wrap" style="display:none;">
+      <div id="pw-tabs" class="is-hidden"></div>
+      <div class="ym-wrap is-hidden" id="sc-ym-wrap">
         <span class="ym-lbl">対象年月</span>
         <span id="sc-ym-slot"></span>
         <span class="ym-note" id="sc-ym-note"></span>
       </div>
       <div class="hdr-spacer" style="flex:1;"></div>
-      <span id="publish-approval" style="display:none;font-size:11px;margin-right:6px;white-space:nowrap;" onclick="openApprovalModal()"></span>
-      <span id="publish-open-date" style="display:none;font-size:11px;color:var(--ink3);margin-right:6px;white-space:nowrap;"></span>
-      <button class="hbtn" id="reject-btn" style="display:none;" onclick="rejectShift()">⚠️ 差し戻す</button>
+      <span id="publish-approval" class="is-hidden" style="font-size:11px;margin-right:6px;white-space:nowrap;" onclick="openApprovalModal()"></span>
+      <span id="publish-open-date" class="is-hidden" style="font-size:11px;color:var(--ink3);margin-right:6px;white-space:nowrap;"></span>
+      <button class="hbtn is-hidden" id="reject-btn" onclick="rejectShift()">⚠️ 差し戻す</button>
       <button class="hbtn pub" id="publish-btn" onclick="togglePublish()">✅ シフト作成完了</button>
     </div>
   </div>
@@ -49,7 +49,7 @@
     <button class="mtab"     id="mtab-create"   onclick="switchMainTab('create',this)">✏️ シフト作成</button>
     <button class="mtab"     id="mtab-settings" onclick="switchMainTab('settings',this)">⚙️ 設定</button>
     <div class="mt-spacer" style="flex:1;"></div>
-    <div id="create-tools" style="display:none;align-items:center;gap:6px;margin-right:8px;">
+    <div id="create-tools" class="is-hidden">
       <button class="tb-btn" id="undo-btn" style="white-space:nowrap;" title="元に戻す（Ctrl+Z）／やり直す（Ctrl+Shift+Z）" onclick="doUndo()" disabled>↶ 元に戻す</button>
       <button class="tb-btn" style="white-space:nowrap;" onclick="openPreflight()">🔍 チェック</button>
     </div>
@@ -74,7 +74,7 @@
     </div>
   </div>
 
-  <div class="rsz-bar" id="split-rsz" style="display:none;" title="ドラッグして幅を調整"></div>
+  <div class="rsz-bar is-hidden" id="split-rsz" title="ドラッグして幅を調整"></div>
   <!-- TAB2: シフト作成 -->
   <div class="tab-content" id="tab-create">
     <div class="dtabs" id="dtabs" style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;overflow-x:auto;flex-shrink:0;align-items:center;"><div style="padding:10px 14px;font-size:12px;color:var(--ink3);">読み込み中...</div></div>
@@ -102,7 +102,7 @@
           <div style="padding:24px;color:var(--ink3);text-align:center;">「シフト作成」タブを選択すると読み込みます</div>
         </div>
       </div>
-      <div class="rsz-bar purple" id="cmp-rsz" style="display:none;" title="ドラッグして幅を調整"></div>
+      <div class="rsz-bar purple is-hidden" id="cmp-rsz" title="ドラッして幅を調整"></div>
       <div class="cmp-panel" id="cmp-panel">
         <div class="cmp-sel-bar">
           <span class="cmp-label">比較表示</span>
@@ -275,12 +275,12 @@
 
 <div class="ta" id="ta"></div>
 
-<script src="js/session.js?v=4"></script>
-<script src="js/api.js?v=9"></script>
-<script src="js/confirm.js?v=1"></script>
+<script src="js/session.js?v=5"></script>
+<script src="js/api.js?v=10"></script>
+<script src="js/confirm.js?v=2"></script>
 <script src="js/validation.js?v=9"></script>
-<script src="js/picker.js?v=7"></script>
-<script src="js/dnd.js?v=15"></script>
-<script src="js/shift-create.js?v=56"></script>
+<script src="js/picker.js?v=8"></script>
+<script src="js/dnd.js?v=16"></script>
+<script src="js/shift-create.js?v=57"></script>
 </body>
 </html>

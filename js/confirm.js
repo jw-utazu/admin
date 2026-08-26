@@ -32,6 +32,7 @@
       '.uic-ov{position:fixed;inset:0;z-index:10500;background:rgba(0,0,0,.45);',
       '  display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px);}',
       '.uic-ov.open{display:flex;}',
+      '.uic-hidden{display:none!important;}',
       '.uic-box{background:var(--surface,#fff);color:var(--ink,#18181b);border-radius:var(--r-lg,12px);',
       '  width:100%;max-width:380px;max-height:88vh;overflow-y:auto;font-family:var(--sans),sans-serif;',
       '  box-shadow:0 10px 30px rgba(0,0,0,.22);animation:uic-in .16s ease;}',
@@ -124,7 +125,7 @@
     ov.querySelector('#uic-ic').textContent = t.icon;
     ov.querySelector('#uic-tt').textContent = opt.title || '確認';
     ov.querySelector('#uic-bd').textContent = opt.message || '';
-    ov.querySelector('#uic-bd').style.display = opt.message ? '' : 'none';
+    ov.querySelector('#uic-bd').classList.toggle('uic-hidden', !opt.message);
     ov.querySelector('#uic-ft').innerHTML =
       '<button class="uic-btn uic-cancel" id="uic-no"></button>'
       + '<button class="uic-btn uic-ok ' + t.okClass + '" id="uic-yes"></button>';
@@ -153,7 +154,7 @@
     ov.querySelector('#uic-ic').textContent = t.icon;
     ov.querySelector('#uic-tt').textContent = opt.title || 'お知らせ';
     ov.querySelector('#uic-bd').textContent = opt.message || '';
-    ov.querySelector('#uic-bd').style.display = opt.message ? '' : 'none';
+    ov.querySelector('#uic-bd').classList.toggle('uic-hidden', !opt.message);
     ov.querySelector('#uic-ft').innerHTML =
       '<button class="uic-btn uic-ok ' + t.okClass + '" id="uic-yes"></button>';
     ov.querySelector('#uic-yes').textContent = opt.okText || 'OK';

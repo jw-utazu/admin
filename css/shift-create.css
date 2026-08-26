@@ -1,6 +1,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 *{scrollbar-width:none;}
 *::-webkit-scrollbar{display:none;}
+.is-hidden{display:none!important;}
 :root{
   --ink:#18181b;--ink2:#52525b;--ink3:#71717a;
   --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
@@ -27,7 +28,8 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .login-sub{font-size:12px;color:var(--ink2);margin-bottom:22px;}
 
 /* LOADING */
-#loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9000;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+#loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.9);z-index:9000;flex-direction:column;align-items:center;justify-content:center;gap:12px;backdrop-filter:blur(2px);}
+#loading-overlay.on{display:flex;}
 .spin{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin 1s linear infinite;}
 .lo-msg{font-size:13px;color:var(--ink2);}
 
@@ -47,7 +49,8 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .hbtn:hover{background:var(--bg);}
 /* PW 切替タブ（フォルダタブ風） */
-#pw-tabs{align-self:stretch;align-items:flex-end;gap:8px;}
+#app-screen{display:flex;flex-direction:column;height:100%;}
+#pw-tabs{display:flex;align-self:stretch;align-items:flex-end;gap:8px;}
 .pw-tab-sc{position:relative;margin-bottom:4px;padding:4px 14px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;transition:background .15s,color .15s;}
 .pw-tab-sc:hover:not(.on):not(:disabled){background:var(--bg);color:var(--ink);}
 /* アクティブ：上だけ角丸（非アクティブと同じ var(--r)）、下辺を消して下のコンテンツとつなげる。
@@ -97,6 +100,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 
 /* MAIN TABS */
 .main-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;flex-shrink:0;}
+#create-tools{display:flex;align-items:center;gap:6px;margin-right:8px;}
 .mtab{padding:10px 16px;border:none;border-bottom:3px solid transparent;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);transition:all .15s;white-space:nowrap;}
 .mtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
 .mtab:hover:not(.on){color:var(--ink);background:var(--bg);}
@@ -122,7 +126,6 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .tbl-outer{flex:1;overflow:hidden;padding:10px;display:flex;flex-direction:column;}
 .tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;flex:1;display:flex;flex-direction:column;}
 #wish-table-wrap{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
-#wish-table-wrap > div[style]{flex:1;}
 /* 見出しと氏名列を sticky で固定するので border-collapse:collapse は使えない。
    collapse だと罫線がテーブル側に描かれて sticky セルと一緒に動かず、
    固定された見出しの上端・左端に 1px の透き間が残る。そこを本文がスクロールで
@@ -215,7 +218,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .sc-badge{display:inline-block;box-sizing:border-box;width:100%;text-align:center;font-size:10px;padding:2px 0;border-radius:3px;font-weight:700;}
 .sc-a{background:#fef3c7;color:#92400e;}.sc-r{background:var(--green-l);color:var(--green);}.sc-k{background:var(--purple-l);color:var(--purple);}.sc-w{background:var(--blue-l);color:var(--blue);}
 /* 希望確認テーブル */
-.wish-snap-outer{overflow:auto;min-height:412px;}
+.wish-snap-outer{overflow-x:auto;overflow-y:visible;min-height:412px;}
 .th-date{background:var(--green4);color:var(--green-d);font-weight:700;font-size:11px;padding:6px 10px;position:sticky;top:0;z-index:3;box-shadow:0 1px 0 var(--border);}
 /* 罫線がセル自前になった（border-collapse:separate）ので、見出し下の線は
    セルの border だけで足りる。影は境目を少し強めるための 1px にとどめる */
@@ -232,7 +235,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
    そこを指でなぞると、外側（#wish-table-wrap）ではなく画面外にあるこの枠の
    中身が動く。見えている物は何も動かないので「スクロールできない」ことになる。
    縦は外側の1つに任せ、ここは日付列の横スクロールだけを担当させる */
-.wish-snap-outer-na{overflow:auto;}
+.wish-snap-outer-na{overflow-x:auto;overflow-y:visible;}
 .rm-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;}
 .rm{overflow-y:auto;padding:14px;background:var(--bg);flex:1;}
 .tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;}
@@ -411,13 +414,13 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .v-badge.v-err{background:var(--red-l);color:var(--red);}
 
 /* 公開前チェックパネル */
-.pf-box{max-width:640px;width:92vw;max-height:80vh;display:flex;flex-direction:column;}
+.pf-box{max-width:640px;width:92vw;max-height:80vh;display:flex;flex-direction:column;overflow-y:auto;}
 .pf-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
 .pf-summary{font-size:12px;font-weight:700;color:var(--ink2);display:flex;gap:6px;align-items:baseline;}
 .pf-toggle{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink2);cursor:pointer;white-space:nowrap;}
 .pf-row.acked{opacity:.5;}
 .pf-ack-meta{display:block;color:var(--green);}
-.pf-list{flex:1;overflow-y:auto;margin:10px 0;border:1px solid var(--border);border-radius:var(--r);}
+.pf-list{flex:none;overflow:visible;margin:10px 0;border:1px solid var(--border);border-radius:var(--r);}
 .pf-list:empty{display:none;}
 .pf-grp{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--ink2);position:sticky;top:0;}
 .pf-row{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;}

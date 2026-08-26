@@ -8,7 +8,7 @@
 //   opts.title    見出し
 //   opts.search   検索欄を出すか
 //   opts.multi    複数選択（トグル）にするか
-//   opts.items    [{ value, label, html, sub, disabled, group, selected }]
+//   opts.items    [{ value, label, labelClass, badges, sub, disabled, group, selected }]
 //   opts.value    単一選択時の現在値／複数選択時は配列
 //   opts.onPick   (value, item) => void  単一選択で確定したとき
 //   opts.onToggle (values[]) => void 複数選択で変わったとき（都度呼ぶ）
@@ -24,6 +24,10 @@ let _pkOpts = null;
 let _pkAnchor = null;
 let _pkValues = [];    // multi のときの選択値
 let _pkIdx = -1;       // キーボード操作中の候補位置
+
+function _pkSetVisible(el, on) {
+  if (el) el.classList.toggle('is-hidden', !on);
+}
 
 function _pkBuild() {
   if (_pkEl) return _pkEl;
@@ -80,9 +84,9 @@ function openPicker(anchorEl, opts) {
   el.querySelector('.pk-title').textContent = _pkOpts.title || '';
   const note = el.querySelector('.pk-note');
   note.textContent = _pkOpts.note || '';
-  note.style.display = _pkOpts.note ? '' : 'none';
+  _pkSetVisible(note, !!_pkOpts.note);
   const s = el.querySelector('.pk-search');
-  s.style.display = _pkOpts.search ? '' : 'none';
+  _pkSetVisible(s, !!_pkOpts.search);
   s.value = '';
   el.classList.add('on');
   _pkRender();
@@ -126,25 +130,65 @@ function _pkFiltered() {
   const q = (_pkEl.querySelector('.pk-search').value || '').trim().toLowerCase();
   const items = (_pkOpts.items || []);
   if (!q) return items;
-  return items.filter(it => (it.search || it.label || '').toLowerCase().includes(q));
+  return items.filter(it => String(it.search || it.label || '').toLowerCase().includes(q));
 }
 
 function _pkRender() {
   const list = _pkEl.querySelector('.pk-list');
   const items = _pkFiltered();
-  let html = '', lastGroup = null;
+  list.replaceChildren();
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'pk-empty';
+    empty.textContent = '該当する候補がありません';
+    list.appendChild(empty);
+    return;
+  }
+  let lastGroup = null;
   items.forEach((it, i) => {
-    if (it.group && it.group !== lastGroup) { html += `<div class="pk-grp">${it.group}</div>`; lastGroup = it.group; }
+    if (it.group && it.group !== lastGroup) {
+      const group = document.createElement('div');
+      group.className = 'pk-grp';
+      group.textContent = String(it.group);
+      list.appendChild(group);
+      lastGroup = it.group;
+    }
     const on = _pkOpts.multi ? _pkValues.includes(it.value) : (it.value === _pkOpts.value);
-    html += `<button type="button" class="pk-it${on ? ' on' : ''}${it.disabled ? ' dis' : ''}${i === _pkIdx ? ' cur' : ''}" data-i="${i}"${it.disabled ? ' disabled' : ''}>`
-         +  (_pkOpts.multi ? `<span class="pk-cb">${on ? '☑' : '☐'}</span>` : '')
-         +  `<span class="pk-body">${it.html || it.label}</span>`
-         +  (it.sub ? `<span class="pk-sub">${it.sub}</span>` : '')
-         +  `</button>`;
-  });
-  list.innerHTML = html || '<div class="pk-empty">該当する候補がありません</div>';
-  list.querySelectorAll('.pk-it').forEach(b => {
-    b.addEventListener('click', () => _pkChoose(items[+b.dataset.i]));
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pk-it' + (on ? ' on' : '') + (it.disabled ? ' dis' : '') + (i === _pkIdx ? ' cur' : '');
+    button.dataset.i = String(i);
+    button.disabled = !!it.disabled;
+    if (_pkOpts.multi) {
+      const check = document.createElement('span');
+      check.className = 'pk-cb';
+      check.textContent = on ? '☑' : '☐';
+      button.appendChild(check);
+    }
+    const body = document.createElement('span');
+    body.className = 'pk-body';
+    const label = document.createElement('span');
+    label.className = it.labelClass || '';
+    label.textContent = String(it.label == null ? '' : it.label);
+    body.appendChild(label);
+    // バッジもHTML文字列にせずDOM化する。氏名・備考などが
+    // 呼び出し側から渡っても、実行可能なマークアップにはならない。
+    (it.badges || []).forEach(badgeSpec => {
+      const badge = document.createElement('span');
+      badge.className = badgeSpec.className || 'pk-b';
+      badge.textContent = String(badgeSpec.text == null ? '' : badgeSpec.text);
+      if (badgeSpec.title) badge.title = String(badgeSpec.title);
+      body.appendChild(badge);
+    });
+    button.appendChild(body);
+    if (it.sub) {
+      const sub = document.createElement('span');
+      sub.className = 'pk-sub';
+      sub.textContent = String(it.sub);
+      button.appendChild(sub);
+    }
+    button.addEventListener('click', () => _pkChoose(items[i]));
+    list.appendChild(button);
   });
 }
 
@@ -203,8 +247,8 @@ function openMonthPicker(anchorEl, opts) {
   el.querySelector('.pk-title').textContent = _pkOpts.title || '対象年月';
   const note = el.querySelector('.pk-note');
   note.textContent = _pkOpts.note || '';
-  note.style.display = _pkOpts.note ? '' : 'none';
-  el.querySelector('.pk-search').style.display = 'none';
+  _pkSetVisible(note, !!_pkOpts.note);
+  _pkSetVisible(el.querySelector('.pk-search'), false);
   el.classList.add('on');
   _pkRenderYm();
   _pkPosition(anchorEl);
@@ -264,14 +308,18 @@ function _pkPickYm(y, m) {
 const _uiSel = {};
 
 function _uiEsc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
 function _uiSelHit(key, v) {
   return ((_uiSel[key] || {}).items || []).find(it => String(it.value) === String(v));
 }
 
-function _uiSelEl(key) { return document.querySelector('[data-uisel="' + key + '"]'); }
+function _uiSelEl(key) {
+  const wanted = String(key);
+  return Array.from(document.querySelectorAll('[data-uisel]'))
+    .find(el => el.dataset.uisel === wanted) || null;
+}
 
 function uiSelHtml(key, spec) {
   _uiSel[key] = spec = spec || {};

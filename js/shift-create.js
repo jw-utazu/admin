@@ -51,16 +51,20 @@ let _scPollListening = false;
 let wishLoaded   = false;
 
 // ===== オートセーブ =====
-const _saveTimers    = {}; // bKey -> setTimeoutのid（デバウンス待ち）
-const _saveInFlight   = {}; // bKey -> 保存中フラグ
-const _savePending    = {}; // bKey -> 保存中に追加の編集が入った場合に立てるフラグ
-const _saveRetried    = {}; // bKey -> 失敗時の自動リトライ（1回のみ）を予約済みか
+const _saveTimers          = {}; // 完全ブロックキー -> setTimeout（デバウンス待ち）
+const _saveQueues          = {}; // 完全ブロックキー -> 直列化された Promise tail
+const _savePendingSnaps    = {}; // 完全ブロックキー -> 未送信の最新 immutable snapshot
+const _saveLatestSnaps     = {}; // 完全ブロックキー -> 最新 revision の snapshot
+const _saveLatestRevision  = {}; // 完全ブロックキー -> 最新 revision
+const _saveRetryTimers     = {}; // 完全ブロックキー -> 失敗時の再試行 timer
+const _saveRetrySnaps      = {}; // 完全ブロックキー -> 再試行対象 snapshot
+const _saveLastErrors      = {}; // 完全ブロックキー -> 最新保存失敗
 const AUTOSAVE_DEBOUNCE_MS = 500;
 const AUTOSAVE_RETRY_MS    = 5000;
 
 // apiGet / apiAuthGet は js/api.js（共有通信層）で定義
 
-// 年月依存のAPI（getWishData / getApplicants / getShiftCreateData / createShiftSheet と
+// 年月依存のAPI（getWishData / getApplicants / getShiftCreateData と
 // 公開操作系 publishShift / unpublishShift / approveShift / rejectShift / getShiftPublishStatus）には
 // 必ず編集中の年月を渡す。curYM が未確定な初回読み込み時だけ付けず、サーバー既定
 // （＝申込中カレンダーの年月）に従う。
@@ -69,6 +73,13 @@ const AUTOSAVE_RETRY_MS    = 5000;
 // 前月のシフトの取り消し・確認完了・差し戻しができなくなる
 function ymP(extra) {
   return Object.assign({}, extra || {}, curYM ? { year: curYM.year, month: curYM.month } : {});
+}
+
+function clearSaveTracking() {
+  Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
+  Object.keys(_saveRetryTimers).forEach(k => { clearTimeout(_saveRetryTimers[k]); delete _saveRetryTimers[k]; });
+  [_savePendingSnaps, _saveLatestSnaps, _saveLatestRevision, _saveRetrySnaps, _saveLastErrors]
+    .forEach(store => Object.keys(store).forEach(k => delete store[k]));
 }
 
 // ============================================================
@@ -82,21 +93,13 @@ async function initAuth() {
     pwgwsGoToLogin();
     return;
   }
-  try {
-    const u = JSON.parse(localStorage.getItem('adminUser') || 'null');
-    if (u && u.isAdmin) {
-      adminUser = u;
-      showApp();
-      refreshAdminAvatar(u.email); // 表示はキャッシュのまま即座に、裏で最新のアバターだけ取り直す
-      return;
-    }
-  } catch (_) {}
   // Googleアカウントが使えない管理者のための救済セッション（有効期限はサーバー側で検証）
   if (await tryRecoveryLogin()) return;
 
-  // 共通ログイン画面でログイン済みなら引き継ぐ（管理者権限は必ずサーバーで確認する）
+  // adminUser は表示用キャッシュであり、本人確認・権限確認には使わない。
+  // 共通セッションの不透明tokenをサーバーが検証できた場合だけ画面を開く。
   const shared = pwgwsGetSession();
-  if (shared) {
+  if (shared && pwgwsGetSessionToken()) {
     try {
       setLoading(true, '権限を確認中...');
       const d = await apiAuthGet(shared.email, 'admin');
@@ -114,7 +117,7 @@ async function initAuth() {
   // ログイン自体は済んでいるが管理者権限が無い場合（アカウント切り替えで
   // 個人アカウントに変えたときなど）はログアウトさせず、フォームアプリへ送る。
   // 未ログインのときだけ共通ログイン画面へ（このアプリ内に認証画面は持たない）
-  if (shared) { location.replace(PWGWS_FORM_URL); return; }
+  if (shared && pwgwsGetSessionToken()) { location.replace(PWGWS_FORM_URL); return; }
   pwgwsGoToLogin();
 }
 async function tryRecoveryLogin() {
@@ -122,7 +125,7 @@ async function tryRecoveryLogin() {
   try { token = localStorage.getItem('pwgws_recovery_session') || ''; } catch (_) {}
   if (!token) return false;
   try {
-    const res = await apiPost({ action: 'validateRecoverySession', sessionToken: token });
+    const res = await apiPost({ action: 'validateRecoverySession' });
     if (!res.ok || !res.isAdmin) return false;
     adminUser = { email: '', name: res.name, uid: res.uid || '', isAdmin: true, picture: '', isRecoverySession: true };
     showApp();
@@ -137,8 +140,7 @@ function signOut() {
   setTimeout(() => pwgwsGoToLogin(), 800);
 }
 function showApp() {
-
-  document.getElementById('app-screen').style.display = 'flex';
+  setVisible(document.getElementById('app-screen'), true);
   renderAccIcon();
   loadInitData();
 }
@@ -215,13 +217,22 @@ async function loadInitData() {
 // ============================================================
 // カレンダーが存在する年月の一覧と、公開中カレンダーの年月を取得する。
 // 限定PWはフェーズが複数月にまたがるため対象外（セレクタを出さない）
-async function loadYmList() {
-  if (currentPwType !== 'normal') { ymList = []; publishedYM = null; shiftPubYMs = []; ymLoaded = false; renderYmSelect(); return; }
-  try {
-    const r = await apiGet('getCalendarSheetList', {});
-    ymList = r && r.ok ? (r.list || []) : [];
-    ymLoaded = true;
-  } catch (e) { ymList = []; ymLoaded = false; }
+async function fetchYmList(type) {
+  if (type !== 'normal') return { list: [], loaded: false };
+  const r = await apiGet('getCalendarSheetList', { type });
+  if (!r || !r.ok) throw new Error((r && r.error) || '対象年月の取得に失敗しました');
+  return { list: r.list || [], loaded: true };
+}
+
+function applyYmList(data, type) {
+  ymList = data && data.list ? data.list : [];
+  ymLoaded = !!(data && data.loaded);
+  if (type !== 'normal') {
+    publishedYM = null;
+    shiftPubYMs = [];
+    renderYmSelect();
+    return;
+  }
   // 通常PWの申込中カレンダーは常に最大1件だが、念のため最新の月を採用する
   // （サーバー側 getCurrentCal と同じ「年月の降順で先頭」の解釈に合わせる）
   const pubs = ymList.filter(c => c.calPublished);
@@ -232,6 +243,14 @@ async function loadYmList() {
   shiftPubYMs = ymList.filter(c => c.shiftPublished).map(c => ({ year: c.year, month: c.month }));
   renderYmSelect();
   updatePublishBtn();
+}
+
+async function loadYmList() {
+  try { applyYmList(await fetchYmList(currentPwType), currentPwType); }
+  catch (e) {
+    applyYmList({ list: [], loaded: false }, currentPwType);
+    throw e;
+  }
 }
 
 // 対象年月セレクタの候補として出す月かどうか。
@@ -298,7 +317,7 @@ function ymStateTag(c) {
 function renderYmSelect() {
   const wrap = document.getElementById('sc-ym-slot');
   if (!wrap) return;
-  if (currentPwType !== 'normal' || ymList.length === 0) { wrap.parentNode.style.display = 'none'; return; }
+  if (currentPwType !== 'normal' || ymList.length === 0) { setVisible(wrap.parentNode, false); return; }
   const cur = ymKey(curYM);
   const items = ymList.filter(isYmSelectable).map(c => ({
     value: c.year + '.' + c.month,
@@ -315,7 +334,7 @@ function renderYmSelect() {
     title: '対象年月', items, value: cur, onPick: v => onYmChange(v),
     style: 'font-size:12px;',
   });
-  wrap.parentNode.style.display = 'flex';
+  setVisible(wrap.parentNode, true);
   renderYmNote();
 }
 
@@ -358,6 +377,8 @@ function setYmSwitching(on) {
   if (sel) sel.disabled = !!on;
   document.querySelectorAll('.main-tabs .mtab').forEach(b => { b.disabled = !!on; });
   document.querySelectorAll('#pw-tabs .pw-tab-sc').forEach(b => { b.disabled = !!on; });
+  document.querySelectorAll('#dtabs button, #dtabs-time button, .wish-reload-btn, #split-btn')
+    .forEach(b => { b.disabled = !!on; });
 }
 
 async function onYmChange(val) {
@@ -365,29 +386,34 @@ async function onYmChange(val) {
   const y = parseInt(parts[0]), m = parseInt(parts[1]);
   if (!y || !m) return;
   if (curYM && curYM.year === y && curYM.month === m) return;
-  await flushPendingSave(activeTimeIdx);
-  curYM = { year: y, month: m };
-  resetMonthState();
-  renderYmNote();
-  updatePublishBtn();
-
   setYmSwitching(true);
   setLoading(true, y + '年' + m + '月 のデータを読み込み中...');
   try {
-    // 作成完了・確認状況・公開予定日は月ごとに違う。切り替えたら必ず取り直す
-    // （取り直さないと、公開中の月を表示しているのにヘッダーだけ前の月＝未完了のまま残り、
-    //   「シフト作成完了」を押せてしまう）。
-    // 年月一覧も一緒に取り直す。管理アプリで予定表を公開したのがこの画面を開いたあとだと、
-    // 申込中の月が古いままになり、公開できるはずの月でボタンが押せなくなる
-    await refreshPublishState();
+    if (createLoaded) syncCurrentBlock();
+    await flushPendingSave();
     const wishOn   = splitMode || document.getElementById('tab-wish').classList.contains('on');
     const createOn = splitMode || document.getElementById('tab-create').classList.contains('on');
-    if (wishOn) await loadWishDataInternal();
-    setLoading(false);
-    // loadCreateData は自前でオーバーレイを表示する
-    if (createOn) await loadCreateData();
+    const params = { type: currentPwType, year: y, month: m };
+    // 先に全取得を完了し、成功したときだけ global/DOM を対象月へ切り替える。
+    // 途中失敗では現在の編集画面をそのまま残す。
+    const [statusRes, ymData, wishBundle, createBundle] = await Promise.all([
+      fetchPublishStatus(params),
+      fetchYmList(currentPwType),
+      wishOn ? fetchWishDataBundle({ params }) : Promise.resolve(null),
+      createOn ? fetchCreateDataBundle({ params }) : Promise.resolve(null),
+    ]);
+    if (!statusRes || !statusRes.ok) throw new Error((statusRes && statusRes.error) || '公開状態の取得に失敗しました');
+
+    curYM = { year: y, month: m };
+    resetMonthState();
+    applyYmList(ymData, currentPwType);
+    applyPublishStatus(statusRes);
+    if (wishBundle) applyWishDataBundle(wishBundle);
+    if (createBundle) applyCreateDataBundle(createBundle);
+    renderYmNote();
+    updatePublishBtn();
   } catch (e) {
-    toast('読み込みエラー: ' + e.message, 'e');
+    toast('切り替えを中止しました: ' + e.message, 'e');
   } finally {
     setLoading(false);
     setYmSwitching(false);
@@ -402,10 +428,7 @@ function resetMonthState() {
   applicants   = [];
   shiftDates   = [];
   Object.keys(bs).forEach(k => delete bs[k]);
-  Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
-  Object.keys(_saveInFlight).forEach(k => delete _saveInFlight[k]);
-  Object.keys(_savePending).forEach(k => delete _savePending[k]);
-  Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
+  clearSaveTracking();
   Object.keys(_srvSig).forEach(k => delete _srvSig[k]);
   window._blockCols  = {};
   window._cartUnlock = {};
@@ -415,6 +438,7 @@ function resetMonthState() {
   // 更新監視の基準は月ごとに取り直す
   _scKnownTs = null;
   _scKnownWishTs = null;
+  _scKnownDraftTs = null;
 }
 
 // ============================================================
@@ -428,64 +452,91 @@ let pwTypeList = [];  // [{id:'limited2', name:'テストPW'}, ...]
 function renderPwTabsSc() {
   const bar = document.getElementById('pw-tabs');
   if (!bar) return;
-  if (pwTypeList.length === 0) { bar.style.display = 'none'; return; }
-  let html = `<button class="pw-tab-sc${currentPwType === 'normal' ? ' on' : ''}" onclick="switchPwTypeSc('normal')">通常PW</button>`;
+  if (pwTypeList.length === 0) { setVisible(bar, false); return; }
+  let html = `<button type="button" class="pw-tab-sc${currentPwType === 'normal' ? ' on' : ''}" data-pw-type="normal">通常PW</button>`;
   pwTypeList.forEach(s => {
-    html += `<button class="pw-tab-sc${currentPwType === s.id ? ' on' : ''}" onclick="switchPwTypeSc('${s.id}')">${esc(s.name)}</button>`;
+    html += `<button type="button" class="pw-tab-sc${currentPwType === s.id ? ' on' : ''}" data-pw-type="${esc(s.id)}">${esc(s.name)}</button>`;
   });
   bar.innerHTML = html;
-  bar.style.display = 'flex';
+  bar.querySelectorAll('[data-pw-type]').forEach(button => {
+    button.addEventListener('click', () => switchPwTypeSc(button.dataset.pwType || 'normal'));
+  });
+  setVisible(bar, true);
 }
 
 async function switchPwTypeSc(type) {
   if (currentPwType === type) return;
-  await flushPendingSave(activeTimeIdx);
-  currentPwType = type;
-  renderPwTabsSc();
-
-  // キャッシュ・状態をリセット
-  curYM = null;
-  createLoaded = false;
-  settingsLoaded = false;
-  memberFlags = {};
-  applicants = [];
-  shiftDates = [];
-  Object.keys(bs).forEach(k => delete bs[k]);
-  Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
-  Object.keys(_saveInFlight).forEach(k => delete _saveInFlight[k]);
-  Object.keys(_savePending).forEach(k => delete _savePending[k]);
-  Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
-  window._blockCols = {};
-  // 更新監視のタイムスタンプは pw_type ごとに別キーなので基準を取り直す
-  _scKnownTs = null;
-  _scKnownWishTs = null;
-
+  const previousType = currentPwType;
   const label = type === 'normal' ? '通常PW' : (pwTypeList.find(s => s.id === type)?.name || '限定PW');
+  setYmSwitching(true);
   setLoading(true, label + ' のデータを読み込み中...');
   try {
-    // 公開状態・対象年月の候補は常に更新
-    const [statusRes] = await Promise.all([fetchPublishStatus(), loadYmList()]);
-    applyPublishStatus(statusRes);
-
+    if (createLoaded) syncCurrentBlock();
+    await flushPendingSave();
     // 表示中のタブ（分割表示なら両方）を再読み込み
     const wishOn     = splitMode || document.getElementById('tab-wish').classList.contains('on');
     const createOn   = splitMode || document.getElementById('tab-create').classList.contains('on');
     const settingsOn = document.getElementById('tab-settings').classList.contains('on');
-    if (wishOn) await loadWishDataInternal();
-    setLoading(false);
-    // loadCreateData / loadSettingsData は自前でオーバーレイを表示する
-    if (createOn)   await loadCreateData();
-    if (settingsOn) await loadSettingsData();
-    // curYM はここまでの読み込みで確定する。取った公開状態がその月のものか確かめる
-    await ensurePublishStatusForCurYM();
+    const params = { type };
+    let [statusRes, ymData, wishBundle, createBundle, settingsBundle] = await Promise.all([
+      fetchPublishStatus(params),
+      fetchYmList(type),
+      wishOn ? fetchWishDataBundle({ params, forceMemberFlags: true }) : Promise.resolve(null),
+      createOn ? fetchCreateDataBundle({ params }) : Promise.resolve(null),
+      settingsOn ? fetchSettingsDataBundle({ params }) : Promise.resolve(null),
+    ]);
+    if (!statusRes || !statusRes.ok) throw new Error((statusRes && statusRes.error) || '公開状態の取得に失敗しました');
+
+    const dataYm = createBundle
+      ? { year: createBundle.shiftRes.year || createBundle.appRes.year, month: createBundle.shiftRes.month || createBundle.appRes.month }
+      : wishBundle ? { year: wishBundle.res.year, month: wishBundle.res.month }
+      : { year: statusRes.year || (curYM && curYM.year), month: statusRes.month || (curYM && curYM.month) };
+    const targetYm = dataYm.year && dataYm.month ? { year: Number(dataYm.year), month: Number(dataYm.month) } : null;
+    if (targetYm && (Number(statusRes.year) !== targetYm.year || Number(statusRes.month) !== targetYm.month)) {
+      statusRes = await fetchPublishStatus({ type, year: targetYm.year, month: targetYm.month });
+      if (!statusRes || !statusRes.ok) throw new Error((statusRes && statusRes.error) || '公開状態の取得に失敗しました');
+    }
+
+    // 全取得が成功してから初めてPWと画面状態を差し替える。失敗時は旧PWの編集を保持する。
+    currentPwType = type;
+    curYM = targetYm;
+    resetMonthState();
+    settingsLoaded = false;
+    memberFlags = {};
+    applyYmList(ymData, type);
+    applyPublishStatus(statusRes);
+    if (wishBundle) applyWishDataBundle(wishBundle);
+    if (createBundle) applyCreateDataBundle(createBundle);
+    if (settingsBundle) applySettingsDataBundle(settingsBundle);
+    renderPwTabsSc();
+    renderYmSelect();
   } catch (e) {
+    // global は全取得成功後まで変更しないため、ここでは旧画面がそのまま残る。
+    currentPwType = previousType;
+    toast('切り替えを中止しました: ' + e.message, 'e');
+  } finally {
     setLoading(false);
-    toast('読み込みエラー: ' + e.message, 'e');
+    setYmSwitching(false);
   }
 }
 
-function switchMainTab(name, btn) {
+async function switchMainTab(name, btn) {
   if (splitMode && (name === 'wish' || name === 'create')) return;
+  const needsLoad = (name === 'wish' && !wishLoaded)
+    || (name === 'create' && !createLoaded)
+    || (name === 'settings' && !settingsLoaded);
+  if (needsLoad) {
+    setYmSwitching(true);
+    try {
+      if (name === 'wish') await loadWishData({ rethrow: true });
+      else if (name === 'create') await loadCreateData({ rethrow: true });
+      else await loadSettingsData({ rethrow: true });
+    } catch (_) {
+      return; // loader がエラー表示済み。元のタブは保持する。
+    } finally {
+      setYmSwitching(false);
+    }
+  }
   if (splitMode && name === 'settings') {
     splitMode = false;
     document.getElementById('content-wrapper').classList.remove('split');
@@ -502,9 +553,6 @@ function switchMainTab(name, btn) {
   // 非表示のまま組まれた表は高さを測れず段差が既定値のままなので、
   // 見えるようになったこの時点で測り直す
   if (name === 'wish') fixWishHeadOffset();
-  if (name === 'wish' && !wishLoaded) loadWishData();
-  if (name === 'create' && !createLoaded) loadCreateData();
-  if (name === 'settings' && !settingsLoaded) loadSettingsData();
 }
 
 // 「元に戻す」「チェック」はシフト作成タブ専用。作成タブ表示中（分割表示中も含む）だけ出す
@@ -512,12 +560,19 @@ function updateCreateToolsVis() {
   const el = document.getElementById('create-tools');
   if (!el) return;
   const on = splitMode || document.getElementById('tab-create').classList.contains('on');
-  el.style.display = on ? 'flex' : 'none';
+  setVisible(el, on);
 }
 // ===== 分割表示 =====
 let splitMode = false;
-function toggleSplitView() {
-  splitMode = !splitMode;
+async function toggleSplitView() {
+  const nextSplitMode = !splitMode;
+  if (nextSplitMode && !createLoaded) {
+    setYmSwitching(true);
+    try { await loadCreateData({ rethrow: true }); }
+    catch (_) { return; }
+    finally { setYmSwitching(false); }
+  }
+  splitMode = nextSplitMode;
   const wrapper = document.getElementById('content-wrapper');
   const btn = document.getElementById('split-btn');
   const rsz = document.getElementById('split-rsz');
@@ -527,14 +582,13 @@ function toggleSplitView() {
     wrapper.classList.add('split');
     btn.classList.add('on');
     btn.textContent = '⊡ 分割解除';
-    if (rsz) rsz.style.display = 'block';
+    setVisible(rsz, true);
     updateCreateToolsVis();
-    if (!createLoaded) loadCreateData();
   } else {
     wrapper.classList.remove('split');
     btn.classList.remove('on');
     btn.textContent = '⬛ 分割表示';
-    if (rsz) rsz.style.display = 'none';
+    setVisible(rsz, false);
     document.getElementById('tab-wish').style.flex = '';
     document.getElementById('tab-create').style.flex = '';
     switchMainTab('wish', document.getElementById('mtab-wish'));
@@ -549,13 +603,13 @@ function toggleCompareMode() {
   const rsz = document.getElementById('cmp-rsz');
   if (compareMode) {
     panel.classList.add('on');
-    if (rsz) rsz.style.display = 'block';
+    setVisible(rsz, true);
     btn.textContent = '⊡ 比較解除';
     btn.style.cssText = 'border-color:var(--purple);color:var(--purple);white-space:nowrap;';
     populateCmpDateSel();
   } else {
     panel.classList.remove('on');
-    if (rsz) rsz.style.display = 'none';
+    setVisible(rsz, false);
     btn.textContent = '⬜ 比較';
     btn.style.cssText = 'border-color:var(--teal);color:var(--teal);white-space:nowrap;';
     const rmWrap = document.querySelector('#tab-create .rm-wrap');
@@ -680,26 +734,43 @@ function openAccountMenu(el) {
 // ============================================================
 // TAB1: 希望確認
 // ============================================================
-async function loadWishData() {
-  document.getElementById('wish-table-wrap').innerHTML = '<div class="empty-msg">読み込み中...</div>';
+async function loadWishData(options) {
+  const opts = options || {};
   setLoading(true, 'シフト希望を取得中...');
-  try { await loadWishDataInternal(); } catch (e) { toast('読み込みエラー: ' + e.message, 'e'); } finally { setLoading(false); }
+  try {
+    await loadWishDataInternal(opts);
+    return true;
+  } catch (e) {
+    toast('読み込みエラー: ' + e.message, 'e');
+    if (opts.rethrow) throw e;
+    return false;
+  } finally { setLoading(false); }
 }
-async function loadWishDataInternal() {
+async function fetchWishDataBundle(options) {
+  const opts = options || {};
+  const params = Object.assign({}, opts.params || ymP());
   // getWishData と getMemberFlags と getShiftCreateData を並行取得
   const [res, flagsRes, shiftRes] = await Promise.all([
-    apiGet('getWishData', ymP()),
-    Object.keys(memberFlags).length > 0 ? Promise.resolve({ ok: true, flags: memberFlags }) : apiGet('getMemberFlags'),
-    apiGet('getShiftCreateData', ymP())
+    apiGet('getWishData', params),
+    !opts.forceMemberFlags && Object.keys(memberFlags).length > 0
+      ? Promise.resolve({ ok: true, flags: memberFlags })
+      : apiGet('getMemberFlags', { type: params.type }),
+    apiGet('getShiftCreateData', params)
   ]);
+  if (!res || !res.ok) throw new Error((res && res.error) || '取得失敗');
+  if (!shiftRes || !shiftRes.ok) throw new Error((shiftRes && shiftRes.error) || 'シフト割当の取得に失敗しました');
+  return { res, flagsRes, shiftRes };
+}
+
+function applyWishDataBundle(bundle) {
+  const { res, flagsRes, shiftRes } = bundle;
   const year  = res.year  || new Date().getFullYear();
   const month = res.month || new Date().getMonth() + 1;
   if (!curYM) { curYM = { year, month }; renderYmSelect(); }
   document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
   document.getElementById('ws-ym').textContent     = year + '年' + month + '月';
-  if (!res.ok) throw new Error(res.error || '取得失敗');
   // memberFlagsを更新（未取得だった場合）
-  if (flagsRes.ok && Object.keys(memberFlags).length === 0) memberFlags = flagsRes.flags || {};
+  if (flagsRes.ok) memberFlags = flagsRes.flags || {};
   document.getElementById('ws-applied').textContent = res.appliedCount || 0;
   document.getElementById('ws-total').textContent   = res.totalMembers || 0;
   // 申込が0名でも時間枠は出す（未申込一覧に全員が並ぶ）。実施日そのものが無いときだけ空表示にする
@@ -712,6 +783,12 @@ async function loadWishDataInternal() {
   // 直前に自分で再読み込みした内容を「他者の変更」として再検知しないよう基準を取り直す
   _scKnownWishTs = null;
   if (!_scPollTimer) startShiftCreateSync();
+}
+
+async function loadWishDataInternal(options) {
+  const bundle = options && options.bundle ? options.bundle : await fetchWishDataBundle(options);
+  applyWishDataBundle(bundle);
+  return bundle;
 }
 function buildAssignmentMap(shiftRes) {
   const map = {};
@@ -737,6 +814,18 @@ function wishCellClass(applied, isAssigned) {
 function wishCellInner(applied, isAssigned, hasComment) {
   if (!applied && !isAssigned) return '';
   return `<span class="check-mark">〇</span>${applied && hasComment ? '<span class="note-mark">📝</span>' : ''}`;
+}
+
+let _wishCellContexts = [];
+
+function bindWishCellEvents(wrap) {
+  wrap.querySelectorAll('[data-wish-context]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const ctx = _wishCellContexts[Number(cell.dataset.wishContext)];
+      if (!ctx) return;
+      openWishEdit(cell, ctx.uid, ctx.name, ctx.slot, ctx.applied, ctx.comment);
+    });
+  });
 }
 
 // シフト作成側の割当が変わったときに、希望確認テーブルの「割当」列と紫セル（cell-on）だけを
@@ -770,6 +859,7 @@ function refreshWishAssign() {
 function buildWishTable(data, shiftRes) {
   const { members, slots, matrix } = data;
   const assignMap = buildAssignmentMap(shiftRes);
+  _wishCellContexts = [];
 
   // 日付+時間帯をカレンダー順にソート
   const sortedSlots = [...slots].sort((a, b) => {
@@ -832,11 +922,15 @@ function buildWishTable(data, shiftRes) {
       const val = row[slot];
       const isAssigned = !!(assignMap[uid] && assignMap[uid].has(slot));
       const hc = typeof val === 'object' && val.comment;
-      // onclick に埋めるので改行は \n のままでは JS 文字列が切れる。エスケープしてから渡す
-      const comment = hc ? String(val.comment).replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n') : '';
+      // コメント・氏名は onclick や data 属性へ入れず、JS 側の配列だけに保持する。
+      // 保存済み文字列に引用符やタグが含まれても HTML/JavaScript として解釈されない。
+      const contextIndex = _wishCellContexts.push({
+        uid: String(uid || ''), name: String(name || ''), slot: String(slot || ''),
+        applied: !!val, comment: hc ? String(val.comment) : '',
+      }) - 1;
       // data-uid / data-slot / data-applied は refreshWishAssign() の差分更新用
       const dataAttr = `data-uid="${esc(uid)}" data-slot="${esc(slot)}" data-applied="${val ? 1 : 0}"`;
-      r += `<td class="${wishCellClass(!!val, isAssigned)}" style="cursor:pointer;" ${dataAttr} onclick="openWishEdit(this,'${esc(uid)}','${esc(name)}','${esc(slot)}',${val ? 'true' : 'false'},'${esc(comment)}')">${wishCellInner(!!val, isAssigned, !!hc)}</td>`;
+      r += `<td class="${wishCellClass(!!val, isAssigned)} wish-edit-cell" ${dataAttr} data-wish-context="${contextIndex}">${wishCellInner(!!val, isAssigned, !!hc)}</td>`;
     });
     r += `<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${slotCountFor(uid)}</td>`;
     r += `<td class="cell-data" data-assign-total="${esc(uid)}" style="position:sticky;right:0;background:var(--purple-l);font-weight:700;color:var(--purple);z-index:2;">${assignCountFor(uid)}</td>`;
@@ -869,7 +963,9 @@ function buildWishTable(data, shiftRes) {
     html += `</div>`;
   }
 
-  document.getElementById('wish-table-wrap').innerHTML = html;
+  const wrap = document.getElementById('wish-table-wrap');
+  wrap.innerHTML = html;
+  bindWishCellEvents(wrap);
   fixWishHeadOffset();
 }
 
@@ -1022,7 +1118,7 @@ function openWishEdit(el, uid, name, slot, applied, comment) {
   // カート担当に登録されていない人には出さない。ただし既に「カート不可」が
   // 入っているデータでは、隠して黙って消してしまわないよう表示する
   const isCartUser = !!(memberFlags[uid] || {}).cartFlag;
-  document.getElementById('we-cart-row').style.display = (isCartUser || hasCartNg) ? '' : 'none';
+  setVisible(document.getElementById('we-cart-row'), isCartUser || hasCartNg);
   document.querySelector('[data-chip="we-cartng"]')?.classList.toggle('on', hasCartNg);
   weRenderNote(weParseNote(raw.replace('カート不可', '').trim()));
   const toggleBtn = document.getElementById('we-toggle-btn');
@@ -1030,11 +1126,11 @@ function openWishEdit(el, uid, name, slot, applied, comment) {
   if (applied) {
     toggleBtn.textContent = '不参加にする';
     toggleBtn.className = 's-btn del';
-    saveBtn.style.display = '';
+    setVisible(saveBtn, true);
   } else {
     toggleBtn.textContent = '参加にする';
     toggleBtn.className = 's-btn green';
-    saveBtn.style.display = 'none';
+    setVisible(saveBtn, false);
   }
   document.getElementById('wish-edit-modal').classList.add('on');
 }
@@ -1059,8 +1155,7 @@ async function submitWishChange(applied) {
   setLoading(true, '保存中...');
   try {
     const res = await apiGet('adminSetWish', ymP({
-      uid: ctx.uid, name: ctx.name, date, time, applied, comment,
-      adminUid: adminUser?.uid || '', adminName: adminUser?.name || ''
+      uid: ctx.uid, date, time, applied, comment,
     }));
     if (!res.ok) throw new Error(res.error || '保存に失敗しました');
     closeWishEditModal();
@@ -1090,9 +1185,8 @@ async function refreshApplicantsForCreate() {
 }
 function toggleWishApplied() { if (wishEditCtx) submitWishChange(!wishEditCtx.applied); }
 function saveWishComment()   { submitWishChange(true); }
-// 開閉はクラスで行う。インラインスタイル（style="display:block"）で開くと
-// style 属性が付き、CSS の `#wish-table-wrap > div[style]` に不意に一致して
-// flex:1（flex-basis:0）が当たってしまう。見出しと本体で同じ .open を使う
+// 開閉はクラスで行う。属性セレクタとインライン表示切替に依存すると、
+// 無関係なレイアウト規則に誤って一致するため、見出しと本体で同じ .open を使う。
 function toggleWishNotApplied(el) {
   el.classList.toggle('open');
   const body = el.nextElementSibling;
@@ -1102,51 +1196,70 @@ function toggleWishNotApplied(el) {
 // ============================================================
 // TAB2: シフト作成
 // ============================================================
-async function loadCreateData() {
+async function fetchCreateDataBundle(options) {
+  const opts = options || {};
+  const params = Object.assign({}, opts.params || ymP());
+  const [flagsRes, appRes, shiftRes, ackRes, ruleRes] = await Promise.all([
+    apiGet('getMemberFlags', { type: params.type }),
+    apiGet('getApplicants', params),
+    apiGet('getShiftCreateData', params),
+    apiGet('getValidationAcks', params).catch(() => ({ ok: false })),
+    apiGet('getValidationRules', { type: params.type }).catch(() => ({ ok: false }))
+  ]);
+  if (!flagsRes || !flagsRes.ok) throw new Error((flagsRes && flagsRes.error) || 'メンバー情報の取得に失敗しました');
+  if (!appRes || !appRes.ok) throw new Error((appRes && appRes.error) || '申込者の取得に失敗しました');
+  if (!shiftRes || !shiftRes.ok) throw new Error((shiftRes && shiftRes.error) || 'シフトデータの取得に失敗しました');
+  return { flagsRes, appRes, shiftRes, ackRes, ruleRes };
+}
+
+function applyCreateDataBundle(bundle) {
+  const { flagsRes, appRes, shiftRes, ackRes, ruleRes } = bundle;
+  Object.keys(bs).forEach(k => delete bs[k]); // 再読み込み時は保存状態をクリア
+  clearSaveTracking();
+  window._blockCols = {};
+  window._cartUnlock = {};
+  clearUndo();
+  setValidationAcks(ackRes.ok ? (ackRes.acks || []) : []);
+  setValidationConfig(ruleRes.ok ? (ruleRes.rules || {}) : {});
+  const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
+  const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
+  const ymChanged = ymKey(curYM) !== (year + '.' + month);
+  curYM = { year, month };
+  if (ymChanged) renderYmSelect();
+  document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
+  memberFlags  = flagsRes.flags || {};
+  applicants   = appRes.applicants || [];
+  shiftDates   = shiftRes.dates || [];
+  locations    = shiftRes.locations    || [];
+  cartNumbers  = shiftRes.cartNumbers  || [];
+  conflictMap  = shiftRes.conflictMap  || {};
+  memoMap = {};
+  if (shiftRes.memoMap) Object.assign(memoMap, shiftRes.memoMap);
+  defaultSlot  = shiftRes.defaultSlot  || 15;
+  Object.keys(_srvSig).forEach(k => delete _srvSig[k]);
+  shiftDates.forEach(b => { _srvSig[bKey(b)] = blockSig(b); });
+  recalcCounts();
+  buildCreateTabs();
+  buildLeftPanel();
+  refreshWishAssign();
+  if (shiftDates.length > 0) { activeDateIdx = 0; activeTimeIdx = 0; buildTimeTabs(); }
+  else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「🗂 シフト作成準備」を実行してください。</div>'; }
+  createLoaded = true;
+  startShiftCreateSync();
+}
+
+async function loadCreateData(options) {
+  const opts = options || {};
   setLoading(true, 'シフトデータを読み込み中...');
   try {
-    Object.keys(bs).forEach(k => delete bs[k]); // 再読み込み時は保存状態をクリア
-    Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
-    Object.keys(_saveInFlight).forEach(k => delete _saveInFlight[k]);
-    Object.keys(_savePending).forEach(k => delete _savePending[k]);
-    Object.keys(_saveRetried).forEach(k => delete _saveRetried[k]);
-    window._blockCols = {};
-    window._cartUnlock = {};
-    clearUndo();
-    const [flagsRes, appRes, shiftRes, ackRes, ruleRes] = await Promise.all([
-      apiGet('getMemberFlags'), apiGet('getApplicants', ymP()), apiGet('getShiftCreateData', ymP()),
-      apiGet('getValidationAcks', {}).catch(() => ({ ok: false })),
-      apiGet('getValidationRules', {}).catch(() => ({ ok: false }))
-    ]);
-    setValidationAcks(ackRes.ok ? (ackRes.acks || []) : []);
-    setValidationConfig(ruleRes.ok ? (ruleRes.rules || {}) : {});
-    const year  = shiftRes.year  || appRes.year  || new Date().getFullYear();
-    const month = shiftRes.month || appRes.month || new Date().getMonth() + 1;
-    const ymChanged = ymKey(curYM) !== (year + '.' + month);
-    curYM = { year, month };
-    if (ymChanged) renderYmSelect();
-    document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
-    memberFlags  = flagsRes.ok ? flagsRes.flags    : {};
-    applicants   = appRes.ok  ? appRes.applicants  : [];
-    shiftDates   = shiftRes.ok ? shiftRes.dates    : [];
-    locations    = shiftRes.locations    || [];
-    cartNumbers  = shiftRes.cartNumbers  || [];
-    conflictMap  = shiftRes.conflictMap  || {};
-    memoMap = {};
-    if (shiftRes.memoMap) Object.assign(memoMap, shiftRes.memoMap);
-    defaultSlot  = shiftRes.defaultSlot  || 15;
-    Object.keys(_srvSig).forEach(k => delete _srvSig[k]);
-    shiftDates.forEach(b => { _srvSig[bKey(b)] = blockSig(b); });
-    recalcCounts();
-    buildCreateTabs();
-    buildLeftPanel();
-    refreshWishAssign();
-    if (shiftDates.length > 0) { activeDateIdx = 0; activeTimeIdx = 0; buildTimeTabs(); }
-    else { document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">シフトデータがありません。<br>管理アプリの「募集開始処理」から「🗂 シフト作成準備」を実行してください。</div>'; }
-    createLoaded = true;
-    setLoading(false);
-    startShiftCreateSync();
-  } catch (e) { setLoading(false); toast('読み込みエラー: ' + e.message, 'e'); }
+    const bundle = opts.bundle || await fetchCreateDataBundle(opts);
+    applyCreateDataBundle(bundle);
+    return true;
+  } catch (e) {
+    toast('読み込みエラー: ' + e.message, 'e');
+    if (opts.rethrow) throw e;
+    return false;
+  } finally { setLoading(false); }
 }
 
 function buildCreateTabs() {
@@ -1162,18 +1275,29 @@ function buildCreateTabs() {
   // 全ブロックを描き直して書き戻すため、押すと未編集のブロックまで更新扱いになり、
   // 他の管理者側で無用な同期が走るという副作用の方が大きかった
   // 並びは「… 保存ステータス → 再読み込み」。再読み込みは右端に固定する
-  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><div class="save-st" id="gst" style="display:none;margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button>';
+  document.getElementById('dtabs').innerHTML = tabs + '<div class="dtabs-spacer" style="flex:1;"></div><div class="save-st is-hidden" id="gst" style="margin-right:8px;"><div class="save-dot"></div><span id="gst-txt">未保存あり</span></div><button class="tb-btn" style="white-space:nowrap;" onclick="reloadCreateData()">🔄 再読み込み</button>';
   if (compareMode) populateCmpDateSel();
 }
 
 async function switchDateTab(i) {
-  syncCurrentBlock();
-  await flushPendingSave(activeTimeIdx);
-  document.querySelectorAll('.dtab').forEach((b, idx) => b.className = 'dtab' + (idx === i ? ' on' : ''));
-  activeDateIdx = i;
-  activeTimeIdx = 0;
-  buildTimeTabs();
-  buildLeftPanel();
+  const target = (window._dateTabs || [])[i];
+  if (!target || i === activeDateIdx) return;
+  setYmSwitching(true);
+  setLoading(true, target.date + ' のデータへ切り替え中...');
+  try {
+    syncCurrentBlock();
+    await flushPendingSave();
+    document.querySelectorAll('.dtab').forEach((b, idx) => b.className = 'dtab' + (idx === i ? ' on' : ''));
+    activeDateIdx = i;
+    activeTimeIdx = 0;
+    buildTimeTabs();
+    buildLeftPanel();
+  } catch (e) {
+    toast('日付の切り替えを中止しました: ' + e.message, 'e');
+  } finally {
+    setLoading(false);
+    setYmSwitching(false);
+  }
 }
 
 function buildTimeTabs() {
@@ -1189,12 +1313,24 @@ function buildTimeTabs() {
 }
 
 async function switchTimeTab(bi) {
-  syncCurrentBlock();
-  await flushPendingSave(activeTimeIdx);
-  document.querySelectorAll('.ttab').forEach((b, idx) => b.className = 'ttab' + (idx === bi ? ' on' : ''));
-  activeTimeIdx = bi;
-  buildLeftPanel();
-  renderBlock();
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const target = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
+  if (!target || bi === activeTimeIdx) return;
+  setYmSwitching(true);
+  setLoading(true, target.time + ' のデータへ切り替え中...');
+  try {
+    syncCurrentBlock();
+    await flushPendingSave();
+    document.querySelectorAll('.ttab').forEach((b, idx) => b.className = 'ttab' + (idx === bi ? ' on' : ''));
+    activeTimeIdx = bi;
+    buildLeftPanel();
+    renderBlock();
+  } catch (e) {
+    toast('時間帯の切り替えを中止しました: ' + e.message, 'e');
+  } finally {
+    setLoading(false);
+    setYmSwitching(false);
+  }
 }
 
 function renderBlock() {
@@ -1212,7 +1348,7 @@ function renderBlock() {
   else if (bs[key] === false) {
     // 未保存のまま作り直した場合はステータス表示も復元する
     const st = document.getElementById('st-' + activeTimeIdx);
-    if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; }
+    if (st) { st.textContent = '● 未保存'; st.className = 'tb-st'; setVisible(st, true); }
   }
   ug();
   refreshValidationUI();
@@ -1223,13 +1359,21 @@ function renderBlock() {
 function filterAppliedForSlot(date, blockTime) {
   return applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => {
     const sk = typeof s === 'object' ? s.slot : s;
-    const dp = sk.indexOf('/'); const pp = sk.indexOf('(');
-    const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk;
-    if (dn !== date) return false;
-    if (!blockTime) return true;
-    const startT = blockTime.split('~')[0];
-    return sk.includes(') ' + startT) || sk.includes(' ' + startT);
+    return wishSlotMatchesBlock(sk, date, blockTime);
   }));
+}
+
+function wishSlotMatchesBlock(slotKey, date, blockTime) {
+  const sk = String(slotKey || '');
+  const slash = sk.indexOf('/');
+  const paren = sk.indexOf('(');
+  const space = sk.indexOf(' ');
+  const datePart = slash >= 0 ? sk.slice(0, paren >= 0 ? paren : (space >= 0 ? space : undefined)) : sk;
+  if (datePart !== String(date || '')) return false;
+  if (!blockTime) return true;
+  const start = String(blockTime).split(/[~〜]/)[0].trim();
+  const timePart = paren >= 0 ? sk.slice(sk.indexOf(' ', paren) + 1) : (space >= 0 ? sk.slice(space + 1) : '');
+  return timePart.split(/[~〜]/)[0].trim() === start;
 }
 
 function recalcCounts() {
@@ -1290,11 +1434,8 @@ function buildLeftPanel() {
     const badgeK = a.cartFlag ? `<span class="sc-badge sc-k">カ${cartCounts[a.uid] || 0}</span>` : '';
     const badgeW = `<span class="sc-badge sc-w">割${slotAssignCounts[a.uid] || 0}</span>`;
     // 選択中時間帯のコメント・カート不可を取得
-    const slotObj = blockTime ? (a.appliedSlots || []).find(s => {
-      const sk = typeof s === 'object' ? s.slot : s;
-      const startT = blockTime.split('~')[0];
-      return sk.includes(') ' + startT) || sk.includes(' ' + startT);
-    }) : null;
+    const slotObj = blockTime ? (a.appliedSlots || []).find(s =>
+      wishSlotMatchesBlock(typeof s === 'object' ? s.slot : s, tab.date, blockTime)) : null;
     const cartNg = slotObj && typeof slotObj === 'object' ? slotObj.cartNg : false;
     const note   = slotObj && typeof slotObj === 'object' ? slotObj.note   : '';
     const cartNgHtml = cartNg ? `<span style="font-size:10px;color:var(--red);font-weight:700;">🚫カート不可</span>` : '';
@@ -1330,10 +1471,10 @@ function buildBlock(block, bi) {
     <div class="tb-hd">
       <span class="tb-time">${esc(block.date)}（${esc(block.weekday)}） ${esc(block.time)}</span>
       <div class="tb-acts">
-        <span class="tb-st" id="st-${bi}" style="display:none;">● 未保存</span>
+        <span class="tb-st is-hidden" id="st-${bi}">● 未保存</span>
       </div>
     </div>
-    <div class="sc-sync-banner" id="sync-banner-${bi}" style="display:none;">
+    <div class="sc-sync-banner is-hidden" id="sync-banner-${bi}">
       <span>⚠️ 他の管理者がこの時間帯を更新しました。保存すると上書きされます。</span>
       <button class="tb-btn" onclick="acceptSyncUpdate(${bi})">最新を確認</button>
     </div>
@@ -1388,19 +1529,20 @@ function openRespPicker(el) {
     if (ca !== cb) return ca - cb;
     return vByFurigana(a.uid, b.uid);
   });
-  const items = [{ value: '', label: '—（未選択）', html: '<span class="pk-none">—（未選択）</span>' }];
+  const items = [{ value: '', label: '—（未選択）', labelClass: 'pk-none' }];
   sorted.forEach(a => {
     const n = respCounts[a.uid] || 0;
-    const badges = `<span class="pk-b b-w">責${n}</span>` + (n === 0 ? '<span class="pk-b b-p">優先</span>' : '');
+    const badges = [{ text: '責' + n, className: 'pk-b b-w' }];
+    if (n === 0) badges.push({ text: '優先', className: 'pk-b b-p' });
     items.push({
       value: a.uid, label: a.name, search: a.name,
-      html: `<span class="pk-nm${vGenderCls(a.uid)}">${esc(a.name)}</span>${badges}`,
-      sub: cf(a.uid) ? esc(cf(a.uid).trim()) : '',
+      labelClass: 'pk-nm' + vGenderCls(a.uid), badges,
+      sub: cf(a.uid) ? cf(a.uid).trim() : '',
     });
   });
   // 保存済みだが今月は申込していない人（希望を取り下げた等）も、現在値なら候補に残す
   if (cur && !respMembers.find(a => a.uid === cur)) {
-    items.splice(1, 0, { value: cur, label: nm[cur] || cur, html: `<span class="pk-nm${vGenderCls(cur)}">${esc(nm[cur] || cur)}</span>` });
+    items.splice(1, 0, { value: cur, label: nm[cur] || cur, labelClass: 'pk-nm' + vGenderCls(cur) });
   }
   openPicker(el, {
     title: `責任者　${block.time}`,
@@ -1527,19 +1669,20 @@ function openCartRolePicker(el) {
     if (ca !== cb) return ca - cb;
     return vByFurigana(a.uid, b.uid);
   });
-  const items = [{ value: '', label: '—（未選択）', html: '<span class="pk-none">—（未選択）</span>' }];
+  const items = [{ value: '', label: '—（未選択）', labelClass: 'pk-none' }];
   sorted.forEach(a => {
     const n = cartCounts[a.uid] || 0;
-    const badges = `<span class="pk-b b-w">カ${n}</span>`
-                 + (priority.has(a.uid) ? '<span class="pk-b b-p">🔗前後グループと同一</span>' : (n === 0 ? '<span class="pk-b b-p">優先</span>' : ''));
+    const badges = [{ text: 'カ' + n, className: 'pk-b b-w' }];
+    if (priority.has(a.uid)) badges.push({ text: '🔗前後グループと同一', className: 'pk-b b-p' });
+    else if (n === 0) badges.push({ text: '優先', className: 'pk-b b-p' });
     items.push({
       value: a.uid, label: a.name, search: a.name,
-      html: `<span class="pk-nm${vGenderCls(a.uid)}">${esc(a.name)}</span>${badges}`,
-      sub: cf(a.uid) ? esc(cf(a.uid).trim()) : '',
+      labelClass: 'pk-nm' + vGenderCls(a.uid), badges,
+      sub: cf(a.uid) ? cf(a.uid).trim() : '',
     });
   });
   if (cur && !cartMembers.find(a => a.uid === cur)) {
-    items.splice(1, 0, { value: cur, label: nm[cur] || cur, html: `<span class="pk-nm${vGenderCls(cur)}">${esc(nm[cur] || cur)}</span>` });
+    items.splice(1, 0, { value: cur, label: nm[cur] || cur, labelClass: 'pk-nm' + vGenderCls(cur) });
   }
   openPicker(el, {
     title: `カート担当（${role === 'bring' ? '持ち込み' : '持ち帰り'}）　${block.time}`,
@@ -1643,7 +1786,7 @@ function openCartPicker(el) {
     return {
       value: s, label: circledNum(n), html: `<span style="font-size:15px;">${circledNum(n)}</span>`,
       disabled: !!where,
-      sub: where ? esc(where + (layer === 'place' ? ' に設置中' : ' が運びます')) : '',
+      sub: where ? where + (layer === 'place' ? ' に設置中' : ' が運びます') : '',
     };
   });
   openPicker(el, {
@@ -1776,8 +1919,9 @@ function onPlaceChange(bi) {
 function buildSlotTable(bi, block) {
   const slots   = block.slots || [];
   const nm      = buildNameMap();
-  const allApplied = applicants.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; const dp = sk.indexOf('/'); const pp = sk.indexOf('('); const dn = dp >= 0 ? sk.slice(0, pp >= 0 ? pp : sk.indexOf(' ')) : sk; return dn === block.date; }));
-  const sa = allApplied.filter(a => a.appliedSlots && a.appliedSlots.some(s => { const sk = typeof s === 'object' ? s.slot : s; const sp = sk.indexOf(') '); const timeStr = sp >= 0 ? sk.slice(sp + 2) : sk; return timeStr === block.time; }));
+  // 日付と時間を同じ1件の申込スロットで照合する。別日に同時刻の申込があるだけの人を
+  // このブロックの候補に混ぜない。
+  const sa = filterAppliedForSlot(block.date, block.time);
   const placeCart = block.placeCart || [];
   if (slots.length === 0) return '<div style="padding:12px;color:var(--ink3);font-size:12px;">スロットなし</div>';
   const pc = ['#e0f2fe','#fef9c3','#fce7f3','#dcfce7','#ede9fe'];
@@ -1923,7 +2067,7 @@ function openMemberPicker(el) {
       // 「なぜ選べないのか」が分かるようにする
       disabled: c.state === 'blocked' || !!c.fixedNg,
       html: `<span class="pk-nm${c.gender === 'M' ? ' g-m' : (c.gender ? ' g-f' : '')}">${esc(c.name)}</span>${badges}`,
-      sub: (c.reason ? esc(c.reason) : '') + (c.note ? ' 📝' + esc(c.note) : ''),
+      sub: (c.reason || '') + (c.note ? ' 📝' + c.note : ''),
     });
   });
   openPicker(el, {
@@ -2044,11 +2188,16 @@ function mu(bi, hist) {
   // この時点の block はまだ変更前の状態（syncCurrentBlock はこのあと）なので、
   // ここで積めば「1操作ぶん戻す」履歴になる
   pushUndo(bi, block, hist);
+  const snapshot = captureSaveSnapshot(bi, block, hist);
+  if (!snapshot) return;
+  // モデルも同じ snapshot へ直ちにそろえる。以後の描画・候補計算が DOM の
+  // 一時状態ではなく、保存予約済みの内容を参照できるようにする。
+  applyPayloadToBlock(block, snapshot.payload);
   bs[bKey(block)] = false;
   const st = document.getElementById('st-' + bi);
-  if (st) { st.style.display = ''; st.textContent = '● 未保存'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
+  if (st) { setVisible(st, true); st.textContent = '● 未保存'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
   ug();
-  scheduleAutoSave(bi);
+  scheduleAutoSave(snapshot);
   // 左メニューのバッジ・割当ドットと希望タブの割当表示を、保存完了を待たずに即時反映する。
   // buildLeftPanel / refreshWishAssign は main-content を触らないので入力中のフォーカスは失われない
   if (bi === activeTimeIdx) {
@@ -2312,8 +2461,7 @@ async function ackIssue(i) {
   refreshValidationUI();
   if (document.getElementById('preflight-modal').classList.contains('on')) openPreflight();
   try {
-    await apiGet('ackValidationIssue', { issueKey: x.key, date: x.date, time: x.time, ruleId: x.rule,
-      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '' });
+    await apiGet('ackValidationIssue', { issueKey: x.key, date: x.date, time: x.time, ruleId: x.rule });
   } catch (e) {
     vRemoveAck(x.key);
     refreshValidationUI();
@@ -2446,12 +2594,12 @@ function openPreflight() {
   const pubBtn = document.getElementById('pf-publish-btn');
   // 確認者は「確認完了」、作成担当者は「作成完了」をこのパネルからも実行できる
   if (shiftApproval.isApprover) {
-    pubBtn.style.display = (shiftPublished && !shiftApproval.approvedByMe) ? '' : 'none';
+    setVisible(pubBtn, shiftPublished && !shiftApproval.approvedByMe);
     pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま確認完了にする' : '☑️ 確認完了にする';
     pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
     pubBtn.onclick = () => { closePreflight(); approveShift(true); };
   } else {
-    pubBtn.style.display = shiftPublished ? 'none' : '';
+    setVisible(pubBtn, !shiftPublished);
     pubBtn.textContent = c.err > 0 ? '⚠️ エラーのまま公開する' : '📣 シフトを公開する';
     pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
     pubBtn.onclick = () => doPublish();
@@ -2471,43 +2619,208 @@ async function vJump(date, time) {
 
 // ============================================================
 // オートセーブ（デバウンス）
-// mu(bi) からブロック単位でタイマーを(再)設定する。0.5秒操作が止まったら保存を実行する。
-// 保存中に追加の編集が入った場合は完了後にもう一度保存し直し、同一ブロックへの
-// 保存リクエストが重ならないようにする（saveShiftBlockはdelete→insertのため
-// 並行実行すると書き込み順序が入れ替わりデータ不整合を起こしうる）。
+// 編集時点の type/year/month/date/time/payload を immutable snapshot にして保持する。
+// 保存時に activeDateIdx などの global を読み直さないため、通信中に別の日・月・PWへ
+// 移っても保存先がずれない。同じ完全ブロックキーは Promise queue で必ず直列化する。
 // ============================================================
-function scheduleAutoSave(bi) {
-  const tab = (window._dateTabs || [])[activeDateIdx];
-  const block = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
-  if (!block) return;
-  const key = bKey(block);
-  clearTimeout(_saveTimers[key]);
-  _saveTimers[key] = setTimeout(() => { delete _saveTimers[key]; runAutoSave(bi); }, AUTOSAVE_DEBOUNCE_MS);
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(deepFreeze);
+  return Object.freeze(value);
 }
 
-async function runAutoSave(bi) {
+function saveQueueKey(parts) {
+  return [parts.type || 'normal', parts.year || '', parts.month || '', parts.date || '', parts.time || ''].join('|');
+}
+
+function captureSaveSnapshot(bi, block, hist) {
+  if (!block || !curYM) return null;
+  const payload = undoSnap(hist ? hist.after : (collectBlock(bi) || block));
+  const base = {
+    type: currentPwType, year: curYM.year, month: curYM.month,
+    date: block.date, time: block.time,
+  };
+  const key = saveQueueKey(base);
+  const revision = (_saveLatestRevision[key] || 0) + 1;
+  _saveLatestRevision[key] = revision;
+  const snapshot = deepFreeze(Object.assign({}, base, { key, revision, payload }));
+  _saveLatestSnaps[key] = snapshot;
+  return snapshot;
+}
+
+function applyPayloadToBlock(block, payload) {
+  if (!block || !payload) return;
+  const data = undoSnap(payload);
+  block.responsible = data.responsible;
+  block.cart = data.cart;
+  block.slots = data.slots;
+  block.place = { p1: (data.usedPlaces || [])[0] || '', p2: (data.usedPlaces || [])[1] || '' };
+  block.usedPlaces = data.usedPlaces || [];
+  block.placeCart = data.placeCart || [];
+}
+
+function currentSnapshotBlock(snapshot) {
+  if (!snapshot || currentPwType !== snapshot.type || !curYM
+      || curYM.year !== snapshot.year || curYM.month !== snapshot.month) return null;
+  return shiftDates.find(block => block.date === snapshot.date && block.time === snapshot.time) || null;
+}
+
+function visibleBiForSnapshot(snapshot) {
   const tab = (window._dateTabs || [])[activeDateIdx];
-  const block = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
-  if (!block) return;
-  const key = bKey(block);
-  if (_saveInFlight[key]) { _savePending[key] = true; return; }
-  _saveInFlight[key] = true;
-  try {
-    await saveBlock(bi);
-  } finally {
-    _saveInFlight[key] = false;
-    if (_savePending[key]) { _savePending[key] = false; runAutoSave(bi); }
+  if (!tab || tab.date !== snapshot.date) return -1;
+  return shiftDates.filter(block => block.date === tab.date).findIndex(block => block.time === snapshot.time);
+}
+
+function showSnapshotStatus(snapshot, state, error) {
+  if (_saveLatestRevision[snapshot.key] !== snapshot.revision) return;
+  const bi = visibleBiForSnapshot(snapshot);
+  if (bi < 0) return;
+  const st = document.getElementById('st-' + bi);
+  if (!st) return;
+  setVisible(st, true);
+  st.onclick = null;
+  st.className = 'tb-st';
+  st.style.cursor = '';
+  if (state === 'saving') st.textContent = '保存中...';
+  else if (state === 'saved') { st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; }
+  else if (state === 'error') {
+    st.textContent = '⚠ 保存失敗（タップで再試行）';
+    st.className = 'tb-st err';
+    st.style.cursor = 'pointer';
+    st.onclick = () => retryLatestSave(snapshot.key);
+    if (error) st.title = error.message || String(error);
   }
 }
 
-// 離脱前に保留中の保存を確定させる（デバウンス待ち中に別ブロックへ切り替える場合の安全弁）
-async function flushPendingSave(bi) {
-  const tab = (window._dateTabs || [])[activeDateIdx];
-  const block = tab ? shiftDates.filter(d => d.date === tab.date)[bi] : null;
-  if (!block) return;
-  const key = bKey(block);
+function scheduleRetry(snapshot) {
+  if (_saveLatestRevision[snapshot.key] !== snapshot.revision || _saveRetryTimers[snapshot.key]) return;
+  _saveRetrySnaps[snapshot.key] = snapshot;
+  _saveRetryTimers[snapshot.key] = setTimeout(() => {
+    delete _saveRetryTimers[snapshot.key];
+    const retry = _saveRetrySnaps[snapshot.key];
+    delete _saveRetrySnaps[snapshot.key];
+    if (retry && _saveLatestRevision[retry.key] === retry.revision) enqueueSaveSnapshot(retry).catch(() => {});
+  }, AUTOSAVE_RETRY_MS);
+}
+
+function retryLatestSave(key) {
+  const snapshot = _saveLatestSnaps[key];
+  if (!snapshot) return Promise.resolve();
+  if (_saveRetryTimers[key]) { clearTimeout(_saveRetryTimers[key]); delete _saveRetryTimers[key]; }
+  delete _saveRetrySnaps[key];
+  return enqueueSaveSnapshot(snapshot).catch(() => {});
+}
+
+async function discardPendingSaveForBlock(block) {
+  if (!block || !curYM) return;
+  const key = saveQueueKey({
+    type: currentPwType, year: curYM.year, month: curYM.month,
+    date: block.date, time: block.time,
+  });
   if (_saveTimers[key]) { clearTimeout(_saveTimers[key]); delete _saveTimers[key]; }
-  if (bs[key] === false) await runAutoSave(bi);
+  if (_saveRetryTimers[key]) { clearTimeout(_saveRetryTimers[key]); delete _saveRetryTimers[key]; }
+  delete _savePendingSnaps[key];
+  delete _saveRetrySnaps[key];
+  delete _saveLatestSnaps[key];
+  delete _saveLastErrors[key];
+  // 送信済みの fetch 自体は中断できない。revision を進めてUIへの反映を無効化し、
+  // 完了だけ待ってからサーバーの最新値を読み直す。
+  _saveLatestRevision[key] = (_saveLatestRevision[key] || 0) + 1;
+  if (_saveQueues[key]) await _saveQueues[key].catch(() => {});
+}
+
+async function persistBlockSnapshot(snapshot) {
+  showSnapshotStatus(snapshot, 'saving');
+  try {
+    const data = snapshot.payload;
+    const res = await apiGet('saveShiftBlock', {
+      type: snapshot.type, year: snapshot.year, month: snapshot.month,
+      date: snapshot.date, time: snapshot.time,
+      responsible: data.responsible, cart: data.cart,
+      placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots,
+    });
+    if (!res || !res.ok) throw new Error((res && res.error) || '保存に失敗しました');
+    if (res.lastUpdated) _scKnownTs = res.lastUpdated;
+
+    const uiKey = snapshot.date + '_' + snapshot.time;
+    _srvSig[uiKey] = blockSig(data);
+    if (_saveLatestRevision[snapshot.key] === snapshot.revision) {
+      const block = currentSnapshotBlock(snapshot);
+      if (block) applyPayloadToBlock(block, data);
+      bs[uiKey] = true;
+      delete _saveLastErrors[snapshot.key];
+      if (_saveRetryTimers[snapshot.key]) { clearTimeout(_saveRetryTimers[snapshot.key]); delete _saveRetryTimers[snapshot.key]; }
+      delete _saveRetrySnaps[snapshot.key];
+      showSnapshotStatus(snapshot, 'saved');
+      recalcCounts();
+      buildLeftPanel();
+      refreshWishAssign();
+      ug();
+    }
+    return res;
+  } catch (error) {
+    if (_saveLatestRevision[snapshot.key] === snapshot.revision) {
+      bs[snapshot.date + '_' + snapshot.time] = false;
+      _saveLastErrors[snapshot.key] = error;
+      showSnapshotStatus(snapshot, 'error', error);
+      ug();
+      scheduleRetry(snapshot);
+      toast('保存に失敗しました: ' + error.message, 'e');
+    }
+    throw error;
+  }
+}
+
+function enqueueSaveSnapshot(snapshot) {
+  if (!snapshot) return Promise.resolve();
+  const previous = _saveQueues[snapshot.key] || Promise.resolve();
+  const run = previous.catch(() => {}).then(() => persistBlockSnapshot(snapshot));
+  let tracked;
+  tracked = run.finally(() => {
+    if (_saveQueues[snapshot.key] === tracked) delete _saveQueues[snapshot.key];
+  });
+  _saveQueues[snapshot.key] = tracked;
+  return tracked;
+}
+
+function scheduleAutoSave(snapshot) {
+  if (!snapshot) return;
+  const key = snapshot.key;
+  if (_saveRetryTimers[key]) { clearTimeout(_saveRetryTimers[key]); delete _saveRetryTimers[key]; }
+  delete _saveRetrySnaps[key];
+  clearTimeout(_saveTimers[key]);
+  _savePendingSnaps[key] = snapshot;
+  _saveTimers[key] = setTimeout(() => {
+    delete _saveTimers[key];
+    const pending = _savePendingSnaps[key];
+    if (pending === snapshot) delete _savePendingSnaps[key];
+    enqueueSaveSnapshot(snapshot).catch(() => {});
+  }, AUTOSAVE_DEBOUNCE_MS);
+}
+
+// 切替前に全ブロックのデバウンス待ち・失敗後の再試行・通信中queueを drain する。
+// Promise tail が消えるまで繰り返すため、単に「保存を開始」した時点では返らない。
+async function flushPendingSave() {
+  while (true) {
+    Object.keys(_savePendingSnaps).forEach(key => {
+      if (_saveTimers[key]) { clearTimeout(_saveTimers[key]); delete _saveTimers[key]; }
+      const snapshot = _savePendingSnaps[key];
+      delete _savePendingSnaps[key];
+      enqueueSaveSnapshot(snapshot).catch(() => {});
+    });
+    Object.keys(_saveRetrySnaps).forEach(key => {
+      if (_saveRetryTimers[key]) { clearTimeout(_saveRetryTimers[key]); delete _saveRetryTimers[key]; }
+      const snapshot = _saveRetrySnaps[key];
+      delete _saveRetrySnaps[key];
+      enqueueSaveSnapshot(snapshot).catch(() => {});
+    });
+    const tails = Object.values(_saveQueues);
+    if (tails.length === 0) return;
+    const results = await Promise.allSettled(tails);
+    const failed = results.find(result => result.status === 'rejected');
+    if (failed) throw failed.reason;
+    if (Object.keys(_savePendingSnaps).length === 0 && Object.keys(_saveQueues).length === 0) return;
+  }
 }
 
 // 未送信の変更（デバウンス待ち・保存失敗）が残ったままタブを閉じようとしたら警告する
@@ -2517,13 +2830,13 @@ window.addEventListener('beforeunload', (e) => {
 
 function markSaved(bi) {
   const st = document.getElementById('st-' + bi);
-  if (st) { st.style.display = ''; st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; st.onclick = null; st.style.cursor = ''; }
+  if (st) { setVisible(st, true); st.textContent = '✓ 保存済み'; st.className = 'tb-st saved'; st.onclick = null; st.style.cursor = ''; }
 }
 function ug() {
   const u = Object.values(bs).some(v => !v);
   document.getElementById('gst').className = u ? 'save-st' : 'save-st saved';
   document.getElementById('gst-txt').textContent = u ? '未保存あり' : '保存済み';
-  document.getElementById('gst').style.display = Object.keys(bs).length > 0 ? '' : 'none';
+  setVisible(document.getElementById('gst'), Object.keys(bs).length > 0);
 }
 
 // 未保存の変更があるか判定（bsの値に1つでもfalseがあれば未保存あり）
@@ -2580,10 +2893,16 @@ async function checkShiftCreateUpdate() {
     if (_scKnownDraftTs === null) _scKnownDraftTs = draftTs;
     else if (draftTs !== _scKnownDraftTs) {
       const since = _scKnownDraftTs;
-      _scKnownDraftTs = draftTs;
       // 基準がまだ無い（この月で誰も保存していなかった）場合は差分の起点を作れない。
       // 起こるのは最初の1回だけなので、そのときだけ月全体を取り直す
-      if (createLoaded) { if (since) await syncChangedShiftBlocks(since); else await syncShiftCreateData(); }
+      if (createLoaded) {
+        const synced = since ? await syncChangedShiftBlocks(since) : await syncShiftCreateData();
+        // 全ページの取得・mergeが終わるまで基準時刻を進めない。途中失敗で
+        // 61件目以降を取りこぼしたまま「同期済み」にしないため。
+        if (synced !== false) _scKnownDraftTs = draftTs;
+      } else {
+        _scKnownDraftTs = draftTs;
+      }
     } else if (publishTsChanged && createLoaded) {
       await syncShiftCreateData();
     }
@@ -2668,20 +2987,38 @@ function applyMergeResult(r) {
 // 前回の同期以降に保存されたブロックだけを取りに行く。
 // 月全体を返す getShiftCreateData は重く、変更検知のたびに呼ぶと反映まで数秒かかっていた
 async function syncChangedShiftBlocks(since) {
-  let res;
-  try { res = await apiGet('getChangedShiftBlocks', ymP({ since })); } catch (e) { return; }
-  if (!res || !res.ok) return;
-  const r = mergeShiftBlocks(res.blocks);
+  const blocks = [];
+  const memos = {};
+  let cursor = null;
+  let pages = 0;
+  try {
+    do {
+      const res = await apiGet('getChangedShiftBlocks', ymP({ since, cursor }));
+      if (!res || !res.ok) return false;
+      blocks.push(...(res.blocks || []));
+      if (res.memos) Object.assign(memos, res.memos);
+      cursor = res.hasMore ? (res.nextCursor || null) : null;
+      pages++;
+      // 壊れたcursorで無限ループしないための防御。通常は1〜数ページ。
+      if (res.hasMore && !cursor) return false;
+      if (pages > 1000) throw new Error('差分ページ数が上限を超えました');
+    } while (cursor);
+  } catch (e) {
+    console.warn('[syncChangedShiftBlocks]', e);
+    return false;
+  }
+  const r = mergeShiftBlocks(blocks);
   // メモは対象ブロックぶんだけが返るので、全体を作り直さず該当キーだけ差し替える
-  if (res.memos) Object.assign(memoMap, res.memos);
+  Object.assign(memoMap, memos);
   applyMergeResult(r);
+  return true;
 }
 
 // 月全体を取り直す重い同期。差分では追えない変更（公開状態の変化など）だけで使う
 async function syncShiftCreateData() {
   let res;
-  try { res = await apiGet('getShiftCreateData', ymP()); } catch (e) { return; }
-  if (!res || !res.ok) return;
+  try { res = await apiGet('getShiftCreateData', ymP()); } catch (e) { return false; }
+  if (!res || !res.ok) return false;
 
   const r = mergeShiftBlocks(res.dates);
   conflictMap = res.conflictMap || conflictMap;
@@ -2689,11 +3026,12 @@ async function syncShiftCreateData() {
   if (res.memoMap) Object.assign(memoMap, res.memoMap);
   defaultSlot = res.defaultSlot || defaultSlot;
   applyMergeResult(r);
+  return true;
 }
 
 function showSyncConflictBanner(bi) {
   const el = document.getElementById('sync-banner-' + bi);
-  if (el) el.style.display = 'flex';
+  setVisible(el, true);
 }
 
 // 競合バナーの「最新を確認」：ユーザー起動の明示的な再取得なのでオーバーレイ表示する
@@ -2704,6 +3042,7 @@ async function acceptSyncUpdate(bi) {
   if (!block) return;
   setLoading(true, '最新のデータを読み込み中...');
   try {
+    await discardPendingSaveForBlock(block);
     const res = await apiGet('getShiftCreateData', ymP());
     const fresh = res && res.ok ? (res.dates || []).find(d => bKey(d) === bKey(block)) : null;
     if (fresh) {
@@ -2711,7 +3050,6 @@ async function acceptSyncUpdate(bi) {
       const idx = shiftDates.findIndex(d => bKey(d) === key);
       shiftDates[idx] = fresh;
       bs[key] = true;
-      if (_saveTimers[key]) { clearTimeout(_saveTimers[key]); delete _saveTimers[key]; }
       recalcCounts();
       buildLeftPanel();
       refreshWishAssign();
@@ -2818,69 +3156,6 @@ function collectBlock(bi) {
   return { responsible, cart, placeCart, usedPlaces, slots };
 }
 
-async function saveBlock(bi) {
-  const tab   = (window._dateTabs || [])[activeDateIdx];
-  const block = shiftDates.filter(d => d.date === tab.date)[bi];
-  if (!block) return;
-  const key = bKey(block);
-  const st  = document.getElementById('st-' + bi);
-  if (st) { st.style.display = ''; st.textContent = '保存中...'; st.className = 'tb-st'; st.onclick = null; st.style.cursor = ''; }
-  try {
-    const data = collectBlock(bi);
-    const res = await apiGet('saveShiftBlock', ymP({ date: block.date, time: block.time, responsible: data.responsible, cart: data.cart, placeCart: data.placeCart, usedPlaces: data.usedPlaces, slots: data.slots }));
-    // 自分の保存でタイムスタンプが動くため、基準値を取り直して
-    // 自分の変更が「他の管理者の更新」として跳ね返らないようにする
-    if (res && res.lastUpdated) _scKnownTs = res.lastUpdated;
-    _srvSig[key] = blockSig(data);
-    block.responsible = data.responsible;
-    block.cart = data.cart;
-    block.slots = data.slots;
-    block.place = { p1: (data.usedPlaces || [])[0] || '', p2: (data.usedPlaces || [])[1] || '' };
-    block.usedPlaces = data.usedPlaces || [];
-    block.placeCart = data.placeCart || [];
-    recalcCounts();
-    bs[key] = true; _saveRetried[key] = false; markSaved(bi); ug();
-    buildLeftPanel();
-    refreshWishAssign();
-  } catch (e) {
-    bs[key] = false;
-    if (st) {
-      st.style.display = '';
-      st.textContent = '⚠ 保存失敗（タップで再試行）';
-      st.className = 'tb-st err';
-      st.style.cursor = 'pointer';
-      st.onclick = () => { st.onclick = null; runAutoSave(bi); };
-    }
-    toast('保存に失敗しました: ' + e.message, 'e');
-    if (!_saveRetried[key]) {
-      _saveRetried[key] = true;
-      setTimeout(() => { _saveRetried[key] = false; runAutoSave(bi); }, AUTOSAVE_RETRY_MS);
-    }
-  }
-}
-
-async function saveAll() {
-  const tabs = window._dateTabs || [];
-  const origDateIdx = activeDateIdx;
-  const origTimeIdx = activeTimeIdx;
-  // 現在表示中のブロックを最初に保存（DOM が正しい状態のうちに収集する）
-  await saveBlock(origTimeIdx);
-  for (let di = 0; di < tabs.length; di++) {
-    activeDateIdx = di;
-    const dayBlocks = shiftDates.filter(d => d.date === tabs[di].date);
-    for (let bi = 0; bi < dayBlocks.length; bi++) {
-      if (di === origDateIdx && bi === origTimeIdx) continue;
-      activeTimeIdx = bi;
-      buildTimeTabs();
-      await saveBlock(bi);
-    }
-  }
-  activeDateIdx = origDateIdx;
-  activeTimeIdx = origTimeIdx;
-  buildTimeTabs();
-  toast('すべて保存しました', 's');
-}
-
 // 公開状態を変える操作のあとに使う。作成完了フラグが変わると年月セレクタの
 // 「（シフト公開中）」表示と、どの月を公開操作できるかの判定も変わるため合わせて取り直す
 async function refreshPublishState() {
@@ -2906,18 +3181,16 @@ async function ensurePublishStatusForCurYM() {
 
 // 公開状態＋確認状況を取得する。確認者かどうかの判定にログイン中の管理者UID、
 // オーナー（確認省略可）かどうかの判定にメールアドレスが必要
-function fetchPublishStatus() {
-  return apiGet('getShiftPublishStatus', ymP({
-    adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '',
-    adminEmail: (adminUser && adminUser.email) || ''
-  }));
+function fetchPublishStatus(params) {
+  // 実行者は X-PWGWS-Session からサーバーが確定する。表示対象だけを送る。
+  return apiGet('getShiftPublishStatus', Object.assign({}, params || ymP()));
 }
 
 function applyPublishStatus(res) {
   if (!res || !res.ok) return;
   // サーバーは「どの月の状態を返したか」を必ず返す。年月を送らずに呼んだ初回は
   // サーバー既定（申込中の月）が返るため、表示中の月とは限らない
-  statusYM = (res.year && res.month) ? { year: res.year, month: res.month } : null;
+  statusYM = (res.year && res.month) ? { year: Number(res.year), month: Number(res.month) } : null;
   shiftPublished = !!res.published;
   shiftOpenDate  = res.openDate || '';
   shiftApproval = {
@@ -2942,7 +3215,7 @@ function updatePublishBtn() {
   const rejBtn    = document.getElementById('reject-btn');
   const apprLabel = document.getElementById('publish-approval');
   const openLabel = document.getElementById('publish-open-date');
-  const hide = el => { if (el) { el.textContent = ''; el.style.display = 'none'; } };
+  const hide = el => { if (el) { el.textContent = ''; setVisible(el, false); } };
 
   // 別の月の状態しか持っていないときは、それをこの月の状態として描かない。
   // 押せば対象は表示中の月なので、前の月の「未完了」が残っていると
@@ -2954,7 +3227,7 @@ function updatePublishBtn() {
     btn.title = '公開状態を取得中です';
     hide(openLabel);
     hide(apprLabel);
-    if (rejBtn) rejBtn.style.display = 'none';
+    setVisible(rejBtn, false);
     return;
   }
 
@@ -2971,7 +3244,7 @@ function updatePublishBtn() {
       : '公開中のカレンダーがありません。管理アプリで予定表を公開してください';
     hide(openLabel);
     hide(apprLabel);
-    if (rejBtn) rejBtn.style.display = 'none';
+    setVisible(rejBtn, false);
     return;
   }
 
@@ -2997,13 +3270,13 @@ function updatePublishBtn() {
       btn.title = 'シフト内容を確認し、公開を承認します';
     }
     if (rejBtn) {
-      rejBtn.style.display = shiftPublished ? '' : 'none';
+      setVisible(rejBtn, shiftPublished);
       rejBtn.className = 'hbtn rej';
       rejBtn.title = '作成完了を取り消して作成担当者に修正を依頼します';
     }
   } else {
     // 作成担当者（およびオーナー）
-    if (rejBtn) rejBtn.style.display = 'none';
+    setVisible(rejBtn, false);
     if (shiftPublished) {
       btn.textContent = '↩️ 作成完了を取り消す';
       btn.className = 'hbtn pub-off';
@@ -3019,13 +3292,13 @@ function updatePublishBtn() {
       apprLabel.textContent = '⚠️ 差し戻し（' + (a.rejected.by || '確認者') + ' ' + (a.rejected.at || '') + '）';
       apprLabel.style.color = 'var(--red)';
       apprLabel.title = a.rejected.note ? '理由: ' + a.rejected.note : '理由の記入はありません';
-      apprLabel.style.display = '';
+      setVisible(apprLabel, true);
     } else if (a.approvalSkipped && shiftPublished) {
       apprLabel.textContent = '⚠️ 確認省略（オーナー）';
       apprLabel.style.color = 'var(--amber)';
       apprLabel.title = 'オーナーアカウントが確認者の確認を省略して公開しました\n確認者: '
         + (a.approvers.map(x => x.name).join('・') || 'なし');
-      apprLabel.style.display = '';
+      setVisible(apprLabel, true);
     } else if (a.required > 0 && shiftPublished) {
       const detail = a.approvers.map(x => (x.approved ? '✅ ' : '⬜ ') + x.name + (x.at ? '（' + x.at + '）' : '')).join('\n');
       apprLabel.textContent = a.approvedAll
@@ -3033,14 +3306,14 @@ function updatePublishBtn() {
         : ('⏳ 確認 ' + a.approvedCount + '/' + a.required);
       apprLabel.style.color = a.approvedAll ? 'var(--green)' : 'var(--amber)';
       apprLabel.title = '確認状況\n' + detail + '\n\nクリックで詳細を表示';
-      apprLabel.style.display = '';
+      setVisible(apprLabel, true);
     } else {
       hide(apprLabel);
     }
   }
   if (openLabel) {
     openLabel.textContent = shiftOpenDate ? ('公開予定日: ' + shiftOpenDate) : '';
-    openLabel.style.display = shiftOpenDate ? '' : 'none';
+    setVisible(openLabel, !!shiftOpenDate);
   }
 }
 
@@ -3121,9 +3394,7 @@ async function togglePublish() {
       type: 'danger', title: 'シフト作成完了の取り消し', message: msg, confirmText: '取り消す',
     })) return;
     try {
-      await apiGet('unpublishShift', ymP({
-        adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
-      }));
+      await apiGet('unpublishShift', ymP());
       await refreshPublishState();
       toast('作成完了を取り消しました', 's');
     } catch (e) { toast('取り消しに失敗しました: ' + e.message, 'e'); }
@@ -3153,10 +3424,7 @@ async function doPublish() {
   closePreflight();
   setLoading(true, 'シフトを作成完了にしています...');
   try {
-    const res = await apiGet('publishShift', ymP({
-      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '',
-      adminEmail: (adminUser && adminUser.email) || ''
-    }));
+    const res = await apiGet('publishShift', ymP());
     await refreshPublishState();
     toast(res && res.approvalRequired ? 'シフト作成完了にしました。確認者へ確認依頼を送信しました'
         : res && res.approvalSkipped  ? 'シフト作成完了にしました（オーナー権限で確認を省略）'
@@ -3190,9 +3458,7 @@ async function approveShift(force) {
   })) return;
   setLoading(true, '確認完了として登録しています...');
   try {
-    const res = await apiGet('approveShift', ymP({
-      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
-    }));
+    const res = await apiGet('approveShift', ymP());
     if (!res.ok) throw new Error(res.error || '登録に失敗しました');
     await refreshPublishState();
     toast(res.allApproved
@@ -3218,9 +3484,7 @@ async function rejectShift() {
   })) return;
   setLoading(true, '差し戻しています...');
   try {
-    const res = await apiGet('rejectShift', ymP({
-      note, adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || ''
-    }));
+    const res = await apiGet('rejectShift', ymP({ note }));
     if (!res.ok) throw new Error(res.error || '差し戻しに失敗しました');
     await refreshPublishState();
     toast('差し戻しました。作成担当者へ通知しました', 's');
@@ -3338,19 +3602,43 @@ document.getElementById('lpResize').addEventListener('mousedown', e => {
 // ============================================================
 // TAB3: 設定
 // ============================================================
-async function loadSettingsData() {
+async function fetchSettingsDataBundle(options) {
+  const opts = options || {};
+  const params = Object.assign({}, opts.params || { type: currentPwType });
+  const [lr, cr, sr, vr] = await Promise.all([
+    apiGet('getLocations', params), apiGet('getCartNumbers', params),
+    apiGet('getDefaultSlot', params), apiGet('getValidationRules', params).catch(() => ({ ok: false }))
+  ]);
+  if (!lr || !lr.ok) throw new Error((lr && lr.error) || '場所設定の取得に失敗しました');
+  if (!cr || !cr.ok) throw new Error((cr && cr.error) || 'カート番号の取得に失敗しました');
+  if (!sr || !sr.ok) throw new Error((sr && sr.error) || '既定スロットの取得に失敗しました');
+  return { lr, cr, sr, vr };
+}
+
+function applySettingsDataBundle(bundle) {
+  const { lr, cr, sr, vr } = bundle;
+  settingsVRules = vr.ok ? (vr.rules || {}) : {};
+  setValidationConfig(settingsVRules);
+  settingsLocations    = lr.locations    || [];
+  settingsCartNumbers  = cr.cartNumbers  || [];
+  defaultSlot  = sr.defaultSlot  || 15;
+  renderLocationList(); renderCartTags(); renderValidationRules();
+  renderDefaultSlotChips();
+  settingsLoaded = true;
+}
+
+async function loadSettingsData(options) {
+  const opts = options || {};
   setLoading(true, '設定を読み込み中...');
   try {
-    const [lr, cr, sr, vr] = await Promise.all([apiGet('getLocations', {}), apiGet('getCartNumbers'), apiGet('getDefaultSlot'), apiGet('getValidationRules', {}).catch(() => ({ ok: false }))]);
-    settingsVRules = vr.ok ? (vr.rules || {}) : {};
-    setValidationConfig(settingsVRules);
-    settingsLocations    = lr.ok ? lr.locations    : [];
-    settingsCartNumbers  = cr.ok ? cr.cartNumbers  : [];
-    defaultSlot  = sr.ok ? sr.defaultSlot  : 15;
-    renderLocationList(); renderCartTags(); renderValidationRules();
-    renderDefaultSlotChips();
-    settingsLoaded = true; setLoading(false);
-  } catch (e) { setLoading(false); toast('設定読み込みエラー: ' + e.message, 'e'); }
+    const bundle = opts.bundle || await fetchSettingsDataBundle(opts);
+    applySettingsDataBundle(bundle);
+    return true;
+  } catch (e) {
+    toast('設定読み込みエラー: ' + e.message, 'e');
+    if (opts.rethrow) throw e;
+    return false;
+  } finally { setLoading(false); }
 }
 
 // ------------------------------------------------------------
@@ -3408,7 +3696,7 @@ function openLocModal(i) {
   // 限定PWタブで編集中の場所は、既にその限定PW専用。さらに別の限定PWへ
   // 紐づける意味がないので「限定PW」の選択肢は通常PWタブでのみ出す
   const segPw = document.getElementById('loc-seg-pw');
-  segPw.style.display = (currentPwType === 'normal' || locForm.linkPwType) ? '' : 'none';
+  setVisible(segPw, currentPwType === 'normal' || !!locForm.linkPwType);
   _ympTarget = null;
   applyLocMode(locForm.mode);
   document.getElementById('loc-modal').classList.add('on');
@@ -3569,8 +3857,7 @@ function onVRuleChange(el) {
 
 async function saveValidationRules() {
   try {
-    await apiGet('saveValidationRules', { rules: settingsVRules,
-      adminUid: (adminUser && adminUser.uid) || '', adminName: (adminUser && adminUser.name) || '' });
+    await apiGet('saveValidationRules', { rules: settingsVRules });
     setValidationConfig(settingsVRules);
     if (createLoaded) refreshValidationUI();
     toast('検証ルールを保存しました', 's');
@@ -3614,26 +3901,15 @@ async function saveDefaultSlot() {
   catch (e) { toast('保存に失敗しました: ' + e.message, 'e'); }
 }
 
-async function execCreateShiftSheet() {
-  if (!await uiConfirm({
-    type: 'danger', title: 'シフト作成枠の作成',
-    message: '現在のシフトデータをバックアップし、3シートをクリアします。\n\n実行してもよいですか？',
-    confirmText: '実行する',
-  })) return;
-  setLoading(true, 'シフト作成枠を作成中...');
-  try {
-    const res = await apiGet('createShiftSheet', ymP());
-    if (!res.ok) throw new Error(res.error || '失敗');
-    toast('シフト作成枠を作成しました（' + (res.yearMonth || '') + '）', 's');
-    createLoaded = false;
-  } catch (e) { toast('エラー: ' + e.message, 'e'); }
-  finally { setLoading(false); }
-}
-
 // ============================================================
 // ユーティリティ
 // ============================================================
-function setLoading(on, msg) { document.getElementById('loading-overlay').style.display = on ? 'flex' : 'none'; if (msg) document.getElementById('lo-msg').textContent = msg; }
+function setVisible(el, on) { if (el) el.classList.toggle('is-hidden', !on); }
+function setLoading(on, msg) {
+  const overlay = document.getElementById('loading-overlay');
+  if (msg) document.getElementById('lo-msg').textContent = msg;
+  if (overlay) overlay.classList.toggle('on', !!on);
+}
 function toast(msg, type) { const ta = document.getElementById('ta'), t = document.createElement('div'); t.className = 'toast' + (type ? ' ' + type : ''); t.textContent = msg; ta.appendChild(t); setTimeout(() => t.remove(), 2800); }
 function esc(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
