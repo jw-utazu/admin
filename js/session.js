@@ -179,12 +179,21 @@ function pwgwsGetRecoveryToken() {
 
 // 通常ログインと救済ログインは同時に有効にしない。救済ログインへ切り替えたら、
 // Google セッションの現在ポインタとアプリ固有キャッシュを消す。
-function pwgwsSaveRecoveryToken(token) {
+function pwgwsSaveRecoveryToken(token, expectedGoogleIdentity) {
+  if (!token) return false;
   try {
+    // 同じタブでGoogle認証と救済OTPが並行して完了した場合も、後から返った
+    // 救済レスポンスで新しいGoogle sessionを上書きしない。
+    const googleSession = pwgwsGetSession();
+    const currentGoogleIdentity = googleSession
+      ? googleSession.email + ':' + (googleSession.token || '')
+      : '';
+    if (arguments.length > 1 && currentGoogleIdentity !== String(expectedGoogleIdentity || '')) return false;
     localStorage.removeItem(PWGWS_SESSION_KEY);
-    localStorage.setItem(PWGWS_RECOVERY_KEY, token || '');
-  } catch (_) {}
+    localStorage.setItem(PWGWS_RECOVERY_KEY, token);
+  } catch (_) { return false; }
   pwgwsClearAppSessions();
+  return true;
 }
 
 function pwgwsGetSessionToken() {
@@ -222,13 +231,20 @@ const PWGWS_INITIAL_IDENTITY = (function() {
   return pwgwsGetRecoveryToken() || (s ? s.email + ':' + (s.token || '') : '');
 })();
 let pwgwsStorageReloading = false;
+function pwgwsReloadForSessionChange() {
+  if (pwgwsStorageReloading) return;
+  pwgwsStorageReloading = true;
+  // アプリ側へ先に通知し、旧 principal で進行中の通信と操作を止めてから再読込する。
+  try { window.dispatchEvent(new Event('pwgws:session-changing')); } catch (_) {}
+  location.reload();
+}
 window.addEventListener('storage', function(e) {
   if (pwgwsStorageReloading || [PWGWS_SESSION_KEY, PWGWS_RECOVERY_KEY].indexOf(e.key) < 0) return;
   const s = pwgwsGetSession();
   const now = pwgwsGetRecoveryToken() || (s ? s.email + ':' + (s.token || '') : '');
   if (now !== PWGWS_INITIAL_IDENTITY) {
-    pwgwsStorageReloading = true;
-    location.reload();
+    // storage event は変更したタブ自身には発火しないため、切替元の通常 reload と競合しない。
+    pwgwsReloadForSessionChange();
   }
 });
 
@@ -299,8 +315,8 @@ function pwgwsAccIconHtml(a) {
     ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   // 画像が読めなかったらイニシャルに落とす（Googleの写真URLは期限切れになることがある）
   return a.picture
-    ? '<span class="pwgws-acc-ic"><img src="' + esc(a.picture) + '" alt="" ' +
-      'data-fallback-initial="' + esc(initial) + '"></span>'
+    ? '<span class="pwgws-acc-ic" data-initial="' + esc(initial) + '">' +
+      '<img src="' + esc(a.picture) + '" alt=""></span>'
     : '<span class="pwgws-acc-ic">' + esc(initial) + '</span>';
 }
 
@@ -345,16 +361,14 @@ function pwgwsOpenAccountMenu(anchorEl, opts) {
   menu.className = 'pwgws-acc';
   menu.id = 'pwgws-acc-menu';
   menu.innerHTML = html;
-  // initial を inline JavaScript に埋め込まない。HTML entity は属性のパース後に
-  // 復号されるため、氏名先頭が引用符の場合に onerror 文字列を壊しうる。
-  menu.querySelectorAll('.pwgws-acc-ic img[data-fallback-initial]').forEach(img => {
-    img.addEventListener('error', () => {
-      const holder = img.parentElement;
-      if (holder) holder.textContent = img.dataset.fallbackInitial || '?';
-    }, { once: true });
-  });
   document.body.appendChild(back);
   document.body.appendChild(menu);
+  menu.querySelectorAll('.pwgws-acc-ic img').forEach(img => {
+    img.addEventListener('error', () => {
+      const icon = img.parentElement;
+      if (icon) icon.textContent = icon.dataset.initial || '?';
+    }, { once: true });
+  });
 
   // 位置決め：アイコンの下・右端そろえ。画面外にはみ出さないように収める。
   // position:fixed なので、ヘッダーが sticky でもスクロールでズレない
@@ -396,7 +410,7 @@ function pwgwsOpenAccountMenu(anchorEl, opts) {
       const cur = pwgwsGetSession();
       pwgwsCloseAccountMenu();
       if (cur && cur.email === email) return; // 今のアカウントなら何もしない
-      if (pwgwsSwitchAccount(email)) location.reload();
+      if (pwgwsSwitchAccount(email)) pwgwsReloadForSessionChange();
     }
   });
 }
