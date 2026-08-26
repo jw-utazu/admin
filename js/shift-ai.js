@@ -338,6 +338,64 @@ function scAiCheckNoteTimes(blocks, sd, winOf) {
   return out;
 }
 
+// セルの人数が cellTarget（上限）を超えていないかの自前検証（2026-08-26 実機確認で発覚。
+// 例外者を足した結果セルが目標人数を超える不具合があったため、プロンプトの指示だけに
+// 頼らずアプリ側でも機械的に検出し、超えていれば error として再生成にフィードバックする）
+function scAiCheckCellOverflow(blocks, sd) {
+  const out = [];
+  blocks.forEach((b, bi) => {
+    const slots = (sd[bi] || {}).slots || [];
+    slots.forEach((s, si) => {
+      (s.places || []).forEach((cell, ci) => {
+        const n = (cell || []).length;
+        if (n > b.cellTarget) {
+          out.push({ level: 'error', rule: 'cellOverflow',
+            msg: b.label + ' の周' + (Math.floor(si / b.cyc) + 1) + '位置' + (si % b.cyc) + ' の '
+              + (b.places[ci] || '') + ' が上限' + b.cellTarget + '名を超えています（' + n + '名）',
+            uids: (cell || []).slice() });
+        }
+      });
+    });
+  });
+  return out;
+}
+
+// 例外者以外の人が、指定していない周だけ抜けたり足されたりしていないかの自前検証
+// （2026-08-26 実機確認で発覚。「本人の申告なく途中で入ったり抜けたりしない」の担保）
+function scAiCheckRosterConsistency(blocks, plan, sd) {
+  const out = [];
+  blocks.forEach((b, bi) => {
+    const slots = (sd[bi] || {}).slots || [];
+    const pl = plan[b.label];
+    const extraAt = {}; // "rep|pos" -> Set(uid)
+    (pl.extras || []).forEach(e => (e.at || []).forEach(x => {
+      const k = x.rep + '|' + x.pos;
+      (extraAt[k] = extraAt[k] || new Set()).add(e.uid);
+    }));
+    for (let p = 0; p < b.cyc; p++) {
+      let baseSet = null;
+      for (let r = 0; r < b.reps; r++) {
+        const si = r * b.cyc + p;
+        const cellUids = ((slots[si] || {}).places || []).reduce((a, c) => a.concat(c || []), []);
+        const extras = extraAt[r + '|' + p] || new Set();
+        const core = new Set(cellUids.filter(u => !extras.has(u)));
+        if (baseSet === null) { baseSet = core; continue; }
+        const same = baseSet.size === core.size && [...baseSet].every(u => core.has(u));
+        if (!same) {
+          const added = [...core].filter(u => !baseSet.has(u));
+          const removed = [...baseSet].filter(u => !core.has(u));
+          out.push({ level: 'error', rule: 'rosterInconsistent',
+            msg: b.label + ' の位置' + p + 'で、周' + (r + 1) + 'の顔ぶれが周1と一致しません（例外者以外）: '
+              + (added.length ? '追加=' + added.join(',') + ' ' : '')
+              + (removed.length ? '削除=' + removed.join(',') : ''),
+            uids: [...added, ...removed] });
+        }
+      }
+    }
+  });
+  return out;
+}
+
 // validateShift の issue.msg は氏名を埋め込んで組み立てられている
 // （validation.js の nameOf 復元）。Gateway へ送る前に uid だけの文へ詰め替える。
 // これを怠ると2回目以降の生成で必ず氏名混入検査（サーバー側 422）に落ちる
@@ -378,7 +436,8 @@ async function scAiRunGenerationLoop(blocks, plan, winOf, applicants, memberFlag
 
     const sd = scAiToShiftDates(blocks, plan, res.result);
     const vout = validateShift(sd, { applicants, memberFlags, conflictMap: conflictMapArg || {}, pwType: currentPwType });
-    const issues = vout.issues.filter(i => i.scope === 'live').concat(scAiCheckNoteTimes(blocks, sd, winOf));
+    const issues = vout.issues.filter(i => i.scope === 'live').concat(scAiCheckNoteTimes(blocks, sd, winOf))
+      .concat(scAiCheckCellOverflow(blocks, sd)).concat(scAiCheckRosterConsistency(blocks, plan, sd));
     const errs = issues.filter(i => i.level === 'error');
     const warns = issues.filter(i => i.level === 'warn');
     const sc = computeShiftScore(sd, { memberFlags, couples, meta: SCORE_META });
