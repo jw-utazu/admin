@@ -4000,8 +4000,11 @@ function _aiBlockCycleRow(b) {
     const on = overridden ? d === blockRules.cycle : isAuto;
     return `<button type="button" class="uic${on ? ' on' : ''}" onclick="_aiSaveRule('block',{cycle:${d}},'${b.blockKey}')">`
       + `周期${d}${isAuto ? '（自動）' : ''}</button>`;
-  }).join('');
-  return `<div class="ai-rule-row"><span class="ai-rule-lbl">周期を変える</span><div class="uic-row">${chips}</div></div>`;
+  }).join('') + (overridden
+    ? `<button type="button" class="uic" onclick="_aiSaveRule('block',{cycle:null},'${b.blockKey}')">↺ 自動に戻す</button>`
+    : '');
+  const note = overridden ? `<div class="ai-note">この枠だけ周期${blockRules.cycle}に上書き中</div>` : '';
+  return `<div class="ai-rule-row"><span class="ai-rule-lbl">周期を変える</span><div class="uic-row">${chips}</div></div>${note}`;
 }
 
 function _aiRenderConfirm() {
