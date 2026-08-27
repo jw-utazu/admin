@@ -3833,6 +3833,14 @@ async function openPhotoMgmtModal(category) {
   await loadPhotoMgmtList();
 }
 
+// Drive CDN直リンクは署名に有効期限があるため、読めなかったら従来URLで1度だけ再試行する
+function photoImgFallback(img) {
+  const fb = img.getAttribute('data-fallback');
+  img.removeAttribute('data-fallback');
+  img.onerror = null;
+  if (fb) img.src = fb;
+}
+
 async function loadPhotoMgmtList() {
   const body = document.getElementById('m-photo-mgmt-body');
   body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="spin"></div> 読み込み中...</div>';
@@ -3849,7 +3857,9 @@ async function loadPhotoMgmtList() {
     let grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:10px;">';
     photos.forEach(p => {
       grid += '<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#f9fafb;">'
-        + '<img src="' + p.url + '" alt="' + p.fileName + '" style="width:100%;height:100px;object-fit:cover;display:block;" loading="lazy">'
+        + '<img src="' + p.url + '"'
+        +   (p.fallbackUrl && p.fallbackUrl !== p.url ? ' data-fallback="' + esc(p.fallbackUrl) + '" onerror="photoImgFallback(this)"' : '')
+        +   ' alt="' + p.fileName + '" style="width:100%;height:100px;object-fit:cover;display:block;" loading="lazy">'
         + '<div style="padding:4px 6px;font-size:11px;color:var(--ink3);word-break:break-all;">' + p.fileName + '</div>'
         + '<button onclick="deletePhoto(\'' + p.fileId + '\')" style="position:absolute;top:4px;right:4px;background:rgba(239,68,68,0.85);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;">' + ic('x') + '</button>'
         + '</div>';
