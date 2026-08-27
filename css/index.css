@@ -28,7 +28,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
 
 /* APP */
-#app{display:flex;flex-direction:column;min-height:100vh;}
+#app{display:flex;flex-direction:column;min-height:100vh;opacity:0;transition:opacity .3s ease;}
+#app.show-fade{opacity:1;}
 
 /* HEADER */
 .hdr{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;position:sticky;top:0;z-index:100;}
@@ -384,28 +385,20 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .loading-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);padding:8px 0;}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-/* ページローディング画面 */
-#loading{position:fixed;inset:0;z-index:9999;display:none;flex-direction:column;background:var(--bg);}
+/* ページローディング画面：ロゴのフェードだけで済ませ、内部処理の段階は見せない。
+   1.5秒を超えて終わらないときだけ .ld-spinner にスピナーを出す保険を入れる */
+#loading{position:fixed;inset:0;z-index:9999;display:none;flex-direction:column;background:var(--bg);opacity:1;transition:opacity .35s ease;}
 #loading.show{display:flex;}
+#loading.fade-out{opacity:0;}
 .ld-topbar{height:3px;background:var(--blue);flex-shrink:0;}
 .ld-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;}
 .ld-logo{width:72px;height:72px;border-radius:18px;overflow:hidden;background:var(--blue);margin-bottom:20px;box-shadow:0 4px 20px rgba(37,99,235,.2);flex-shrink:0;}
 .ld-logo img{width:100%;height:100%;object-fit:cover;}
-.ld-name{font-size:22px;font-weight:700;color:var(--ink);margin-bottom:8px;letter-spacing:-.02em;}
-.ld-status{font-size:13px;color:var(--ink2);margin-bottom:40px;min-height:20px;text-align:center;}
-.ld-steps{display:flex;align-items:flex-start;margin-bottom:28px;}
-.ld-step{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:72px;}
-.ld-dot{width:32px;height:32px;border-radius:50%;border:2px solid var(--border2);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ink3);transition:all .3s;}
-.ld-step.active .ld-dot{border-color:var(--blue);background:var(--blue);color:#fff;animation:ld-pulse 1.6s ease infinite;}
-.ld-step.done .ld-dot{border-color:var(--green);background:var(--green);color:#fff;animation:none;}
+.ld-name{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em;}
+.ld-spinner-wrap{height:34px;display:flex;align-items:center;justify-content:center;margin-top:22px;}
+.ld-spinner{display:none;width:26px;height:26px;border-width:3px;}
+.ld-spinner.show{display:inline-block;}
 @keyframes ld-pulse{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.3);}50%{box-shadow:0 0 0 8px rgba(37,99,235,0);}}
-.ld-label{font-size:11px;font-weight:700;color:var(--ink3);white-space:nowrap;}
-.ld-step.active .ld-label{color:var(--blue);}
-.ld-step.done .ld-label{color:var(--green);}
-.ld-line{width:48px;height:2px;background:var(--border2);margin-top:15px;transition:background .4s;}
-.ld-line.done{background:var(--green);}
-.ld-bar-bg{width:200px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
-.ld-bar{height:100%;width:0%;background:var(--blue);border-radius:2px;transition:width .5s ease;}
 .exec-st{display:none;align-items:center;gap:8px;font-size:12px;color:var(--ink2);padding:8px 0;}
 .exec-st.show{display:flex;}
 
@@ -803,10 +796,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   .mft{padding:10px 12px;flex-wrap:wrap;}
   .map-row{grid-template-columns:88px 12px 1fr;}
   .sumk{width:82px;}
-  /* 手順表示・読み込み中の手順は、ラベルと連結線を詰めて1行に収める */
+  /* 手順表示は、ラベルと連結線を詰めて1行に収める */
   .sl{font-size:8px;}
-  .ld-step{min-width:60px;}
-  .ld-line{width:32px;}
 
   /* ===== メンバー行・救済申請 ===== */
   .member-row{padding:8px 10px;flex-wrap:wrap;}

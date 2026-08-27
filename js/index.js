@@ -49,7 +49,7 @@ async function tryRecoveryLogin() {
     if (!res.ok || !res.isAdmin) return false;
     _currentUser = { uid: res.uid || '', name: res.name, email: '', isRecoverySession: true };
     document.getElementById('loading').classList.add('show');
-    setLoadingStep(3, 'データを読み込み中...');
+    startBootSpinnerTimer();
     const av = document.getElementById('av');
     av.textContent = ([...res.name || '?'][0] || '?').toUpperCase();
     const now = new Date();
@@ -102,13 +102,20 @@ async function _processUserWithGasAuth(u, save) {
   if (!document.getElementById('loading').classList.contains('show')) {
     document.getElementById('loading').classList.add('show');
   }
-  setLoadingStep(2, '管理者権限を確認中...');
+  startBootSpinnerTimer();
+  // 権限確認と初期データ取得を1回のAPI呼び出し（adminBootstrap）にまとめて、
+  // 起動時の往復を1回減らす。対象年月は取得前に確定させておく必要がある
+  const now = new Date();
+  const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  curY = _nm.getFullYear();
+  curM = _nm.getMonth() + 1; // 来月をデフォルト
+  calY = now.getFullYear(); calM = now.getMonth() + 1;
   // 認証応答は try の外（アイコン表示・localStorage 保存）でも使うので、
   // try の中で const 宣言してはいけない。ブロックスコープから漏れて
   // ReferenceError になり、しかも catch の外なので権限確認のまま止まる
   let auth = null;
   try {
-    const res = await apiAuthGet(u.email, 'admin');
+    const res = await apiGet('adminBootstrap', { year: curY, month: curM, type: currentPwType });
     if (!res.ok) { showAuthErr('', 'unauthorized'); return; }
     if (!res.isAdmin) { showAuthErr('', 'noadmin'); return; }
     auth = res;
@@ -134,13 +141,8 @@ async function _processUserWithGasAuth(u, save) {
   } else {
     av.textContent = ([...u.name||u.email][0]||'?').toUpperCase();
   }
-  const now = new Date();
-  const _nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  curY = _nm.getFullYear();
-  curM = _nm.getMonth() + 1; // 来月をデフォルト
-  calY = now.getFullYear(); calM = now.getMonth() + 1;
-  setLoadingStep(3, 'データを読み込み中...');
-  await loadAdminData({ initial: true });
+  const bundle = { data: auth.data, calStatus: auth.calStatus, shiftStatusResult: auth.shiftStatusResult, calApprovalResult: auth.calApprovalResult };
+  await loadAdminData({ initial: true, bundle, year: curY, month: curM, type: currentPwType });
 }
 // アカウント切り替えメニュー（実体は共有の session.js。3アプリで同じ見た目にするため）
 function openAccountMenu(el) {
@@ -154,21 +156,25 @@ function signOut() {
   // （Google認証は login.html 側で行うため、ここでGISを触ってはいけない）
   pwgwsGoToLogin();
 }
-function setLoadingStep(step, msg) {
-  document.getElementById('ld-status').textContent = msg;
-  for (let i = 1; i <= 3; i++) {
-    const el = document.getElementById('ldst-' + i);
-    el.classList.remove('active', 'done');
-    if (i < step) el.classList.add('done');
-    else if (i === step) el.classList.add('active');
-    if (i < 3) document.getElementById('ldsl-' + i).classList.toggle('done', i < step);
-  }
-  const pct = [0, 20, 55, 80];
-  document.getElementById('ld-bar').style.width = pct[step] + '%';
+// 起動処理が1.5秒を超えて終わらないときだけ、ロゴの下にスピナーを出す保険。
+// 通常は一瞬で終わるので表示されない想定
+let _ldSpinnerTimer = null;
+function startBootSpinnerTimer() {
+  clearTimeout(_ldSpinnerTimer);
+  _ldSpinnerTimer = setTimeout(() => {
+    const sp = document.getElementById('ld-spinner');
+    if (sp) sp.classList.add('show');
+  }, 1500);
+}
+function stopBootSpinnerTimer() {
+  clearTimeout(_ldSpinnerTimer);
+  const sp = document.getElementById('ld-spinner');
+  if (sp) sp.classList.remove('show');
 }
 // 認証に関する失敗は共通ログイン画面へ戻して、そこで理由を表示させる。
 // データ読み込み失敗など認証以外の失敗はこの画面上に出す
 function showAuthErr(msg, reason) {
+  stopBootSpinnerTimer();
   if (reason === 'noadmin') {
     // 管理者権限が無いだけで、本人としては正しくログインできている。
     // アカウント切り替えで個人アカウントに変えたときがこれにあたるので、
@@ -242,26 +248,32 @@ async function fetchAdminMonthBundle(year, month, type) {
     apiGet('getShiftPublishStatus', target),
     apiGet('getCalApprovalStatus', target),
   ]);
-  if (!data || data.ok === false) throw new Error((data && data.error) || '管理データの取得に失敗しました');
-  [calStatus, shiftStatusResult, calApprovalResult].forEach(result => {
-    if (result && result.ok === false) throw new Error(result.error || '公開・承認状態の取得に失敗しました');
-  });
   return { data, calStatus, shiftStatusResult, calApprovalResult };
 }
 
 function showInitialApp() {
+  stopBootSpinnerTimer();
+  const loadingEl = document.getElementById('loading');
+  const appEl = document.getElementById('app');
   let shown = false;
   const show = () => {
     if (shown) return;
     shown = true;
-    document.getElementById('ld-bar').style.width = '100%';
-    setTimeout(() => {
-      document.getElementById('loading').classList.remove('show');
-      setVisible(document.getElementById('app'), true);
-    }, 400);
+    loadingEl.classList.add('fade-out');
+    setVisible(appEl, true);
+    requestAnimationFrame(() => requestAnimationFrame(() => appEl.classList.add('show-fade')));
+    setTimeout(() => { loadingEl.classList.remove('show', 'fade-out'); }, 350);
   };
   requestAnimationFrame(() => requestAnimationFrame(show));
   setTimeout(show, 1000);
+}
+
+function validateAdminBundle(bundle) {
+  const data = bundle && bundle.data;
+  if (!data || data.ok === false) throw new Error((data && data.error) || '管理データの取得に失敗しました');
+  [bundle.calStatus, bundle.shiftStatusResult, bundle.calApprovalResult].forEach(result => {
+    if (result && result.ok === false) throw new Error(result.error || '公開・承認状態の取得に失敗しました');
+  });
 }
 
 async function loadAdminData(options) {
@@ -271,7 +283,8 @@ async function loadAdminData(options) {
   const targetType = opts.type || currentPwType;
   const generation = ++_adminLoadGeneration;
   try {
-    const bundle = await fetchAdminMonthBundle(targetYear, targetMonth, targetType);
+    const bundle = opts.bundle || await fetchAdminMonthBundle(targetYear, targetMonth, targetType);
+    validateAdminBundle(bundle);
     if (generation !== _adminLoadGeneration) return false;
     const d = bundle.data;
 

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=49">
+<link rel="stylesheet" href="css/index.css?v=50">
 </head>
 <body>
 
@@ -23,24 +23,8 @@
   <div class="ld-body">
     <div class="ld-logo"><img src="logo.png" alt="PW" onerror="this.classList.add('is-hidden');this.parentNode.style.background='var(--blue)'"></div>
     <div class="ld-name">PW管理アプリ</div>
-    <div class="ld-status" id="ld-status">準備中...</div>
-    <div class="ld-steps">
-      <div class="ld-step" id="ldst-1">
-        <div class="ld-dot">1</div>
-        <div class="ld-label">ログイン</div>
-      </div>
-      <div class="ld-line" id="ldsl-1"></div>
-      <div class="ld-step" id="ldst-2">
-        <div class="ld-dot">2</div>
-        <div class="ld-label">権限確認</div>
-      </div>
-      <div class="ld-line" id="ldsl-2"></div>
-      <div class="ld-step" id="ldst-3">
-        <div class="ld-dot">3</div>
-        <div class="ld-label">データ読込</div>
-      </div>
-    </div>
-    <div class="ld-bar-bg"><div class="ld-bar" id="ld-bar"></div></div>
+    <!-- 通常は一瞬で消えるので何も出さない。1.5秒経っても終わらないときだけ表示する保険 -->
+    <div class="ld-spinner-wrap"><div class="spin ld-spinner" id="ld-spinner"></div></div>
     <!-- データ読み込み失敗など、認証以外のエラーの表示先 -->
     <div class="load-err is-hidden" id="load-err"></div>
   </div>
@@ -664,6 +648,6 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=72"></script>
+<script src="js/index.js?v=73"></script>
 </body>
 </html>
