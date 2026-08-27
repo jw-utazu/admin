@@ -996,7 +996,7 @@ function buildDaySelectContent(y,m,d) {
       <div class="ab-tx"><span class="ab-n" style="color:var(--blue);">シフト公開日</span><span class="ab-d">${isOpen?ic('check',{color:'#15803D'})+' 設定済み':'この日をシフト公開日にする'}</span></div>
     </button>
     <button class="abtn" onclick="setDayAsSlot()" style="border-color:${hasSlot?'var(--purple)':'var(--border)'};background:${hasSlot?'var(--purple-l)':''};">
-      <div class="ab-ic ic-t">&#127775;</div>
+      <div class="ab-ic ic-t">${ic('clock')}</div>
       <div class="ab-tx"><span class="ab-n" style="color:var(--purple);">実施日</span><span class="ab-d">${hasSlot?ic('check',{color:'#15803D'})+' 設定済み（クリックで時間帯編集）':'この日を実施日にする'}</span></div>
     </button>`;
 }
@@ -1862,7 +1862,9 @@ function renderProgressStrip() {
     const line = i ? `<div class="pline${st[steps[i - 1][0]] === 'done' ? ' done' : ''}"></div>` : '';
     // pending（承認済み・自動公開待ち）は done（実際に公開済み）と紛らわしいので、
     // 色だけでなくマークの形でも区別する
-    const mark = st[k] === 'done' ? ic('check', { color: '#15803D' }) : st[k] === 'pending' ? ic('hourglass') : (i + 1);
+    // .pstep.done .pdot は背景緑・文字白の設計なので、ここで色を固定すると白が上書きされて
+    // 緑地に緑のチェックになる（currentColorのまま渡し、.pdotの白を継がせる）
+    const mark = st[k] === 'done' ? ic('check') : st[k] === 'pending' ? ic('hourglass') : (i + 1);
     const act = action[k] || '';
     const tip = !act ? ''
       : k === 'calPublish'   ? (st.calPublish === 'pending' ? 'クリックで承認状況を確認' : (calInfo ? calInfo.title : ''))
