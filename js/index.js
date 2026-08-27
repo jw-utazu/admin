@@ -3100,6 +3100,46 @@ async function loadPendingCounts() {
 // （ここで getPendingCounts を呼び直す必要はない）
 function updateRecoveryBadge(n) { setInboxCount('recovery', n); }
 
+// ===== モバイル用サイドメニュー =====
+// ハンバーガーの再タップでも同じボタンで開閉できるようにする。
+const MOBILE_SIDEBAR_BREAKPOINT = 780;
+function setMobileSidebar(open) {
+  const sb = document.getElementById('sb');
+  const backdrop = document.getElementById('sb-mobile-backdrop');
+  const btn = document.getElementById('hdr-menu-btn');
+  if (!sb || !backdrop || !btn) return;
+
+  const shouldOpen = !!open && window.innerWidth <= MOBILE_SIDEBAR_BREAKPOINT;
+  sb.classList.toggle('mobile-open', shouldOpen);
+  backdrop.classList.toggle('show', shouldOpen);
+  backdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+  btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  btn.setAttribute('aria-label', shouldOpen ? 'メニューを閉じる' : 'メニューを開く');
+  document.body.classList.toggle('sb-menu-open', shouldOpen);
+}
+function toggleMobileSidebar() {
+  const btn = document.getElementById('hdr-menu-btn');
+  setMobileSidebar(!(btn && btn.getAttribute('aria-expanded') === 'true'));
+}
+function closeMobileSidebar() { setMobileSidebar(false); }
+(function initMobileSidebar() {
+  const sb = document.getElementById('sb');
+  if (!sb) return;
+  sb.addEventListener('click', event => {
+    const target = event.target.closest('button, a');
+    if (!target) return;
+    // 管理・設定の開閉だけは、開いたサイドメニューを閉じずに操作できるようにする。
+    if (target.id === 'tools-toggle' || target.classList.contains('sec-toggle')) return;
+    closeMobileSidebar();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeMobileSidebar();
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > MOBILE_SIDEBAR_BREAKPOINT) closeMobileSidebar();
+  });
+})();
+
 // ===== 管理・設定セクションの開閉 =====
 // 数ヶ月に一度しか触らない区画なので畳めるようにする。
 // 開閉は端末ごとの好みなので localStorage に覚えさせる
@@ -4525,4 +4565,3 @@ function setProcStep(id, state, errMsg) {
 async function refreshAdminData() {
   return loadAdminData({ year: curY, month: curM, type: currentPwType, rethrow: true });
 }
-

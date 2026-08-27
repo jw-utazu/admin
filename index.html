@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=52">
+<link rel="stylesheet" href="css/index.css?v=53">
 </head>
 <body>
 
@@ -34,9 +34,12 @@
 <div id="app" class="is-hidden">
   <!-- HEADER -->
   <header class="hdr">
+    <button class="hdr-menu-btn" id="hdr-menu-btn" type="button" aria-label="メニューを開く" aria-controls="sb" aria-expanded="false" onclick="toggleMobileSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" /></svg>
+    </button>
     <div class="hdr-logo" id="hdr-logo"><img src="logo.png" alt="PW" onerror="this.parentNode.textContent='PW'"></div>
-    <span style="font-size:14px;font-weight:700;color:var(--ink);margin-right:auto;padding-left:8px;">PW管理アプリ</span>
-    <div style="display:flex;align-items:center;gap:8px;">
+    <span class="hdr-title">PW管理アプリ</span>
+    <div class="hdr-actions">
       <!-- アイコンを押すとアカウント切り替えメニューが開く（ログアウトもこの中） -->
       <div class="av" id="av" role="button" tabindex="0" title="アカウント"
            onclick="openAccountMenu(this)"></div>
@@ -53,20 +56,22 @@
       <div class="tab-sw-text" id="tab-sw-text">データを読み込み中...</div>
       <div class="tab-sw-sub">しばらくお待ちください</div>
     </div>
+    <!-- スマホ用サイドメニューの背景。ヘッダーは覆わず、ヘッダー直下だけを覆う -->
+    <div class="sb-mobile-backdrop" id="sb-mobile-backdrop" aria-hidden="true" onclick="closeMobileSidebar()"></div>
     <!-- CAL PANEL -->
     <div class="cp">
       <!-- タブなし（カレンダーのみ） -->
       <div id="tab-cal" style="display:flex;flex-direction:column;flex:1;">
         <!-- 年月ヘッダー -->
         <div class="cal-ym-header">
-          <div id="cal-ym-nav" style="display:flex;align-items:center;gap:8px;">
+          <span class="cal-ym-section-label">シフト管理</span>
+          <div id="cal-ym-nav">
             <button class="cal-ym-nav-btn" onclick="chM(-1)">&#8249;</button>
             <!-- 年月そのものを押すと年月ピッカーが開く（遠い月へ一度で飛べる） -->
             <button class="cal-ym-pick" id="cal-ym-label" onclick="openYmPicker(this)">読み込み中...</button>
             <button class="cal-ym-nav-btn" onclick="chM(1)">&#8250;</button>
-            <span class="cal-ym-section-label">シフト管理</span>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;">
+          <div class="cal-ym-actions">
             <!-- 予定表の状態に応じた操作ボタン（設定完了して承認を依頼／承認する／
                  設定中に戻す／今すぐ公開／非公開に戻す）。1状態＝1ボタンになるよう
                  calStageInfo() が状態から操作を1つに決め、renderCalStageMini() が
@@ -179,7 +184,7 @@
                       「開く必要があるか」を見ただけで判断できるようにする
          管理・設定 … 数ヶ月に一度しか触らないもの。3列アイコンに畳む
          全部を同じ大きさで並べると頻度の差が見た目に出ず、探すものが埋もれる -->
-    <div class="sb">
+    <div class="sb" id="sb" aria-label="操作メニュー">
       <div class="sb-sec">
         <div class="plbl">今月の作業</div>
         <div class="ag">
@@ -650,6 +655,6 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=74"></script>
+<script src="js/index.js?v=75"></script>
 </body>
 </html>

@@ -33,8 +33,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 
 /* HEADER */
 .hdr{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;position:sticky;top:0;z-index:100;}
+.hdr-menu-btn{display:none;width:32px;height:32px;padding:6px;border:1px solid transparent;border-radius:6px;background:none;color:var(--ink2);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0;}
+.hdr-menu-btn:hover{background:var(--bg);}
+.hdr-menu-btn svg{width:18px;height:18px;}
 .hdr-logo{width:28px;height:28px;border-radius:7px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--blue);color:#fff;font-size:14px;}
 .hdr-logo img{width:100%;height:100%;object-fit:cover;}
+.hdr-title{font-size:14px;font-weight:700;color:var(--ink);margin-right:auto;padding-left:8px;white-space:nowrap;}
+.hdr-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
 /* 年月タイトル（クリックで年月選択） */
 .ym-title{display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;padding:4px 8px;border-radius:var(--r);transition:background .12s;min-width:0;}
 .ym-title:hover{background:var(--bg);}
@@ -44,8 +49,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .av img{width:100%;height:100%;object-fit:cover;}
 
 /* LAYOUT */
-.layout{display:grid;grid-template-columns:1fr 272px;flex:1;min-height:calc(100vh - 50px);position:relative;}
-@media(max-width:780px){.layout{grid-template-columns:1fr;}.sb{border-left:none;border-top:1px solid var(--border);}}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 272px;flex:1;height:calc(100vh - 50px);min-height:0;position:relative;}
+@media(max-width:780px){
+  .layout{display:block;height:auto;min-height:0;}
+}
 /* タブ切り替えローディングオーバーレイ */
 #tab-switch-ov{position:fixed;inset:0;background:rgba(255,255,255,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:8000;backdrop-filter:blur(2px);}
 #tab-switch-ov.show{display:flex;}
@@ -55,7 +62,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 #pw-type-bar .pw-type-tab:disabled{opacity:.5;cursor:not-allowed;}
 
 /* CAL PANEL */
-.cp{overflow-y:auto;display:flex;flex-direction:column;}
+.cp{height:100%;min-height:0;overflow-y:auto;display:flex;flex-direction:column;}
 
 /* Tabs */
 .tabs{display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;position:sticky;top:50px;z-index:50;}
@@ -63,7 +70,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 /* 縦送りは .cp の1か所に集約し、カレンダー内に二重スクロールを作らない */
 .cal-scroll-area{padding:14px;border-bottom:1px solid var(--border);}
 .cal-month-block{margin-bottom:20px;}
-.cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-bottom:1px solid var(--border);}
+.cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);}
+#cal-ym-nav{display:flex;align-items:center;gap:8px;position:absolute;left:50%;transform:translateX(-50%);}
+.cal-ym-actions{display:flex;align-items:center;gap:6px;margin-left:auto;max-width:50%;justify-content:flex-end;}
 .cal-ym-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .cal-ym-nav-btn:hover{background:var(--border);}
 .cal-ym-section-label{font-size:20px;font-weight:700;color:var(--ink);white-space:nowrap;letter-spacing:-.02em;}
@@ -210,7 +219,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .slot-empty{padding:14px;text-align:center;font-size:12px;color:var(--ink3);}
 
 /* SIDEBAR */
-.sb{border-left:1px solid var(--border);background:var(--surface);padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
+.sb{border-left:1px solid var(--border);background:var(--surface);padding:16px 12px;display:flex;flex-direction:column;gap:14px;height:100%;min-height:0;position:sticky;top:0;overflow-y:auto;}
+.sb-mobile-backdrop{display:none;}
 .plbl{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--ink3);text-transform:uppercase;margin-bottom:5px;}
 .ag{display:flex;flex-direction:column;gap:4px;}
 .abtn{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);cursor:pointer;text-align:left;width:100%;font-family:var(--sans);transition:all .12s;text-decoration:none;}
@@ -740,7 +750,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 
 /* ============================================================
    スマートフォン最適化（〜700px）
-   この画面はもともと縦積みのカード中心で、サイドバーも 780px で下に回る
+   この画面はもともと縦積みのカード中心で、サイドバーはモバイルドロワーにする
    （上の .layout の @media）。ここで直すのは「1行に並べきれない箇所」と
    「指には小さすぎる部品」の2点に絞ってある
    ============================================================ */
@@ -784,7 +794,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   .sdel{padding:5px 7px;font-size:13px;}
   .slot-set-list{max-height:none;}
 
-  /* ===== サイドバー（780px で下に回ったあとの中身） ===== */
+  /* ===== サイドバー（モバイルドロワー内） ===== */
   .sb{padding:12px 10px;}
 
   /* ===== モーダル ===== */
@@ -812,4 +822,27 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   /* ===== トースト ===== */
   .ta{left:10px;right:10px;bottom:10px;}
   .toast{max-width:none;}
+}
+
+/* ============================================================
+   モバイル用サイドメニュー
+   ヘッダーは残し、ヘッダー直下から左へ開くドロワーにする。
+   ============================================================ */
+@media (max-width:780px){
+  .hdr{position:sticky;top:0;}
+  .hdr-menu-btn{display:flex;}
+  .hdr-logo{display:none;}
+  .hdr-title{position:absolute;left:50%;transform:translateX(-50%);margin:0;padding-left:0;}
+  .hdr-actions{margin-left:auto;}
+
+  .cp{height:auto;overflow:visible;}
+  .cal-ym-header{display:grid;grid-template-columns:1fr auto;justify-content:normal;}
+  .cal-ym-section-label{grid-column:1;grid-row:1;}
+  .cal-ym-actions{grid-column:2;grid-row:1;max-width:none;}
+  #cal-ym-nav{position:static;grid-column:1 / -1;grid-row:2;transform:none;justify-self:center;}
+  .sb-mobile-backdrop{display:block;position:fixed;inset:50px 0 0;background:rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .18s;z-index:110;}
+  .sb-mobile-backdrop.show{opacity:1;pointer-events:auto;}
+  .sb{position:fixed;top:50px;right:auto;bottom:0;left:0;width:min(86vw,320px);height:auto;max-height:none;padding:12px 10px;border:none;border-right:1px solid var(--border);box-shadow:8px 0 24px rgba(0,0,0,.16);transform:translateX(-102%);visibility:hidden;pointer-events:none;transition:transform .2s ease,visibility 0s linear .2s;z-index:120;}
+  .sb.mobile-open{transform:translateX(0);visibility:visible;pointer-events:auto;transition-delay:0s;}
+  body.sb-menu-open{overflow:hidden;}
 }
