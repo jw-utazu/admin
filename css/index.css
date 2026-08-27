@@ -219,8 +219,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .ic-g{background:var(--green-l);color:#15803d;}.ic-a{background:var(--amber-l);color:var(--amber);}.ic-p{background:var(--purple-l);color:var(--purple);}.ic-t{background:var(--teal-l);color:var(--teal);}
 .ab-tx{flex:1;}
 .ab-n{font-size:12px;font-weight:700;color:var(--ink);display:block;}
-/* 行頭アイコンだけテキストより少し目立たせる（絵文字時代の賑やかさが無くなった分の調整） */
-.ab-n svg{color:#3663d6;}
 .ab-d{font-size:10px;color:var(--ink2);display:block;margin-top:1px;}
 .ab-ar{color:var(--ink3);font-size:12px;}
 /* ===== 進行状況ストリップ ===== */
