@@ -654,8 +654,15 @@ body.dnd-on *{cursor:grabbing !important;}
      下のコンテンツとつながって見える形なので、タブの下に来る領域を白にしておく必要がある
      （PC では下が .main-tabs＝白なので成立している） */
   .hdr-row2{padding:5px 10px;row-gap:5px;background:var(--surface);}
+  /* 状態文言（確認待ち／公開待ち）が長い月でも、ヘッダー自体を横に広げない。
+     対象年月の行を先に幅いっぱいで確保し、内側の2要素だけを縮め・折り返す */
+  .hdr-row2{min-width:0;max-width:100%;}
   .hdr-spacer{display:none;}
   .ym-lbl{display:none;}
+  .ym-wrap{flex:0 1 100%;width:100%;max-width:100%;min-width:0;}
+  #sc-ym-slot{display:flex;flex:0 1 58%;max-width:58%;min-width:0;}
+  #sc-ym-slot .uisel{width:100%;max-width:100%;min-width:0;}
+  .ym-note{flex:1 1 0;min-width:0;max-width:none;white-space:normal;overflow-wrap:anywhere;line-height:1.35;}
   /* PW タブはフォルダ型のまま、常に最上段に固定する。
      他の要素と同じ行に混ざると「行の下線に乗る」形が崩れるので、
      order:-1 と flex-basis:100% で必ず独立した1行目に回し、
