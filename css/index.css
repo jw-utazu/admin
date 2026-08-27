@@ -392,8 +392,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 #loading.fade-out{opacity:0;}
 .ld-topbar{height:3px;background:var(--blue);flex-shrink:0;}
 .ld-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;}
-.ld-logo{width:72px;height:72px;border-radius:18px;overflow:hidden;background:var(--blue);margin-bottom:20px;box-shadow:0 4px 20px rgba(37,99,235,.2);flex-shrink:0;}
+.ld-logo{width:96px;height:96px;border-radius:22px;overflow:hidden;background:var(--blue);margin-bottom:20px;box-shadow:0 4px 20px rgba(37,99,235,.2);flex-shrink:0;animation:ld-logo-in .7s cubic-bezier(.2,.9,.3,1.2) both;}
 .ld-logo img{width:100%;height:100%;object-fit:cover;}
+@keyframes ld-logo-in{from{transform:scale(.8);opacity:0;}to{transform:scale(1);opacity:1;}}
 .ld-name{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em;}
 .ld-spinner-wrap{height:34px;display:flex;align-items:center;justify-content:center;margin-top:22px;}
 .ld-spinner{display:none;width:26px;height:26px;border-width:3px;}
