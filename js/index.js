@@ -3945,59 +3945,39 @@ function buildPhotoScopeLabel() {
     + '</div>';
 }
 
+// 1か月につき1枚だけ保持する運用のため、新しい写真を選ぶと既存の写真は自動的に置き換わる
 async function onPhotoFilesSelected(event) {
   const files = Array.from(event.target.files);
-  if (!files.length) return;
-  const body = document.getElementById('m-photo-mgmt-body');
-
-  // 既存写真数を確認してindexを決める
-  let startIndex = 1;
-  try {
-    const res = await apiGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
-    startIndex = ((res && res.photos) || []).length + 1;
-  } catch(e) { console.warn('[onPhotoFilesSelected]', e); }
-
-  const total = files.length;
-  let completed = 0;
-  let failed = 0;
-
-  showProc('写真をアップロードしています...', total + '枚中 0枚完了');
-
-  // base64変換を全ファイル並列で実行
-  const base64List = await Promise.all(files.map(f => fileToBase64(f)));
-
-  // アップロードを全ファイル並列で実行
-  await Promise.all(files.map(async (file, i) => {
-    try {
-      await apiPost('uploadPhoto', {
-        category: _photoMgmtCategory,
-        type:     currentPwType,
-        year:     _photoMgmtYear,
-        month:    _photoMgmtMonth,
-        base64:   base64List[i],
-        mimeType: file.type || 'image/jpeg',
-        index:    startIndex + i
-      });
-      completed++;
-    } catch(e) {
-      failed++;
-      console.error('アップロード失敗:', file.name, e.message);
-    }
-    setProcMsg(undefined, total + '枚中 ' + (completed + failed) + '枚処理済み' + (failed > 0 ? '（' + failed + '枚失敗）' : ''));
-  }));
-
-  // リスト再読み込み
   const inp = document.getElementById('photo-upload-input');
-  if (inp) inp.value = '';
-  await loadPhotoMgmtList();
-  hideProc();
+  if (!files.length) return;
+  const file = files[0];
 
-  if (failed === 0) {
-    toast(total + '枚のアップロードが完了しました', 's');
-  } else if (completed > 0) {
-    toast(completed + '枚完了、' + failed + '枚失敗しました', 'e');
-  } else {
-    toast('アップロードに失敗しました', 'e');
+  showProc('写真を登録しています...', '少々お待ちください');
+  try {
+    // 既存の写真を先に削除してから新しい写真を1枚だけ登録する
+    const res = await apiGet('getPhotos', { category: _photoMgmtCategory, year: _photoMgmtYear, month: _photoMgmtMonth });
+    const existing = (res && res.photos) || [];
+    for (const p of existing) {
+      await apiGet('deletePhoto', { fileId: p.fileId });
+    }
+    const base64 = await fileToBase64(file);
+    await apiPost('uploadPhoto', {
+      category: _photoMgmtCategory,
+      type:     currentPwType,
+      year:     _photoMgmtYear,
+      month:    _photoMgmtMonth,
+      base64,
+      mimeType: file.type || 'image/jpeg',
+      index:    1
+    });
+    toast('写真を登録しました', 's');
+  } catch(e) {
+    console.error('アップロード失敗:', e.message);
+    toast('アップロードに失敗しました: ' + e.message, 'e');
+  } finally {
+    if (inp) inp.value = '';
+    await loadPhotoMgmtList();
+    hideProc();
   }
 }
 
