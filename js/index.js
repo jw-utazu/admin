@@ -2391,11 +2391,70 @@ async function execCalPub(){
 // ============================================================
 // モーダル制御
 // ============================================================
-function openM(id){ document.getElementById(id).classList.add('open'); }
-function closeM(id){ document.getElementById(id).classList.remove('open'); }
+// モーダルを開いても履歴には何も積んでいなかったため、スマホの「戻る」操作
+// （ブラウザの戻る・Androidの戻るジェスチャー／ボタン）がそのままアプリ自体の
+// 終了・前ページ遷移として扱われ、「戻る＝アプリが閉じる」ように見えていた
+// （2026-08-28）。openM/closeM に履歴の積み下ろしを持たせ、popstate では
+// 一番上に開いているモーダルを閉じるだけにする。
+//
+// 同じ同期処理内で closeM→openM を連続で呼ぶ「モーダルの差し替え」
+// （例: setDayAs が m-day-select を閉じてから m-slot-edit を開く）で
+// history.back() と pushState を続けて呼ぶと、back() の完了（popstate）を
+// 待たずに pushState してしまい順序が壊れる。そのため実際の履歴操作は
+// マイクロタスクまでまとめ、その同期処理が終わった時点の「開いている数の
+// 差分」だけを見て1回で反映する（差し替えのように差分が0なら何もしない）。
+let _modalStack = [];
+let _modalBatchStartDepth = null;
+let _modalBatchScheduled  = false;
+let _suppressModalHistory = false; // popstate起点の変化では履歴を操作しない
+
+function _modalBatchBegin() {
+  if (_modalBatchScheduled) return;
+  _modalBatchStartDepth = _modalStack.length;
+  _modalBatchScheduled  = true;
+  queueMicrotask(_modalBatchFlush);
+}
+
+function _modalBatchFlush() {
+  _modalBatchScheduled = false;
+  if (_suppressModalHistory) return;
+  const before = _modalBatchStartDepth;
+  const after  = _modalStack.length;
+  if (before === after) return; // 差し替えなど：開いている数は変わらない
+  if (after > before) {
+    for (let i = 0; i < after - before; i++) history.pushState({ admModal: true }, '');
+  } else if (after === 0) {
+    history.back();
+  } else {
+    history.go(-(before - after));
+  }
+}
+
+function openM(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  _modalBatchBegin();
+  el.classList.add('open');
+  _modalStack.push(id);
+}
+function closeM(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.classList.contains('open')) return;
+  _modalBatchBegin();
+  el.classList.remove('open');
+  const i = _modalStack.lastIndexOf(id);
+  if (i !== -1) _modalStack.splice(i, 1);
+}
 // オーバーレイクリックで閉じる
 document.addEventListener('click', e => {
   if(e.target.classList.contains('ov')) closeM(e.target.id);
+});
+// 戻る操作：開いているモーダルが無ければ何もしない（通常のブラウザ履歴に任せる）
+window.addEventListener('popstate', () => {
+  if (!_modalStack.length) return;
+  _suppressModalHistory = true;
+  closeM(_modalStack[_modalStack.length - 1]);
+  queueMicrotask(() => { _suppressModalHistory = false; });
 });
 
 // ============================================================
