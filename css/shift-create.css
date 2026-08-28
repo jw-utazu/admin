@@ -52,6 +52,8 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hdr-title{font-size:14px;font-weight:700;flex:1;}
 .hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .hbtn:hover{background:var(--bg);}
+.sc-back-btn{display:inline-flex;align-items:center;gap:4px;}
+.sc-back-btn svg{width:14px;height:14px;flex-shrink:0;}
 /* PW 切替タブ（フォルダタブ風） */
 #app-screen{display:flex;flex-direction:column;height:100%;}
 #pw-tabs{display:flex;align-self:stretch;align-items:flex-end;gap:8px;}
@@ -649,6 +651,7 @@ body.dnd-on *{cursor:grabbing !important;}
   /* ===== ヘッダー ===== */
   .hdr-row1{height:42px;padding:0 10px;gap:8px;}
   .hdr-title{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sc-back-btn{padding:5px 8px;}
   /* 折り返し自体は幅を問わず常時有効（.hdr-row2 base 参照）。ここではスマホ幅特有の
      余白・背景だけ上書きする。背景は白。フォルダタブは「下線の下が白い」ことで
      下のコンテンツとつながって見える形なので、タブの下に来る領域を白にしておく必要がある
@@ -677,6 +680,9 @@ body.dnd-on *{cursor:grabbing !important;}
   .hdr-row2 .hbtn{padding:5px 9px;}
   #publish-approval,#publish-open-date{font-size:10px!important;}
   .ym-note{padding:2px 7px;font-size:10px;}
+  /* 幅の狭い端末では戻る操作を矢印だけにして、タイトルとアカウントを押し出さない */
+  .sc-back-btn span{display:none;}
+  .sc-back-btn svg{width:16px;height:16px;}
 
   /* ===== メインタブ ===== */
   .main-tabs{padding:0 6px;overflow-x:auto;}

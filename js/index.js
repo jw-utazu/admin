@@ -2407,6 +2407,7 @@ let _modalStack = [];
 let _modalBatchStartDepth = null;
 let _modalBatchScheduled  = false;
 let _suppressModalHistory = false; // popstate起点の変化では履歴を操作しない
+let _skipNextModalPopstate = false; // ボタンで閉じた後の history.go/back の通知を消費する
 
 function _modalBatchBegin() {
   if (_modalBatchScheduled) return;
@@ -2424,15 +2425,17 @@ function _modalBatchFlush() {
   if (after > before) {
     for (let i = 0; i < after - before; i++) history.pushState({ admModal: true }, '');
   } else if (after === 0) {
+    _skipNextModalPopstate = true;
     history.back();
   } else {
+    _skipNextModalPopstate = true;
     history.go(-(before - after));
   }
 }
 
 function openM(id) {
   const el = document.getElementById(id);
-  if (!el) return;
+  if (!el || el.classList.contains('open')) return;
   _modalBatchBegin();
   el.classList.add('open');
   _modalStack.push(id);
@@ -2451,6 +2454,10 @@ document.addEventListener('click', e => {
 });
 // 戻る操作：開いているモーダルが無ければ何もしない（通常のブラウザ履歴に任せる）
 window.addEventListener('popstate', () => {
+  if (_skipNextModalPopstate) {
+    _skipNextModalPopstate = false;
+    return;
+  }
   if (!_modalStack.length) return;
   _suppressModalHistory = true;
   closeM(_modalStack[_modalStack.length - 1]);

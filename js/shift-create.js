@@ -50,6 +50,69 @@ let _scPollTimer = null;
 let _scPollListening = false;
 let wishLoaded   = false;
 
+// シフト管理画面内のポップアップは、スマホの「戻る」で最上位だけ閉じる。
+// 確認・編集ポップアップは openM/closeM を使っていないため、ここで一元管理する。
+const _scOverlayStack = [];
+let _scOverlayHistoryDepth = 0;
+let _scOverlayPendingDepth = null;
+let _scOverlayBatchScheduled = false;
+
+function _scOverlayBatchBegin() {
+  if (_scOverlayBatchScheduled) return;
+  _scOverlayBatchScheduled = true;
+  queueMicrotask(_scOverlayBatchFlush);
+}
+
+function _scOverlayBatchFlush() {
+  _scOverlayBatchScheduled = false;
+  const targetDepth = _scOverlayStack.length;
+  const delta = targetDepth - _scOverlayHistoryDepth;
+  if (!delta) return;
+  if (delta > 0) {
+    for (let i = 0; i < delta; i++) history.pushState({ scOverlay: true }, '');
+    _scOverlayHistoryDepth = targetDepth;
+  } else {
+    // history.go(-n) は popstate が1回だけ発生するため、戻り先の深さを記録する。
+    _scOverlayPendingDepth = targetDepth;
+    history.go(delta);
+  }
+}
+
+function openScOverlay(id) {
+  const el = document.getElementById(id);
+  if (!el || el.classList.contains('on')) return;
+  _scOverlayBatchBegin();
+  el.classList.add('on');
+  _scOverlayStack.push(id);
+}
+
+function closeScOverlay(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.classList.contains('on')) return;
+  _scOverlayBatchBegin();
+  el.classList.remove('on');
+  const i = _scOverlayStack.lastIndexOf(id);
+  if (i !== -1) _scOverlayStack.splice(i, 1);
+}
+
+window.addEventListener('popstate', () => {
+  if (_scOverlayPendingDepth !== null) {
+    _scOverlayHistoryDepth = _scOverlayPendingDepth;
+    _scOverlayPendingDepth = null;
+    return;
+  }
+  if (!_scOverlayStack.length) return;
+  const id = _scOverlayStack.pop();
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('on');
+  _scOverlayHistoryDepth = Math.max(0, _scOverlayHistoryDepth - 1);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !_scOverlayStack.length) return;
+  closeScOverlay(_scOverlayStack[_scOverlayStack.length - 1]);
+});
+
 // ===== オートセーブ =====
 const _saveTimers          = {}; // 完全ブロックキー -> setTimeout（デバウンス待ち）
 const _saveQueues          = {}; // 完全ブロックキー -> 直列化された Promise tail
@@ -1132,9 +1195,9 @@ function openWishEdit(el, uid, name, slot, applied, comment) {
     toggleBtn.className = 's-btn green';
     setVisible(saveBtn, false);
   }
-  document.getElementById('wish-edit-modal').classList.add('on');
+  openScOverlay('wish-edit-modal');
 }
-function closeWishEditModal() { document.getElementById('wish-edit-modal').classList.remove('on'); wishEditCtx = null; }
+function closeWishEditModal() { closeScOverlay('wish-edit-modal'); wishEditCtx = null; }
 async function submitWishChange(applied) {
   if (!wishEditCtx) return;
   const ctx = wishEditCtx;
@@ -2604,9 +2667,9 @@ function openPreflight() {
     pubBtn.className = c.err > 0 ? 's-btn del' : 's-btn green';
     pubBtn.onclick = () => doPublish();
   }
-  document.getElementById('preflight-modal').classList.add('on');
+  openScOverlay('preflight-modal');
 }
-function closePreflight() { document.getElementById('preflight-modal').classList.remove('on'); }
+function closePreflight() { closeScOverlay('preflight-modal'); }
 
 async function vJump(date, time) {
   closePreflight();
@@ -2845,6 +2908,32 @@ function hasUnsavedChanges() {
 }
 
 // シフト作成タブの再読み込みボタン
+let _returningToAdmin = false;
+async function returnToAdmin() {
+  if (_returningToAdmin) return;
+  _returningToAdmin = true;
+  try {
+    if (hasUnsavedChanges()) {
+      const ok = await uiConfirm({
+        type: 'warn',
+        title: '未保存の変更があります',
+        message: '変更を保存して管理画面へ戻りますか？',
+        confirmText: '保存して戻る',
+      });
+      if (!ok) return;
+      setLoading(true, '変更を保存中...');
+      await flushPendingSave();
+    }
+    if (typeof pwgwsCloseAccountMenu === 'function') pwgwsCloseAccountMenu();
+    location.replace('./index.html');
+  } catch (e) {
+    toast('保存に失敗したため戻れませんでした: ' + e.message, 'e');
+  } finally {
+    setLoading(false);
+    _returningToAdmin = false;
+  }
+}
+
 async function reloadCreateData() {
   if (hasUnsavedChanges() && !await uiConfirm({
     type: 'danger', title: '未保存の変更があります',
@@ -3357,12 +3446,11 @@ function openApprovalModal() {
          + a.approvedCount + ' / ' + a.required + ' 名</div>';
   }
   list.innerHTML = html;
-  box.classList.add('on');
+  openScOverlay('approval-modal');
 }
 
 function closeApprovalModal() {
-  const box = document.getElementById('approval-modal');
-  if (box) box.classList.remove('on');
+  closeScOverlay('approval-modal');
 }
 
 // 表示中の月が公開操作の対象外か（限定PW・未取得のうちは制限しない）。対象になるのは
@@ -3699,10 +3787,10 @@ function openLocModal(i) {
   setVisible(segPw, currentPwType === 'normal' || !!locForm.linkPwType);
   _ympTarget = null;
   applyLocMode(locForm.mode);
-  document.getElementById('loc-modal').classList.add('on');
+  openScOverlay('loc-modal');
   setTimeout(() => { const n = document.getElementById('loc-name'); if (n) n.focus(); }, 50);
 }
-function closeLocModal() { closeYmp(); document.getElementById('loc-modal').classList.remove('on'); }
+function closeLocModal() { closeYmp(); closeScOverlay('loc-modal'); }
 
 function applyLocMode(mode) {
   locForm.mode = mode;
@@ -3746,12 +3834,12 @@ function toggleYmp(target) {
   const cur = target === 'start' ? locForm.startYM : locForm.endYM;
   const m = /^(\d{4})/.exec(cur || '');
   _ympYear = m ? parseInt(m[1], 10) : new Date().getFullYear();
-  document.getElementById('ymp').classList.add('on');
+  openScOverlay('ymp');
   renderYmp(); renderYmFields();
 }
 function closeYmp() {
   _ympTarget = null;
-  const p = document.getElementById('ymp'); if (p) p.classList.remove('on');
+  closeScOverlay('ymp');
   renderYmFields();
 }
 function ympYear(d) { _ympYear += d; renderYmp(); }
@@ -3935,7 +4023,7 @@ async function openAiDraftModal() {
   if (!createLoaded || !shiftDates.length) { toast('シフト作成タブを読み込んでから使ってください', 'e'); return; }
   const box = document.getElementById('ai-confirm-modal');
   document.getElementById('ai-confirm-body').innerHTML = '<div class="empty-msg">計算中...</div>';
-  box.classList.add('on');
+  openScOverlay('ai-confirm-modal');
   setLoading(true, 'AI原案の準備をしています…');
   try {
     const ym = _aiYmKey();
@@ -3951,12 +4039,12 @@ async function openAiDraftModal() {
     _aiRenderConfirm();
   } catch (e) {
     toast('準備に失敗しました: ' + e.message, 'e');
-    box.classList.remove('on');
+    closeScOverlay('ai-confirm-modal');
   } finally { setLoading(false); }
 }
 
-function closeAiConfirmModal() { document.getElementById('ai-confirm-modal').classList.remove('on'); }
-function closeAiDiffModal() { document.getElementById('ai-diff-modal').classList.remove('on'); }
+function closeAiConfirmModal() { closeScOverlay('ai-confirm-modal'); }
+function closeAiDiffModal() { closeScOverlay('ai-diff-modal'); }
 
 let _aiSavingRule = false;
 async function _aiSaveRule(scope, values, blockKey) {
@@ -4049,7 +4137,7 @@ async function startAiGeneration() {
   const box = document.getElementById('ai-diff-modal');
   document.getElementById('ai-diff-body').innerHTML = '<div class="empty-msg">生成中...</div>';
   document.getElementById('ai-diff-apply').disabled = true;
-  box.classList.add('on');
+  openScOverlay('ai-diff-modal');
   setLoading(true, 'AI原案を生成中…');
   try {
     const s = _aiState;
