@@ -221,6 +221,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 /* SIDEBAR */
 .sb{border-left:1px solid var(--border);background:var(--surface);padding:16px 12px;display:flex;flex-direction:column;gap:14px;height:100%;min-height:0;position:sticky;top:0;overflow-y:auto;}
 .sb-mobile-backdrop{display:none;}
+/* デスクトップでは中央パネルのスクロールから独立させ、モードタブの下で右端に固定する */
+@media (min-width:781px){
+  .sb{position:fixed;top:calc(50px + 45px);right:0;bottom:0;width:272px;height:auto;z-index:40;}
+}
 .plbl{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--ink3);text-transform:uppercase;margin-bottom:5px;}
 .ag{display:flex;flex-direction:column;gap:4px;}
 .abtn{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);cursor:pointer;text-align:left;width:100%;font-family:var(--sans);transition:all .12s;text-decoration:none;}
