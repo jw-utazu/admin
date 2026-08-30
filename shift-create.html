@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/shift-create.css?v=47">
+<link rel="stylesheet" href="css/shift-create.css?v=48">
 </head>
 <body>
 
@@ -26,8 +26,8 @@
       <a class="hbtn" href="https://jw-utazu.github.io/manual/walkthrough.html#/admin/shift" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v16" /><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" /></svg> マニュアル</a>
       <!-- アイコンを押すとアカウント切り替えメニューが開く（ログアウトもこの中） -->
       <div class="acc-wrap">
-        <div class="acc-icon" id="acc-icon" role="button" tabindex="0" title="アカウント"
-             onclick="openAccountMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg></div>
+        <button class="acc-icon" id="acc-icon" type="button" aria-label="アカウントメニューを開く" aria-haspopup="menu"
+             onclick="openAccountMenu(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg></button>
       </div>
     </div>
     <div class="hdr-row2">

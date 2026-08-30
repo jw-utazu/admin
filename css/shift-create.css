@@ -7,11 +7,11 @@
    周囲のフォントサイズに揃えて縦中央に来るよう全体に既定値を与える */
 svg[viewBox="0 0 24 24"]{width:1em;height:1em;display:inline-block;vertical-align:-0.15em;flex-shrink:0;}
 :root{
-  --ink:#18181b;--ink2:#52525b;--ink3:#71717a;
+  --ink:#18181b;--ink2:#52525b;--ink3:#6b7280;
   --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
   --border:#e4e4e7;--border2:#d4d4d8;
   --blue:#2563eb;--blue-l:#eff6ff;
-  --green:#16a34a;--green-l:#f0fdf4;--green-d:#14532d;
+  --green:#15803d;--green-l:#f0fdf4;--green-d:#14532d;
   --green3:#bbf7d0;--green4:#dcfce7;
   --amber:#d97706;--amber-l:#fffbeb;--red:#dc2626;--red-l:#fef2f2;
   --purple:#7c3aed;--purple-l:#f5f3ff;
@@ -19,7 +19,12 @@ svg[viewBox="0 0 24 24"]{width:1em;height:1em;display:inline-block;vertical-alig
   --r:8px;--r-lg:12px;
   --sh:0 1px 3px rgba(0,0,0,.1);
 }
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
+}
 html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5;}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
 body{display:flex;flex-direction:column;overflow:hidden;}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes t-up{from{opacity:0;transform:translateY(8px);}}
@@ -50,7 +55,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .hdr-row2{height:auto;min-height:36px;display:flex;align-items:center;flex-wrap:wrap;padding:5px 14px;gap:8px;row-gap:6px;border-top:1px solid var(--border);background:var(--surface2);}
 .hdr-logo{width:28px;height:28px;border-radius:7px;background:var(--purple);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;}
 .hdr-title{font-size:14px;font-weight:700;flex:1;}
-.hbtn{padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
+.hbtn{min-height:44px;padding:5px 12px;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--ink2);font-family:var(--sans);white-space:nowrap;}
 .hbtn:hover{background:var(--bg);}
 .sc-back-btn{display:inline-flex;align-items:center;gap:4px;}
 .sc-back-btn svg{width:14px;height:14px;flex-shrink:0;}
@@ -98,7 +103,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 .ym-note.ok{background:var(--green-l);color:var(--green);}
 .ym-note.warn{background:#fffbeb;color:#92400e;}
 .acc-wrap{position:relative;}
-.acc-icon{width:28px;height:28px;border-radius:50%;background:var(--purple-l);border:1px solid #ddd6fe;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;}
+.acc-icon{width:44px;height:44px;padding:0;border-radius:50%;background:var(--purple-l);border:1px solid #ddd6fe;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;font-family:var(--sans);}
 .acc-icon:hover{background:#ede9fe;}
 .save-st{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--amber);}
 .save-st.saved{color:var(--green);}
@@ -107,7 +112,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 /* MAIN TABS */
 .main-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;flex-shrink:0;}
 #create-tools{display:flex;align-items:center;gap:6px;margin-right:8px;}
-.mtab{padding:10px 16px;border:none;border-bottom:3px solid transparent;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);transition:all .15s;white-space:nowrap;}
+.mtab{min-height:44px;padding:10px 16px;border:none;border-bottom:3px solid transparent;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);transition:all .15s;white-space:nowrap;}
 .mtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
 .mtab:hover:not(.on){color:var(--ink);background:var(--bg);}
 
@@ -365,7 +370,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .ymp.on{display:block;animation:t-up .18s ease;}
 .ymp-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;}
 .ymp-hd b{font-size:12px;}
-.ymp-nav{width:26px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--ink2);cursor:pointer;font-size:12px;line-height:1;font-family:var(--sans);flex-shrink:0;}
+.ymp-nav{width:44px;height:44px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--ink2);cursor:pointer;font-size:14px;line-height:1;font-family:var(--sans);flex-shrink:0;}
 .ymp-nav:hover{background:var(--bg);border-color:var(--purple);color:var(--purple);}
 .ymp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
 .ymp-grid button{padding:7px 0;font-size:11px;font-weight:700;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink2);cursor:pointer;}
@@ -817,4 +822,11 @@ body.dnd-on *{cursor:grabbing !important;}
   .pk{max-width:calc(100vw - 20px);}
   .pk-it{padding:8px 6px;}
   .ta{left:10px;right:10px;bottom:10px;}
+}
+
+/* キーボード操作でも現在位置を見失わないよう、各コンポーネント固有の outline:none より後で定義する */
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
 }

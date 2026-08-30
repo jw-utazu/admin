@@ -7,11 +7,11 @@
    周囲のフォントサイズに揃えて縦中央に来るよう全体に既定値を与える */
 svg[viewBox="0 0 24 24"]{width:1em;height:1em;display:inline-block;vertical-align:-0.15em;flex-shrink:0;}
 :root{
-  --ink:#18181b;--ink2:#52525b;--ink3:#a1a1aa;
+  --ink:#18181b;--ink2:#52525b;--ink3:#6b7280;
   --bg:#f4f4f5;--surface:#fff;--surface2:#fafafa;
   --border:#e4e4e7;--border2:#d4d4d8;
   --blue:#2563eb;--blue-l:#eff6ff;--blue-d:#1d4ed8;
-  --green:#16a34a;--green-l:#f0fdf4;
+  --green:#15803d;--green-l:#f0fdf4;
   --amber:#d97706;--amber-l:#fffbeb;
   --red:#dc2626;--red-l:#fef2f2;
   --purple:#7c3aed;--purple-l:#f5f3ff;
@@ -23,6 +23,7 @@ svg[viewBox="0 0 24 24"]{width:1em;height:1em;display:inline-block;vertical-alig
   --sh-lg:0 4px 6px rgba(0,0,0,.07),0 10px 15px rgba(0,0,0,.1);
 }
 body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.6;min-height:100vh;}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
 
 /* AUTH */
 #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -33,7 +34,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 
 /* HEADER */
 .hdr{height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;position:sticky;top:0;z-index:100;}
-.hdr-menu-btn{display:none;width:32px;height:32px;padding:6px;border:1px solid transparent;border-radius:6px;background:none;color:var(--ink2);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0;}
+.hdr-menu-btn{display:none;width:44px;height:44px;padding:10px;border:1px solid transparent;border-radius:6px;background:none;color:var(--ink2);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0;}
 .hdr-menu-btn:hover{background:var(--bg);}
 .hdr-menu-btn svg{width:18px;height:18px;}
 .hdr-logo{width:28px;height:28px;border-radius:7px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--blue);color:#fff;font-size:14px;}
@@ -44,7 +45,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .ym-title{display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;padding:4px 8px;border-radius:var(--r);transition:background .12s;min-width:0;}
 .ym-title:hover{background:var(--bg);}
 .ym-title-text{font-size:18px;font-weight:700;white-space:nowrap;letter-spacing:-.02em;}
-.av{width:26px;height:26px;border-radius:50%;background:var(--blue-l);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;overflow:hidden;flex-shrink:0;cursor:pointer;}
+.av{width:44px;height:44px;border:0;padding:9px;border-radius:50%;background:var(--blue-l);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;overflow:hidden;flex-shrink:0;cursor:pointer;font-family:var(--sans);}
 .av:hover{box-shadow:0 0 0 2px var(--blue-l);}
 .av img{width:100%;height:100%;object-fit:cover;}
 
@@ -73,7 +74,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .cal-ym-header{font-size:20px;font-weight:700;padding:8px 14px;color:var(--ink);letter-spacing:-.02em;display:flex;align-items:center;justify-content:space-between;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);}
 #cal-ym-nav{display:flex;align-items:center;gap:8px;position:absolute;left:50%;transform:translateX(-50%);}
 .cal-ym-actions{display:flex;align-items:center;gap:6px;margin-left:auto;max-width:50%;justify-content:flex-end;}
-.cal-ym-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.cal-ym-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:44px;height:44px;cursor:pointer;font-size:18px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .cal-ym-nav-btn:hover{background:var(--border);}
 .cal-ym-section-label{font-size:20px;font-weight:700;color:var(--ink);white-space:nowrap;letter-spacing:-.02em;}
 .cal-view-nav{display:flex;align-items:center;gap:6px;padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);}
@@ -149,7 +150,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 .slot-detail-card.show{display:block;}
 .sdc-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--purple-l);border-bottom:1px solid var(--border);}
 .sdc-title{font-size:12px;font-weight:700;color:var(--purple);}
-.sdc-close{border:none;background:none;cursor:pointer;color:var(--purple);font-size:16px;padding:0 2px;}
+.sdc-close{width:44px;height:44px;border:none;background:none;cursor:pointer;color:var(--purple);font-size:16px;padding:0 2px;display:inline-flex;align-items:center;justify-content:center;}
 .sdc-body{padding:8px 12px;display:flex;flex-direction:column;gap:4px;}
 .sdc-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);}
 .sdc-row:last-child{border-bottom:none;}
@@ -338,7 +339,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 @keyframes m-in{from{opacity:0;transform:translateY(10px) scale(.98);}}
 .mhd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;}
 .mt{font-size:13px;font-weight:700;}
-.mx{width:26px;height:26px;border:none;background:none;border-radius:5px;cursor:pointer;font-size:16px;color:var(--ink2);display:flex;align-items:center;justify-content:center;line-height:1;}
+.mx{width:44px;height:44px;border:none;background:none;border-radius:5px;cursor:pointer;font-size:16px;color:var(--ink2);display:flex;align-items:center;justify-content:center;line-height:1;}
 .mx:hover{background:var(--surface2);}
 .mbd{padding:14px 16px;}
 .mft{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;position:sticky;bottom:0;background:var(--surface);}
@@ -669,7 +670,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
 /* 年月ピッカー（openMonthPicker）。.on＝いま選んでいる月／.today＝実際の今月 */
 .pk-ym-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
 .pk-ym-y{font-size:13px;font-weight:700;color:var(--ink);}
-.pk-ym-nav{width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink2);font-family:var(--sans);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.pk-ym-nav{width:44px;height:44px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink2);font-family:var(--sans);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .pk-ym-nav:hover{background:var(--bg);}
 .pk-ym-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
 .pk-ym-m{padding:9px 0;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;}
@@ -779,7 +780,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   .cal-ym-header{padding:6px 10px;flex-wrap:wrap;row-gap:6px;}
   .cal-ym-header #cal-ym-label{font-size:15px;font-weight:700;}
   .cal-ym-section-label{font-size:15px;}
-  .cal-ym-nav-btn{width:32px;height:32px;}
+  .cal-ym-nav-btn{width:44px;height:44px;}
   .cal-view-nav{padding:5px 10px;flex-wrap:wrap;row-gap:4px;}
   /* 560px 固定だと画面の大半を内側スクロールが占めてしまい、
      下のカードまで指が届きにくい。画面高に対する比率にする */
@@ -850,3 +851,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13p
   .sb.mobile-open{transform:translateX(0);visibility:visible;pointer-events:auto;transition-delay:0s;}
   body.sb-menu-open{overflow:hidden;}
 }
+
+@media (max-width:780px){
+  .btn,.cal-pub-mini,.cal-approve-mini,.cal-stage-secondary-link{min-height:44px;}
+  .cal-stage-secondary-link{padding:8px 6px;}
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
+}
+
+/* キーボード操作でも現在位置を見失わないよう、各コンポーネント固有の outline:none より後で定義する */
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
