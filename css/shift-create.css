@@ -112,7 +112,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 /* MAIN TABS */
 .main-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;flex-shrink:0;}
 #create-tools{display:flex;align-items:center;gap:6px;margin-right:8px;}
-.mtab{min-height:44px;padding:10px 16px;border:none;border-bottom:3px solid transparent;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);transition:all .15s;white-space:nowrap;}
+.mtab{padding:10px 16px;border:none;border-bottom:3px solid transparent;background:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--ink2);transition:all .15s;white-space:nowrap;}
 .mtab.on{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
 .mtab:hover:not(.on){color:var(--ink);background:var(--bg);}
 
@@ -370,7 +370,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .ymp.on{display:block;animation:t-up .18s ease;}
 .ymp-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;}
 .ymp-hd b{font-size:12px;}
-.ymp-nav{width:44px;height:44px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--ink2);cursor:pointer;font-size:14px;line-height:1;font-family:var(--sans);flex-shrink:0;}
+.ymp-nav{width:26px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--ink2);cursor:pointer;font-size:12px;line-height:1;font-family:var(--sans);flex-shrink:0;}
 .ymp-nav:hover{background:var(--bg);border-color:var(--purple);color:var(--purple);}
 .ymp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
 .ymp-grid button{padding:7px 0;font-size:11px;font-weight:700;font-family:var(--sans);border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink2);cursor:pointer;}
