@@ -16,7 +16,7 @@ const INTV_LIST  = [5,10,15,20,30];
 // 状態
 // ============================================================
 let currentPwType = 'normal'; // 'normal' | 'limited' | 'limited2' | ...
-let limitedSlots  = [];       // [{id:'limited', name:'限定PW'}, ...]
+let limitedSlots  = [];       // [{id, name, startDate, endDate, showNormalPw}, ...]
 const _initNow = new Date();
 const _nextM = new Date(_initNow.getFullYear(), _initNow.getMonth() + 1, 1);
 let curY  = _nextM.getFullYear();
@@ -527,23 +527,15 @@ function renderPwTypeTabs() {
   const isNormal = currentPwType === 'normal';
   let html = `<button type="button" class="pw-type-tab pw-tab-first${isNormal ? ' active normal-tab' : ''}" data-pw-type="normal">通常PW</button>`;
 
-  limitedSlots.forEach((slot, idx) => {
+  limitedSlots.forEach(slot => {
     const isActive = currentPwType === slot.id;
-    html += `<button type="button" class="pw-type-tab${isActive ? ' active' : ''}" data-pw-type="${escHtml(slot.id)}">${escHtml(slot.name)}<span class="lt-edit-ic" data-edit-pw="${escHtml(slot.id)}">${ic('pencil')}</span></button>`;
+    html += `<button type="button" class="pw-type-tab${isActive ? ' active' : ''}" data-pw-type="${escHtml(slot.id)}">${escHtml(slot.name)}</button>`;
   });
 
-  html += '<button type="button" class="pw-type-tab pw-tab-add" data-add-pw>＋</button>';
   bar.innerHTML = html;
   bar.querySelectorAll('[data-pw-type]').forEach(button => {
     button.addEventListener('click', () => switchPwType(button.dataset.pwType || 'normal'));
   });
-  bar.querySelectorAll('[data-edit-pw]').forEach(button => {
-    button.addEventListener('click', event => {
-      event.stopPropagation();
-      openEditLimitedSlotModal(button.dataset.editPw || '');
-    });
-  });
-  bar.querySelector('[data-add-pw]')?.addEventListener('click', openAddLimitedSlotModal);
 
   // 限定PW 対象メンバー管理ボタンの表示切り替え
   const btnLm = document.getElementById('btn-limited-members');
@@ -580,6 +572,53 @@ async function switchPwType(type) {
     setAdminSwitching(false);
     _adminSwitching = false;
   }
+}
+
+function normalizeLimitedDate(value) {
+  return String(value == null ? '' : value).replace(/\//g, '-').slice(0, 10);
+}
+
+function limitedSlotPeriodText(slot) {
+  const start = normalizeLimitedDate(slot && slot.startDate);
+  const end = normalizeLimitedDate(slot && slot.endDate);
+  if (!start && !end) return '無期限';
+  return `${start || '指定なし'} 〜 ${end || '指定なし'}`;
+}
+
+function validateLimitedSlotDates(startDate, endDate) {
+  if (startDate && endDate && startDate > endDate) {
+    toast('開始日は終了日以前の日付にしてください', 'e');
+    return false;
+  }
+  return true;
+}
+
+function openLimitedSettingsModal() {
+  renderLimitedSettings();
+  openM('m-limited-settings');
+}
+
+function renderLimitedSettings() {
+  const list = document.getElementById('limited-settings-list');
+  if (!list) return;
+  if (!limitedSlots.length) {
+    list.innerHTML = '<div style="padding:20px 8px;text-align:center;color:var(--ink3);font-size:13px;">限定PWが登録されていません</div>';
+    return;
+  }
+  list.innerHTML = limitedSlots.map(slot => {
+    const showNormal = slot.showNormalPw !== false;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);">${ic('lock')} ${esc(slot.name)}</div>
+        <div style="margin-top:3px;font-size:11px;color:var(--ink3);">利用期間：${esc(limitedSlotPeriodText(slot))}</div>
+      </div>
+      <span class="uic${showNormal ? ' on' : ''}" style="display:inline-block;cursor:default;">通常PW ${showNormal ? '表示' : '非表示'}</span>
+      <button type="button" class="btn btn-g" data-edit-limited-settings="${esc(slot.id)}">編集</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-edit-limited-settings]').forEach(button => {
+    button.addEventListener('click', () => openEditLimitedSlotModal(button.dataset.editLimitedSettings || ''));
+  });
 }
 
 // ============================================================
@@ -679,7 +718,10 @@ let _editingSlotId = null;
 let _addSlotSelectedMembers = new Map(); // uid -> {uid, name}
 
 function openAddLimitedSlotModal() {
+  closeM('m-limited-settings');
   document.getElementById('add-slot-name').value = '';
+  document.getElementById('add-slot-start-date').value = '';
+  document.getElementById('add-slot-end-date').value = '';
   document.getElementById('add-slot-show-normal')?.classList.add('on');
   document.getElementById('add-slot-member-search').value = '';
   _addSlotSelectedMembers = new Map();
@@ -747,6 +789,9 @@ async function confirmAddLimitedSlot() {
   const name = document.getElementById('add-slot-name').value.trim();
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
 
+  const startDate = normalizeLimitedDate(document.getElementById('add-slot-start-date').value);
+  const endDate = normalizeLimitedDate(document.getElementById('add-slot-end-date').value);
+  if (!validateLimitedSlotDates(startDate, endDate)) return;
   const showNormalPw = uiChipOn('add-slot-show-normal');
   const selectedMembers = [..._addSlotSelectedMembers.values()];
   const tasks = [{ id: 'slot', label: `${ic('lock')} 限定PW「${name}」を作成` }];
@@ -764,13 +809,21 @@ async function confirmAddLimitedSlot() {
 
   try {
     const res = await runStep('slot', async () => {
-      const r = await apiGet('addLimitedSlot', { name, showNormalPw });
+      const r = await apiGet('addLimitedSlot', { name, startDate, endDate, showNormalPw });
       if (!r.ok) throw new Error(r.error);
       return r;
     });
 
-    limitedSlots.push({ id: res.id, name: res.name, showNormalPw: res.showNormalPw !== false });
+    const slotName = res.name || name;
+    limitedSlots.push({
+      id: res.id,
+      name: slotName,
+      startDate: normalizeLimitedDate(res.startDate !== undefined ? res.startDate : startDate),
+      endDate: normalizeLimitedDate(res.endDate !== undefined ? res.endDate : endDate),
+      showNormalPw: res.showNormalPw !== false,
+    });
     renderPwTypeTabs();
+    renderLimitedSettings();
 
     if (selectedMembers.length > 0) {
       setProcStep('members', 'running');
@@ -783,17 +836,17 @@ async function confirmAddLimitedSlot() {
         setProcStep('members', 'err', `${failed}名失敗`);
         await new Promise(r => setTimeout(r, 600));
         hideProc();
-        toast(`「${res.name}」を追加しましたが、${failed}名の設定に失敗しました`, 'e');
+        toast(`「${slotName}」を追加しましたが、${failed}名の設定に失敗しました`, 'e');
       } else {
         setProcStep('members', 'done');
         await new Promise(r => setTimeout(r, 600));
         hideProc();
-        toast(`「${res.name}」を追加し、${selectedMembers.length}名のメンバーを設定しました`, 's');
+        toast(`「${slotName}」を追加し、${selectedMembers.length}名のメンバーを設定しました`, 's');
       }
     } else {
       await new Promise(r => setTimeout(r, 400));
       hideProc();
-      toast(`「${res.name}」を追加しました`, 's');
+      toast(`「${slotName}」を追加しました`, 's');
     }
   } catch (e) {
     hideProc();
@@ -805,7 +858,10 @@ function openEditLimitedSlotModal(id) {
   _editingSlotId = id;
   const slot = limitedSlots.find(s => s.id === id);
   if (!slot) return;
+  closeM('m-limited-settings');
   document.getElementById('edit-slot-name').value = slot.name;
+  document.getElementById('edit-slot-start-date').value = normalizeLimitedDate(slot.startDate);
+  document.getElementById('edit-slot-end-date').value = normalizeLimitedDate(slot.endDate);
   document.getElementById('edit-slot-show-normal')?.classList.toggle('on', slot.showNormalPw !== false);
   setVisible(document.getElementById('edit-slot-delete-btn'), true);
   openM('m-edit-limited-slot');
@@ -815,16 +871,28 @@ async function confirmUpdateLimitedSlot() {
   const name = document.getElementById('edit-slot-name').value.trim();
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
   if (!_editingSlotId) return;
+  const startDate = normalizeLimitedDate(document.getElementById('edit-slot-start-date').value);
+  const endDate = normalizeLimitedDate(document.getElementById('edit-slot-end-date').value);
+  if (!validateLimitedSlotDates(startDate, endDate)) return;
   const showNormalPw = uiChipOn('edit-slot-show-normal');
+  showProc('限定PWの設定を保存しています...', '少々お待ちください');
   try {
-    const res = await apiGet('updateLimitedSlot', { id: _editingSlotId, name, showNormalPw });
+    const res = await apiGet('updateLimitedSlot', { id: _editingSlotId, name, startDate, endDate, showNormalPw });
     if (!res.ok) throw new Error(res.error);
     const slot = limitedSlots.find(s => s.id === _editingSlotId);
-    if (slot) { slot.name = name; slot.showNormalPw = res.showNormalPw !== false; }
+    if (slot) {
+      slot.name = res.name !== undefined ? res.name : name;
+      slot.startDate = normalizeLimitedDate(res.startDate !== undefined ? res.startDate : startDate);
+      slot.endDate = normalizeLimitedDate(res.endDate !== undefined ? res.endDate : endDate);
+      slot.showNormalPw = res.showNormalPw !== undefined ? res.showNormalPw !== false : showNormalPw;
+    }
     renderPwTypeTabs();
+    renderLimitedSettings();
     closeM('m-edit-limited-slot');
+    hideProc();
     toast('限定PWの設定を保存しました', 's');
   } catch (e) {
+    hideProc();
     toast('保存失敗: ' + e.message, 'e');
   }
 }
@@ -866,6 +934,7 @@ async function confirmDeleteLimitedSlot() {
       currentPwType = limitedSlots.length > 0 ? limitedSlots[0].id : 'normal';
     }
     await loadAdminData();
+    renderLimitedSettings();
     hideProc();
     closeM('m-edit-limited-slot');
     toast('削除しました', 's');
