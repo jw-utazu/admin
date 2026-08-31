@@ -574,23 +574,64 @@ async function switchPwType(type) {
   }
 }
 
-function normalizeLimitedDate(value) {
-  return String(value == null ? '' : value).replace(/\//g, '-').slice(0, 10);
+function normalizeLimitedMonth(value) {
+  const raw = String(value == null ? '' : value).replace(/\//g, '-').trim();
+  if (!raw) return '';
+  const match = raw.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
+  return match ? `${match[1]}-${match[2]}` : '';
+}
+
+function limitedMonthToDate(value) {
+  const month = normalizeLimitedMonth(value);
+  return month ? `${month}-01` : '';
+}
+
+function limitedMonthLabel(value, fallback) {
+  const month = normalizeLimitedMonth(value);
+  if (!month) return fallback;
+  const [year, number] = month.split('-');
+  return `${year}年${Number(number)}月`;
 }
 
 function limitedSlotPeriodText(slot) {
-  const start = normalizeLimitedDate(slot && slot.startDate);
-  const end = normalizeLimitedDate(slot && slot.endDate);
+  const start = normalizeLimitedMonth(slot && slot.startDate);
+  const end = normalizeLimitedMonth(slot && slot.endDate);
   if (!start && !end) return '無期限';
-  return `${start || '指定なし'} 〜 ${end || '指定なし'}`;
+  return `${limitedMonthLabel(start, '指定なし')} 〜 ${limitedMonthLabel(end, '指定なし')}`;
 }
 
-function validateLimitedSlotDates(startDate, endDate) {
-  if (startDate && endDate && startDate > endDate) {
-    toast('開始日は終了日以前の日付にしてください', 'e');
+function validateLimitedSlotMonths(startMonth, endMonth) {
+  if (startMonth && endMonth && startMonth > endMonth) {
+    toast('開始月は終了月以前の月にしてください', 'e');
     return false;
   }
   return true;
+}
+
+function setLimitedMonth(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const month = normalizeLimitedMonth(value);
+  el.dataset.month = month;
+  el.textContent = limitedMonthLabel(month, id.includes('start') ? '開始月を選択' : '終了月を選択');
+}
+
+function clearLimitedMonth(id) {
+  setLimitedMonth(id, '');
+}
+
+function openLimitedMonthPicker(anchorEl) {
+  if (!anchorEl) return;
+  const current = normalizeLimitedMonth(anchorEl.dataset.month);
+  const now = new Date();
+  const year = current ? Number(current.slice(0, 4)) : now.getFullYear();
+  const month = current ? Number(current.slice(5, 7)) : now.getMonth() + 1;
+  openMonthPicker(anchorEl, {
+    title: anchorEl.id.includes('start') ? '利用開始月' : '利用終了月',
+    year, month,
+    note: '月単位で設定します',
+    onPick: (y, m) => setLimitedMonth(anchorEl.id, `${y}-${String(m).padStart(2, '0')}`),
+  });
 }
 
 function openLimitedSettingsModal() {
@@ -720,8 +761,8 @@ let _addSlotSelectedMembers = new Map(); // uid -> {uid, name}
 function openAddLimitedSlotModal() {
   closeM('m-limited-settings');
   document.getElementById('add-slot-name').value = '';
-  document.getElementById('add-slot-start-date').value = '';
-  document.getElementById('add-slot-end-date').value = '';
+  setLimitedMonth('add-slot-start-month', '');
+  setLimitedMonth('add-slot-end-month', '');
   document.getElementById('add-slot-show-normal')?.classList.add('on');
   document.getElementById('add-slot-member-search').value = '';
   _addSlotSelectedMembers = new Map();
@@ -789,9 +830,11 @@ async function confirmAddLimitedSlot() {
   const name = document.getElementById('add-slot-name').value.trim();
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
 
-  const startDate = normalizeLimitedDate(document.getElementById('add-slot-start-date').value);
-  const endDate = normalizeLimitedDate(document.getElementById('add-slot-end-date').value);
-  if (!validateLimitedSlotDates(startDate, endDate)) return;
+  const startMonth = document.getElementById('add-slot-start-month')?.dataset.month || '';
+  const endMonth = document.getElementById('add-slot-end-month')?.dataset.month || '';
+  if (!validateLimitedSlotMonths(startMonth, endMonth)) return;
+  const startDate = limitedMonthToDate(startMonth);
+  const endDate = limitedMonthToDate(endMonth);
   const showNormalPw = uiChipOn('add-slot-show-normal');
   const selectedMembers = [..._addSlotSelectedMembers.values()];
   const tasks = [{ id: 'slot', label: `${ic('lock')} 限定PW「${name}」を作成` }];
@@ -818,8 +861,8 @@ async function confirmAddLimitedSlot() {
     limitedSlots.push({
       id: res.id,
       name: slotName,
-      startDate: normalizeLimitedDate(res.startDate !== undefined ? res.startDate : startDate),
-      endDate: normalizeLimitedDate(res.endDate !== undefined ? res.endDate : endDate),
+      startDate: normalizeLimitedMonth(res.startDate !== undefined ? res.startDate : startDate),
+      endDate: normalizeLimitedMonth(res.endDate !== undefined ? res.endDate : endDate),
       showNormalPw: res.showNormalPw !== false,
     });
     renderPwTypeTabs();
@@ -860,8 +903,8 @@ function openEditLimitedSlotModal(id) {
   if (!slot) return;
   closeM('m-limited-settings');
   document.getElementById('edit-slot-name').value = slot.name;
-  document.getElementById('edit-slot-start-date').value = normalizeLimitedDate(slot.startDate);
-  document.getElementById('edit-slot-end-date').value = normalizeLimitedDate(slot.endDate);
+  setLimitedMonth('edit-slot-start-month', slot.startDate);
+  setLimitedMonth('edit-slot-end-month', slot.endDate);
   document.getElementById('edit-slot-show-normal')?.classList.toggle('on', slot.showNormalPw !== false);
   setVisible(document.getElementById('edit-slot-delete-btn'), true);
   openM('m-edit-limited-slot');
@@ -871,9 +914,11 @@ async function confirmUpdateLimitedSlot() {
   const name = document.getElementById('edit-slot-name').value.trim();
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
   if (!_editingSlotId) return;
-  const startDate = normalizeLimitedDate(document.getElementById('edit-slot-start-date').value);
-  const endDate = normalizeLimitedDate(document.getElementById('edit-slot-end-date').value);
-  if (!validateLimitedSlotDates(startDate, endDate)) return;
+  const startMonth = document.getElementById('edit-slot-start-month')?.dataset.month || '';
+  const endMonth = document.getElementById('edit-slot-end-month')?.dataset.month || '';
+  if (!validateLimitedSlotMonths(startMonth, endMonth)) return;
+  const startDate = limitedMonthToDate(startMonth);
+  const endDate = limitedMonthToDate(endMonth);
   const showNormalPw = uiChipOn('edit-slot-show-normal');
   showProc('限定PWの設定を保存しています...', '少々お待ちください');
   try {
@@ -882,8 +927,8 @@ async function confirmUpdateLimitedSlot() {
     const slot = limitedSlots.find(s => s.id === _editingSlotId);
     if (slot) {
       slot.name = res.name !== undefined ? res.name : name;
-      slot.startDate = normalizeLimitedDate(res.startDate !== undefined ? res.startDate : startDate);
-      slot.endDate = normalizeLimitedDate(res.endDate !== undefined ? res.endDate : endDate);
+      slot.startDate = normalizeLimitedMonth(res.startDate !== undefined ? res.startDate : startDate);
+      slot.endDate = normalizeLimitedMonth(res.endDate !== undefined ? res.endDate : endDate);
       slot.showNormalPw = res.showNormalPw !== undefined ? res.showNormalPw !== false : showNormalPw;
     }
     renderPwTypeTabs();

@@ -335,11 +335,17 @@
         <input type="text" id="add-slot-name" class="finp" placeholder="例：スペシャルPW・奉仕者B PW" maxlength="20" />
       </div>
       <div class="fg" style="margin-top:12px;">
-        <label class="fl">利用期間（未入力は無期限）</label>
+        <label class="fl">利用期間（月単位・未設定は無期限）</label>
         <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;">
-          <input type="date" id="add-slot-start-date" class="finp" aria-label="利用開始日">
+          <div style="min-width:0;">
+            <button type="button" class="cal-ym-pick" id="add-slot-start-month" data-month="" onclick="openLimitedMonthPicker(this)" style="width:100%;justify-content:space-between;">開始月を選択</button>
+            <button type="button" class="btn btn-g" onclick="clearLimitedMonth('add-slot-start-month')" style="margin-top:4px;padding:3px 8px;font-size:11px;">解除</button>
+          </div>
           <span style="font-size:12px;color:var(--ink3);">〜</span>
-          <input type="date" id="add-slot-end-date" class="finp" aria-label="利用終了日">
+          <div style="min-width:0;">
+            <button type="button" class="cal-ym-pick" id="add-slot-end-month" data-month="" onclick="openLimitedMonthPicker(this)" style="width:100%;justify-content:space-between;">終了月を選択</button>
+            <button type="button" class="btn btn-g" onclick="clearLimitedMonth('add-slot-end-month')" style="margin-top:4px;padding:3px 8px;font-size:11px;">解除</button>
+          </div>
         </div>
       </div>
       <div class="fg" style="margin-top:12px;">
@@ -372,11 +378,17 @@
         <input type="text" id="edit-slot-name" class="finp" maxlength="20" />
       </div>
       <div class="fg" style="margin-top:12px;">
-        <label class="fl">利用期間（未入力は無期限）</label>
+        <label class="fl">利用期間（月単位・未設定は無期限）</label>
         <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;">
-          <input type="date" id="edit-slot-start-date" class="finp" aria-label="利用開始日">
+          <div style="min-width:0;">
+            <button type="button" class="cal-ym-pick" id="edit-slot-start-month" data-month="" onclick="openLimitedMonthPicker(this)" style="width:100%;justify-content:space-between;">開始月を選択</button>
+            <button type="button" class="btn btn-g" onclick="clearLimitedMonth('edit-slot-start-month')" style="margin-top:4px;padding:3px 8px;font-size:11px;">解除</button>
+          </div>
           <span style="font-size:12px;color:var(--ink3);">〜</span>
-          <input type="date" id="edit-slot-end-date" class="finp" aria-label="利用終了日">
+          <div style="min-width:0;">
+            <button type="button" class="cal-ym-pick" id="edit-slot-end-month" data-month="" onclick="openLimitedMonthPicker(this)" style="width:100%;justify-content:space-between;">終了月を選択</button>
+            <button type="button" class="btn btn-g" onclick="clearLimitedMonth('edit-slot-end-month')" style="margin-top:4px;padding:3px 8px;font-size:11px;">解除</button>
+          </div>
         </div>
       </div>
       <div class="fg" style="margin-top:12px;">
@@ -702,6 +714,6 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=80"></script>
+<script src="js/index.js?v=81"></script>
 </body>
 </html>
