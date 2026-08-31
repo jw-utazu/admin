@@ -680,6 +680,7 @@ let _addSlotSelectedMembers = new Map(); // uid -> {uid, name}
 
 function openAddLimitedSlotModal() {
   document.getElementById('add-slot-name').value = '';
+  document.getElementById('add-slot-show-normal')?.classList.add('on');
   document.getElementById('add-slot-member-search').value = '';
   _addSlotSelectedMembers = new Map();
   document.getElementById('add-slot-selected-count').textContent = '';
@@ -746,6 +747,7 @@ async function confirmAddLimitedSlot() {
   const name = document.getElementById('add-slot-name').value.trim();
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
 
+  const showNormalPw = uiChipOn('add-slot-show-normal');
   const selectedMembers = [..._addSlotSelectedMembers.values()];
   const tasks = [{ id: 'slot', label: `${ic('lock')} 限定PW「${name}」を作成` }];
   if (selectedMembers.length > 0) tasks.push({ id: 'members', label: `${ic('users')} メンバー設定（${selectedMembers.length}名）` });
@@ -762,12 +764,12 @@ async function confirmAddLimitedSlot() {
 
   try {
     const res = await runStep('slot', async () => {
-      const r = await apiGet('addLimitedSlot', { name });
+      const r = await apiGet('addLimitedSlot', { name, showNormalPw });
       if (!r.ok) throw new Error(r.error);
       return r;
     });
 
-    limitedSlots.push({ id: res.id, name: res.name });
+    limitedSlots.push({ id: res.id, name: res.name, showNormalPw: res.showNormalPw !== false });
     renderPwTypeTabs();
 
     if (selectedMembers.length > 0) {
@@ -804,6 +806,7 @@ function openEditLimitedSlotModal(id) {
   const slot = limitedSlots.find(s => s.id === id);
   if (!slot) return;
   document.getElementById('edit-slot-name').value = slot.name;
+  document.getElementById('edit-slot-show-normal')?.classList.toggle('on', slot.showNormalPw !== false);
   setVisible(document.getElementById('edit-slot-delete-btn'), true);
   openM('m-edit-limited-slot');
 }
@@ -812,14 +815,15 @@ async function confirmUpdateLimitedSlot() {
   const name = document.getElementById('edit-slot-name').value.trim();
   if (!name) { toast('タブ名を入力してください', 'e'); return; }
   if (!_editingSlotId) return;
+  const showNormalPw = uiChipOn('edit-slot-show-normal');
   try {
-    const res = await apiGet('updateLimitedSlot', { id: _editingSlotId, name });
+    const res = await apiGet('updateLimitedSlot', { id: _editingSlotId, name, showNormalPw });
     if (!res.ok) throw new Error(res.error);
     const slot = limitedSlots.find(s => s.id === _editingSlotId);
-    if (slot) slot.name = name;
+    if (slot) { slot.name = name; slot.showNormalPw = res.showNormalPw !== false; }
     renderPwTypeTabs();
     closeM('m-edit-limited-slot');
-    toast('タブ名を変更しました', 's');
+    toast('限定PWの設定を保存しました', 's');
   } catch (e) {
     toast('保存失敗: ' + e.message, 'e');
   }
