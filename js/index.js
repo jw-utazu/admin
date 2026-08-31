@@ -16,7 +16,7 @@ const INTV_LIST  = [5,10,15,20,30];
 // 状態
 // ============================================================
 let currentPwType = 'normal'; // 'normal' | 'limited' | 'limited2' | ...
-let limitedSlots  = [];       // [{id, name, startDate, endDate, showNormalPw}, ...]
+let limitedSlots  = [];       // [{id, name, startDate, endDate, showNormalPw, showNormalSchedule}, ...]
 const _initNow = new Date();
 const _nextM = new Date(_initNow.getFullYear(), _initNow.getMonth() + 1, 1);
 let curY  = _nextM.getFullYear();
@@ -699,12 +699,14 @@ function renderLimitedSettings() {
   }
   list.innerHTML = limitedSlots.map(slot => {
     const showNormal = slot.showNormalPw !== false;
+    const showNormalSchedule = slot.showNormalSchedule !== false;
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:700;color:var(--ink);">${ic('lock')} ${esc(slot.name)}</div>
         <div style="margin-top:3px;font-size:11px;color:var(--ink3);">利用期間：${esc(limitedSlotPeriodText(slot))}</div>
       </div>
-      <span class="uic${showNormal ? ' on' : ''}" style="display:inline-block;cursor:default;">通常PW ${showNormal ? '表示' : '非表示'}</span>
+      <span class="uic${showNormal ? ' on' : ''}" style="display:inline-block;cursor:default;">通常PWタブ：${showNormal ? '表示' : '非表示'}</span>
+      <span class="uic${showNormalSchedule ? ' on' : ''}" style="display:inline-block;cursor:default;">通常PW日程：${showNormalSchedule ? '表示' : '非表示'}</span>
       <button type="button" class="btn btn-g" data-edit-limited-settings="${esc(slot.id)}">編集</button>
     </div>`;
   }).join('');
@@ -815,6 +817,7 @@ function openAddLimitedSlotModal() {
   setLimitedMonth('add-slot-start-month', '');
   setLimitedMonth('add-slot-end-month', '');
   document.getElementById('add-slot-show-normal')?.classList.add('on');
+  document.getElementById('add-slot-show-normal-schedule')?.classList.add('on');
   document.getElementById('add-slot-member-search').value = '';
   _addSlotSelectedMembers = new Map();
   document.getElementById('add-slot-selected-count').textContent = '';
@@ -887,6 +890,7 @@ async function confirmAddLimitedSlot() {
   const startDate = limitedMonthToDate(startMonth);
   const endDate = limitedMonthToDate(endMonth);
   const showNormalPw = uiChipOn('add-slot-show-normal');
+  const showNormalSchedule = uiChipOn('add-slot-show-normal-schedule');
   const selectedMembers = [..._addSlotSelectedMembers.values()];
   const tasks = [{ id: 'slot', label: `${ic('lock')} 限定PW「${name}」を作成` }];
   if (selectedMembers.length > 0) tasks.push({ id: 'members', label: `${ic('users')} メンバー設定（${selectedMembers.length}名）` });
@@ -903,7 +907,7 @@ async function confirmAddLimitedSlot() {
 
   try {
     const res = await runStep('slot', async () => {
-      const r = await apiGet('addLimitedSlot', { name, startDate, endDate, showNormalPw });
+      const r = await apiGet('addLimitedSlot', { name, startDate, endDate, showNormalPw, showNormalSchedule });
       if (!r.ok) throw new Error(r.error);
       return r;
     });
@@ -915,6 +919,7 @@ async function confirmAddLimitedSlot() {
       startDate: normalizeLimitedMonth(res.startDate !== undefined ? res.startDate : startDate),
       endDate: normalizeLimitedMonth(res.endDate !== undefined ? res.endDate : endDate),
       showNormalPw: res.showNormalPw !== false,
+      showNormalSchedule: res.showNormalSchedule !== false,
     });
     renderPwTypeTabs();
     renderLimitedSettings();
@@ -957,6 +962,7 @@ function openEditLimitedSlotModal(id) {
   setLimitedMonth('edit-slot-start-month', slot.startDate);
   setLimitedMonth('edit-slot-end-month', slot.endDate);
   document.getElementById('edit-slot-show-normal')?.classList.toggle('on', slot.showNormalPw !== false);
+  document.getElementById('edit-slot-show-normal-schedule')?.classList.toggle('on', slot.showNormalSchedule !== false);
   setVisible(document.getElementById('edit-slot-delete-btn'), true);
   openM('m-edit-limited-slot');
 }
@@ -971,9 +977,10 @@ async function confirmUpdateLimitedSlot() {
   const startDate = limitedMonthToDate(startMonth);
   const endDate = limitedMonthToDate(endMonth);
   const showNormalPw = uiChipOn('edit-slot-show-normal');
+  const showNormalSchedule = uiChipOn('edit-slot-show-normal-schedule');
   showProc('限定PWの設定を保存しています...', '少々お待ちください');
   try {
-    const res = await apiGet('updateLimitedSlot', { id: _editingSlotId, name, startDate, endDate, showNormalPw });
+    const res = await apiGet('updateLimitedSlot', { id: _editingSlotId, name, startDate, endDate, showNormalPw, showNormalSchedule });
     if (!res.ok) throw new Error(res.error);
     const slot = limitedSlots.find(s => s.id === _editingSlotId);
     if (slot) {
@@ -981,6 +988,7 @@ async function confirmUpdateLimitedSlot() {
       slot.startDate = normalizeLimitedMonth(res.startDate !== undefined ? res.startDate : startDate);
       slot.endDate = normalizeLimitedMonth(res.endDate !== undefined ? res.endDate : endDate);
       slot.showNormalPw = res.showNormalPw !== undefined ? res.showNormalPw !== false : showNormalPw;
+      slot.showNormalSchedule = res.showNormalSchedule !== undefined ? res.showNormalSchedule !== false : showNormalSchedule;
     }
     renderPwTypeTabs();
     renderLimitedSettings();

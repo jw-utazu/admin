@@ -356,6 +356,13 @@
         <div style="margin-top:2px;font-size:12px;color:var(--ink3);">オフにすると、この限定PWの対象者には通常PWタブを表示しません。</div>
       </div>
       <div class="fg" style="margin-top:12px;">
+        <label class="fl">通常PW日程の表示</label>
+        <div class="uic-row">
+          <button type="button" class="uic lg on" id="add-slot-show-normal-schedule" data-chip="add-slot-show-normal-schedule" onclick="uiChipToggle(this)">通常PWの日程を表示する</button>
+        </div>
+        <div style="margin-top:2px;font-size:12px;color:var(--ink3);">オフにすると、限定PW画面のカレンダーに通常PWの日程を表示しません。</div>
+      </div>
+      <div class="fg" style="margin-top:12px;">
         <label class="fl">対象メンバー（任意）</label>
         <input type="text" id="add-slot-member-search" class="finp" placeholder="氏名で絞り込み..." oninput="filterAddSlotPicker()" style="margin-bottom:6px;" />
         <div id="add-slot-picker-list" style="border:1px solid var(--border);border-radius:6px;"></div>
@@ -397,6 +404,13 @@
           <button type="button" class="uic lg on" id="edit-slot-show-normal" data-chip="edit-slot-show-normal" onclick="uiChipToggle(this)">通常PWを表示する</button>
         </div>
         <div style="margin-top:2px;font-size:12px;color:var(--ink3);">オフにすると、この限定PWの対象者には通常PWタブを表示しません。</div>
+      </div>
+      <div class="fg" style="margin-top:12px;">
+        <label class="fl">通常PW日程の表示</label>
+        <div class="uic-row">
+          <button type="button" class="uic lg on" id="edit-slot-show-normal-schedule" data-chip="edit-slot-show-normal-schedule" onclick="uiChipToggle(this)">通常PWの日程を表示する</button>
+        </div>
+        <div style="margin-top:2px;font-size:12px;color:var(--ink3);">オフにすると、限定PW画面のカレンダーに通常PWの日程を表示しません。</div>
       </div>
     </div>
     <div class="mft">
@@ -714,6 +728,6 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=82"></script>
+<script src="js/index.js?v=83"></script>
 </body>
 </html>
