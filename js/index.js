@@ -700,14 +700,16 @@ function renderLimitedSettings() {
   list.innerHTML = limitedSlots.map(slot => {
     const showNormal = slot.showNormalPw !== false;
     const showNormalSchedule = slot.showNormalSchedule !== false;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-      <div style="flex:1;min-width:0;">
+    return `<div class="limited-setting-row">
+      <div class="limited-setting-main">
         <div style="font-size:13px;font-weight:700;color:var(--ink);">${ic('lock')} ${esc(slot.name)}</div>
         <div style="margin-top:3px;font-size:11px;color:var(--ink3);">利用期間：${esc(limitedSlotPeriodText(slot))}</div>
       </div>
-      <span class="uic${showNormal ? ' on' : ''}" style="display:inline-block;cursor:default;">通常PWタブ：${showNormal ? '表示' : '非表示'}</span>
-      <span class="uic${showNormalSchedule ? ' on' : ''}" style="display:inline-block;cursor:default;">通常PW日程：${showNormalSchedule ? '表示' : '非表示'}</span>
-      <button type="button" class="btn btn-g" data-edit-limited-settings="${esc(slot.id)}">編集</button>
+      <div class="limited-setting-actions">
+        <span class="uic${showNormal ? ' on' : ''}">通常PWタブ：${showNormal ? '表示' : '非表示'}</span>
+        <span class="uic${showNormalSchedule ? ' on' : ''}">通常PW日程：${showNormalSchedule ? '表示' : '非表示'}</span>
+        <button type="button" class="btn btn-g" data-edit-limited-settings="${esc(slot.id)}">編集</button>
+      </div>
     </div>`;
   }).join('');
   list.querySelectorAll('[data-edit-limited-settings]').forEach(button => {

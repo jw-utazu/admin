@@ -343,6 +343,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .mx:hover{background:var(--surface2);}
 .mbd{padding:14px 16px;}
 .mft{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end;position:sticky;bottom:0;background:var(--surface);}
+.limited-setting-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.limited-setting-main{flex:1;min-width:0;}
+.limited-setting-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;flex-shrink:0;}
+.limited-setting-actions .uic{display:inline-block;cursor:default;}
 
 /* Steps */
 .steps{display:flex;align-items:center;margin-bottom:14px;}
@@ -817,6 +821,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .member-row{padding:8px 10px;flex-wrap:wrap;}
   .rec-card-actions .btn{padding:7px 12px;}
   .rec-otp-code{font-size:34px;}
+  .limited-setting-row{display:block;}
+  .limited-setting-main{margin-bottom:8px;}
+  .limited-setting-actions{justify-content:flex-start;gap:6px;}
 
   /* ===== ログ ===== */
   /* 幅が足りず日時と本文が潰れ合うので、日時を上の行に逃がす */
