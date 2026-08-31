@@ -358,7 +358,16 @@ function updYmTitle() {
 }
 function updCalViewLabel() {
   const el = document.getElementById('cal-view-label');
-  if(el) el.textContent = calY+'年'+calM+'月';
+  const period = currentLimitedCalendarPeriod();
+  const fixed = !!(period && period.finite);
+  if (el) {
+    el.disabled = fixed;
+    el.textContent = fixed
+      ? limitedMonthLabel(period.start, '') + '〜' + limitedMonthLabel(period.end, '')
+      : calY + '年' + calM + '月';
+  }
+  document.querySelectorAll('#cal-view-nav-bar .cal-ym-nav-btn')
+    .forEach(button => { button.disabled = fixed; });
 }
 // 年月の表示そのものを押して対象年月を選ぶ。
 // ‹ › の送りだけだと数ヶ月先へ行くのに何度も押すことになるため
@@ -371,6 +380,8 @@ function openYmPicker(el) {
 
 // 限定PWのカレンダー表示月（対象年月とは別物。表示を送るだけ）
 function openCalViewPicker(el) {
+  const period = currentLimitedCalendarPeriod();
+  if (period && period.finite) return;
   openMonthPicker(el, {
     title: 'カレンダー表示月', year: calY, month: calM,
     note: '表示する月を変えるだけで、対象年月は変わりません',
@@ -379,22 +390,31 @@ function openCalViewPicker(el) {
 }
 
 // ============================================================
-// カレンダースクロール（当月から6ヶ月分表示）
+// カレンダースクロール
 // ============================================================
 function buildCalScroll() {
   const area = document.getElementById('cal-scroll-area');
   area.innerHTML = '';
   updCalViewLabel();
-  // 通常PW: 前月 + 管理月の2ヶ月固定 / 限定PW: calY/calM から6ヶ月
+  // 通常PW: 前月 + 管理月の2ヶ月固定
+  // 限定PW: 開始月・終了月が両方あれば、その期間をすべて表示。
+  // 片側未設定／無期限の場合は、従来どおり表示月から6ヶ月。
   const months = [];
   if (currentPwType === 'normal') {
     months.push(prevMonth(curY, curM));
     months.push({y: curY, m: curM});
   } else {
-    let my = calY, mm = calM;
-    for (let i = 0; i < 6; i++) {
-      months.push({y: my, m: mm});
-      if (mm === 12) { my++; mm = 1; } else { mm++; }
+    const period = currentLimitedCalendarPeriod();
+    if (period && period.finite) {
+      for (let index = period.startIndex; index <= period.endIndex; index++) {
+        months.push(limitedMonthFromIndex(index));
+      }
+    } else {
+      let my = calY, mm = calM;
+      for (let i = 0; i < 6; i++) {
+        months.push({y: my, m: mm});
+        if (mm === 12) { my++; mm = 1; } else { mm++; }
+      }
     }
   }
   months.forEach(({y,m}) => {
@@ -444,6 +464,8 @@ async function setYm(y, m) {
   }
 }
 function chCalM(dir) {
+  const period = currentLimitedCalendarPeriod();
+  if (period && period.finite) return;
   calM += dir;
   if (calM > 12) { calM = 1; calY++; }
   if (calM < 1)  { calM = 12; calY--; }
@@ -598,6 +620,35 @@ function limitedSlotPeriodText(slot) {
   const end = normalizeLimitedMonth(slot && slot.endDate);
   if (!start && !end) return '無期限';
   return `${limitedMonthLabel(start, '指定なし')} 〜 ${limitedMonthLabel(end, '指定なし')}`;
+}
+
+function limitedMonthIndex(value) {
+  const month = normalizeLimitedMonth(value);
+  if (!month) return null;
+  const [year, number] = month.split('-').map(Number);
+  return year * 12 + number - 1;
+}
+
+function limitedMonthFromIndex(index) {
+  const year = Math.floor(index / 12);
+  const month = index % 12 + 1;
+  return { y: year, m: month };
+}
+
+function currentLimitedCalendarPeriod() {
+  if (currentPwType === 'normal') return null;
+  const slot = limitedSlots.find(item => item.id === currentPwType);
+  const start = normalizeLimitedMonth(slot && slot.startDate);
+  const end = normalizeLimitedMonth(slot && slot.endDate);
+  const startIndex = limitedMonthIndex(start);
+  const endIndex = limitedMonthIndex(end);
+  return {
+    start,
+    end,
+    startIndex,
+    endIndex,
+    finite: startIndex !== null && endIndex !== null && startIndex <= endIndex,
+  };
 }
 
 function validateLimitedSlotMonths(startMonth, endMonth) {
@@ -933,6 +984,7 @@ async function confirmUpdateLimitedSlot() {
     }
     renderPwTypeTabs();
     renderLimitedSettings();
+    if (currentPwType === _editingSlotId) buildCalScroll();
     closeM('m-edit-limited-slot');
     hideProc();
     toast('限定PWの設定を保存しました', 's');
