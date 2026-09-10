@@ -1,0 +1,959 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>区域割り当て管理</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --ink: #18181b; --ink2: #52525b; --ink3: #a1a1aa;
+    --bg: #f4f4f5; --surface: #fff; --surface2: #fafafa;
+    --border: #e4e4e7; --border2: #d4d4d8;
+    --blue: #2563eb; --blue-l: #eff6ff; --blue-d: #1d4ed8;
+    --green: #16a34a; --green-l: #f0fdf4;
+    --amber: #d97706; --amber-l: #fffbeb;
+    --red: #dc2626; --red-l: #fef2f2;
+    --purple: #7c3aed; --purple-l: #f5f3ff;
+    --teal: #0d9488; --teal-l: #f0fdfa;
+    --stock: #52525b; --stock-l: #f4f4f5;
+    --r: 8px; --r-lg: 12px;
+    --sh: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1);
+    --sh-lg: 0 4px 6px rgba(0,0,0,.07), 0 10px 15px rgba(0,0,0,.1);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e4e4e7; --ink2: #a1a1aa; --ink3: #71717a;
+      --bg: #0f1115; --surface: #1a1d23; --surface2: #20242b;
+      --border: #2c313a; --border2: #3a4049;
+      --blue: #5b8def; --blue-l: #1b2a44; --blue-d: #7aa4f5;
+      --green: #4ade80; --green-l: #14261c;
+      --amber: #f0b429; --amber-l: #33280f;
+      --red: #f87171; --red-l: #341717;
+      --purple: #a78bfa; --purple-l: #251d3a;
+      --teal: #2dd4bf; --teal-l: #102926;
+      --stock: #a1a1aa; --stock-l: #24272e;
+      --sh: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.35);
+      --sh-lg: 0 4px 6px rgba(0,0,0,.35), 0 10px 15px rgba(0,0,0,.4);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e4e4e7; --ink2: #a1a1aa; --ink3: #71717a;
+    --bg: #0f1115; --surface: #1a1d23; --surface2: #20242b;
+    --border: #2c313a; --border2: #3a4049;
+    --blue: #5b8def; --blue-l: #1b2a44; --blue-d: #7aa4f5;
+    --green: #4ade80; --green-l: #14261c;
+    --amber: #f0b429; --amber-l: #33280f;
+    --red: #f87171; --red-l: #341717;
+    --purple: #a78bfa; --purple-l: #251d3a;
+    --teal: #2dd4bf; --teal-l: #102926;
+    --stock: #a1a1aa; --stock-l: #24272e;
+    --sh: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.35);
+    --sh-lg: 0 4px 6px rgba(0,0,0,.35), 0 10px 15px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+  button { font-family: inherit; }
+  table { font-variant-numeric: tabular-nums; }
+  input, select { font-family: inherit; }
+
+  /* ---- header ---- */
+  .hdr {
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .hdr-logo {
+    width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--blue); color: #fff; font-size: 13px; font-weight: 800;
+  }
+  .hdr-titles { display: flex; flex-direction: column; gap: 0; margin-right: auto; }
+  .hdr-eyebrow { font-size: 10px; letter-spacing: .06em; color: var(--ink3); }
+  .hdr-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .hdr-stat {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    background: var(--surface2); color: var(--ink2); white-space: nowrap;
+  }
+  .hdr-stat b { color: var(--blue); font-weight: 800; }
+
+  /* ---- layout ---- */
+  .layout { display: grid; grid-template-columns: 1fr 280px; align-items: start; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .sb { border-left: none; border-top: 1px solid var(--border); }
+  }
+  main.cp { padding: 20px; min-width: 0; }
+  .sb {
+    border-left: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 18px;
+    position: sticky; top: 52px;
+    height: calc(100vh - 52px);
+    overflow-y: auto;
+  }
+
+  .plbl { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: var(--ink3); text-transform: uppercase; margin-bottom: 8px; padding: 0 2px; }
+  .ag { display: flex; flex-direction: column; gap: 6px; }
+  .abtn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 10px 10px;
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    background: var(--surface); cursor: pointer; text-align: left;
+    font-family: inherit; color: inherit;
+  }
+  .abtn:hover { border-color: var(--border2); background: var(--surface2); }
+  .abtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .ab-ic {
+    width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .ab-tx { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+  .ab-n { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+  .ab-d { font-size: 11px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ab-ar { color: var(--ink3); font-size: 15px; flex-shrink: 0; }
+  .sb-foot { font-size: 10.5px; color: var(--ink3); line-height: 1.7; padding: 0 2px; }
+
+  /* ---- dashboard ---- */
+  .pagehead { margin-bottom: 18px; display: flex; flex-direction: column; gap: 3px; }
+  .pagehead .eyebrow { font-size: 10.5px; letter-spacing: .06em; color: var(--blue); text-transform: uppercase; font-weight: 700; }
+  .pagehead h1 { font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
+  .pagehead p { margin: 1px 0 0; color: var(--ink2); font-size: 12.5px; max-width: 64ch; }
+
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .grid { display: grid; gap: 12px; }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 720px) { .grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 14px 16px; box-shadow: var(--sh);
+  }
+  .tile { display: flex; flex-direction: column; gap: 5px; }
+  .tile .tl { font-size: 10.5px; letter-spacing: .04em; color: var(--ink3); text-transform: uppercase; font-weight: 700; }
+  .tile .tv { font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
+  .tile .ts { font-size: 11px; color: var(--ink3); }
+
+  .section-title {
+    font-size: 12px; font-weight: 800; letter-spacing: .01em; color: var(--ink);
+    margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap;
+  }
+  .chip.stock { background: var(--stock-l); color: var(--stock); }
+  .chip.active { background: var(--blue-l); color: var(--blue); }
+  .chip.pending { background: var(--amber-l); color: var(--amber); }
+  .chip.good { background: var(--green-l); color: var(--green); }
+  .chip.critical { background: var(--red-l); color: var(--red); }
+  .chip.plain { background: var(--surface2); color: var(--ink3); border: 1px solid var(--border); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 8px 9px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink3); font-weight: 700; }
+  tbody tr:hover { background: var(--surface2); }
+  .table-wrap { overflow-x: auto; border-radius: var(--r); }
+  .empty-note { color: var(--ink3); font-size: 12px; padding: 16px; text-align: center; }
+
+  .pack {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 6px; background: var(--surface2);
+    border: 1px solid var(--border); font-weight: 800; font-size: 11px; flex: none;
+  }
+
+  select, input[type="text"], input[type="date"], input[type="number"] {
+    font-size: 12.5px; padding: 6px 8px; border-radius: var(--r);
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  }
+  select:focus, input:focus, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  label { font-size: 11px; color: var(--ink2); display: flex; flex-direction: column; gap: 3px; }
+  .field-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+
+  .banner {
+    display: flex; gap: 9px; align-items: flex-start; padding: 10px 12px;
+    border-radius: var(--r); background: var(--amber-l); color: var(--amber);
+    font-size: 12px; border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+  }
+  .banner b { color: inherit; }
+  .banner a { color: inherit; }
+
+  /* ---- buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 12px; border-radius: var(--r); border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--border2); }
+  .btn-p { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn-p:hover { background: var(--blue-d); border-color: var(--blue-d); }
+  .btn-g { background: var(--surface2); color: var(--ink2); }
+  .btn-d { background: var(--red-l); color: var(--red); border-color: var(--red-l); }
+  .btn-d:hover { border-color: var(--red); }
+  .btn.small { padding: 4px 9px; font-size: 11.5px; }
+  .btn[disabled] { opacity: .4; cursor: not-allowed; }
+
+  /* ---- filter tabs (used inside modals) ---- */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .tb {
+    padding: 7px 11px; border: none; border-bottom: 2px solid transparent;
+    background: none; font-family: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer; color: var(--ink2);
+  }
+  .tb.on { color: var(--blue); border-bottom-color: var(--blue); font-weight: 700; }
+
+  /* ---- modals ---- */
+  .ov {
+    display: none; position: fixed; inset: 0; background: rgba(15,17,21,.5);
+    align-items: flex-start; justify-content: center; padding: 5vh 16px; z-index: 500; overflow-y: auto;
+  }
+  .ov.show { display: flex; }
+  .ov.confirm-ov { z-index: 900; align-items: center; }
+  .modal {
+    background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-lg);
+    width: 100%; max-width: 720px; display: flex; flex-direction: column; max-height: 90vh;
+  }
+  .modal.sm { max-width: 460px; }
+  .confirm-msg { white-space: pre-wrap; font-size: 12.5px; color: var(--ink2); line-height: 1.7; margin: 0; }
+  .mhd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .mt { font-size: 14px; font-weight: 800; }
+  .mx {
+    border: none; background: none; cursor: pointer; color: var(--ink3);
+    font-size: 15px; padding: 4px; line-height: 1; border-radius: 6px;
+  }
+  .mx:hover { background: var(--surface2); color: var(--ink); }
+  .mbd { padding: 16px 18px; overflow-y: auto; }
+  .mft {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+  }
+  .mft.spread { justify-content: space-between; }
+
+  .adj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; }
+  .adj-cell {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 7px 4px; border-radius: var(--r); border: 1px solid var(--border);
+    font-size: 12px; cursor: pointer; user-select: none; background: var(--surface2);
+  }
+  .adj-cell.on { background: var(--blue-l); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+  .adj-cell.self { opacity: .3; cursor: default; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 100px;
+    font-size: 12px; font-weight: 700; box-shadow: var(--sh-lg);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease; z-index: 700;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* PW_GWS共通ログインの確認が終わるまで、区域データを表示しない */
+  html.area-auth-pending body > * { visibility: hidden; }
+  html.area-auth-pending body::before {
+    content: "認証を確認しています…";
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg); color: var(--ink2);
+    font-size: 14px; font-weight: 700;
+    visibility: visible;
+  }
+</style>
+<script>document.documentElement.classList.add("area-auth-pending");</script>
+
+<header class="hdr">
+  <div class="hdr-logo">区</div>
+  <div class="hdr-titles">
+    <span class="hdr-eyebrow">宇多津・坂出</span>
+    <span class="hdr-name">区域割り当て管理</span>
+  </div>
+  <div class="hdr-stat" id="hdrStat">--</div>
+</header>
+
+<div class="layout">
+  <main class="cp" id="main"></main>
+  <aside class="sb">
+    <div>
+      <div class="plbl">区域の操作</div>
+      <div class="ag" id="sbActions"></div>
+    </div>
+    <div class="sb-foot" id="sbFoot"></div>
+  </aside>
+</div>
+
+<!-- 区域一覧・割当操作 -->
+<div class="ov" id="ov-territories">
+  <div class="modal">
+    <div class="mhd"><span class="mt">📋 区域一覧・割当操作</span><button class="mx" onclick="closeModal()">&#10005;</button></div>
+    <div class="mbd" id="mbd-territories"></div>
+    <div class="mft"><button class="btn btn-g" onclick="closeModal()">閉じる</button></div>
+  </div>
+</div>
+
+<!-- 隣接関係 -->
+<div class="ov" id="ov-adjacency">
+  <div class="modal">
+    <div class="mhd"><span class="mt">🗺 隣接関係</span><button class="mx" onclick="closeModal()">&#10005;</button></div>
+    <div class="mbd" id="mbd-adjacency"></div>
+    <div class="mft"><button class="btn btn-g" onclick="closeModal()">閉じる</button></div>
+  </div>
+</div>
+
+<!-- プール管理 -->
+<div class="ov" id="ov-pools">
+  <div class="modal">
+    <div class="mhd"><span class="mt">📦 プール管理</span><button class="mx" onclick="closeModal()">&#10005;</button></div>
+    <div class="mbd" id="mbd-pools"></div>
+    <div class="mft"><button class="btn btn-g" onclick="closeModal()">閉じる</button></div>
+  </div>
+</div>
+
+<!-- グループ管理 -->
+<div class="ov" id="ov-groups">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">👥 グループ管理</span><button class="mx" onclick="closeModal()">&#10005;</button></div>
+    <div class="mbd" id="mbd-groups"></div>
+    <div class="mft spread">
+      <button class="btn" onclick="addGroup()">＋ グループを追加</button>
+      <button class="btn btn-g" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- バックアップ -->
+<div class="ov" id="ov-backup">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt">💾 バックアップ</span><button class="mx" onclick="closeModal()">&#10005;</button></div>
+    <div class="mbd" id="mbd-backup"></div>
+    <div class="mft"><button class="btn btn-g" onclick="closeModal()">閉じる</button></div>
+  </div>
+</div>
+
+<!-- 確認ダイアログ（サンドボックス内では window.confirm が使えないため自前で用意） -->
+<div class="ov confirm-ov" id="ov-confirm">
+  <div class="modal sm">
+    <div class="mhd"><span class="mt" id="confirmTitle">確認</span><button class="mx" onclick="confirmNo()">&#10005;</button></div>
+    <div class="mbd"><p class="confirm-msg" id="confirmMsg"></p></div>
+    <div class="mft">
+      <button class="btn btn-g" onclick="confirmNo()">キャンセル</button>
+      <button class="btn btn-p" id="confirmYesBtn" onclick="confirmYes()">実行する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../js/session.js?v=7"></script>
+<script src="../js/api.js?v=10"></script>
+<script>
+(function () {
+  "use strict";
+
+  // admin / shift-form と同じセッションを使い、区域係の管理者だけを通す。
+  // 権限はlocalStorageを信用せず、既存Supabase APIへ毎回確認する。
+  window.areaAccessReady = (async function () {
+    if (typeof pwgwsEnforceRelogin === "function" && pwgwsEnforceRelogin()) {
+      if (typeof pwgwsGoToLogin === "function") pwgwsGoToLogin();
+      return false;
+    }
+
+    var recoveryToken = typeof pwgwsGetRecoveryToken === "function" ? pwgwsGetRecoveryToken() : "";
+    var session = typeof pwgwsGetSession === "function" ? pwgwsGetSession() : null;
+    if (!recoveryToken && !session) {
+      if (typeof pwgwsGoToLogin === "function") pwgwsGoToLogin();
+      return false;
+    }
+
+    try {
+      var auth = recoveryToken
+        ? await apiPost({ action: "validateRecoverySession" })
+        : await apiAuthGet("", "admin");
+      if (!auth || !auth.ok || !auth.isAdmin) {
+        if (typeof PWGWS_FORM_URL !== "undefined" && PWGWS_FORM_URL) {
+          location.replace(PWGWS_FORM_URL);
+        } else if (typeof pwgwsGoToLogin === "function") {
+          pwgwsGoToLogin("区域係管理画面を利用する権限がありません。");
+        }
+        return false;
+      }
+      document.documentElement.classList.remove("area-auth-pending");
+      return true;
+    } catch (e) {
+      document.documentElement.classList.remove("area-auth-pending");
+      document.body.innerHTML =
+        '<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);color:var(--ink);font-family:inherit">' +
+        '<div style="max-width:420px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--sh-lg)">' +
+        '<h1 style="font-size:18px;margin:0 0 10px">認証を確認できませんでした</h1>' +
+        '<p style="margin:0 0 16px;color:var(--ink2);font-size:13px">通信状態を確認して、もう一度お試しください。</p>' +
+        '<button type="button" onclick="location.reload()" style="padding:9px 16px;border:0;border-radius:8px;background:var(--blue);color:#fff;font:inherit;font-weight:700;cursor:pointer">再読み込み</button>' +
+        '</div></main>';
+      return false;
+    }
+  })();
+})();
+</script>
+<script>
+window.areaAccessReady.then(function (areaAccessGranted) {
+  if (!areaAccessGranted) return;
+  (function () {
+  "use strict";
+
+  var STORAGE_KEY = "utazu-territory-app:v1";
+  var TOTAL_TERRITORIES = 42;
+
+  var PURPOSE_LABEL = { normal: "通常", patrol: "巡回訪問", joint: "合同奉仕", campaign: "キャンペーン確保" };
+
+  // 2026-07-30時点で目視確認済みの隣接関係（利用者のバックアップデータより）。区域42（瀬居）は陸続きの隣接なし。
+  var VERIFIED_ADJACENCY = {
+    1: [2,3], 2: [1,3,4,5], 3: [1,2,5,6,8], 4: [2,5,9], 5: [2,3,4,6,7,9,15],
+    6: [3,5,7,8], 7: [5,6,8,15], 8: [3,6,7,15,18], 9: [4,5,10,15], 10: [9,11,15],
+    11: [10,12,13,14,15,16,17,27], 12: [11,13,14], 13: [11,12,14,32,33], 14: [11,12,13,38,39],
+    15: [5,7,8,9,10,11,18], 16: [11,17,18,19,20,21], 17: [11,16,21,22,26], 18: [8,15,16,19],
+    19: [16,18,20], 20: [16,19,21], 21: [16,17,20,22], 22: [17,21,23,24,26], 23: [22,24,25],
+    24: [22,23,25,26,29,30], 25: [23,24,30,41], 26: [17,22,24,27,28,29], 27: [11,26,28,32],
+    28: [26,27,29,30,31,32], 29: [24,26,28,30], 30: [24,25,28,29,31,41], 31: [28,30,32,41],
+    32: [13,27,28,31,33,34], 33: [13,32,34,35], 34: [32,33,35], 35: [33,34,36,37],
+    36: [35,37], 37: [35,36], 38: [14,39,40], 39: [14,38,40], 40: [38,39,41], 41: [25,30,31,40],
+    42: []
+  };
+
+  function defaultState() {
+    var groups = [
+      { id: "g1", name: "青の山", targetActiveCount: 3 },
+      { id: "g2", name: "川津", targetActiveCount: 3 },
+      { id: "g3", name: "浜", targetActiveCount: 3 },
+      { id: "g4", name: "瀬居", targetActiveCount: 3 }
+    ];
+    var territories = [];
+    for (var i = 1; i <= TOTAL_TERRITORIES; i++) {
+      territories.push({
+        id: i, area: "", adjacentIds: (VERIFIED_ADJACENCY[i] || []).slice(), purpose: "normal", status: "stock",
+        currentGroupId: null, assignedDate: null, dueDate: null, collectedDate: null,
+        note: "", history: []
+      });
+    }
+    return { groups: groups, territories: territories, setupDismissed: false };
+  }
+
+  var state = loadState();
+  var ui = {
+    openModal: null,
+    territoryFilter: "all",
+    assignGroupId: state.groups[0] ? state.groups[0].id : null,
+    manualActivateId: null,
+    adjSelected: 1
+  };
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.territories) || !Array.isArray(parsed.groups)) return defaultState();
+      return parsed;
+    } catch (e) { return defaultState(); }
+  }
+
+  function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+  function esc(s) {
+    return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+  function addMonths(iso, months) {
+    var d = new Date(iso + "T00:00:00");
+    var day = d.getDate();
+    d.setMonth(d.getMonth() + months);
+    if (d.getDate() < day) d.setDate(0);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function daysBetween(fromISO, toISO) {
+    var a = new Date(fromISO + "T00:00:00");
+    var b = new Date(toISO + "T00:00:00");
+    return Math.round((b - a) / 86400000);
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    var p = iso.split("-");
+    return p[0].slice(2) + "/" + p[1] + "/" + p[2];
+  }
+
+  function findTerritory(id) {
+    id = Number(id);
+    for (var i = 0; i < state.territories.length; i++) if (state.territories[i].id === id) return state.territories[i];
+    return null;
+  }
+  function findGroup(id) {
+    for (var i = 0; i < state.groups.length; i++) if (state.groups[i].id === id) return state.groups[i];
+    return null;
+  }
+  function groupName(id) { var g = findGroup(id); return g ? g.name : "未割当"; }
+  function activeTerritories() { return state.territories.filter(function (t) { return t.status === "active"; }); }
+  // id -> currentGroupId のマップ。同一グループ内の隣接は許容し、別グループとの隣接のみを競合とみなすため、
+  // どのグループが使用中かを判定できるようにしている。
+  function activeGroupMap() {
+    var m = {};
+    activeTerritories().forEach(function (t) { m[t.id] = t.currentGroupId; });
+    return m;
+  }
+  function isAdjacentToActive(territory, groupMap, targetGroupId) {
+    var conflict = false;
+    function isOtherGroup(id) {
+      return Object.prototype.hasOwnProperty.call(groupMap, id) && groupMap[id] !== targetGroupId;
+    }
+    territory.adjacentIds.forEach(function (aid) { if (isOtherGroup(aid)) conflict = true; });
+    state.territories.forEach(function (t) {
+      if (isOtherGroup(t.id) && t.adjacentIds.indexOf(territory.id) !== -1) conflict = true;
+    });
+    return conflict;
+  }
+
+  function toast(msg) {
+    var el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.classList.remove("show"); }, 2200);
+  }
+
+  // window.confirm() はArtifactのサンドボックスiframe内では表示されず常にfalseを返すため、
+  // 自前のモーダルで確認フローを実装する。
+  var pendingConfirm = null;
+  window.showConfirm = function (message, onYes) {
+    pendingConfirm = onYes;
+    document.getElementById("confirmMsg").textContent = message;
+    document.getElementById("ov-confirm").classList.add("show");
+  };
+  window.confirmYes = function () {
+    var fn = pendingConfirm;
+    pendingConfirm = null;
+    document.getElementById("ov-confirm").classList.remove("show");
+    if (fn) fn();
+  };
+  window.confirmNo = function () {
+    pendingConfirm = null;
+    document.getElementById("ov-confirm").classList.remove("show");
+  };
+
+  // ---------- mutations ----------
+
+  window.openModal = function (id) { ui.openModal = id; render(); };
+  window.closeModal = function () { ui.openModal = null; ui.manualActivateId = null; render(); };
+
+  window.setTerritoryFilter = function (f) { ui.territoryFilter = f; render(); };
+
+  window.setArea = function (id, area) { var t = findTerritory(id); if (!t) return; t.area = area; saveState(); };
+  window.setNote = function (id, note) { var t = findTerritory(id); if (!t) return; t.note = note; saveState(); };
+  window.setPurpose = function (id, purpose) {
+    var t = findTerritory(id); if (!t) return;
+    t.purpose = purpose; saveState(); render();
+    toast("区域 " + id + " の用途を「" + PURPOSE_LABEL[purpose] + "」に変更しました");
+  };
+
+  window.markActiveManually = function (id) { ui.manualActivateId = id; render(); };
+  window.cancelManualActivate = function () { ui.manualActivateId = null; render(); };
+  window.confirmManualActivate = function (id) {
+    var t = findTerritory(id); if (!t) return;
+    var groupSel = document.getElementById("manualGroupSelect");
+    var dateSel = document.getElementById("manualDateInput");
+    var gid = groupSel ? groupSel.value : null;
+    var date = dateSel ? dateSel.value : todayISO();
+    if (!gid) { toast("グループを選択してください"); return; }
+    t.status = "active"; t.currentGroupId = gid; t.assignedDate = date;
+    t.dueDate = addMonths(date, 3); t.collectedDate = null;
+    ui.manualActivateId = null; saveState(); render();
+    toast("区域 " + id + " を「" + groupName(gid) + "」の割当中に設定しました");
+  };
+
+  window.selectAssignGroup = function (gid) { ui.assignGroupId = gid; render(); };
+
+  window.assignTerritory = function (id) {
+    var t = findTerritory(id); if (!t || t.status !== "stock") return;
+    var dateInput = document.getElementById("assignDate_" + id);
+    var date = (dateInput && dateInput.value) || todayISO();
+    var gid = ui.assignGroupId;
+    if (!gid) { toast("先に割当先グループを選択してください"); return; }
+    t.status = "active"; t.currentGroupId = gid; t.assignedDate = date; t.dueDate = addMonths(date, 3);
+    saveState(); render();
+    toast("区域 " + id + " を「" + groupName(gid) + "」に割り当てました（期限 " + fmtDate(t.dueDate) + "）");
+  };
+
+  window.startReturn = function (id) {
+    var t = findTerritory(id); if (!t || t.status !== "active") return;
+    t.status = "pending"; saveState(); render();
+    toast("区域 " + id + " を回収待ちにしました");
+  };
+  window.undoReturn = function (id) {
+    var t = findTerritory(id); if (!t || t.status !== "pending") return;
+    t.status = "active"; saveState(); render();
+  };
+  window.completeReturn = function (id) {
+    var t = findTerritory(id); if (!t || t.status !== "pending") return;
+    var dateInput = document.getElementById("returnDate_" + id);
+    var date = (dateInput && dateInput.value) || todayISO();
+    t.history.unshift({
+      groupId: t.currentGroupId, startDate: t.assignedDate, endDate: date,
+      days: t.assignedDate ? daysBetween(t.assignedDate, date) : null, exchangeTerritoryId: null
+    });
+    t.collectedDate = date; t.status = "stock"; t.currentGroupId = null; t.assignedDate = null; t.dueDate = null;
+    saveState(); render();
+    toast("区域 " + id + " の回収を記録し、ストックに戻しました");
+  };
+
+  window.toggleAdjSelect = function (id) { ui.adjSelected = Number(id); render(); };
+  window.toggleAdjacent = function (otherId) {
+    var t = findTerritory(ui.adjSelected), o = findTerritory(otherId);
+    if (!t || !o || t.id === o.id) return;
+    var idx = t.adjacentIds.indexOf(o.id);
+    if (idx === -1) {
+      t.adjacentIds.push(o.id);
+      if (o.adjacentIds.indexOf(t.id) === -1) o.adjacentIds.push(t.id);
+    } else {
+      t.adjacentIds.splice(idx, 1);
+      var oidx = o.adjacentIds.indexOf(t.id);
+      if (oidx !== -1) o.adjacentIds.splice(oidx, 1);
+    }
+    saveState(); render();
+  };
+
+  window.applyVerifiedAdjacency = function () {
+    showConfirm(
+      "2026-07-30時点で目視確認済みの隣接データ（区域1〜41）を適用します。\n\n" +
+      "現在登録済みの隣接関係はすべて上書きされます。よろしいですか？",
+      function () {
+        state.territories.forEach(function (t) {
+          t.adjacentIds = (VERIFIED_ADJACENCY[t.id] || []).slice();
+        });
+        saveState(); render();
+        toast("確認済みの隣接データを適用しました");
+      }
+    );
+  };
+
+  window.updateGroupName = function (gid, name) { var g = findGroup(gid); if (!g) return; g.name = name; saveState(); };
+  window.updateGroupTarget = function (gid, val) {
+    var g = findGroup(gid); if (!g) return;
+    g.targetActiveCount = Math.max(0, Number(val) || 0); saveState(); render();
+  };
+  window.addGroup = function () {
+    state.groups.push({ id: "g" + Date.now(), name: "新規グループ", targetActiveCount: 3 });
+    saveState(); render();
+  };
+  window.removeGroup = function (gid) {
+    var activeCount = state.territories.filter(function (t) { return t.currentGroupId === gid; }).length;
+    var msg = activeCount > 0
+      ? "このグループには現在 " + activeCount + " 区域が割り当てられています。削除すると割当情報が「未割当」表示になります。削除しますか？"
+      : "グループ「" + groupName(gid) + "」を削除しますか？";
+    showConfirm(msg, function () {
+      state.groups = state.groups.filter(function (g) { return g.id !== gid; });
+      if (ui.assignGroupId === gid) ui.assignGroupId = state.groups[0] ? state.groups[0].id : null;
+      saveState(); render();
+    });
+  };
+
+  window.exportBackup = function () {
+    var data = JSON.stringify(state, null, 2);
+    var filename = "territory-backup-" + todayISO() + ".json";
+    if (window.claude && window.claude.downloads) {
+      window.claude.downloads.save({ filename: filename, data: data })
+        .then(function () { toast("バックアップを書き出しました"); })
+        .catch(function () { toast("書き出しに失敗しました"); });
+    } else { toast("この環境ではダウンロード機能を利用できません"); }
+  };
+  window.importBackup = function (input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(reader.result);
+        if (!parsed || !Array.isArray(parsed.territories) || !Array.isArray(parsed.groups)) {
+          toast("ファイルの形式が正しくありません"); return;
+        }
+        showConfirm("現在のデータを、読み込んだバックアップで上書きします。よろしいですか？", function () {
+          state = parsed; saveState(); render();
+          toast("バックアップを読み込みました");
+        });
+      } catch (e) { toast("読み込みに失敗しました"); }
+    };
+    reader.readAsText(file);
+    input.value = "";
+  };
+  window.resetAll = function () {
+    showConfirm("全データを初期状態（42区域すべてストック）にリセットします。元に戻せません。よろしいですか？", function () {
+      state = defaultState(); saveState(); render();
+      toast("初期状態にリセットしました");
+    });
+  };
+  window.dismissSetup = function () { state.setupDismissed = true; saveState(); render(); };
+
+  // ---------- render ----------
+
+  function render() {
+    renderHeader();
+    renderSidebar();
+    document.getElementById("main").innerHTML = renderDashboard();
+    renderModals();
+  }
+
+  function renderHeader() {
+    var stock = state.territories.filter(function (t) { return t.status === "stock"; }).length;
+    var active = state.territories.filter(function (t) { return t.status === "active"; }).length;
+    document.getElementById("hdrStat").innerHTML =
+      "全" + TOTAL_TERRITORIES + "区域 ・ 割当中 <b>" + active + "</b> ・ ストック <b>" + stock + "</b>";
+  }
+
+  function renderSidebar() {
+    var pendingCount = state.territories.filter(function (t) { return t.status === "pending"; }).length;
+    var stockCount = state.territories.filter(function (t) { return t.status === "stock" && t.purpose === "normal"; }).length;
+    var actions = [
+      { id: "territories", icon: "📋", iconBg: "var(--blue-l)", iconColor: "var(--blue)", name: "区域一覧・割当操作",
+        desc: "割当 " + activeTerritories().length + "・ストック " + stockCount + "・回収待ち " + pendingCount },
+      { id: "adjacency", icon: "🗺", iconBg: "var(--purple-l)", iconColor: "var(--purple)", name: "隣接関係",
+        desc: "区域どうしの隣接を登録" },
+      { id: "pools", icon: "📦", iconBg: "var(--teal-l)", iconColor: "var(--teal)", name: "プール管理",
+        desc: "巡回訪問・合同奉仕・確保区域" },
+      { id: "groups", icon: "👥", iconBg: "var(--green-l)", iconColor: "var(--green)", name: "グループ管理",
+        desc: state.groups.length + "グループ・目標保持数の設定" },
+      { id: "backup", icon: "💾", iconBg: "var(--amber-l)", iconColor: "var(--amber)", name: "バックアップ",
+        desc: "書き出し・読み込み・初期化" }
+    ];
+    document.getElementById("sbActions").innerHTML = actions.map(function (a) {
+      return '<button class="abtn" onclick="openModal(\'' + a.id + '\')">' +
+        '<div class="ab-ic" style="background:' + a.iconBg + ';color:' + a.iconColor + ';">' + a.icon + '</div>' +
+        '<div class="ab-tx"><span class="ab-n">' + esc(a.name) + '</span><span class="ab-d">' + esc(a.desc) + '</span></div>' +
+        '<span class="ab-ar">›</span></button>';
+    }).join("");
+    document.getElementById("sbFoot").innerHTML = "このブラウザ（localStorage）に自動保存されます。他端末へ移す場合は「バックアップ」から書き出してください。";
+  }
+
+  function statusChip(t) {
+    if (t.status === "stock") return '<span class="chip stock">ストック</span>';
+    if (t.status === "pending") return '<span class="chip pending">回収待ち</span>';
+    var rd = t.dueDate ? daysBetween(todayISO(), t.dueDate) : null;
+    if (rd !== null && rd < 0) return '<span class="chip critical">期限超過</span>';
+    if (rd !== null && rd <= 14) return '<span class="chip pending">残り' + rd + "日</span>";
+    return '<span class="chip active">割当中</span>';
+  }
+  function purposeChip(p) {
+    if (p === "normal") return "";
+    var cls = p === "campaign" ? "pending" : "plain";
+    return '<span class="chip ' + cls + '">' + esc(PURPOSE_LABEL[p]) + "</span>";
+  }
+
+  // ---- dashboard (always visible main content) ----
+  function renderDashboard() {
+    var groupTiles = state.groups.map(function (g) {
+      var count = state.territories.filter(function (t) { return t.status === "active" && t.currentGroupId === g.id; }).length;
+      var diff = count - g.targetActiveCount;
+      var subCls = diff < 0 ? "chip pending" : diff > 0 ? "chip plain" : "chip good";
+      var subText = diff === 0 ? "目標通り" : (diff > 0 ? "目標より+" + diff : "目標まであと" + (-diff));
+      return '<div class="card tile"><span class="tl">' + esc(g.name) + '</span><span class="tv">' + count + " / " + g.targetActiveCount + '</span><span class="' + subCls + '">' + subText + "</span></div>";
+    }).join("");
+
+    var stock = state.territories.filter(function (t) { return t.status === "stock" && t.purpose === "normal"; }).length;
+    var pending = state.territories.filter(function (t) { return t.status === "pending"; }).length;
+    var patrol = state.territories.filter(function (t) { return t.purpose === "patrol"; }).length;
+    var joint = state.territories.filter(function (t) { return t.purpose === "joint"; }).length;
+
+    var poolTiles = '<div class="card tile"><span class="tl">通常ストック</span><span class="tv">' + stock + '</span><span class="ts">すぐ割当可能</span></div>' +
+      '<div class="card tile"><span class="tl">回収待ち</span><span class="tv">' + pending + '</span><span class="ts">回収完了日の入力待ち</span></div>' +
+      '<div class="card tile"><span class="tl">巡回訪問確保</span><span class="tv">' + patrol + '</span></div>' +
+      '<div class="card tile"><span class="tl">合同奉仕確保</span><span class="tv">' + joint + '</span></div>';
+
+    var due = activeTerritories().map(function (t) {
+      var rd = t.dueDate ? daysBetween(todayISO(), t.dueDate) : 9999;
+      return { t: t, rd: rd };
+    }).filter(function (x) { return x.rd <= 21; }).sort(function (a, b) { return a.rd - b.rd; });
+
+    var dueRows = due.length ? due.map(function (x) {
+      var badge = x.rd < 0 ? '<span class="chip critical">期限超過 ' + (-x.rd) + "日</span>" : '<span class="chip pending">残り' + x.rd + "日</span>";
+      return "<tr><td><span class=\"pack\">" + x.t.id + '</span></td><td>' + esc(groupName(x.t.currentGroupId)) + "</td><td>" + fmtDate(x.t.assignedDate) + "</td><td>" + fmtDate(x.t.dueDate) + "</td><td>" + badge + "</td></tr>";
+    }).join("") : '<tr><td colspan="5" class="empty-note">期限が近い区域はありません</td></tr>';
+
+    var pendingList = state.territories.filter(function (t) { return t.status === "pending"; });
+    var pendingRows = pendingList.length ? pendingList.map(function (t) {
+      return "<tr><td><span class=\"pack\">" + t.id + '</span></td><td>' + esc(groupName(t.currentGroupId)) + "</td><td>" + fmtDate(t.assignedDate) + "</td><td><button class=\"btn small\" onclick=\"openModal('territories');setTerritoryFilter('pending')\">回収処理へ</button></td></tr>";
+    }).join("") : '<tr><td colspan="4" class="empty-note">回収待ちの区域はありません</td></tr>';
+
+    var banner = state.setupDismissed ? "" :
+      '<div class="banner" style="margin-bottom:16px"><span>&#9888;</span><div>' +
+      "<b>初期セットアップの案内：</b> 全区域はいったん「ストック」で読み込まれています。現在すでに使用中の区域は" +
+      '「区域一覧・割当操作」から <b>割当中に設定</b> してください。また「隣接関係」で区域どうしの隣接を登録すると、' +
+      "新規割当時に自動でチェックされます。 " +
+      '<a href="#" onclick="dismissSetup();return false;">この案内を閉じる</a></div></div>';
+
+    return '<div class="pagehead"><span class="eyebrow">Overview</span><h1>ダッシュボード</h1><p>グループごとの保持数と、期限が近い区域・回収待ちの区域をひと目で確認できます。操作は右のカードから行ってください。</p></div>' +
+      banner +
+      '<div class="stack">' +
+      '<div><div class="section-title">グループ別 保持数</div><div class="grid cols-4">' + groupTiles + "</div></div>" +
+      '<div><div class="section-title">プール状況</div><div class="grid cols-4">' + poolTiles + "</div></div>" +
+      '<div class="card"><div class="section-title">期限が近い区域（21日以内）</div><div class="table-wrap"><table><thead><tr><th>区域</th><th>グループ</th><th>開始日</th><th>期限</th><th>状態</th></tr></thead><tbody>' + dueRows + "</tbody></table></div></div>" +
+      '<div class="card"><div class="section-title">回収待ちの区域</div><div class="table-wrap"><table><thead><tr><th>区域</th><th>グループ</th><th>開始日</th><th></th></tr></thead><tbody>' + pendingRows + "</tbody></table></div></div>" +
+      "</div>";
+  }
+
+  // ---- modal bodies ----
+  function renderModals() {
+    ["territories", "adjacency", "pools", "groups", "backup"].forEach(function (id) {
+      var ov = document.getElementById("ov-" + id);
+      if (ui.openModal === id) {
+        ov.classList.add("show");
+        document.getElementById("mbd-" + id).innerHTML = MODAL_BODY[id]();
+      } else {
+        ov.classList.remove("show");
+      }
+    });
+  }
+
+  var MODAL_BODY = {
+    territories: function () {
+      var filters = [
+        { id: "all", label: "すべて" },
+        { id: "stock", label: "ストック" },
+        { id: "active", label: "割当中" },
+        { id: "pending", label: "回収待ち" }
+      ];
+      var tabs = filters.map(function (f) {
+        return '<button class="tb' + (ui.territoryFilter === f.id ? " on" : "") + '" onclick="setTerritoryFilter(\'' + f.id + '\')">' + f.label + "</button>";
+      }).join("");
+
+      var groupMap = activeGroupMap();
+      var groupOpts = state.groups.map(function (g) {
+        return '<option value="' + g.id + '"' + (ui.assignGroupId === g.id ? " selected" : "") + '>' + esc(g.name) + "</option>";
+      }).join("");
+
+      var list = state.territories.filter(function (t) {
+        return ui.territoryFilter === "all" || t.status === ui.territoryFilter;
+      });
+
+      var rows = list.map(function (t) {
+        var manualRow = "";
+        if (ui.manualActivateId === t.id) {
+          manualRow = '<tr><td colspan="7"><div class="field-row">' +
+            '<label>グループ<select id="manualGroupSelect">' + groupOpts + "</select></label>" +
+            '<label>開始日<input type="date" id="manualDateInput" value="' + todayISO() + '"></label>' +
+            '<button class="btn btn-p small" onclick="confirmManualActivate(' + t.id + ')">設定する</button>' +
+            '<button class="btn small" onclick="cancelManualActivate()">取消</button>' +
+            "</div></td></tr>";
+        }
+
+        var action;
+        if (t.status === "stock") {
+          var conflict = isAdjacentToActive(t, groupMap, ui.assignGroupId);
+          action = '<div class="field-row">' +
+            (conflict ? '<span class="chip pending">別グループと隣接</span>' : '') +
+            '<input type="date" id="assignDate_' + t.id + '" value="' + todayISO() + '" style="width:122px">' +
+            '<button class="btn btn-p small" onclick="assignTerritory(' + t.id + ')">割当する</button>' +
+            '<button class="btn small" onclick="markActiveManually(' + t.id + ')">手動設定</button>' +
+            "</div>";
+        } else if (t.status === "active") {
+          action = '<button class="btn small" onclick="startReturn(' + t.id + ')">回収待ちへ</button>';
+        } else {
+          action = '<div class="field-row">' +
+            '<input type="date" id="returnDate_' + t.id + '" value="' + todayISO() + '" style="width:122px">' +
+            '<button class="btn btn-p small" onclick="completeReturn(' + t.id + ')">回収完了</button>' +
+            '<button class="btn small" onclick="undoReturn(' + t.id + ')">戻す</button>' +
+            "</div>";
+        }
+
+        return "<tr><td><span class=\"pack\">" + t.id + "</span></td><td>" + statusChip(t) + " " + purposeChip(t.purpose) + "</td>" +
+          "<td>" + esc(groupName(t.currentGroupId)) + "</td>" +
+          "<td>" + fmtDate(t.assignedDate) + "</td><td>" + fmtDate(t.dueDate) + "</td>" +
+          "<td>" + t.adjacentIds.length + "件</td>" +
+          "<td>" + action + "</td></tr>" + manualRow;
+      }).join("");
+
+      if (!list.length) rows = '<tr><td colspan="7" class="empty-note">該当する区域はありません</td></tr>';
+
+      return '<div class="tabs">' + tabs + "</div>" +
+        '<div class="field-row" style="margin-bottom:12px"><label>新規割当の割当先グループ<select onchange="selectAssignGroup(this.value)">' + groupOpts + "</select></label></div>" +
+        '<div class="table-wrap"><table><thead><tr><th>区域</th><th>状態</th><th>グループ</th><th>開始日</th><th>期限</th><th>隣接</th><th>操作</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+    },
+
+    adjacency: function () {
+      var t = findTerritory(ui.adjSelected);
+      var picker = state.territories.map(function (x) {
+        return '<button class="btn small' + (ui.adjSelected === x.id ? " btn-p" : "") + '" onclick="toggleAdjSelect(' + x.id + ')">' + x.id + "</button>";
+      }).join(" ");
+      var grid = state.territories.map(function (x) {
+        if (x.id === t.id) return '<div class="adj-cell self">' + x.id + "</div>";
+        var on = t.adjacentIds.indexOf(x.id) !== -1;
+        return '<div class="adj-cell' + (on ? " on" : "") + '" onclick="toggleAdjacent(' + x.id + ')">' + x.id + "</div>";
+      }).join("");
+      return '<p style="margin:0 0 10px;color:var(--ink2);font-size:12.5px">区域番号を選び、実際に隣接する区域をクリックしてON/OFFします。一方を設定すると自動で双方向に反映されます。</p>' +
+        '<div class="banner" style="margin-bottom:14px;background:var(--blue-l);color:var(--blue);border-color:color-mix(in srgb, var(--blue) 35%, transparent)"><span>&#9989;</span><div>' +
+        '<b>確認済みの隣接データ：</b> 2026-07-30時点で目視確認済みの隣接関係（区域1〜41）を用意しています。新規・未設定のブラウザでは自動的にこの内容が初期値になります。現在の登録をこの確認済みデータで上書きしたい場合は下のボタンから適用できます。' +
+        '<div style="margin-top:8px"><button class="btn small" onclick="applyVerifiedAdjacency()">確認済みデータを適用（現在の登録を上書き）</button></div></div></div>' +
+        '<div class="section-title">区域を選択</div><div class="field-row" style="flex-wrap:wrap;margin-bottom:16px">' + picker + "</div>" +
+        '<div class="section-title">区域 ' + t.id + ' の隣接区域（' + t.adjacentIds.length + '件選択中）</div><div class="adj-grid">' + grid + "</div>";
+    },
+
+    pools: function () {
+      var rows = state.territories.map(function (t) {
+        var opts = Object.keys(PURPOSE_LABEL).map(function (k) {
+          return '<option value="' + k + '"' + (t.purpose === k ? " selected" : "") + ">" + PURPOSE_LABEL[k] + "</option>";
+        }).join("");
+        return "<tr><td><span class=\"pack\">" + t.id + "</span></td><td>" + statusChip(t) + '</td><td><select onchange="setPurpose(' + t.id + ', this.value)">' + opts + "</select></td>" +
+          '<td><input type="text" value="' + esc(t.area) + '" placeholder="宇多津 / 坂出" onchange="setArea(' + t.id + ', this.value)" style="width:120px"></td>' +
+          '<td><input type="text" value="' + esc(t.note) + '" placeholder="メモ" onchange="setNote(' + t.id + ', this.value)" style="width:160px"></td></tr>';
+      }).join("");
+      return '<p style="margin:0 0 12px;color:var(--ink2);font-size:12.5px">通常割当以外に確保しておく区域（巡回訪問・合同奉仕・9月キャンペーン確保）を指定します。通常以外の用途は新規割当の候補から除外されます。</p>' +
+        '<div class="table-wrap"><table><thead><tr><th>区域</th><th>状態</th><th>用途</th><th>地域</th><th>メモ</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+    },
+
+    groups: function () {
+      var rows = state.groups.map(function (g) {
+        var count = state.territories.filter(function (t) { return t.status === "active" && t.currentGroupId === g.id; }).length;
+        return "<tr><td><input type=\"text\" value=\"" + esc(g.name) + "\" onchange=\"updateGroupName('" + g.id + "', this.value)\" style=\"width:110px\"></td>" +
+          '<td><input type="number" min="0" value="' + g.targetActiveCount + "\" onchange=\"updateGroupTarget('" + g.id + "', this.value)\" style=\"width:60px\"></td>" +
+          "<td>" + count + "件</td>" +
+          "<td><button class=\"btn btn-d small\" onclick=\"removeGroup('" + g.id + "')\">削除</button></td></tr>";
+      }).join("");
+      return '<p style="margin:0 0 12px;color:var(--ink2);font-size:12.5px">8月の3グループ体制への移行時は、ここでグループの改名・削除・追加や目標保持数の変更ができます。</p>' +
+        '<div class="table-wrap"><table><thead><tr><th>グループ名</th><th>目標</th><th>現在</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+    },
+
+    backup: function () {
+      return '<div class="stack">' +
+        '<div class="card stack"><div class="section-title">書き出し</div><p style="margin:0;color:var(--ink2);font-size:12px">現在のデータをJSONファイルとして保存します。</p><button class="btn btn-p" onclick="exportBackup()">JSONを書き出す</button></div>' +
+        '<div class="card stack"><div class="section-title">読み込み</div><p style="margin:0;color:var(--ink2);font-size:12px">以前のバックアップで現在のデータを上書きします。</p><input type="file" accept="application/json" onchange="importBackup(this)"></div>' +
+        '<div class="card stack"><div class="section-title">初期化</div><p style="margin:0;color:var(--ink2);font-size:12px">全区域をストックに戻し、履歴を消去します。</p><button class="btn btn-d" onclick="resetAll()">全データをリセット</button></div>' +
+        "</div>";
+    }
+  };
+
+  render();
+  })();
+});
+</script>
+
+</body>
+</html>
