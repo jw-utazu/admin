@@ -1165,10 +1165,7 @@ function buildDaySelectContent(y,m,d) {
 
   let phaseTabs = '';
   if (isLimited) {
-    const tabs = adminPhases.map((p, i) => {
-      const active = i === currentPhaseIndex;
-      return `<button onclick="switchPhaseInModal(${i})" style="padding:3px 9px;border:1px solid ${active?'var(--blue)':'var(--border)'};border-radius:5px;background:${active?'var(--blue)':'var(--surface)'};color:${active?'#fff':'var(--ink2)'};font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">フェーズ ${i+1}</button>`;
-    }).join('');
+    const tabs = adminPhases.map((p, i) => phaseTabHtml(p, i, 'switchPhaseInModal')).join('');
     phaseTabs = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);align-items:center;">
       <span style="font-size:11px;color:var(--ink3);flex-shrink:0;">対象フェーズ：</span>${tabs}
       <button onclick="addNewPhaseFromModal()" style="padding:3px 8px;border:1px solid var(--blue);border-radius:5px;background:var(--blue-l);color:var(--blue);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">＋</button>
@@ -1452,6 +1449,31 @@ function syncSlotsFromPhases() {
   adminPhases.forEach(ph => { (ph.slots||[]).forEach(s => slots.push(s)); });
 }
 
+// 限定PWでは1フェーズが1カレンダー行に対応する。
+// 保存直後のローカルデータには year/month が無い場合があるため、
+// API側と同じ優先順位（実施日 → シフト公開日 → 締切日 → 申込開始日）で年月を求める。
+function limitedPhaseYM(ph) {
+  if (!ph) return null;
+  const directY = Number(ph.year), directM = Number(ph.month);
+  if (Number.isInteger(directY) && Number.isInteger(directM) && directM >= 1 && directM <= 12) {
+    return { y: directY, m: directM };
+  }
+  const slot = (ph.slots || []).find(s => Number(s.y) && Number(s.m));
+  if (slot) return { y: Number(slot.y), m: Number(slot.m) };
+  for (const date of [ph.open, ph.deadline, ph.apply]) {
+    if (date && Number(date.y) && Number(date.m)) return { y: Number(date.y), m: Number(date.m) };
+  }
+  return null;
+}
+
+function phaseTabHtml(p, i, onClick) {
+  const active = i === currentPhaseIndex;
+  const published = p && p.published === true;
+  return `<button class="phase-tab${active ? ' active' : ''}" onclick="${onClick}(${i})">
+    <span>フェーズ ${i+1}</span><span class="phase-pub-badge${published ? ' published' : ''}">${published ? '公開中' : '未公開'}</span>
+  </button>`;
+}
+
 function buildPhaseManageArea(isLimited) {
   const card = document.getElementById('phase-manage-card');
   if (!card) return;
@@ -1468,21 +1490,27 @@ function buildPhaseManageArea(isLimited) {
     return `<span>${obj.m}/${obj.d}（${dow}）</span>`;
   };
 
-  const tabsHtml = phases.map((p, i) => {
-    const active = i === currentPhaseIndex;
-    return `<button onclick="switchPhase(${i})" style="padding:3px 9px;border:1px solid ${active?'var(--blue)':'var(--border)'};border-radius:5px;background:${active?'var(--blue)':'var(--surface)'};color:${active?'#fff':'var(--ink2)'};font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);">フェーズ ${i+1}</button>`;
-  }).join('');
+  const tabsHtml = phases.map((p, i) => phaseTabHtml(p, i, 'switchPhase')).join('');
 
   let contentHtml = '';
   if (phases.length === 0) {
     contentHtml = '<div style="padding:14px;text-align:center;color:var(--ink3);font-size:12px;">カレンダーの日付をクリックして申込開始日などを設定してください</div>';
   } else {
     const ph = phases[currentPhaseIndex];
+    const phaseYM = limitedPhaseYM(ph);
+    const phasePublished = ph.published === true;
+    const phasePubHtml = phaseYM
+      ? `<div class="phase-pub-row">
+          <span class="phase-pub-state${phasePublished ? ' published' : ''}">${phasePublished ? ic('check') + ' 公開中' : ic('lock') + ' 未公開'}</span>
+          <button class="phase-pub-btn${phasePublished ? ' published' : ''}" onclick="togglePhasePub(${currentPhaseIndex})">${phasePublished ? '非公開にする' : '公開する'}</button>
+        </div>`
+      : '<div class="phase-pub-hint">年月が決まると、このフェーズを公開できます</div>';
     contentHtml += `<div class="date-grid-cards">
       <div class="dgc g"><span class="dgc-label">申込開始</span><span class="dgc-val">${fmtVal(ph.apply)}</span></div>
       <div class="dgc a"><span class="dgc-label">締切日</span><span class="dgc-val">${fmtVal(ph.deadline)}</span></div>
       <div class="dgc b"><span class="dgc-label">シフト公開</span><span class="dgc-val">${fmtVal(ph.open)}</span></div>
     </div>`;
+    contentHtml += phasePubHtml;
     const phSlots = ph.slots || [];
     if (phSlots.length === 0) {
       contentHtml += '<div style="padding:8px 12px;font-size:11px;color:var(--ink3);border-top:1px solid var(--border);">実施日がありません。カレンダーの日付をクリックして追加できます。</div>';
@@ -1519,6 +1547,40 @@ function switchPhase(i) {
   currentPhaseIndex = i;
   buildPhaseManageArea(true);
   buildCalScroll();
+}
+
+async function togglePhasePub(index) {
+  if (currentPwType === 'normal') return;
+  const ph = adminPhases[index];
+  const ym = limitedPhaseYM(ph);
+  if (!ph || !ym) {
+    toast('先にこのフェーズの日付または実施日を設定してください', 'e');
+    return;
+  }
+  const published = ph.published === true;
+  if (published && !await uiConfirm({
+    type: 'danger', title: 'フェーズを非公開にする',
+    message: `フェーズ ${index + 1}（${ym.y}年${ym.m}月）を非公開にしますか？\n\n対象メンバーはこのフェーズの日程・実施日を確認できなくなります。`,
+    confirmText: '非公開にする',
+  })) return;
+
+  const requestType = currentPwType;
+  showProc(published ? 'フェーズを非公開にしています...' : 'フェーズを公開しています...', '少々お待ちください');
+  try {
+    const action = published ? 'unpublishCalendar' : 'publishCalendar';
+    const res = await apiGet(action, { type: requestType, year: ym.y, month: ym.m });
+    if (!res.ok) throw new Error(res.error || '失敗しました');
+    ph.published = !published;
+    if (currentPwType === requestType) {
+      buildPhaseManageArea(true);
+      buildCalScroll();
+    }
+    hideProc();
+    toast(published ? `フェーズ ${index + 1} を非公開にしました` : `フェーズ ${index + 1} を公開しました`, 's');
+  } catch (e) {
+    hideProc();
+    toast('エラー: ' + e.message, 'e');
+  }
 }
 
 async function addNewPhase() {
@@ -2092,16 +2154,15 @@ function renderProgressStrip() {
 // 予定表の状態に応じた「今できる操作」を1つに決める
 // ============================================================
 // 4状態（① 設定中 → ② 承認待ち → ③ 承認済み・公開待ち → ④ 公開中）に
-// 押せるボタンは原則1つ。月の右のミニボタンと、進行状況ストリップの
-// 「予定表公開」段は同じ状態を別の場所に出しているだけなので、ここを
-// 唯一の判定にして両方から参照する（実行される操作を必ず一致させる）
+  // 押せるボタンは原則1つ。進行状況ストリップの
+  // 「予定表公開」段の状態と操作をここで一元的に判定する。
 function calStageInfo() {
   if (currentPwType !== 'normal') return null;
 
   // 公開中かどうかは日程の有無と無関係に判定できる。日程ガードより先に見ないと、
   // 公開中の月で日程を丸ごとリセット（resetDates の一括リセットなど）しただけで
   // 「非公開に戻す」の導線がミニボタン・ストリップの両方から消えてしまう
-  // （cal-pub-mini は通常PWでは常に非表示なので、代わりの導線が無くなる）
+  // （通常PWでは進行状況ストリップが唯一の導線になる）
   const calOn = isCurMonthPublished();
   if (calOn) {
     return {
@@ -2455,19 +2516,6 @@ async function toggleShiftPub() {
 function updCalPubState() {
   // 公開状態が変わると進行状況ストリップも変わる
   renderProgressStrip();
-  // 限定PWは複数月が同時進行しうるため一本道の進行状況ストリップに乗らない。
-  // 公開/非公開の操作口をミニボタンとして残す（通常PWでは非表示、ストリップ側に一本化）
-  const mini = document.getElementById('cal-pub-mini');
-  const miniText = document.getElementById('cal-pub-mini-text');
-  if (mini && miniText) {
-    if (currentPwType === 'normal') {
-      setVisible(mini, false);
-    } else {
-      setVisible(mini, true);
-      mini.className = 'cal-pub-mini' + (isCurMonthPublished() ? ' published' : ' unpublished');
-      miniText.innerHTML = isCurMonthPublished() ? (ic('calendar') + ' 公開中') : (ic('lock') + ' 未公開');
-    }
-  }
   const note = document.getElementById('cal-pub-note');
   if (!note) return;
   if (currentPwType === 'normal' && calPubStatus && calPubYM && !isCurMonthPublished()) {

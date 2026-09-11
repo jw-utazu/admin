@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=58">
+  <link rel="stylesheet" href="css/index.css?v=59">
 </head>
 <body>
 
@@ -82,11 +82,6 @@
             <!-- 主操作の脇に添える控えめな補助リンク（例：「承認を再依頼」の隣の「設定中に戻す」）。
                  1状態＝主要ボタン1つは保ったまま、取り消し系の導線を完全には失わせない -->
             <button id="cal-stage-secondary" class="cal-stage-secondary-link is-hidden" onclick="calStageSecondaryAction()"></button>
-            <!-- 限定PWは複数月が同時進行しうるため進行状況ストリップの一本道モデルに乗らない。
-                 公開/非公開の操作口をここに残す（通常PWでは非表示、ストリップ側の操作に一本化） -->
-            <button id="cal-pub-mini" class="cal-pub-mini is-hidden" onclick="toggleCalPub()">
-              <span id="cal-pub-mini-text"></span>
-            </button>
           </div>
         </div>
         <!-- 進行状況ストリップ
@@ -733,6 +728,6 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=84"></script>
+<script src="js/index.js?v=85"></script>
 </body>
 </html>

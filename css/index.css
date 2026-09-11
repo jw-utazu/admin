@@ -80,10 +80,22 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .cal-view-nav{display:flex;align-items:center;gap:6px;padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);}
 .cal-view-nav-label{font-size:10px;color:var(--ink3);font-weight:700;white-space:nowrap;}
 #cal-view-label{font-size:12px;font-weight:700;color:var(--ink2);}
-/* 限定PW専用の公開/非公開ミニボタン（通常PWでは非表示） */
-.cal-pub-mini{display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;background:var(--surface);font-family:var(--sans);font-size:11px;font-weight:700;color:var(--ink3);cursor:pointer;transition:all .15s;line-height:1;}
-.cal-pub-mini.published{color:var(--green);border-color:var(--green);background:var(--green-l);}
-.cal-pub-mini.unpublished:hover{background:var(--bg);}
+/* 限定PWフェーズの公開状態 */
+.phase-tab{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);white-space:nowrap;}
+.phase-tab:hover{background:var(--bg);}
+.phase-tab.active{border-color:var(--blue);background:var(--blue);color:#fff;}
+.phase-pub-badge{padding:1px 4px;border-radius:4px;background:var(--bg);color:var(--ink3);font-size:9px;line-height:1.3;}
+.phase-tab.active .phase-pub-badge{background:rgba(255,255,255,.18);color:#fff;}
+.phase-pub-badge.published{background:var(--green-l);color:var(--green);}
+.phase-tab.active .phase-pub-badge.published{background:rgba(255,255,255,.2);color:#fff;}
+.phase-pub-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid var(--border);background:var(--surface2);}
+.phase-pub-state{display:inline-flex;align-items:center;gap:4px;color:var(--ink3);font-size:11px;font-weight:700;}
+.phase-pub-state.published{color:var(--green);}
+.phase-pub-btn{padding:4px 9px;border:1px solid var(--blue);border-radius:5px;background:var(--blue-l);color:var(--blue);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.phase-pub-btn:hover{background:var(--blue);color:#fff;}
+.phase-pub-btn.published{border-color:var(--red);background:var(--red-l);color:var(--red);}
+.phase-pub-btn.published:hover{background:var(--red);color:#fff;}
+.phase-pub-hint{padding:7px 12px;border-top:1px solid var(--border);color:var(--ink3);font-size:11px;}
 .cal-pub-note{font-size:11px;color:#92400e;background:#fffbeb;border-bottom:1px solid #fde68a;}
 .cal-pub-note .cpn-head{display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;user-select:none;}
 .cal-pub-note .cpn-ico{flex-shrink:0;}
@@ -95,7 +107,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .cal-pub-note .cpn-body-in{padding:0 14px 10px 30px;line-height:1.7;}
 .cal-pub-note .cpn-body-in b{font-weight:700;}
 .cal-pub-note .cpn-ok{display:flex;align-items:center;gap:5px;margin-top:5px;color:#166534;font-weight:700;}
-/* 予定表の状態に応じた操作ボタン。月の右、cal-pub-mini と並ぶので同じピル型に揃える。
+/* 予定表の状態に応じた操作ボタン。進行状況ストリップの操作口としてピル型に揃える。
    4状態（設定中→承認待ち→承認済み・公開待ち→公開中）を calStageInfo() が1操作に決め、
    この4色で見分ける：緑＝前に進める操作、黄＝注意（承認待ちの表示専用）、
    グレー＝取り消し系（設定中に戻す）、赤＝公開を止める操作（非公開に戻す） */
