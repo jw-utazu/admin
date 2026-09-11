@@ -1,0 +1,88 @@
+name: Check manual impact
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  manual-impact:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect PR files and body
+        id: pr
+        uses: actions/github-script@v7
+        env:
+          CHANGED_FILES_FILE: ${{ runner.temp }}/manual-impact-files.txt
+          PR_BODY_FILE: ${{ runner.temp }}/manual-impact-pr-body.md
+          DIFF_FILE: ${{ runner.temp }}/manual-impact.diff
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('node:fs')
+            const pullRequest = context.payload.pull_request
+            if (!pullRequest) throw new Error('pull_request event payload is required')
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullRequest.number,
+              per_page: 100,
+            })
+            const fileNames = files.map(({ filename }) => filename)
+
+            // PR本文はワークフローのスクリプトへ埋め込まず、ファイルとして渡す。
+            fs.writeFileSync(process.env.CHANGED_FILES_FILE, fileNames.join(','), { encoding: 'utf8', mode: 0o600 })
+            fs.writeFileSync(process.env.PR_BODY_FILE, pullRequest.body ?? '', { encoding: 'utf8', mode: 0o600 })
+            const diff = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullRequest.number,
+              mediaType: { format: 'diff' },
+            })
+            fs.writeFileSync(process.env.DIFF_FILE, diff.data ?? '', { encoding: 'utf8', mode: 0o600 })
+            fs.chmodSync(process.env.CHANGED_FILES_FILE, 0o600)
+            fs.chmodSync(process.env.PR_BODY_FILE, 0o600)
+            fs.chmodSync(process.env.DIFF_FILE, 0o600)
+
+            const uiChanged = fileNames.some((file) => /(?:^|\/)(?:[^/]+\.(?:html|css|js))$/i.test(file))
+            core.setOutput('ui-changed', String(uiChanged))
+
+      - name: Checkout manual repository
+        if: steps.pr.outputs.ui-changed == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: jw-utazu/manual
+          ref: main
+          path: manual
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Node.js
+        if: steps.pr.outputs.ui-changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check manual impact
+        if: steps.pr.outputs.ui-changed == 'true'
+        env:
+          CHANGED_FILES_FILE: ${{ runner.temp }}/manual-impact-files.txt
+          PR_BODY_FILE: ${{ runner.temp }}/manual-impact-pr-body.md
+          DIFF_FILE: ${{ runner.temp }}/manual-impact.diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed_files="$(<"$CHANGED_FILES_FILE")"
+          node manual/capture/manual-impact.mjs check \
+            --repo admin \
+            --files "$changed_files" \
+            --pr-body-file "$PR_BODY_FILE" \
+            --diff-file "$DIFF_FILE"
+
+      - name: Skip manual impact check for non-UI changes
+        if: steps.pr.outputs.ui-changed != 'true'
+        run: echo 'No HTML, CSS, or JavaScript changes; manual impact check skipped.'
