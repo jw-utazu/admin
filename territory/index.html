@@ -267,6 +267,14 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
 
+  .offline-banner {
+    display: none; position: sticky; top: 52px; z-index: 90;
+    background: var(--amber-l); color: var(--amber);
+    border-bottom: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 8px 16px; font-size: 12px; font-weight: 700; text-align: center;
+  }
+  .offline-banner.show { display: block; }
+
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
   /* PW_GWS共通ログインの確認が終わるまで、区域データを表示しない */
@@ -291,6 +299,8 @@
   <div class="hdr-stat" id="hdrStat">--</div>
 </header>
 
+<div class="offline-banner" id="offlineBanner">⚠ オフラインキャッシュを表示中です。この状態での変更は保存されない可能性があります。</div>
+
 <div class="layout">
   <main class="cp" id="main"></main>
   <aside class="sb">
@@ -299,6 +309,7 @@
       <div class="ag" id="sbActions"></div>
     </div>
     <div class="sb-foot" id="sbFoot"></div>
+    <div class="sb-foot" id="syncStatus">最終保存: —</div>
   </aside>
 </div>
 
@@ -397,7 +408,8 @@
         }
         return false;
       }
-      document.documentElement.classList.remove("area-auth-pending");
+      // area-auth-pending の解除は、区域データ本体の読み込み完了後（territory側のIIFE）まで遅らせる。
+      // ここで先に解除すると、getTerritoryState の応答待ちの間、空の画面が一瞬見えてしまう。
       return true;
     } catch (e) {
       document.documentElement.classList.remove("area-auth-pending");
@@ -414,9 +426,9 @@
 })();
 </script>
 <script>
-window.areaAccessReady.then(function (areaAccessGranted) {
+window.areaAccessReady.then(async function (areaAccessGranted) {
   if (!areaAccessGranted) return;
-  (function () {
+  await (async function () {
   "use strict";
 
   var STORAGE_KEY = "utazu-territory-app:v1";
@@ -456,16 +468,15 @@ window.areaAccessReady.then(function (areaAccessGranted) {
     return { groups: groups, territories: territories, setupDismissed: false };
   }
 
-  var state = loadState();
-  var ui = {
-    openModal: null,
-    territoryFilter: "all",
-    assignGroupId: state.groups[0] ? state.groups[0].id : null,
-    manualActivateId: null,
-    adjSelected: 1
-  };
+  // ---------- persistence: Supabase DBを真実のソースとし、localStorageはオフライン用キャッシュ ----------
 
-  function loadState() {
+  var pendingSyncTimer = null;
+  var retrySyncTimer = null;
+  var lastSyncFailed = false;
+  var syncInFlight = false;
+  var syncChain = Promise.resolve();
+
+  function loadLocalCache() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaultState();
@@ -475,7 +486,139 @@ window.areaAccessReady.then(function (areaAccessGranted) {
     } catch (e) { return defaultState(); }
   }
 
-  function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  function persistLocalCache() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function showOfflineBanner(show) {
+    var el = document.getElementById("offlineBanner");
+    if (el) el.classList.toggle("show", !!show);
+  }
+
+  function nowTimeLabel() {
+    var d = new Date();
+    return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+
+  function setSyncStatus(text) {
+    var el = document.getElementById("syncStatus");
+    if (el) el.textContent = text;
+  }
+
+  async function loadInitialState() {
+    try {
+      var res = await apiPost({ action: "getTerritoryState" });
+      if (!res || !res.ok || !Array.isArray(res.groups) || !Array.isArray(res.territories)) {
+        throw new Error("invalid_response");
+      }
+      var loaded = { groups: res.groups, territories: res.territories, setupDismissed: !!res.setupDismissed };
+      state = loaded;
+      persistLocalCache();
+      showOfflineBanner(false);
+      setSyncStatus("最終保存 " + nowTimeLabel());
+      return loaded;
+    } catch (e) {
+      showOfflineBanner(true);
+      setSyncStatus("オフラインキャッシュを表示中です");
+      return loadLocalCache();
+    }
+  }
+
+  var state = await loadInitialState();
+  document.documentElement.classList.remove("area-auth-pending");
+  var ui = {
+    openModal: null,
+    territoryFilter: "all",
+    assignGroupId: state.groups[0] ? state.groups[0].id : null,
+    manualActivateId: null,
+    adjSelected: 1
+  };
+
+  function buildSyncPayload() {
+    return { action: "saveTerritoryState", groups: state.groups, territories: state.territories, setupDismissed: state.setupDismissed };
+  }
+
+  // syncState()は成功/失敗をboolean(Promise)で返す。importBackup/resetAllなど即時同期が要る箇所から
+  // await して結果判定できるようにしている。
+  // 複数呼び出しはsyncChainで直列化し、必ず「前回の送信が完了してから、その時点最新のstateを送る」
+  // 順序を保つ（そうしないと、遅延した古いリクエストが後から届いて新しい保存を上書きしうる）。
+  function syncState() {
+    var run = syncChain.then(doSyncOnce);
+    syncChain = run.catch(function () {});
+    return run;
+  }
+
+  async function doSyncOnce() {
+    syncInFlight = true;
+    setSyncStatus("保存中…");
+    try {
+      var res = await apiPost(buildSyncPayload());
+      if (!res || res.ok !== true) throw new Error("invalid_response");
+      lastSyncFailed = false;
+      clearTimeout(retrySyncTimer);
+      retrySyncTimer = null;
+      setSyncStatus("最終保存 " + nowTimeLabel());
+      return true;
+    } catch (e) {
+      lastSyncFailed = true;
+      setSyncStatus("保存に失敗しました（自動的に再試行します）");
+      scheduleRetry();
+      return false;
+    } finally {
+      syncInFlight = false;
+    }
+  }
+
+  // 失敗時のフォールバック再試行。visibilitychangeで再表示された時にも再試行するが、
+  // タブを表示したまま何も編集せず放置された場合に備え、一定間隔でも自動的に再送する。
+  function scheduleRetry() {
+    clearTimeout(retrySyncTimer);
+    retrySyncTimer = setTimeout(function () {
+      retrySyncTimer = null;
+      if (lastSyncFailed) syncState();
+    }, 15000);
+  }
+
+  function scheduleSync() {
+    clearTimeout(pendingSyncTimer);
+    pendingSyncTimer = setTimeout(function () {
+      pendingSyncTimer = null;
+      syncState();
+    }, 500);
+  }
+
+  // ページ離脱時（タブ非表示・実際に閉じる）に保留中のデバウンス保存を取りこぼさないよう、
+  // keepalive付きfetchで即時送信する。apiPost()はkeepaliveを渡せないため専用に組み立てる。
+  // sendBeacon()はカスタムヘッダー（セッショントークン）を送れないため使わない。
+  function sendSyncKeepalive() {
+    try {
+      var headers = { "Authorization": "Bearer " + ANON_KEY, "Content-Type": "application/json" };
+      var token = typeof pwgwsGetSessionToken === "function" ? pwgwsGetSessionToken() : "";
+      if (token) headers["X-PWGWS-Session"] = token;
+      fetch(API_URL, { method: "POST", keepalive: true, headers: headers, body: JSON.stringify(buildSyncPayload()) });
+    } catch (e) {}
+  }
+
+  function flushPendingSync() {
+    if (pendingSyncTimer === null) return;
+    clearTimeout(pendingSyncTimer);
+    pendingSyncTimer = null;
+    sendSyncKeepalive();
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      flushPendingSync();
+    } else if (lastSyncFailed) {
+      syncState();
+    }
+  });
+  window.addEventListener("pagehide", flushPendingSync);
+
+  function saveState() {
+    persistLocalCache();
+    scheduleSync();
+  }
 
   function esc(s) {
     return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -673,6 +816,7 @@ window.areaAccessReady.then(function (areaAccessGranted) {
       : "グループ「" + groupName(gid) + "」を削除しますか？";
     showConfirm(msg, function () {
       state.groups = state.groups.filter(function (g) { return g.id !== gid; });
+      state.territories.forEach(function (t) { if (t.currentGroupId === gid) t.currentGroupId = null; });
       if (ui.assignGroupId === gid) ui.assignGroupId = state.groups[0] ? state.groups[0].id : null;
       saveState(); render();
     });
@@ -697,9 +841,19 @@ window.areaAccessReady.then(function (areaAccessGranted) {
         if (!parsed || !Array.isArray(parsed.territories) || !Array.isArray(parsed.groups)) {
           toast("ファイルの形式が正しくありません"); return;
         }
-        showConfirm("現在のデータを、読み込んだバックアップで上書きします。よろしいですか？", function () {
-          state = parsed; saveState(); render();
-          toast("バックアップを読み込みました");
+        showConfirm("現在のデータを、読み込んだバックアップで上書きします。よろしいですか？", async function () {
+          var previous = state;
+          state = parsed;
+          persistLocalCache(); render();
+          clearTimeout(pendingSyncTimer); pendingSyncTimer = null;
+          var ok = await syncState();
+          if (ok) {
+            toast("バックアップを読み込みました");
+          } else {
+            state = previous;
+            persistLocalCache(); render();
+            toast("保存に失敗したため、読み込みを取り消しました");
+          }
         });
       } catch (e) { toast("読み込みに失敗しました"); }
     };
@@ -707,9 +861,19 @@ window.areaAccessReady.then(function (areaAccessGranted) {
     input.value = "";
   };
   window.resetAll = function () {
-    showConfirm("全データを初期状態（42区域すべてストック）にリセットします。元に戻せません。よろしいですか？", function () {
-      state = defaultState(); saveState(); render();
-      toast("初期状態にリセットしました");
+    showConfirm("全データを初期状態（42区域すべてストック）にリセットします。元に戻せません。よろしいですか？", async function () {
+      var previous = state;
+      state = defaultState();
+      persistLocalCache(); render();
+      clearTimeout(pendingSyncTimer); pendingSyncTimer = null;
+      var ok = await syncState();
+      if (ok) {
+        toast("初期状態にリセットしました");
+      } else {
+        state = previous;
+        persistLocalCache(); render();
+        toast("保存に失敗したため、リセットを取り消しました");
+      }
     });
   };
   window.dismissSetup = function () { state.setupDismissed = true; saveState(); render(); };
@@ -751,7 +915,7 @@ window.areaAccessReady.then(function (areaAccessGranted) {
         '<div class="ab-tx"><span class="ab-n">' + esc(a.name) + '</span><span class="ab-d">' + esc(a.desc) + '</span></div>' +
         '<span class="ab-ar">›</span></button>';
     }).join("");
-    document.getElementById("sbFoot").innerHTML = "このブラウザ（localStorage）に自動保存されます。他端末へ移す場合は「バックアップ」から書き出してください。";
+    document.getElementById("sbFoot").innerHTML = "Supabase DBに保存されます。オフライン時は一時的にこの端末に保持し、再接続時に送信します。";
   }
 
   function statusChip(t) {
