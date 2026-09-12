@@ -259,6 +259,18 @@
   .adj-cell.on { background: var(--blue-l); border-color: var(--blue); color: var(--blue); font-weight: 700; }
   .adj-cell.self { opacity: .3; cursor: default; }
 
+  .proposal-card { background: var(--blue-l); border-color: color-mix(in srgb, var(--blue) 28%, var(--border)); }
+  .proposal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .proposal-title { font-size: 12.5px; font-weight: 800; }
+  .proposal-desc { margin: 2px 0 0; color: var(--ink2); font-size: 11.5px; }
+  .proposal-list { display: flex; flex-direction: column; gap: 8px; }
+  .proposal-row { padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--blue) 18%, var(--border)); border-radius: var(--r); background: var(--surface); }
+  .proposal-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .proposal-group { font-weight: 800; }
+  .proposal-meta { color: var(--ink3); font-size: 11px; }
+  .proposal-ids { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; color: var(--ink2); font-size: 11.5px; }
+  .proposal-note { margin: 10px 0 0; color: var(--ink2); font-size: 11.5px; }
+
   .toast {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
     background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 100px;
@@ -434,7 +446,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   var STORAGE_KEY = "utazu-territory-app:v1";
   var TOTAL_TERRITORIES = 42;
 
-  var PURPOSE_LABEL = { normal: "通常", patrol: "巡回訪問", joint: "合同奉仕", campaign: "キャンペーン確保" };
+  var PURPOSE_LABEL = { normal: "通常", joint: "合同奉仕", campaign: "キャンペーン確保" };
 
   // 2026-07-30時点で目視確認済みの隣接関係（利用者のバックアップデータより）。区域42（瀬居）は陸続きの隣接なし。
   var VERIFIED_ADJACENCY = {
@@ -468,6 +480,20 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     return { groups: groups, territories: territories, setupDismissed: false };
   }
 
+  function normalizeState(input) {
+    var changed = false;
+    input.territories.forEach(function (t) {
+      // 巡回訪問用途は廃止。過去データに残っている指定は通常区域へ戻す。
+      if (t.purpose === "patrol" || !Object.prototype.hasOwnProperty.call(PURPOSE_LABEL, t.purpose)) {
+        t.purpose = "normal";
+        changed = true;
+      }
+      if (!Array.isArray(t.adjacentIds)) { t.adjacentIds = []; changed = true; }
+      if (!Array.isArray(t.history)) { t.history = []; changed = true; }
+    });
+    return changed;
+  }
+
   // ---------- persistence: Supabase DBを真実のソースとし、localStorageはオフライン用キャッシュ ----------
 
   var pendingSyncTimer = null;
@@ -475,6 +501,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   var lastSyncFailed = false;
   var syncInFlight = false;
   var syncChain = Promise.resolve();
+  var needsSyncAfterLoad = false;
 
   function loadLocalCache() {
     try {
@@ -482,6 +509,10 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
       if (!raw) return defaultState();
       var parsed = JSON.parse(raw);
       if (!parsed || !Array.isArray(parsed.territories) || !Array.isArray(parsed.groups)) return defaultState();
+      if (normalizeState(parsed)) {
+        needsSyncAfterLoad = true;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      }
       return parsed;
     } catch (e) { return defaultState(); }
   }
@@ -512,6 +543,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
         throw new Error("invalid_response");
       }
       var loaded = { groups: res.groups, territories: res.territories, setupDismissed: !!res.setupDismissed };
+      if (normalizeState(loaded)) needsSyncAfterLoad = true;
       state = loaded;
       persistLocalCache();
       showOfflineBanner(false);
@@ -531,7 +563,8 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     territoryFilter: "all",
     assignGroupId: state.groups[0] ? state.groups[0].id : null,
     manualActivateId: null,
-    adjSelected: 1
+    adjSelected: 1,
+    showAssignmentProposal: false
   };
 
   function buildSyncPayload() {
@@ -620,6 +653,11 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     scheduleSync();
   }
 
+  if (needsSyncAfterLoad) {
+    needsSyncAfterLoad = false;
+    syncState();
+  }
+
   function esc(s) {
     return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -667,6 +705,9 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     return m;
   }
   function isAdjacentToActive(territory, groupMap, targetGroupId) {
+    return isAdjacentToGroupMap(territory, groupMap, targetGroupId);
+  }
+  function isAdjacentToGroupMap(territory, groupMap, targetGroupId) {
     var conflict = false;
     function isOtherGroup(id) {
       return Object.prototype.hasOwnProperty.call(groupMap, id) && groupMap[id] !== targetGroupId;
@@ -677,6 +718,100 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     });
     return conflict;
   }
+
+  function buildAssignmentProposal() {
+    var activeMap = activeGroupMap();
+    var groups = state.groups.map(function (g) {
+      var currentCount = state.territories.filter(function (t) {
+        return t.status === "active" && t.currentGroupId === g.id;
+      }).length;
+      return {
+        id: g.id,
+        name: g.name,
+        currentCount: currentCount,
+        targetCount: Math.max(0, Number(g.targetActiveCount) || 0),
+        need: Math.max(0, (Number(g.targetActiveCount) || 0) - currentCount)
+      };
+    });
+    var order = groups.filter(function (g) { return g.need > 0; }).slice();
+    var plannedMap = {};
+    var plan = {};
+    var searchNodes = 0;
+    var searchLimit = 100000;
+
+    function mergedMap() {
+      var m = {};
+      Object.keys(activeMap).forEach(function (id) { m[id] = activeMap[id]; });
+      Object.keys(plannedMap).forEach(function (id) { m[id] = plannedMap[id]; });
+      return m;
+    }
+    function candidatesFor(groupId) {
+      var map = mergedMap();
+      return state.territories.filter(function (t) {
+        return t.status === "stock" && t.purpose === "normal" &&
+          !Object.prototype.hasOwnProperty.call(plannedMap, t.id) &&
+          !isAdjacentToGroupMap(t, map, groupId);
+      }).sort(function (a, b) {
+        return a.adjacentIds.length - b.adjacentIds.length || a.id - b.id;
+      });
+    }
+    function chooseForGroup(item, candidates, start, selected, orderIndex) {
+      if (selected.length === item.need) {
+        plan[item.id] = selected.slice();
+        if (searchGroup(orderIndex + 1)) return true;
+        delete plan[item.id];
+        return false;
+      }
+      var remaining = item.need - selected.length;
+      if (candidates.length - start < remaining || searchNodes >= searchLimit) return false;
+      var map = mergedMap();
+      for (var i = start; i <= candidates.length - remaining; i++) {
+        var t = candidates[i];
+        if (isAdjacentToGroupMap(t, map, item.id)) continue;
+        searchNodes++;
+        plannedMap[t.id] = item.id;
+        selected.push(t.id);
+        if (chooseForGroup(item, candidates, i + 1, selected, orderIndex)) return true;
+        selected.pop();
+        delete plannedMap[t.id];
+        if (searchNodes >= searchLimit) return false;
+      }
+      return false;
+    }
+    function searchGroup(index) {
+      if (index >= order.length) return true;
+      var item = order[index];
+      return chooseForGroup(item, candidatesFor(item.id), 0, [], index);
+    }
+
+    // 候補が少ないグループから決めることで、全体の割当案を見つけやすくする。
+    order.sort(function (a, b) {
+      return candidatesFor(a.id).length - candidatesFor(b.id).length || b.need - a.need;
+    });
+    var complete = searchGroup(0);
+    var totalNeed = groups.reduce(function (sum, g) { return sum + g.need; }, 0);
+    var totalSuggested = Object.keys(plan).reduce(function (sum, gid) { return sum + plan[gid].length; }, 0);
+    return {
+      groups: groups.map(function (g) {
+        return {
+          name: g.name,
+          currentCount: g.currentCount,
+          targetCount: g.targetCount,
+          need: g.need,
+          suggestedIds: plan[g.id] || []
+        };
+      }),
+      totalNeed: totalNeed,
+      totalSuggested: totalSuggested,
+      complete: complete && totalSuggested === totalNeed,
+      searchLimitReached: searchNodes >= searchLimit
+    };
+  }
+
+  window.generateAssignmentProposal = function () {
+    ui.showAssignmentProposal = true;
+    render();
+  };
 
   function toast(msg) {
     var el = document.getElementById("toast");
@@ -724,6 +859,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   window.cancelManualActivate = function () { ui.manualActivateId = null; render(); };
   window.confirmManualActivate = function (id) {
     var t = findTerritory(id); if (!t) return;
+    if (t.status !== "stock" || t.purpose !== "normal") return;
     var groupSel = document.getElementById("manualGroupSelect");
     var dateSel = document.getElementById("manualDateInput");
     var gid = groupSel ? groupSel.value : null;
@@ -738,7 +874,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   window.selectAssignGroup = function (gid) { ui.assignGroupId = gid; render(); };
 
   window.assignTerritory = function (id) {
-    var t = findTerritory(id); if (!t || t.status !== "stock") return;
+    var t = findTerritory(id); if (!t || t.status !== "stock" || t.purpose !== "normal") return;
     var dateInput = document.getElementById("assignDate_" + id);
     var date = (dateInput && dateInput.value) || todayISO();
     var gid = ui.assignGroupId;
@@ -843,6 +979,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
         }
         showConfirm("現在のデータを、読み込んだバックアップで上書きします。よろしいですか？", async function () {
           var previous = state;
+          normalizeState(parsed);
           state = parsed;
           persistLocalCache(); render();
           clearTimeout(pendingSyncTimer); pendingSyncTimer = null;
@@ -903,7 +1040,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
       { id: "adjacency", icon: "🗺", iconBg: "var(--purple-l)", iconColor: "var(--purple)", name: "隣接関係",
         desc: "区域どうしの隣接を登録" },
       { id: "pools", icon: "📦", iconBg: "var(--teal-l)", iconColor: "var(--teal)", name: "プール管理",
-        desc: "巡回訪問・合同奉仕・確保区域" },
+        desc: "合同奉仕・キャンペーン確保" },
       { id: "groups", icon: "👥", iconBg: "var(--green-l)", iconColor: "var(--green)", name: "グループ管理",
         desc: state.groups.length + "グループ・目標保持数の設定" },
       { id: "backup", icon: "💾", iconBg: "var(--amber-l)", iconColor: "var(--amber)", name: "バックアップ",
@@ -944,13 +1081,13 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
 
     var stock = state.territories.filter(function (t) { return t.status === "stock" && t.purpose === "normal"; }).length;
     var pending = state.territories.filter(function (t) { return t.status === "pending"; }).length;
-    var patrol = state.territories.filter(function (t) { return t.purpose === "patrol"; }).length;
     var joint = state.territories.filter(function (t) { return t.purpose === "joint"; }).length;
+    var campaign = state.territories.filter(function (t) { return t.purpose === "campaign"; }).length;
 
     var poolTiles = '<div class="card tile"><span class="tl">通常ストック</span><span class="tv">' + stock + '</span><span class="ts">すぐ割当可能</span></div>' +
       '<div class="card tile"><span class="tl">回収待ち</span><span class="tv">' + pending + '</span><span class="ts">回収完了日の入力待ち</span></div>' +
-      '<div class="card tile"><span class="tl">巡回訪問確保</span><span class="tv">' + patrol + '</span></div>' +
-      '<div class="card tile"><span class="tl">合同奉仕確保</span><span class="tv">' + joint + '</span></div>';
+      '<div class="card tile"><span class="tl">合同奉仕確保</span><span class="tv">' + joint + '</span></div>' +
+      '<div class="card tile"><span class="tl">キャンペーン確保</span><span class="tv">' + campaign + '</span></div>';
 
     var due = activeTerritories().map(function (t) {
       var rd = t.dueDate ? daysBetween(todayISO(), t.dueDate) : 9999;
@@ -982,6 +1119,33 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
       '<div class="card"><div class="section-title">期限が近い区域（21日以内）</div><div class="table-wrap"><table><thead><tr><th>区域</th><th>グループ</th><th>開始日</th><th>期限</th><th>状態</th></tr></thead><tbody>' + dueRows + "</tbody></table></div></div>" +
       '<div class="card"><div class="section-title">回収待ちの区域</div><div class="table-wrap"><table><thead><tr><th>区域</th><th>グループ</th><th>開始日</th><th></th></tr></thead><tbody>' + pendingRows + "</tbody></table></div></div>" +
       "</div>";
+  }
+
+  function renderAssignmentProposal() {
+    if (!ui.showAssignmentProposal) return "";
+    var proposal = buildAssignmentProposal();
+    var summary = proposal.complete
+      ? "現在の割当を維持したまま、目標数まで隣接条件を満たせる案です。"
+      : "全グループ分の案を作成できませんでした。隣接関係・確保用途・目標保持数を確認してください。";
+    var rows = proposal.groups.map(function (g) {
+      var status = g.need === 0
+        ? '<span class="chip good">目標達成</span>'
+        : g.suggestedIds.length === g.need
+          ? '<span class="chip good">提案あり</span>'
+          : '<span class="chip pending">候補不足</span>';
+      var ids = g.suggestedIds.length
+        ? g.suggestedIds.map(function (id) { return '<span class="pack">' + id + '</span>'; }).join("")
+        : '<span class="proposal-meta">' + (g.need === 0 ? "追加割当なし" : "割当可能な区域が見つかりません") + '</span>';
+      return '<div class="proposal-row"><div class="proposal-row-head"><span class="proposal-group">' + esc(g.name) +
+        '</span><span class="proposal-meta">現在 ' + g.currentCount + ' / 目標 ' + g.targetCount + '　' + status +
+        '</span></div><div class="proposal-ids"><span>提案区域：</span>' + ids + '</div></div>';
+    }).join("");
+    if (proposal.searchLimitReached) summary += " 検索量が多いため、表示案は一部となる場合があります。";
+    return '<div class="card proposal-card"><div class="proposal-head"><div><div class="proposal-title">隣接条件を考慮した割当案</div>' +
+      '<p class="proposal-desc">通常ストックから、別グループの使用区域と隣接しない組み合わせを提案します。同一グループ内の隣接は許容します。</p></div>' +
+      '<button class="btn small" onclick="generateAssignmentProposal()">再計算</button></div>' +
+      '<div class="proposal-list">' + rows + '</div><p class="proposal-note">' + summary +
+      ' 下の区域一覧で内容を確認し、「割当する」を押して確定してください。</p></div>';
   }
 
   // ---- modal bodies ----
@@ -1030,7 +1194,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
         }
 
         var action;
-        if (t.status === "stock") {
+        if (t.status === "stock" && t.purpose === "normal") {
           var conflict = isAdjacentToActive(t, groupMap, ui.assignGroupId);
           action = '<div class="field-row">' +
             (conflict ? '<span class="chip pending">別グループと隣接</span>' : '') +
@@ -1038,6 +1202,8 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
             '<button class="btn btn-p small" onclick="assignTerritory(' + t.id + ')">割当する</button>' +
             '<button class="btn small" onclick="markActiveManually(' + t.id + ')">手動設定</button>' +
             "</div>";
+        } else if (t.status === "stock") {
+          action = '<span class="chip plain">確保中</span>';
         } else if (t.status === "active") {
           action = '<button class="btn small" onclick="startReturn(' + t.id + ')">回収待ちへ</button>';
         } else {
@@ -1057,7 +1223,11 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
 
       if (!list.length) rows = '<tr><td colspan="7" class="empty-note">該当する区域はありません</td></tr>';
 
-      return '<div class="tabs">' + tabs + "</div>" +
+      var proposalButton = ui.showAssignmentProposal ? "割当案を再計算" : "隣接を考慮して割当案を作成";
+      return '<div class="field-row" style="justify-content:space-between;align-items:center;margin-bottom:12px"><span style="color:var(--ink2);font-size:12px">割当前に候補の組み合わせを確認できます。</span>' +
+        '<button class="btn btn-p small" onclick="generateAssignmentProposal()">' + proposalButton + '</button></div>' +
+        renderAssignmentProposal() +
+        '<div class="tabs">' + tabs + "</div>" +
         '<div class="field-row" style="margin-bottom:12px"><label>新規割当の割当先グループ<select onchange="selectAssignGroup(this.value)">' + groupOpts + "</select></label></div>" +
         '<div class="table-wrap"><table><thead><tr><th>区域</th><th>状態</th><th>グループ</th><th>開始日</th><th>期限</th><th>隣接</th><th>操作</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
     },
@@ -1089,7 +1259,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
           '<td><input type="text" value="' + esc(t.area) + '" placeholder="宇多津 / 坂出" onchange="setArea(' + t.id + ', this.value)" style="width:120px"></td>' +
           '<td><input type="text" value="' + esc(t.note) + '" placeholder="メモ" onchange="setNote(' + t.id + ', this.value)" style="width:160px"></td></tr>';
       }).join("");
-      return '<p style="margin:0 0 12px;color:var(--ink2);font-size:12.5px">通常割当以外に確保しておく区域（巡回訪問・合同奉仕・9月キャンペーン確保）を指定します。通常以外の用途は新規割当の候補から除外されます。</p>' +
+      return '<p style="margin:0 0 12px;color:var(--ink2);font-size:12.5px">通常割当以外に確保しておく区域（合同奉仕・キャンペーン確保）を指定します。確保中の区域は新規割当の候補から除外されます。</p>' +
         '<div class="table-wrap"><table><thead><tr><th>区域</th><th>状態</th><th>用途</th><th>地域</th><th>メモ</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
     },
 
