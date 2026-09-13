@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=59">
+  <link rel="stylesheet" href="css/index.css?v=60">
 </head>
 <body>
 
@@ -245,6 +245,9 @@
           <button class="tool normal-only" onclick="openMemberModal()" title="メンバーの追加・編集・有効無効">
             <span class="tool-ic" style="background:#f0f9ff;color:#0369a1;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg></span><span class="tool-n">メンバー</span>
           </button>
+          <button class="tool normal-only" onclick="openAccessModal()" title="アクセス許可メールの確認・追加・削除・参加者との紐付け">
+            <span class="tool-ic" style="background:#ecfeff;color:#0d9488;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a2 2 0 0 1-2.06 0L2 7" /><path d="M16 16h5" /><path d="M18.5 13.5 21 16l-2.5 2.5" /></svg></span><span class="tool-n">アクセス</span>
+          </button>
           <button class="tool normal-only" onclick="openPositionModal()" title="区域係での立ち位置と、そこから決まる権限の設定">
             <span class="tool-ic" style="background:#f1f5f9;color:#334155;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15H6a4 4 0 0 0-4 4v2" /><path d="m14.305 16.53.923-.382" /><path d="m15.228 13.852-.923-.383" /><path d="m16.852 12.228-.383-.923" /><path d="m16.852 17.772-.383.924" /><path d="m19.148 12.228.383-.923" /><path d="m19.53 18.696-.382-.924" /><path d="m20.772 13.852.924-.383" /><path d="m20.772 16.148.924.383" /><circle cx="18" cy="15" r="3" /><circle cx="9" cy="7" r="4" /></svg></span><span class="tool-n">立ち位置</span>
           </button>
@@ -440,6 +443,14 @@
       <button class="btn btn-g" onclick="closeMemberForm()">閉じる</button>
       <button class="btn btn-p" id="m-member-add-btn" onclick="openMemberAddForm()">＋ メンバー追加</button>
     </div>
+  </div>
+</div>
+<!-- アクセス許可メール管理モーダル -->
+<div class="ov" id="m-access">
+  <div class="modal" style="max-width:640px;">
+    <div class="mhd"><span class="mt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a2 2 0 0 1-2.06 0L2 7" /><path d="M16 16h5" /><path d="M18.5 13.5 21 16l-2.5 2.5" /></svg> アクセス許可メール管理</span><button class="mx" onclick="closeM('m-access')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button></div>
+    <div class="mbd access-body" id="m-access-body">読み込み中...</div>
+    <div class="mft"><button class="btn btn-g" onclick="closeM('m-access')">閉じる</button></div>
   </div>
 </div>
 <!-- お知らせ管理モーダル -->
@@ -728,6 +739,6 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=85"></script>
+<script src="js/index.js?v=86"></script>
 </body>
 </html>

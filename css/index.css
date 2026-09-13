@@ -392,6 +392,48 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .btn-d{background:var(--red);color:#fff;}
 .btn-s{background:var(--green);color:#fff;}
 
+/* アクセス許可メール管理 */
+.access-body{padding:0;}
+.access-intro{padding:13px 16px 4px;color:var(--ink2);font-size:11px;line-height:1.7;}
+.access-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:10px 16px;}
+.access-summary-card{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);font-size:11px;color:var(--ink2);}
+.access-summary-card strong{font-size:16px;color:var(--ink);}
+.access-summary-card.linked strong{color:var(--green);}
+.access-summary-card.unlinked strong{color:var(--amber);}
+.access-add{margin:0 16px 12px;padding:11px 12px;background:var(--blue-l);border:1px solid #bfdbfe;border-radius:var(--r);}
+.access-label{display:block;margin-bottom:5px;font-size:11px;font-weight:700;color:var(--ink2);}
+.access-add-row{display:flex;align-items:center;gap:7px;}
+.access-add-row .mf-inp{flex:1;min-width:0;background:var(--surface);}
+.access-form-error{margin-top:6px;padding:5px 8px;background:var(--red-l);border-radius:5px;color:var(--red);font-size:11px;}
+.access-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px 7px;border-top:1px solid var(--border);}
+.access-list-title{flex:1;font-size:12px;font-weight:700;color:var(--ink);}
+.access-search{width:210px;min-width:0;padding:6px 9px;}
+.access-note{margin:0 16px 8px;padding:7px 9px;background:var(--amber-l);border:1px solid #fde68a;border-radius:var(--r);font-size:11px;line-height:1.6;color:#92400e;}
+.access-list{border-top:1px solid var(--border);}
+.access-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);}
+.access-main{min-width:0;flex:1;}
+.access-email{display:flex;align-items:center;gap:5px;min-width:0;font-family:var(--mono);font-size:12px;color:var(--ink);word-break:break-all;}
+.access-email svg{color:var(--teal);flex-shrink:0;}
+.access-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;font-size:11px;}
+.access-status{padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;}
+.access-status.linked{background:var(--green-l);color:var(--green);}
+.access-status.unlinked{background:var(--amber-l);color:var(--amber);}
+.access-status.invalid{background:var(--red-l);color:var(--red);}
+.access-member{display:inline-flex;align-items:center;gap:3px;color:var(--ink2);}
+.access-member svg{color:var(--ink3);}
+.access-member span{color:var(--ink3);font-size:10px;}
+.access-member-empty{color:var(--ink3);}
+.access-status-text{color:var(--ink3);font-size:10px;}
+.access-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-shrink:0;}
+.btn-access,.btn-delete-access{padding:5px 8px;font-size:11px;white-space:nowrap;}
+.btn-delete-access{border:1px solid var(--red-l);border-radius:var(--r);background:var(--red-l);color:var(--red);cursor:pointer;font-family:var(--sans);}
+.btn-delete-access:hover{background:var(--red);color:#fff;}
+.access-protected{padding:5px 0;color:var(--ink3);font-size:10px;white-space:nowrap;}
+.access-empty{padding:25px 16px;text-align:center;font-size:12px;color:var(--ink3);border-top:1px solid var(--border);}
+.access-footnote{padding:10px 16px 12px;font-size:10px;line-height:1.6;color:var(--ink3);}
+.access-loading{padding:30px 16px;text-align:center;font-size:12px;color:var(--ink3);}
+.access-error{padding:24px 16px;color:var(--red);font-size:12px;}
+
 /* サマリー */
 .sumbox{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
 .sumrow{display:flex;align-items:center;gap:8px;font-size:12px;}
@@ -836,6 +878,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .limited-setting-row{display:block;}
   .limited-setting-main{margin-bottom:8px;}
   .limited-setting-actions{justify-content:flex-start;gap:6px;}
+
+  /* ===== アクセス許可メール ===== */
+  .access-summary{padding-left:10px;padding-right:10px;}
+  .access-add{margin-left:10px;margin-right:10px;}
+  .access-toolbar{padding-left:10px;padding-right:10px;align-items:stretch;flex-direction:column;}
+  .access-search{width:100%;}
+  .access-note{margin-left:10px;margin-right:10px;}
+  .access-row{padding-left:10px;padding-right:10px;align-items:stretch;flex-direction:column;gap:8px;}
+  .access-actions{justify-content:flex-end;}
+  .access-footnote{padding-left:10px;padding-right:10px;}
 
   /* ===== ログ ===== */
   /* 幅が足りず日時と本文が潰れ合うので、日時を上の行に逃がす */

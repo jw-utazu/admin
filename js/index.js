@@ -4451,6 +4451,9 @@ async function openPositionSyncPreview() {
 let _memberList = [];
 let _memberEditRowIndex = null; // 編集中のrowIndex
 let _positions = [];            // 立ち位置マスタ（メンバー編集の選択肢に使う）
+let _accessList = [];
+let _accessMembers = [];
+let _accessQuery = '';
 
 const positionName = id => _positions.find(p => String(p.id) === String(id))?.name || '';
 
@@ -4799,6 +4802,250 @@ async function confirmDeleteMember(rowIndex) {
   } catch(e) {
     hideProc();
     toast('削除に失敗しました: ' + e.message, 'e');
+  }
+}
+
+// ============================================================
+// アクセス許可メール管理モーダル
+// ============================================================
+const ACCESS_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function accessEmailValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function accessEmailIsValid(email) {
+  return email.length <= 320 && ACCESS_EMAIL_RE.test(email);
+}
+
+function accessErrorText(error) {
+  const code = String(error?.message || '');
+  const messages = {
+    invalid_email: 'メールアドレスの形式が正しくありません。',
+    protected_access_email: 'このシステム用メールアドレスは変更できません。',
+    access_email_exists: 'このメールアドレスはすでに登録されています。',
+    access_email_not_found: 'アクセス許可メールが見つかりません。画面を更新してください。',
+    access_email_already_linked: 'このメールアドレスは別の参加者に紐付いています。',
+    member_already_linked: '選択した参加者には、すでにメールアドレスが登録されています。',
+    invalid_member: '無効な参加者には紐付けできません。',
+    member_not_found: '参加者が見つかりません。画面を更新してください。',
+  };
+  return messages[code] || code || '処理に失敗しました。';
+}
+
+async function openAccessModal() {
+  openM('m-access');
+  _accessQuery = '';
+  const body = document.getElementById('m-access-body');
+  if (body) body.innerHTML = '<div class="access-loading">読み込み中...</div>';
+  try {
+    await loadAccessList();
+  } catch (_) { /* loadAccessList が画面内にエラーを表示する */ }
+}
+
+async function loadAccessList() {
+  const body = document.getElementById('m-access-body');
+  if (!body) return;
+  body.innerHTML = '<div class="access-loading">読み込み中...</div>';
+  try {
+    const res = await apiGet('getAccessList');
+    if (!res.ok) throw new Error(res.error || '取得失敗');
+    _accessList = Array.isArray(res.accessList) ? res.accessList : [];
+    _accessMembers = Array.isArray(res.members) ? res.members : [];
+    renderAccessList();
+  } catch (e) {
+    body.innerHTML = '<div class="access-error">エラー: ' + esc(accessErrorText(e)) + '</div>';
+    throw e;
+  }
+}
+
+function renderAccessList() {
+  const body = document.getElementById('m-access-body');
+  if (!body) return;
+  const search = body.querySelector('#access-search');
+  _accessQuery = search ? search.value.trim() : _accessQuery;
+  const q = _accessQuery.toLowerCase();
+  const linked = _accessList.filter(row => row.member);
+  const unlinked = _accessList.filter(row => !row.member);
+  const allowedEmails = new Set(_accessList.map(row => accessEmailValue(row.email)));
+  const membersWithoutAccess = _accessMembers.filter(member =>
+    member.valid && member.email && !allowedEmails.has(accessEmailValue(member.email))
+  );
+  const rows = _accessList;
+
+  let html = `
+    <div class="access-intro">ログインを許可するメールアドレスを管理します。参加者に紐付けると、メンバー情報のメール欄にも反映されます。</div>
+    <div class="access-summary">
+      <div class="access-summary-card"><span>許可メール</span><strong>${_accessList.length}</strong></div>
+      <div class="access-summary-card linked"><span>紐付け済み</span><strong>${linked.length}</strong></div>
+      <div class="access-summary-card unlinked"><span>未紐付け</span><strong>${unlinked.length}</strong></div>
+    </div>
+    <div class="access-add">
+      <label class="access-label" for="access-email-input">メールアドレスを追加</label>
+      <div class="access-add-row">
+        <input id="access-email-input" class="mf-inp" type="email" value="" placeholder="例：taro@example.com">
+        <button type="button" class="btn btn-p" data-access-add>追加</button>
+      </div>
+      <div id="access-form-error" class="access-form-error is-hidden"></div>
+    </div>
+    <div class="access-toolbar">
+      <div class="access-list-title">アクセス許可メール一覧</div>
+      <input id="access-search" class="mf-inp access-search" type="search" value="${escHtml(_accessQuery)}" placeholder="メール・参加者名で検索">
+    </div>`;
+
+  if (membersWithoutAccess.length) {
+    html += `<div class="access-note">${ic('triangle-alert', { color: '#B45309' })} メール登録済みでアクセス許可リストにない有効参加者が ${membersWithoutAccess.length} 名います。</div>`;
+  }
+
+  if (!rows.length) {
+    html += '<div class="access-empty">' + (q ? '検索条件に一致するメールがありません。' : 'アクセス許可メールはまだありません。') + '</div>';
+  } else {
+    html += '<div class="access-list">';
+    rows.forEach(row => {
+      const member = row.member;
+      const rowSearch = [row.email, row.status, member?.name, member?.furigana]
+        .filter(Boolean).join(' ').toLowerCase();
+      const statusClass = member ? (member.valid ? 'linked' : 'invalid') : 'unlinked';
+      const statusLabel = member ? (member.valid ? '紐付け済み' : '無効メンバー') : '未紐付け';
+      const memberLabel = member
+        ? `<span class="access-member">${ic('user-round')} ${escHtml(member.name || '名前未設定')}${member.furigana ? ` <span>${escHtml(member.furigana)}</span>` : ''}</span>`
+        : '<span class="access-member access-member-empty">参加者未紐付け</span>';
+      const linkButton = !row.protected && !member
+        ? `<button type="button" class="btn btn-g btn-access" data-access-link="${escHtml(row.email)}">参加者と紐付け</button>`
+        : '';
+      const removeButton = row.protected
+        ? '<span class="access-protected">システム用</span>'
+        : `<button type="button" class="btn btn-delete-access" data-access-remove="${escHtml(row.email)}">削除</button>`;
+      html += `
+        <div class="access-row" data-access-search="${escHtml(rowSearch)}">
+          <div class="access-main">
+            <div class="access-email">${ic('mail')} <span>${escHtml(row.email)}</span></div>
+            <div class="access-meta"><span class="access-status ${statusClass}">${statusLabel}</span>${memberLabel}<span class="access-status-text">${escHtml(row.status || '状態未設定')}</span></div>
+          </div>
+          <div class="access-actions">${linkButton}${removeButton}</div>
+        </div>`;
+    });
+    html += '<div class="access-filter-empty is-hidden" data-access-filter-empty>検索条件に一致するメールがありません。</div>';
+    html += '</div>';
+  }
+  html += '<div class="access-footnote">アクセス許可を削除しても、参加者に登録されたメールアドレスは保持されます。</div>';
+  body.innerHTML = html;
+  body.querySelector('[data-access-add]')?.addEventListener('click', addAccessEmail);
+  body.querySelector('#access-search')?.addEventListener('input', filterAccessList);
+  body.querySelectorAll('[data-access-link]').forEach(button => {
+    button.addEventListener('click', () => openAccessMemberPicker(button.dataset.accessLink || '', button));
+  });
+  body.querySelectorAll('[data-access-remove]').forEach(button => {
+    button.addEventListener('click', () => removeAccessEmail(button.dataset.accessRemove || ''));
+  });
+  filterAccessList();
+}
+
+function filterAccessList() {
+  const body = document.getElementById('m-access-body');
+  const search = body?.querySelector('#access-search');
+  if (!body || !search) return;
+  _accessQuery = search.value.trim();
+  const q = _accessQuery.toLowerCase();
+  let visible = 0;
+  body.querySelectorAll('.access-row').forEach(row => {
+    const matched = !q || String(row.dataset.accessSearch || '').includes(q);
+    setVisible(row, matched);
+    if (matched) visible++;
+  });
+  const empty = body.querySelector('[data-access-filter-empty]');
+  setVisible(empty, !!q && visible === 0);
+}
+
+function showAccessFormError(message) {
+  const error = document.getElementById('access-form-error');
+  if (!error) return;
+  error.textContent = message;
+  setVisible(error, true);
+}
+
+async function addAccessEmail() {
+  const input = document.getElementById('access-email-input');
+  const email = accessEmailValue(input?.value);
+  if (!accessEmailIsValid(email)) {
+    showAccessFormError('メールアドレスの形式が正しくありません。');
+    input?.focus();
+    return;
+  }
+  showProc('アクセス許可メールを追加しています...', '少々お待ちください');
+  try {
+    const res = await apiGet('addAccessEmail', { email });
+    if (!res.ok) throw new Error(res.error || '追加失敗');
+    await loadAccessList();
+    hideProc();
+    toast('アクセス許可メールを追加しました', 's');
+  } catch (e) {
+    hideProc();
+    showAccessFormError(accessErrorText(e));
+  }
+}
+
+async function removeAccessEmail(email) {
+  const row = _accessList.find(item => accessEmailValue(item.email) === accessEmailValue(email));
+  if (!row || row.protected) return;
+  if (!await uiConfirm({
+    type: 'danger', title: 'アクセス許可メールの削除',
+    message: `${row.email} のログイン許可を削除しますか？\n\n参加者に登録されたメールアドレスは保持されます。`,
+    confirmText: '削除する',
+  })) return;
+
+  showProc('アクセス許可メールを削除しています...', '少々お待ちください');
+  try {
+    const res = await apiGet('removeAccessEmail', { email: row.email });
+    if (!res.ok) throw new Error(res.error || '削除失敗');
+    await loadAccessList();
+    hideProc();
+    toast('アクセス許可メールを削除しました', 's');
+  } catch (e) {
+    hideProc();
+    toast('削除に失敗しました: ' + accessErrorText(e), 'e');
+  }
+}
+
+function openAccessMemberPicker(email, anchor) {
+  const candidates = _accessMembers.filter(member => member.valid && !String(member.email || '').trim());
+  if (!candidates.length) {
+    uiAlert({ type: 'info', title: '紐付けできる参加者がいません', message: '有効でメールアドレス未登録の参加者を、先にメンバー管理から追加してください。' });
+    return;
+  }
+  openPicker(anchor, {
+    title: '紐付け先の参加者',
+    search: true,
+    note: '有効・メールアドレス未登録の参加者から選択',
+    items: candidates.map(member => ({
+      value: String(member.id),
+      label: member.name || '名前未設定',
+      sub: member.furigana || '',
+      search: [member.name, member.furigana].filter(Boolean).join(' '),
+    })),
+    onPick: memberId => confirmAccessMemberLink(email, memberId),
+  });
+}
+
+async function confirmAccessMemberLink(email, memberId) {
+  const member = _accessMembers.find(item => String(item.id) === String(memberId));
+  if (!member) return;
+  if (!await uiConfirm({
+    type: 'info', title: '参加者と紐付け',
+    message: `${email}\n→ ${member.name || '名前未設定'} さんに紐付けますか？\n\n参加者のメールアドレスに登録され、ログインできるようになります。`,
+    confirmText: '紐付ける',
+  })) return;
+
+  showProc('参加者と紐付けています...', '少々お待ちください');
+  try {
+    const res = await apiGet('linkAccessMember', { email, memberId });
+    if (!res.ok) throw new Error(res.error || '紐付け失敗');
+    await loadAccessList();
+    hideProc();
+    toast(`${member.name || '参加者'} さんと紐付けました`, 's');
+  } catch (e) {
+    hideProc();
+    toast('紐付けに失敗しました: ' + accessErrorText(e), 'e');
   }
 }
 
