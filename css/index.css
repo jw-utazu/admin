@@ -339,7 +339,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .sb-foot{flex-direction:row;gap:6px;}
 .foot-btn{flex:1;padding:8px 6px;border:1px solid var(--border);border-radius:var(--r);
   background:var(--surface2);cursor:pointer;font-family:var(--sans);font-size:11px;
-  font-weight:700;color:var(--ink2);white-space:nowrap;}
+  font-weight:700;color:var(--ink2);white-space:nowrap;text-decoration:none;display:flex;align-items:center;justify-content:center;}
 .foot-btn:hover{background:var(--surface);}
 .foot-btn.accent{background:var(--blue-l);border-color:var(--blue);color:var(--blue);}
 

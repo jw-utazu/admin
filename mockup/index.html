@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="PW管理アプリのUI/UX再設計モックアップ">
+  <title>PW管理｜UI/UX再設計モックアップ</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 4h16v16H4Zm0 11h5l2 2h2l2-2h5"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 14.5a8 8 0 0 0 0-5l2-1.5-2-3-2.4 1a8 8 0 0 0-4.3-2.5L12 1H8l-.3 2.5A8 8 0 0 0 3.4 6L1 5 0 8l2 1.5a8 8 0 0 0 0 5L0 16l1 3 2.4-1a8 8 0 0 0 4.3 2.5L8 23h4l.3-2.5a8 8 0 0 0 4.3-2.5l2.4 1 2-3Z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+</svg>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="#" data-page="home" aria-label="PW管理 ホーム"><span>PW</span><strong>管理</strong></a>
+    <nav class="main-nav" aria-label="メインナビゲーション">
+      <button class="nav-item active" data-page="home"><svg><use href="#i-home"/></svg><span>ホーム</span></button>
+      <button class="nav-item" data-page="monthly"><svg><use href="#i-calendar"/></svg><span>月次運用</span></button>
+      <button class="nav-item" data-page="territory"><svg><use href="#i-map"/></svg><span>区域割り当て</span></button>
+      <button class="nav-item" data-page="inbox"><svg><use href="#i-inbox"/></svg><span>対応一覧</span><b class="count">5</b></button>
+    </nav>
+    <div class="nav-spacer"></div>
+    <button class="nav-item" data-page="settings"><svg><use href="#i-settings"/></svg><span>管理・設定</span></button>
+    <button class="account" data-drawer="account"><span class="avatar">田</span><span><b>田中 太郎</b><small>区域係</small></span><svg><use href="#i-arrow"/></svg></button>
+  </aside>
+
+  <header class="mobile-header"><a class="brand" href="#" data-page="home"><span>PW</span><strong>管理</strong></a><button class="avatar" data-drawer="account" aria-label="アカウント">田</button></header>
+
+  <main id="main" tabindex="-1">
+    <section class="page active" id="page-home">
+      <header class="page-header">
+        <div><p class="eyebrow">ホーム</p><h1>おはようございます</h1><p class="lead">2026年9月のシフトは、作成を進める段階です。</p></div>
+        <div class="context-pickers"><button class="chip">通常PW</button><button class="chip">2026年9月⌄</button></div>
+      </header>
+
+      <div class="home-grid">
+        <div class="primary-column">
+          <section class="next-action" aria-labelledby="next-title">
+            <div class="next-copy"><span class="status status-current">現在：シフト作成中</span><p>次にすること</p><h2 id="next-title">希望を確認して、シフトを作成する</h2><p>希望提出 28名／32名。未提出者を確認してから割り当てを進めます。</p></div>
+            <button class="button primary" data-page="monthly" data-stage="shift">シフト作成を続ける <svg><use href="#i-arrow"/></svg></button>
+          </section>
+
+          <section class="section-block" aria-labelledby="progress-title">
+            <div class="section-heading"><div><p class="eyebrow">今月の進行</p><h2 id="progress-title">公開まであと2段階</h2></div><button class="text-button" data-page="monthly">月次運用を開く</button></div>
+            <ol class="progress-list">
+              <li class="done"><span><svg><use href="#i-check"/></svg></span><div><b>日程設定</b><small>9月1日に完了</small></div></li>
+              <li class="done"><span><svg><use href="#i-check"/></svg></span><div><b>希望受付</b><small>28名が提出</small></div></li>
+              <li class="current"><span>3</span><div><b>シフト作成</b><small>編集中</small></div></li>
+              <li><span>4</span><div><b>確認</b><small>未開始</small></div></li>
+              <li><span>5</span><div><b>公開</b><small>9月20日予定</small></div></li>
+            </ol>
+          </section>
+
+          <section class="section-block">
+            <div class="section-heading"><div><p class="eyebrow">直近日程</p><h2>今月の予定</h2></div></div>
+            <div class="schedule-table" role="table" aria-label="今月の予定">
+              <div role="row"><span>9月14日</span><b>希望締切</b><span class="status status-done">完了</span></div>
+              <div role="row"><span>9月18日</span><b>確認者への依頼目安</b><span>あと4日</span></div>
+              <div role="row"><span>9月20日</span><b>シフト公開予定</b><span>あと6日</span></div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="attention-panel">
+          <div class="section-heading"><div><p class="eyebrow">対応が必要</p><h2>5件あります</h2></div><button class="text-button" data-page="inbox">すべて見る</button></div>
+          <button class="attention-row" data-page="inbox"><span class="attention-icon urgent">!</span><span><b>ログイン救済</b><small>最も古い依頼：2日前</small></span><strong>2</strong><svg><use href="#i-arrow"/></svg></button>
+          <button class="attention-row" data-page="inbox"><span class="attention-icon">要</span><span><b>要望</b><small>未対応</small></span><strong>2</strong><svg><use href="#i-arrow"/></svg></button>
+          <button class="attention-row" data-page="inbox"><span class="attention-icon">不</span><span><b>バグ報告</b><small>未対応</small></span><strong>1</strong><svg><use href="#i-arrow"/></svg></button>
+          <div class="record-link"><span><b>配布報告</b><small>今月 14件</small></span><button class="text-button" data-page="inbox">記録を見る</button></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="page-monthly">
+      <header class="page-header compact"><div><p class="eyebrow">月次運用</p><h1>2026年9月・通常PW</h1></div><div class="context-pickers"><button class="chip">通常PW⌄</button><button class="chip">2026年9月⌄</button></div></header>
+      <div class="workspace">
+        <nav class="stage-nav" aria-label="月次運用の段階">
+          <button class="stage done" data-stage="schedule"><span><svg><use href="#i-check"/></svg></span><span><b>日程</b><small>完了</small></span></button>
+          <button class="stage done" data-stage="wishes"><span><svg><use href="#i-check"/></svg></span><span><b>希望</b><small>受付終了</small></span></button>
+          <button class="stage active" data-stage="shift"><span>3</span><span><b>シフト作成</b><small>編集中</small></span></button>
+          <button class="stage" data-stage="review"><span>4</span><span><b>確認</b><small>未開始</small></span></button>
+          <button class="stage" data-stage="publish"><span>5</span><span><b>公開</b><small>9月20日予定</small></span></button>
+          <button class="stage sub" data-stage="month-settings"><svg><use href="#i-settings"/></svg><span><b>この月の設定</b><small>場所・カート・検証</small></span></button>
+        </nav>
+        <section class="work-surface">
+          <div class="mobile-stage"><button data-drawer="stages"><span>3 / 5</span><b>シフト作成中</b><small>段階を変更⌄</small></button></div>
+          <div class="work-toolbar"><div><span class="status status-current">編集中</span><h2 id="stage-title">シフト作成</h2><p id="stage-help">希望を見ながら担当者を割り当てます。</p></div><div class="toolbar-actions"><button class="button secondary">元に戻す</button><button class="button secondary">比較</button><button class="button secondary">AI原案</button></div></div>
+          <div class="shift-toolbar"><button class="chip selected">9月25日（金）</button><button class="chip">10月2日（金）</button><button class="chip">10月9日（金）</button></div>
+          <div class="shift-editor" id="stage-content">
+            <aside class="people-panel"><h3>参加希望 <span>12名</span></h3><button><span class="mini-avatar">佐</span><span><b>佐藤 太郎</b><small>15:00〜18:00</small></span></button><button><span class="mini-avatar">鈴</span><span><b>鈴木 花子</b><small>15:00〜17:00</small></span></button><button><span class="mini-avatar">高</span><span><b>高橋 一郎</b><small>16:00〜18:00</small></span></button><button class="muted">ほか9名を表示</button></aside>
+            <div class="assignment"><div class="assignment-head"><span>時間</span><span>北口</span><span>南口</span></div><div class="assignment-row"><b>15:00</b><button>佐藤・田中</button><button class="empty">＋ 割り当て</button></div><div class="assignment-row"><b>16:00</b><button>鈴木・山田</button><button>高橋・伊藤</button></div><div class="assignment-row"><b>17:00</b><button class="warning">1名不足</button><button>佐藤・高橋</button></div></div>
+          </div>
+        </section>
+        <aside class="stage-summary"><p class="eyebrow">この段階の状態</p><h2>3件の確認があります</h2><ul><li><span class="dot warning"></span>1名不足の枠があります</li><li><span class="dot"></span>重複割当はありません</li><li><span class="dot"></span>責任者は設定済みです</li></ul><button class="button primary" data-dialog="check">公開前チェックへ</button><p class="hint">チェック後に「シフト作成完了」へ進めます。</p></aside>
+      </div>
+      <div class="mobile-primary"><button class="button primary" data-dialog="check">公開前チェックへ</button></div>
+    </section>
+
+    <section class="page simple-page" id="page-territory">
+      <header class="page-header"><div><p class="eyebrow">区域割り当て</p><h1>区域の現況</h1><p class="lead">割当と回収を、状態順に処理します。</p></div></header>
+      <div class="metric-row"><div><span>割当中</span><strong>12</strong></div><div><span>回収待ち</span><strong>3</strong></div><div><span>ストック</span><strong>26</strong></div></div>
+      <section class="section-block"><div class="section-heading"><div><p class="eyebrow">次の処理</p><h2>回収待ちの区域</h2></div><button class="button secondary">区域一覧を開く</button></div><div class="data-list"><button><b>区域 17</b><span>中央グループ・8月20日から</span><span class="status status-wait">回収待ち</span><svg><use href="#i-arrow"/></svg></button><button><b>区域 23</b><span>北グループ・8月28日から</span><span class="status status-wait">回収待ち</span><svg><use href="#i-arrow"/></svg></button></div></section>
+      <nav class="sub-actions"><button>区域一覧・割当操作</button><button>隣接関係</button><button>プール管理</button><button>グループ管理</button><button>バックアップ</button></nav>
+    </section>
+
+    <section class="page simple-page" id="page-inbox">
+      <header class="page-header"><div><p class="eyebrow">対応一覧</p><h1>未対応 5件</h1><p class="lead">対応が必要なものだけを新しい順に表示しています。</p></div><button class="chip">未対応のみ⌄</button></header>
+      <div class="inbox-layout"><nav class="inbox-types"><button class="active">すべて <b>5</b></button><button>ログイン救済 <b>2</b></button><button>要望 <b>2</b></button><button>バグ報告 <b>1</b></button><button>配布報告 <b class="neutral">14</b></button></nav><div class="message-list"><button class="selected" data-drawer="message"><span class="attention-icon urgent">!</span><span><b>ログインできません</b><small>山田 花子・2時間前</small></span><span class="status status-wait">未対応</span></button><button data-drawer="message"><span class="attention-icon">要</span><span><b>希望提出期間について</b><small>佐藤 太郎・昨日</small></span><span class="status status-wait">未対応</span></button><button data-drawer="message"><span class="attention-icon">不</span><span><b>写真が表示されない</b><small>鈴木 一郎・2日前</small></span><span class="status status-wait">未対応</span></button></div><aside class="message-detail"><p class="eyebrow">ログイン救済</p><h2>ログインできません</h2><p class="meta">山田 花子・9月14日 9:32</p><p>Googleアカウントを変更したところ、ログインできなくなりました。</p><button class="button primary">救済設定を開く</button></aside></div>
+    </section>
+
+    <section class="page simple-page" id="page-settings">
+      <header class="page-header"><div><p class="eyebrow">管理・設定</p><h1>アプリ全体の管理</h1><p class="lead">月次作業に直接関係しない設定をまとめています。</p></div></header>
+      <div class="settings-groups">
+        <section><h2>人と権限</h2><div class="settings-list"><button><span><b>メンバー</b><small>追加・編集・有効／無効</small></span><svg><use href="#i-arrow"/></svg></button><button><span><b>アクセス許可</b><small>メール・参加者との紐付け</small></span><svg><use href="#i-arrow"/></svg></button><button><span><b>立ち位置</b><small>区域係での役割と権限</small></span><svg><use href="#i-arrow"/></svg></button><button><span><b>代理送信・夫婦</b><small>希望提出に使う関係設定</small></span><svg><use href="#i-arrow"/></svg></button></div></section>
+        <section><h2>表示内容</h2><div class="settings-list"><button><span><b>お知らせ</b><small>追加・編集・削除</small></span><svg><use href="#i-arrow"/></svg></button><button><span><b>写真</b><small>カート展示写真の管理</small></span><svg><use href="#i-arrow"/></svg></button></div></section>
+        <section><h2>限定PW・その他</h2><div class="settings-list"><button><span><b>限定PW設定</b><small>期間・表示・対象メンバー</small></span><svg><use href="#i-arrow"/></svg></button><button><span><b>ログ</b><small>操作・希望提出・ログイン履歴</small></span><svg><use href="#i-arrow"/></svg></button><button><span><b>マニュアル／ホームに追加</b><small>使い方とPWA設定</small></span><svg><use href="#i-arrow"/></svg></button></div></section>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="スマホ用ナビゲーション"><button class="active" data-page="home"><svg><use href="#i-home"/></svg><span>ホーム</span></button><button data-page="monthly"><svg><use href="#i-calendar"/></svg><span>月次</span></button><button data-page="territory"><svg><use href="#i-map"/></svg><span>区域</span></button><button data-page="settings"><svg><use href="#i-settings"/></svg><span>その他</span><b class="mobile-badge">5</b></button></nav>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"><div class="drawer-handle"></div><div id="drawer-content"></div><button class="button secondary drawer-close">閉じる</button></aside>
+<div class="dialog" id="dialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="dialog-card"><span class="status status-current">公開前チェック</span><h2 id="dialog-title">3件の確認があります</h2><ul><li>17:00 北口：1名不足</li><li>カート担当の確認が必要です</li><li>未提出者 4名を確認してください</li></ul><div class="dialog-actions"><button class="button secondary dialog-close">戻る</button><button class="button primary">確認を続ける</button></div></div></div>
+<script src="app.js"></script>
+</body>
+</html>
