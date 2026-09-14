@@ -1,73 +1,58 @@
-const pages=document.querySelectorAll('.page');
-const navButtons=document.querySelectorAll('[data-page]');
-let activeStage='shift';
-const stageCopy={
-  schedule:['日程・カレンダー','実施日と申込期間をカレンダーで確認・設定します。','設定完了'],
-  wishes:['希望確認','提出状況と参加希望を確認します。','受付終了'],
-  shift:['シフト作成','希望を見ながら担当者を割り当てます。','編集中'],
-  review:['確認','確認者の進捗と指摘を確認します。','未開始'],
-  publish:['公開','公開条件と公開予定日を確認します。','公開待ち'],
-  'month-settings':['この月の設定','場所・カート番号・検証ルールを調整します。','設定']
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+let selected='', pickerCell=null, contextTarget=null, undo=[], redo=[], toastTimer;
+const sheetText={
+ account:'<p class="eyebrow">アカウント</p><h2>田中 太郎</h2><p>区域係・通常PW</p><hr><button class="sheet-link">アカウントを切り替える　›</button><button class="sheet-link">マニュアルを開く　›</button><button class="sheet-link">ログアウト　›</button>',
+ applicants:'<p class="eyebrow">シフト作成</p><h2>参加希望 12名</h2><p class="sheet-note">人を選んでから、戻った作業表の配置先セルをタップできます。PCではドラッグ＆ドロップも使えます。</p><button class="sheet-person" data-person="佐藤 太郎">佐藤 太郎 <small>15:00〜18:00・責任者可</small></button><button class="sheet-person" data-person="鈴木 花子">鈴木 花子 <small>15:00〜17:00・カート不可</small></button><button class="sheet-person" data-person="高橋 一郎">高橋 一郎 <small>16:00〜18:00・カート可</small></button><button class="sheet-person" data-person="伊藤 美咲">伊藤 美咲 <small>15:00〜18:00</small></button>',
+ compare:'<p class="eyebrow">シフト作成・参照モード</p><h2>別日・別時間を比較</h2><p class="sheet-note">比較側は参照専用です。閉じると、9月25日・選択中の編集位置へ戻ります。</p><div class="sheet-pills"><button class="selected" data-compare-date="9月18日">9月18日</button><button data-compare-date="10月2日">10月2日</button><button data-compare-date="10月9日">10月9日</button></div><div class="sheet-pills"><button class="selected" data-compare-time="15:00">15:00</button><button data-compare-time="16:00">16:00</button><button data-compare-time="17:00">17:00</button></div><div class="compare-card"><b data-compare-summary>9月18日 15:00</b><p>北口　田中・山田</p><p>南口　伊藤・佐藤</p><span class="status done">確認完了</span></div>',
+ ai:'<p class="eyebrow">シフト作成支援</p><h2>AI原案</h2><p class="sheet-note">現在の希望、場所、検証ルールをもとに原案を作ります。実データには接続しないモックです。</p><div class="ai-rules"><b>適用ルール</b><span>責任者を優先</span><span>連続配置を警告</span><span>カート担当の重複を防止</span></div><button class="button primary" data-action="generate-ai">原案を生成</button><p class="check-result" id="ai-result"></p>',
+ territory:'<p class="eyebrow">区域割り当て</p><h2>区域管理メニュー</h2><p class="sheet-note">現況を確認しながら、割当・回収・隣接・プール・グループ・バックアップへ進みます。</p><button class="sheet-link">区域一覧・割当操作　›</button><button class="sheet-link">回収待ち　<span class="status wait">3件</span></button><button class="sheet-link">隣接関係　›</button><button class="sheet-link">プール／グループ管理　›</button><button class="sheet-link">バックアップ　›</button>',
+ message:'<p class="eyebrow">ログイン救済</p><h2>ログインできません</h2><p class="sheet-note">山田 花子・9月14日 9:32</p><p>Googleアカウントを変更したところ、ログインできなくなりました。</p><button class="button primary" data-action="resolve-message">救済設定を開く</button>'
 };
-function showPage(name){
-  pages.forEach(page=>page.classList.toggle('active',page.id===`page-${name}`));
-  document.querySelectorAll('.nav-item,.bottom-nav button').forEach(button=>button.classList.toggle('active',button.dataset.page===name));
-  document.getElementById('main').focus({preventScroll:true});
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-navButtons.forEach(button=>button.addEventListener('click',event=>{event.preventDefault();showPage(button.dataset.page);if(button.dataset.stage)showStage(button.dataset.stage)}));
-function showStage(name){
-  const copy=stageCopy[name]||stageCopy.shift;
-  activeStage=name;
-  document.querySelectorAll('.stage').forEach(stage=>stage.classList.toggle('active',stage.dataset.stage===name));
-  document.getElementById('stage-title').textContent=copy[0];
-  document.getElementById('stage-help').textContent=copy[1];
-  const badge=document.querySelector('.work-toolbar .status');
-  badge.textContent=copy[2];
-  const calendar=document.getElementById('calendar-pane');
-  const shift=document.getElementById('stage-content');
-  const shiftToolbar=document.getElementById('shift-toolbar');
-  const createTools=document.getElementById('create-toolbar-actions');
-  if(calendar) calendar.classList.toggle('pane-hidden',name!=='schedule');
-  if(shift) shift.classList.toggle('pane-hidden',name==='schedule');
-  if(shiftToolbar) shiftToolbar.classList.toggle('pane-hidden',name==='schedule');
-  if(createTools) createTools.classList.toggle('pane-hidden',name==='schedule');
-  const primary=document.getElementById('stage-primary');
-  if(primary) primary.textContent=name==='schedule'?'予定表を確認・承認':'公開前チェックへ';
-  showPage('monthly');
-}
-document.querySelectorAll('[data-stage]').forEach(button=>button.addEventListener('click',()=>showStage(button.dataset.stage)));
-const scrim=document.getElementById('scrim');
-const drawer=document.getElementById('drawer');
-const drawerContent=document.getElementById('drawer-content');
-const drawerTemplates={
-  account:'<p class="eyebrow">アカウント</p><h2>田中 太郎</h2><p>区域係・通常PW</p><ul><li>アカウントを切り替える</li><li>マニュアルを開く</li><li>ログアウト</li></ul>',
-  stages:'<p class="eyebrow">月次運用</p><h2>段階を選ぶ</h2><ul><li>✓ 日程・カレンダー — 完了</li><li>✓ 希望 — 受付終了</li><li><b>3 シフト作成 — 編集中</b></li><li>4 確認 — 未開始</li><li>5 公開 — 9月20日予定</li></ul>',
-  message:'<p class="eyebrow">ログイン救済</p><h2>ログインできません</h2><p>山田 花子・9月14日 9:32</p><p>Googleアカウントを変更したところ、ログインできなくなりました。</p><button class="button primary">救済設定を開く</button>'
-};
-function closeDrawer(){drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true');scrim.classList.remove('open')}
-document.querySelectorAll('[data-drawer]').forEach(button=>button.addEventListener('click',()=>{drawerContent.innerHTML=drawerTemplates[button.dataset.drawer];drawer.classList.add('open');drawer.setAttribute('aria-hidden','false');scrim.classList.add('open')}));
-scrim.addEventListener('click',closeDrawer);document.querySelector('.drawer-close').addEventListener('click',closeDrawer);
-const dialog=document.getElementById('dialog');
-document.querySelectorAll('[data-dialog]').forEach(button=>button.addEventListener('click',()=>{document.getElementById('dialog-title').textContent=activeStage==='schedule'?'予定表の確認・承認':'3件の確認があります';document.querySelector('#dialog .status').textContent=activeStage==='schedule'?'予定表の確認':'公開前チェック';dialog.classList.add('open');dialog.setAttribute('aria-hidden','false')}));
-function closeDialog(){dialog.classList.remove('open');dialog.setAttribute('aria-hidden','true')}
-document.querySelector('.dialog-close').addEventListener('click',closeDialog);dialog.addEventListener('click',event=>{if(event.target===dialog)closeDialog()});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeDrawer();closeDialog()}});
-
-const picker=document.getElementById('picker-popover');let pickerTarget=null;
-function closePicker(){picker.classList.remove('open');picker.setAttribute('aria-hidden','true');pickerTarget=null}
-document.addEventListener('click',event=>{
-  const role=event.target.closest('.role-select');
-  if(role){event.preventDefault();event.stopPropagation();pickerTarget=role;picker.classList.add('open');picker.setAttribute('aria-hidden','false');return}
-  const choice=event.target.closest('[data-picker-value]');
-  if(choice&&pickerTarget){const value=choice.dataset.pickerValue;pickerTarget.innerHTML=value==='空欄にする'?'＋ 割り当て <span class="select-caret">⌄</span>':`${value} <span class="select-caret">⌄</span>`;pickerTarget.classList.toggle('empty',value==='空欄にする');closePicker();return}
-  if(!event.target.closest('#picker-popover'))closePicker();
+function showView(name){$$('[data-view]').forEach(p=>p.classList.toggle('active',p.dataset.view===name));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===name));$('#main').focus({preventScroll:true});window.scrollTo({top:0,behavior:'smooth'});closeOverlays()}
+function openSheet(type){$('#sheet-content').innerHTML=sheetText[type]||sheetText.account;$('#sheet').classList.add('open');$('#sheet').setAttribute('aria-hidden','false');$('#scrim').classList.add('open');$('#sheet').dataset.type=type}
+function closeSheet(){$('#sheet').classList.remove('open');$('#sheet').setAttribute('aria-hidden','true');$('#scrim').classList.remove('open')}
+function openDialog(kind){$('#dialog-title').textContent=kind==='schedule'?'予定表の確認・承認':kind==='publish'?'公開条件と公開予定':'3件の確認があります';$('#dialog').classList.add('open');$('#dialog').setAttribute('aria-hidden','false')}
+function closeDialog(){$('#dialog').classList.remove('open');$('#dialog').setAttribute('aria-hidden','true')}
+function closeOverlays(){closeSheet();closeDialog();$('#picker').classList.remove('open');$('#context-menu').classList.remove('open');}
+function notify(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200)}
+function setMonthTab(tab){$$('[data-month-tab]').forEach(b=>b.classList.toggle('active',b.dataset.monthTab===tab));$$('[data-month-view]').forEach(v=>v.classList.toggle('active',v.dataset.monthView===tab))}
+function boardSnapshot(){return $$('.cell').map(c=>[c.dataset.cell,c.dataset.personName||''])}
+function restoreBoard(state){state.forEach(([id,name])=>{const c=document.querySelector(`[data-cell="${id}"]`);if(c){c.dataset.personName=name;c.classList.toggle('empty',!name);c.querySelector('.cell-person').textContent=name||'＋ 割り当て'}})}
+function saveBoard(){const s=$('#save-state'),m=$('#board-message');s.textContent='● 保存中…';s.classList.add('pending');m.textContent='自動保存キューに追加しました';setTimeout(()=>{s.textContent='● 保存済み';s.classList.remove('pending');m.textContent='変更は自動保存されました'},500)}
+function assign(cell,name){const old=cell.dataset.personName||'';if(old!==name)undo.push(boardSnapshot());cell.dataset.personName=name;cell.classList.toggle('empty',!name);cell.querySelector('.cell-person').textContent=name||'＋ 割り当て';if(old!==name){redo=[];saveBoard();notify(name?`${name}を配置しました`:'配置を外しました')}}
+function selectPerson(name){selected=name;$$('.person,.sheet-person').forEach(p=>p.classList.toggle('selected',p.dataset.person===name));$('#selected-person').textContent=`選択中：${name}　→ 配置先セルをタップ`;notify(`${name}を選択。配置先をタップしてください`);if($('#sheet').classList.contains('open'))closeSheet()}
+function openPicker(cell){pickerCell=cell;$('#picker').classList.add('open');$('#picker').setAttribute('aria-hidden','false')}
+function changeContext(value){if(contextTarget){contextTarget.textContent=value+'⌄';}$('#context-menu').classList.remove('open');notify(`表示コンテキストを${value}に変更（モック）`)}
+document.addEventListener('click',e=>{
+ const page=e.target.closest('[data-page]');if(page){e.preventDefault();showView(page.dataset.page);if(page.dataset.monthTab){setMonthTab(page.dataset.monthTab)}return}
+ const mt=e.target.closest('[data-month-tab]');if(mt){setMonthTab(mt.dataset.monthTab);return}
+ const open=e.target.closest('[data-open-sheet]');if(open){openSheet(open.dataset.openSheet);return}
+ if(e.target.closest('[data-close]')){closeOverlays();return}
+ const ctx=e.target.closest('[data-context]');if(ctx){contextTarget=ctx;$('#context-menu').classList.toggle('open');$('#context-title').textContent=ctx.dataset.context==='pw'?'PWを選択':'年月を選択';return}
+ const cv=e.target.closest('[data-context-value]');if(cv){changeContext(cv.dataset.contextValue);return}
+ const split=e.target.closest('[data-split]');if(split){const active=$('#shift-shell').classList.toggle('split');split.textContent=active?'希望と作成の分割を解除':'希望と作成を分割';notify(active?'希望確認と作成表を分割しました':'分割表示を閉じました');return}
+ const shiftDate=e.target.closest('[data-shift-date]');if(shiftDate){$$('[data-shift-date]').forEach(b=>b.classList.toggle('selected',b===shiftDate));notify(`編集対象を${shiftDate.dataset.shiftDate}に切り替えました（モック）`);return}
+ const shiftTime=e.target.closest('[data-shift-time]');if(shiftTime){$$('[data-shift-time]').forEach(b=>b.classList.toggle('selected',b===shiftTime));$$('.assign-row').forEach(row=>row.classList.toggle('focused',row.dataset.time===shiftTime.dataset.shiftTime));document.querySelector(`[data-time="${shiftTime.dataset.shiftTime}"]`)?.scrollIntoView({block:'nearest'});notify(`時間帯を${shiftTime.dataset.shiftTime}に切り替えました（モック）`);return}
+ const compareDate=e.target.closest('[data-compare-date]');if(compareDate){const root=compareDate.closest('.compare-panel,.sheet');root.querySelectorAll('[data-compare-date]').forEach(b=>b.classList.toggle('active',b===compareDate));root.querySelector('[data-compare-summary]').textContent=`${compareDate.dataset.compareDate} ${root.querySelector('[data-compare-time].active')?.dataset.compareTime||'15:00'}`;notify(`比較対象を${compareDate.dataset.compareDate}に変更しました`);return}
+ const compareTime=e.target.closest('[data-compare-time]');if(compareTime){const root=compareTime.closest('.compare-panel,.sheet');root.querySelectorAll('[data-compare-time]').forEach(b=>b.classList.toggle('active',b===compareTime));root.querySelector('[data-compare-summary]').textContent=`${root.querySelector('[data-compare-date].active')?.dataset.compareDate||'9月18日'} ${compareTime.dataset.compareTime}`;notify(`比較時間を${compareTime.dataset.compareTime}に変更しました`);return}
+ const compare=e.target.closest('[data-compare-toggle]');if(compare){if(innerWidth<761)openSheet('compare');else{$('#compare-panel').classList.toggle('open');$('#shift-shell').classList.toggle('has-compare',$('#compare-panel').classList.contains('open'));}return}
+ const applicant=e.target.closest('[data-person]');if(applicant){selectPerson(applicant.dataset.person);return}
+ const cart=e.target.closest('[data-cart]');if(cart){cart.textContent=cart.textContent.includes('5')?'カート 8':'カート 5';saveBoard();notify('カート担当を更新しました');return}
+ const cell=e.target.closest('[data-cell]');if(cell){if(selected){assign(cell,selected);selected='';$('#selected-person').textContent='未選択：人を選んでから配置先をタップできます'}else openPicker(cell);return}
+ const pv=e.target.closest('[data-picker-value]');if(pv&&pickerCell){assign(pickerCell,pv.dataset.pickerValue==='空欄にする'?'':pv.dataset.pickerValue);pickerCell=null;$('#picker').classList.remove('open');return}
+ const dialog=e.target.closest('[data-dialog]');if(dialog){openDialog(dialog.dataset.dialog);return}
+ const action=e.target.closest('[data-action]');if(action){runAction(action.dataset.action);return}
+ if(!e.target.closest('#picker,#context-menu')){$('#picker').classList.remove('open');$('#context-menu').classList.remove('open')}
 });
-
-const dndBar=document.getElementById('dnd-dropbar');let dnd={source:null,ghost:null,press:null,active:false,x:0,y:0};
-function startDnd(source,e){dnd.source=source;dnd.active=true;document.body.classList.add('dnd-on');dndBar.classList.add('open');dndBar.setAttribute('aria-hidden','false');dnd.ghost=document.createElement('div');dnd.ghost.className='dnd-ghost';dnd.ghost.textContent=source.dataset.dndName||source.textContent.trim().replace('⌄','');document.body.append(dnd.ghost);moveGhost(e)}
-function moveGhost(e){if(dnd.ghost){dnd.ghost.style.left=`${e.clientX+12}px`;dnd.ghost.style.top=`${e.clientY+12}px`}}
-function endDnd(e){if(!dnd.active){if(dnd.press)clearTimeout(dnd.press);dnd={source:null,ghost:null,press:null,active:false,x:0,y:0};return}const target=e.target.closest('.drop-zone,.role-select');if(target&&target!==dnd.source){target.innerHTML=`${dnd.source.dataset.dndName||'選択した人'} <span class="select-caret">⌄</span>`;target.classList.remove('empty');target.classList.add('dnd-over')}if(dnd.ghost)dnd.ghost.remove();dndBar.classList.remove('open');dndBar.setAttribute('aria-hidden','true');document.body.classList.remove('dnd-on');dnd={source:null,ghost:null,press:null,active:false,x:0,y:0}}
-document.addEventListener('pointerdown',event=>{const source=event.target.closest('.draggable-candidate,.role-select.draggable,.cart-chip');if(!source)return;dnd.source=source;dnd.x=event.clientX;dnd.y=event.clientY;if(event.pointerType==='touch')dnd.press=setTimeout(()=>startDnd(source,event),320)});
-document.addEventListener('pointermove',event=>{if(!dnd.source)return;if(!dnd.active&&Math.abs(event.clientX-dnd.x)+Math.abs(event.clientY-dnd.y)>8){if(dnd.press)clearTimeout(dnd.press);startDnd(dnd.source,event)}if(dnd.active){event.preventDefault();moveGhost(event);document.querySelectorAll('.dnd-over').forEach(el=>el.classList.remove('dnd-over'));const target=event.target.closest('.drop-zone,.role-select');if(target&&target!==dnd.source)target.classList.add('dnd-over')}},{passive:false});
-document.addEventListener('pointerup',endDnd);document.addEventListener('pointercancel',endDnd);
+function runAction(action){
+ if(action==='run-check'){$('#check-result').textContent='検証完了：警告1件を確認してください。公開前チェックは保存されました。';notify('検証結果を更新しました');return}
+ if(action==='complete-shift'){$('#publish-state').textContent='確認待ち';$('#check-result').textContent='作成完了を登録しました。確認者2名の確認後に公開できます。';notify('シフト作成完了を登録しました');return}
+ if(action==='publish'){$('#publish-state').textContent='公開待ち';$('#check-result').textContent='公開条件を確認しました。確認者2名の確認後に公開できます。';notify('公開条件を確認しました');return}
+ if(action==='generate-ai'){$('#ai-result').textContent='原案を生成しました：12名を配置、警告1件。差分を確認して反映できます。';notify('AI原案を生成しました（モック）');return}
+ if(action==='resolve-message'){notify('救済設定を開きます（モック）');closeSheet();return}
+ if(action==='undo'){if(!undo.length){notify('元に戻せる変更はありません');return}redo.push(boardSnapshot());restoreBoard(undo.pop());saveBoard();notify('直前の配置を元に戻しました');return}
+ if(action==='redo'){if(!redo.length){notify('やり直せる変更はありません');return}undo.push(boardSnapshot());restoreBoard(redo.pop());saveBoard();notify('配置をやり直しました')}
+}
+$$('.person').forEach(p=>{p.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',p.dataset.person);selected=p.dataset.person;notify(`${selected}をドラッグ中。セルへドロップできます`)});});
+$$('.cell').forEach(c=>{c.addEventListener('dragover',e=>{e.preventDefault();c.classList.add('drop-target')});c.addEventListener('dragleave',()=>c.classList.remove('drop-target'));c.addEventListener('drop',e=>{e.preventDefault();c.classList.remove('drop-target');assign(c,e.dataTransfer.getData('text/plain'));selected=''})});
+$('#scrim').addEventListener('click',closeOverlays);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOverlays()});
