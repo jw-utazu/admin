@@ -4,3 +4,41 @@
 .sheet hr{border:0;border-top:1px solid var(--line);margin:18px 0 5px}.sheet h2{font-size:20px;margin:6px 0 10px}.sheet-note{color:var(--muted);font-size:12px;line-height:1.8}.sheet-link,.sheet-person{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;border-bottom:1px solid var(--line);background:#fff;padding:13px 3px;text-align:left;font-size:12px;font-weight:800}.sheet-link:hover,.sheet-person:hover,.sheet-person.selected{background:var(--blue2);color:var(--blue)}.sheet-person small{display:block;margin-left:auto;color:var(--muted);font-size:10px;font-weight:400}.sheet-pills{display:flex;gap:6px;overflow:auto;margin:12px 0}.sheet-pills button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 9px;white-space:nowrap;font-size:11px}.sheet-pills button.selected{background:var(--blue2);border-color:#a9c5f9;color:var(--blue)}.ai-rules{display:grid;gap:7px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:12px;margin:14px 0}.ai-rules span{color:var(--muted);font-size:11px}.ai-rules span:before{content:'✓';color:var(--green);font-weight:800;margin-right:7px}.settings button{font-weight:800}.settings button small{font-weight:400}
 /* Keep the mobile shell independent from the desktop sidebar geometry. */
 @media(max-width:760px){html,body{width:100%;max-width:100%;overflow-x:hidden}.app{display:block;width:100%;min-height:100vh}.sidebar{display:none!important;width:0!important;margin:0!important;padding:0!important;visibility:hidden}.mobile-head{display:flex;width:100%;max-width:100%;min-width:0}.app>main,main{display:block;width:100%;max-width:none;min-width:0;margin:0;padding:22px 14px calc(104px + env(safe-area-inset-bottom));overflow:visible}.page,.page-head,.home-grid,.stack,.section,.next-action,.simple,.shift-head,.shift-toolbar,.shift-shell,.shift-status,.inbox,.settings{min-width:0;max-width:100%}.shift-shell,.shift-shell.split{width:100%;grid-template-columns:minmax(0,1fr)!important;overflow:hidden}.board{width:100%;max-width:100%;min-width:0;overflow:hidden}.board-scroll{width:100%;max-width:100%;overflow-x:auto}.bottom-nav{width:100%;max-width:100%}}
+
+/* Phase 2: the home screen is a calendar-led command center. */
+.home-command-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(340px,.8fr);gap:18px;align-items:start}
+.home-calendar-card{padding:20px}
+.home-calendar-card .section-head{margin-bottom:16px}
+.home-calendar-card .section-head h2{font-size:19px}
+.home-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.home-calendar>b{text-align:center;color:var(--muted);font-size:11px}
+.home-day{min-height:76px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:7px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;transition:.15s}
+.home-day:hover{border-color:#9dbcf5;background:#f9fbff}
+.home-day.selected{border:2px solid var(--blue);padding:6px;background:var(--blue2);box-shadow:0 0 0 2px #d9e6ff}
+.home-day.outside{color:#b4bdca;background:#fbfcfd}
+.day-number{font-size:12px;font-weight:800;line-height:1}
+.day-status{display:block;border-radius:4px;padding:2px 4px;margin-top:auto;font-size:9px;font-style:normal;font-weight:800;line-height:1.25;white-space:nowrap}
+.event-blue .day-status{background:var(--blue2);color:var(--blue)}
+.event-green .day-status{background:var(--green2);color:var(--green)}
+.event-amber .day-status{background:var(--amber2);color:var(--amber)}
+.home-calendar-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;color:var(--muted);font-size:10px}
+.home-calendar-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.home-calendar-legend small{margin-left:auto;color:var(--muted);font-size:10px}
+.home-summary{display:grid;gap:14px}
+.home-summary .next-action .button{flex-shrink:0;white-space:nowrap}
+.selected-day-card{padding:18px;border-color:#c9d8f5;background:linear-gradient(145deg,#fff,#f8fbff)}
+.selected-day-card .section-head{align-items:center}
+.selected-day-card h2{font-size:18px}
+.home-day-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 12px}
+.home-day-meta div{min-width:0;border:1px solid var(--line);border-radius:7px;background:#fff;padding:9px}
+.home-day-meta dt{color:var(--muted);font-size:10px}
+.home-day-meta dd{margin:3px 0 0;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-date-note{margin:0;color:var(--muted);font-size:11px;line-height:1.7}
+.home-date-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:15px}
+.home-date-actions .button{padding:7px 10px;font-size:11px}
+.home-date-actions .text-button{font-size:11px}
+.home-lower-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);gap:18px;margin-top:18px}
+.home-lower-grid>.section{min-width:0}
+
+@media(max-width:1050px){.home-command-grid,.home-lower-grid{grid-template-columns:1fr}.home-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.home-summary .next-action{grid-column:1/-1}}
+@media(max-width:760px){.home-command-grid,.home-lower-grid{display:block}.home-calendar-card{padding:13px}.home-calendar{gap:3px}.home-day{min-height:62px;padding:6px 4px;border-radius:6px}.home-day.selected{padding:5px 3px}.day-number{font-size:11px}.day-status{max-width:100%;padding:2px 3px;margin-top:auto;font-size:8px;overflow:hidden;text-overflow:ellipsis}.home-calendar-legend{gap:7px 10px;margin-top:11px}.home-calendar-legend small{width:100%;margin-left:0}.home-summary{display:block}.selected-day-card,.home-summary .next-action,.home-summary .attention{margin-top:15px}.selected-day-card{padding:15px}.selected-day-card h2{font-size:16px}.home-day-meta{gap:5px;margin:13px 0 10px}.home-day-meta div{padding:8px 6px}.home-day-meta dd{font-size:11px}.home-date-actions{display:grid;grid-template-columns:1fr;gap:5px}.home-date-actions .button{width:100%}.home-date-actions .text-button{justify-self:start;padding-left:0}.home-lower-grid>.section{margin-top:15px}.home-lower-grid .section:first-child{margin-top:15px}}

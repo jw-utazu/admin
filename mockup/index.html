@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="PW管理アプリの情報設計・操作方式モックアップ">
   <title>PW管理｜UX再設計モック</title>
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <svg class="sprite" aria-hidden="true">
@@ -39,13 +39,58 @@
   <main id="main" tabindex="-1">
     <section class="page active" data-view="home">
       <header class="page-head"><div><p class="eyebrow">ホーム</p><h1>おはようございます</h1><p class="lead">2026年9月のシフトは、作成を進める段階です。</p></div><div class="context"><button class="chip" data-context="pw">通常PW⌄</button><button class="chip" data-context="month">2026年9月⌄</button></div></header>
-      <div class="home-grid">
-        <div class="stack">
+      <div class="home-command-grid">
+        <section class="section home-calendar-card">
+          <div class="section-head"><div><p class="eyebrow">今月の日程</p><h2>2026年9月</h2></div><button class="text-button" data-page="monthly" data-month-tab="schedule">日程を詳しく見る ›</button></div>
+          <div class="home-calendar" role="grid" aria-label="2026年9月の日程">
+            <b role="columnheader">月</b><b role="columnheader">火</b><b role="columnheader">水</b><b role="columnheader">木</b><b role="columnheader">金</b><b role="columnheader">土</b><b role="columnheader">日</b>
+            <button class="home-day outside" type="button" role="gridcell" data-home-date="2026-08-31" aria-label="8月31日"><span class="day-number">31</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-01" aria-label="9月1日"><span class="day-number">1</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-02" aria-label="9月2日"><span class="day-number">2</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-03" aria-label="9月3日"><span class="day-number">3</span></button>
+            <button class="home-day event-green" type="button" role="gridcell" data-home-date="2026-09-04" aria-label="9月4日 申込受付開始"><span class="day-number">4</span><span class="day-status">申込</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-05" aria-label="9月5日"><span class="day-number">5</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-06" aria-label="9月6日"><span class="day-number">6</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-07" aria-label="9月7日"><span class="day-number">7</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-08" aria-label="9月8日"><span class="day-number">8</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-09" aria-label="9月9日"><span class="day-number">9</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-10" aria-label="9月10日"><span class="day-number">10</span></button>
+            <button class="home-day event-blue" type="button" role="gridcell" data-home-date="2026-09-11" aria-label="9月11日 実施"><span class="day-number">11</span><span class="day-status">実施</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-12" aria-label="9月12日"><span class="day-number">12</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-13" aria-label="9月13日"><span class="day-number">13</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-14" aria-label="9月14日"><span class="day-number">14</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-15" aria-label="9月15日"><span class="day-number">15</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-16" aria-label="9月16日"><span class="day-number">16</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-17" aria-label="9月17日"><span class="day-number">17</span></button>
+            <button class="home-day event-blue" type="button" role="gridcell" data-home-date="2026-09-18" aria-label="9月18日 実施"><span class="day-number">18</span><span class="day-status">実施</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-19" aria-label="9月19日"><span class="day-number">19</span></button>
+            <button class="home-day event-amber" type="button" role="gridcell" data-home-date="2026-09-20" aria-label="9月20日 シフト公開予定"><span class="day-number">20</span><span class="day-status">公開</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-21" aria-label="9月21日"><span class="day-number">21</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-22" aria-label="9月22日"><span class="day-number">22</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-23" aria-label="9月23日"><span class="day-number">23</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-24" aria-label="9月24日"><span class="day-number">24</span></button>
+            <button class="home-day event-blue selected" type="button" role="gridcell" data-home-date="2026-09-25" aria-label="9月25日 実施 シフト作成中" aria-pressed="true"><span class="day-number">25</span><span class="day-status">作成中</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-26" aria-label="9月26日"><span class="day-number">26</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-27" aria-label="9月27日"><span class="day-number">27</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-28" aria-label="9月28日"><span class="day-number">28</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-29" aria-label="9月29日"><span class="day-number">29</span></button>
+            <button class="home-day" type="button" role="gridcell" data-home-date="2026-09-30" aria-label="9月30日"><span class="day-number">30</span></button>
+            <button class="home-day outside" type="button" role="gridcell" data-home-date="2026-10-01" aria-label="10月1日"><span class="day-number">1</span></button>
+            <button class="home-day outside" type="button" role="gridcell" data-home-date="2026-10-02" aria-label="10月2日"><span class="day-number">2</span></button>
+            <button class="home-day outside" type="button" role="gridcell" data-home-date="2026-10-03" aria-label="10月3日"><span class="day-number">3</span></button>
+            <button class="home-day outside" type="button" role="gridcell" data-home-date="2026-10-04" aria-label="10月4日"><span class="day-number">4</span></button>
+          </div>
+          <div class="home-calendar-legend"><span><i class="blue-dot"></i>実施・作成</span><span><i class="green-dot"></i>申込受付</span><span><i class="amber-dot"></i>公開予定</span><small>日付を選ぶと詳細を表示</small></div>
+        </section>
+        <div class="home-summary">
+          <section class="section selected-day-card" aria-live="polite"><div class="section-head"><div><p class="eyebrow">選択中の日程</p><h2 id="home-date-title">9月25日（金）</h2></div><span class="status current" id="home-date-status">シフト作成中</span></div><dl class="home-day-meta"><div><dt>時間帯</dt><dd id="home-date-time">15:00〜18:00</dd></div><div><dt>申込状況</dt><dd id="home-date-applications">28 / 32</dd></div><div><dt>場所</dt><dd id="home-date-places">北口・南口</dd></div></dl><p class="home-date-note" id="home-date-note">希望を確認しながらシフトを作成しています。</p><div class="home-date-actions"><button class="button primary" id="home-primary-action" data-page="shift"><span id="home-primary-label">シフト作成を続ける</span><svg><use href="#arrow"/></svg></button><button class="text-button" id="home-secondary-action" data-page="monthly" data-month-tab="wishes"><span id="home-secondary-label">申込を見る</span> ›</button></div></section>
           <section class="next-action"><div><span class="status current">現在：シフト作成中</span><p class="eyebrow action-label">次にすること</p><h2>希望を確認して、シフトを作成する</h2><p>希望提出 28名／32名。未提出者を確認してから割り当てを進めます。</p></div><button class="button primary" data-page="shift">シフト作成を続ける <svg><use href="#arrow"/></svg></button></section>
-          <section class="section"><div class="section-head"><div><p class="eyebrow">直接アクセス</p><h2>別の作業へ移動</h2></div><span class="hint">次にすることの代替ではありません</span></div><div class="quick-grid"><button data-page="monthly" data-month-tab="schedule"><span class="quick-icon blue"><svg><use href="#calendar"/></svg></span><b>日程を見る</b><small>実施日・申込期間</small></button><button data-page="monthly" data-month-tab="wishes"><span class="quick-icon green">✓</span><b>申込状況を見る</b><small>希望・未提出者</small></button><button data-page="monthly" data-month-tab="shifts"><span class="quick-icon purple"><svg><use href="#shift"/></svg></span><b>シフトを見る</b><small>確認・公開状況</small></button><button data-page="shift"><span class="quick-icon amber">＋</span><b>シフトを作成</b><small>編集ワークスペース</small></button></div></section>
-          <section class="section"><div class="section-head"><div><p class="eyebrow">今月の進行</p><h2>公開まであと2段階</h2></div><button class="text-button" data-page="monthly">月次運用を開く</button></div><ol class="progress"><li class="done"><i>✓</i><span><b>日程設定</b><small>9月1日に完了</small></span></li><li class="done"><i>✓</i><span><b>希望受付</b><small>28名が提出</small></span></li><li class="now"><i>3</i><span><b>シフト作成</b><small>編集中</small></span></li><li><i>4</i><span><b>確認</b><small>未開始</small></span></li><li><i>5</i><span><b>公開</b><small>9月20日予定</small></span></li></ol></section>
+          <aside class="attention section"><div class="section-head"><div><p class="eyebrow">対応が必要</p><h2>5件あります</h2></div><button class="text-button" data-page="inbox">すべて見る</button></div><button class="attention-row" data-page="inbox"><i class="urgent">!</i><span><b>ログイン救済</b><small>最も古い依頼：2時間前</small></span><strong>2</strong>›</button><button class="attention-row" data-page="inbox"><i>要</i><span><b>要望</b><small>未対応</small></span><strong>2</strong>›</button><button class="attention-row" data-page="inbox"><i>不</i><span><b>バグ報告</b><small>未対応</small></span><strong>1</strong>›</button><div class="record"><span><b>配布報告</b><small>今月 14件</small></span><button class="text-button" data-page="inbox">記録を見る</button></div></aside>
         </div>
-        <aside class="attention section"><div class="section-head"><div><p class="eyebrow">対応が必要</p><h2>5件あります</h2></div><button class="text-button" data-page="inbox">すべて見る</button></div><button class="attention-row" data-page="inbox"><i class="urgent">!</i><span><b>ログイン救済</b><small>最も古い依頼：2時間前</small></span><strong>2</strong>›</button><button class="attention-row" data-page="inbox"><i>要</i><span><b>要望</b><small>未対応</small></span><strong>2</strong>›</button><button class="attention-row" data-page="inbox"><i>不</i><span><b>バグ報告</b><small>未対応</small></span><strong>1</strong>›</button><div class="record"><span><b>配布報告</b><small>今月 14件</small></span><button class="text-button" data-page="inbox">記録を見る</button></div></aside>
+      </div>
+      <div class="home-lower-grid">
+        <section class="section"><div class="section-head"><div><p class="eyebrow">直接アクセス</p><h2>別の作業へ移動</h2></div><span class="hint">次にすることの代替ではありません</span></div><div class="quick-grid"><button data-page="monthly" data-month-tab="schedule"><span class="quick-icon blue"><svg><use href="#calendar"/></svg></span><b>日程を見る</b><small>実施日・申込期間</small></button><button data-page="monthly" data-month-tab="wishes"><span class="quick-icon green">✓</span><b>申込状況を見る</b><small>希望・未提出者</small></button><button data-page="monthly" data-month-tab="shifts"><span class="quick-icon purple"><svg><use href="#shift"/></svg></span><b>シフトを見る</b><small>確認・公開状況</small></button><button data-page="shift"><span class="quick-icon amber">＋</span><b>シフトを作成</b><small>編集ワークスペース</small></button></div></section>
+        <section class="section"><div class="section-head"><div><p class="eyebrow">今月の進行</p><h2>公開まであと2段階</h2></div><button class="text-button" data-page="monthly">月次運用を開く</button></div><ol class="progress"><li class="done"><i>✓</i><span><b>日程設定</b><small>9月1日に完了</small></span></li><li class="done"><i>✓</i><span><b>希望受付</b><small>28名が提出</small></span></li><li class="now"><i>3</i><span><b>シフト作成</b><small>編集中</small></span></li><li><i>4</i><span><b>確認</b><small>未開始</small></span></li><li><i>5</i><span><b>公開</b><small>9月20日予定</small></span></li></ol></section>
       </div>
     </section>
 
@@ -84,5 +129,5 @@
 <div class="picker" id="picker" aria-hidden="true"><p>配置する人を選択</p><button data-picker-value="佐藤 太郎">佐藤 太郎</button><button data-picker-value="鈴木 花子">鈴木 花子</button><button data-picker-value="高橋 一郎">高橋 一郎</button><button data-picker-value="空欄にする">空欄にする</button></div>
 <div class="dialog" id="dialog" aria-hidden="true"><div class="dialog-card"><span class="status current">公開前チェック</span><h2 id="dialog-title">3件の確認があります</h2><ul id="check-list"><li>17:00 北口：1名不足</li><li>未提出者 4名を確認してください</li><li>確認者 2名の確認後に公開できます</li></ul><p class="check-result" id="check-result"></p><div class="dialog-actions"><button class="button secondary" data-close>戻る</button><button class="button primary" data-action="run-check">チェックを実行</button><button class="button primary" data-action="complete-shift">作成完了を登録</button><button class="button primary" data-action="publish">公開へ進む</button></div></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body></html>
