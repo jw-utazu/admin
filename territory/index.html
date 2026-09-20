@@ -166,6 +166,8 @@
   .chip.good { background: var(--green-l); color: var(--green); }
   .chip.critical { background: var(--red-l); color: var(--red); }
   .chip.plain { background: var(--surface2); color: var(--ink3); border: 1px solid var(--border); }
+  .assignment-edit-conflict { display: none; }
+  .assignment-edit-conflict.show { display: inline-flex; }
 
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   th, td { text-align: left; padding: 8px 9px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -563,6 +565,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     territoryFilter: "all",
     assignGroupId: state.groups[0] ? state.groups[0].id : null,
     manualActivateId: null,
+    assignmentEditId: null,
     adjSelected: 1,
     showAssignmentProposal: false
   };
@@ -664,14 +667,21 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     });
   }
 
-  function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function localISODate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function todayISO() { return localISODate(new Date()); }
 
   function addMonths(iso, months) {
     var d = new Date(iso + "T00:00:00");
     var day = d.getDate();
     d.setMonth(d.getMonth() + months);
     if (d.getDate() < day) d.setDate(0);
-    return d.toISOString().slice(0, 10);
+    return localISODate(d);
   }
 
   function daysBetween(fromISO, toISO) {
@@ -843,7 +853,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   // ---------- mutations ----------
 
   window.openModal = function (id) { ui.openModal = id; render(); };
-  window.closeModal = function () { ui.openModal = null; ui.manualActivateId = null; render(); };
+  window.closeModal = function () { ui.openModal = null; ui.manualActivateId = null; ui.assignmentEditId = null; render(); };
 
   window.setTerritoryFilter = function (f) { ui.territoryFilter = f; render(); };
 
@@ -882,6 +892,82 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     t.status = "active"; t.currentGroupId = gid; t.assignedDate = date; t.dueDate = addMonths(date, 3);
     saveState(); render();
     toast("区域 " + id + " を「" + groupName(gid) + "」に割り当てました（期限 " + fmtDate(t.dueDate) + "）");
+  };
+
+  window.startAssignmentEdit = function (id) {
+    var t = findTerritory(id);
+    if (!t || (t.status !== "active" && t.status !== "pending")) return;
+    ui.assignmentEditId = t.id;
+    render();
+  };
+  window.cancelAssignmentEdit = function () {
+    ui.assignmentEditId = null;
+    render();
+  };
+  window.updateAssignmentEditConflict = function (id, gid) {
+    var t = findTerritory(id);
+    var el = document.getElementById("editConflict_" + id);
+    if (!t || !el) return;
+    var conflict = t.status === "active" && isAdjacentToActive(t, activeGroupMap(), gid);
+    el.classList.toggle("show", !!conflict);
+  };
+  window.saveAssignmentEdit = function (id) {
+    var t = findTerritory(id);
+    if (!t || (t.status !== "active" && t.status !== "pending")) return;
+    var groupSel = document.getElementById("editGroupSelect_" + id);
+    var dateInput = document.getElementById("editDateInput_" + id);
+    var replacementSel = document.getElementById("editReplacementSelect_" + id);
+    var gid = groupSel ? groupSel.value : t.currentGroupId;
+    var date = (dateInput && dateInput.value) || t.assignedDate || todayISO();
+    var replacementId = replacementSel ? Number(replacementSel.value || 0) : 0;
+    var replacement = replacementId ? findTerritory(replacementId) : null;
+    if (!gid) { toast("グループを選択してください"); return; }
+    if (replacementId && (!replacement || replacement.status !== "stock" || replacement.purpose !== "normal")) {
+      toast("差し替え先には通常ストックの区域を選択してください"); return;
+    }
+    var originalStatus = t.status;
+    var groupChanged = t.currentGroupId !== gid;
+    var dateChanged = t.assignedDate !== date;
+    var replacementConflict = replacement && isAdjacentToActive(replacement, activeGroupMap(), gid);
+    var apply = function () {
+      if (replacement) {
+        t.status = "stock";
+        t.currentGroupId = null;
+        t.assignedDate = null;
+        t.dueDate = null;
+        t.collectedDate = null;
+        replacement.status = originalStatus;
+        replacement.currentGroupId = gid;
+        replacement.assignedDate = date;
+        replacement.dueDate = addMonths(date, 3);
+        replacement.collectedDate = null;
+      } else {
+        t.currentGroupId = gid;
+        t.assignedDate = date;
+        t.dueDate = addMonths(date, 3);
+      }
+      ui.assignmentEditId = null;
+      saveState();
+      render();
+      var targetId = replacement ? replacement.id : t.id;
+      var suffix = replacementConflict ? "（別グループと隣接）" : "";
+      if (replacement) {
+        toast("区域 " + id + " を区域 " + targetId + " に差し替えました" + suffix);
+      } else if (groupChanged && dateChanged) {
+        toast("区域 " + id + " の割当先と開始日を修正しました（期限 " + fmtDate(t.dueDate) + "）" + suffix);
+      } else if (groupChanged) {
+        toast("区域 " + id + " の割当先を「" + groupName(gid) + "」に変更しました" + suffix);
+      } else if (dateChanged) {
+        toast("区域 " + id + " の開始日を修正しました（期限 " + fmtDate(t.dueDate) + "）");
+      } else {
+        toast("区域 " + id + " の割当内容を保存しました");
+      }
+    };
+    if (replacement) {
+      showConfirm("区域 " + id + " を区域 " + replacement.id + " に差し替えます。\n区域 " + id + " は通常ストックに戻ります。よろしいですか？", apply);
+    } else {
+      apply();
+    }
   };
 
   window.startReturn = function (id) {
@@ -1194,6 +1280,26 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
         }
 
         var action;
+        var editRow = "";
+        if (ui.assignmentEditId === t.id && (t.status === "active" || t.status === "pending")) {
+          var editGroupOpts = state.groups.map(function (g) {
+            return '<option value="' + g.id + '"' + (t.currentGroupId === g.id ? " selected" : "") + '>' + esc(g.name) + "</option>";
+          }).join("");
+          var replacementOpts = state.territories.filter(function (x) {
+            return x.status === "stock" && x.purpose === "normal";
+          }).map(function (x) {
+            return '<option value="' + x.id + '">区域 ' + x.id + (x.area ? "（" + esc(x.area) + "）" : "") + "</option>";
+          }).join("");
+          var editConflict = t.status === "active" && isAdjacentToActive(t, groupMap, t.currentGroupId);
+          editRow = '<tr><td colspan="7"><div class="field-row" style="align-items:flex-end">' +
+            '<label>割当先グループ<select id="editGroupSelect_' + t.id + '" onchange="updateAssignmentEditConflict(' + t.id + ', this.value)">' + editGroupOpts + "</select></label>" +
+            '<label>開始日<input type="date" id="editDateInput_' + t.id + '" value="' + (t.assignedDate || todayISO()) + '"></label>' +
+            '<label>差し替え区域<select id="editReplacementSelect_' + t.id + '"><option value="">現在の区域のまま</option>' + replacementOpts + '</select></label>' +
+            '<span id="editConflict_' + t.id + '" class="chip pending assignment-edit-conflict' + (editConflict ? ' show' : '') + '">別グループと隣接</span>' +
+            '<button class="btn btn-p small" onclick="saveAssignmentEdit(' + t.id + ')">保存</button>' +
+            '<button class="btn small" onclick="cancelAssignmentEdit()">取消</button>' +
+            '</div></td></tr>';
+        }
         if (t.status === "stock" && t.purpose === "normal") {
           var conflict = isAdjacentToActive(t, groupMap, ui.assignGroupId);
           action = '<div class="field-row">' +
@@ -1205,10 +1311,12 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
         } else if (t.status === "stock") {
           action = '<span class="chip plain">確保中</span>';
         } else if (t.status === "active") {
-          action = '<button class="btn small" onclick="startReturn(' + t.id + ')">回収待ちへ</button>';
+          action = '<div class="field-row"><button class="btn small" onclick="startAssignmentEdit(' + t.id + ')">割当を編集</button>' +
+            '<button class="btn small" onclick="startReturn(' + t.id + ')">回収待ちへ</button></div>';
         } else {
           action = '<div class="field-row">' +
             '<input type="date" id="returnDate_' + t.id + '" value="' + todayISO() + '" style="width:122px">' +
+            '<button class="btn small" onclick="startAssignmentEdit(' + t.id + ')">割当を編集</button>' +
             '<button class="btn btn-p small" onclick="completeReturn(' + t.id + ')">回収完了</button>' +
             '<button class="btn small" onclick="undoReturn(' + t.id + ')">戻す</button>' +
             "</div>";
@@ -1218,13 +1326,13 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
           "<td>" + esc(groupName(t.currentGroupId)) + "</td>" +
           "<td>" + fmtDate(t.assignedDate) + "</td><td>" + fmtDate(t.dueDate) + "</td>" +
           "<td>" + t.adjacentIds.length + "件</td>" +
-          "<td>" + action + "</td></tr>" + manualRow;
+          "<td>" + action + "</td></tr>" + editRow + manualRow;
       }).join("");
 
       if (!list.length) rows = '<tr><td colspan="7" class="empty-note">該当する区域はありません</td></tr>';
 
       var proposalButton = ui.showAssignmentProposal ? "割当案を再計算" : "隣接を考慮して割当案を作成";
-      return '<div class="field-row" style="justify-content:space-between;align-items:center;margin-bottom:12px"><span style="color:var(--ink2);font-size:12px">割当前に候補の組み合わせを確認できます。</span>' +
+      return '<div class="field-row" style="justify-content:space-between;align-items:center;margin-bottom:12px"><span style="color:var(--ink2);font-size:12px">割当前に候補を確認できます。割当中・回収待ちは各行の「割当を編集」から修正できます。</span>' +
         '<button class="btn btn-p small" onclick="generateAssignmentProposal()">' + proposalButton + '</button></div>' +
         renderAssignmentProposal() +
         '<div class="tabs">' + tabs + "</div>" +
