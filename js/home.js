@@ -320,6 +320,7 @@
     renderHomeCalendar();
     renderHomeAttention();
     renderHomeAccount();
+    if (typeof renderAdminMonthly === 'function') renderAdminMonthly();
   }
 
   function updateNavActive(view) {
@@ -333,28 +334,33 @@
   function setAdminHomeView(view) {
     const app = document.getElementById('app');
     const home = document.getElementById('home-view');
+    const homeMain = document.getElementById('home-main');
+    const monthly = document.getElementById('monthly-view');
     const layout = document.querySelector('.layout');
     const showHome = view === 'home';
+    const showWorkspace = showHome || view === 'monthly';
     homeView = showHome ? 'home' : 'monthly';
-    if (app) app.classList.toggle('home-mode', showHome);
-    setHomeVisible(home, showHome);
-    setHomeVisible(layout, !showHome);
+    if (app) app.classList.toggle('home-mode', showWorkspace);
+    setHomeVisible(home, showWorkspace);
+    setHomeVisible(homeMain, showHome);
+    setHomeVisible(monthly, !showHome && showWorkspace);
+    setHomeVisible(layout, !showWorkspace);
     updateNavActive(showHome ? 'home' : 'monthly');
     if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
     if (showHome) {
       renderAdminHome();
       requestAnimationFrame(() => document.getElementById('home-main')?.focus({ preventScroll: true }));
-    } else {
-      const panel = document.querySelector('.cp');
-      if (panel) panel.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (showWorkspace) {
+      if (typeof renderAdminMonthly === 'function') renderAdminMonthly();
+      requestAnimationFrame(() => document.getElementById('monthly-view')?.focus({ preventScroll: true }));
     }
   }
 
   function openMonthlyContext(kind) {
     setAdminHomeView('monthly');
     setTimeout(() => {
-      if (kind === 'month' && typeof openYmPicker === 'function') openYmPicker(document.getElementById('cal-ym-label'));
-      if (kind === 'pw') document.getElementById('pw-type-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (kind === 'month' && typeof openYmPicker === 'function') openYmPicker(document.getElementById('monthly-calendar-month-button') || document.getElementById('cal-ym-label'));
+      if (kind === 'pw' && typeof toggleMonthlyPwMenu === 'function') toggleMonthlyPwMenu();
     }, 0);
   }
 

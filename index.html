@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=63">
+  <link rel="stylesheet" href="css/index.css?v=64">
 </head>
 <body>
 
@@ -141,6 +141,83 @@
             </section>
           </aside>
         </div>
+      </main>
+
+      <main class="monthly-main is-hidden" id="monthly-view" tabindex="-1" aria-label="月次運用">
+        <header class="monthly-page-head">
+          <div>
+            <p class="monthly-eyebrow">月次運用</p>
+            <h1>日程と月の進行を管理</h1>
+            <p class="monthly-lead" id="monthly-context-lead">対象の月とPWを読み込んでいます。</p>
+          </div>
+          <div class="monthly-context" aria-label="表示コンテキスト">
+            <button type="button" class="monthly-chip" data-home-context="pw" id="monthly-pw-chip">通常PW⌄</button>
+            <button type="button" class="monthly-chip" data-home-context="month" id="monthly-month-chip">年月を選ぶ⌄</button>
+            <div class="monthly-pw-menu is-hidden" id="monthly-pw-menu" role="menu" aria-label="PWを選択"></div>
+          </div>
+        </header>
+
+        <nav class="monthly-tabs" aria-label="月次運用の表示切り替え">
+          <button type="button" class="monthly-tab active" data-monthly-tab="schedule">日程</button>
+          <button type="button" class="monthly-tab" data-monthly-tab="wishes">申込状況</button>
+          <button type="button" class="monthly-tab" data-monthly-tab="shifts">シフト一覧・確認</button>
+        </nav>
+
+        <section class="monthly-panel" data-monthly-panel="schedule">
+          <section class="monthly-status-card section-card" aria-labelledby="monthly-status-title">
+            <div>
+              <p class="monthly-section-label">予定表の状態</p>
+              <span class="monthly-status" id="monthly-status">読み込み中</span>
+              <h2 id="monthly-status-title">予定表の状態を確認しています</h2>
+              <p id="monthly-status-detail">データの読み込みが完了すると、次の操作を表示します。</p>
+            </div>
+            <div class="monthly-status-actions">
+              <button type="button" class="monthly-primary-button" id="monthly-primary-action">日程を確認する <span>›</span></button>
+              <button type="button" class="monthly-secondary-button" data-monthly-action="legacy">従来の月次画面を開く</button>
+            </div>
+          </section>
+
+          <section class="monthly-calendar-card section-card" aria-labelledby="monthly-calendar-title">
+            <header class="monthly-card-head">
+              <div><p class="monthly-section-label">日程</p><h2 id="monthly-calendar-title">対象年月</h2></div>
+              <div class="monthly-month-nav" aria-label="年月の移動">
+                <button type="button" class="monthly-month-button" data-monthly-month="-1" aria-label="前月">‹</button>
+                <button type="button" class="monthly-month-label" id="monthly-calendar-month-button" data-home-context="month">読み込み中...</button>
+                <button type="button" class="monthly-month-button" data-monthly-month="1" aria-label="次月">›</button>
+              </div>
+            </header>
+            <div class="monthly-calendar-legend"><span><i class="monthly-dot purple"></i>実施日</span><span><i class="monthly-dot green"></i>申込期間</span><span><i class="monthly-dot blue"></i>公開日</span><small>日付を選ぶと設定画面を開きます</small></div>
+            <div class="monthly-calendar-grid" id="monthly-calendar-grid" role="grid" aria-label="対象月の日程"></div>
+            <div class="monthly-selected-day" id="monthly-selected-day" aria-live="polite">日付を選ぶと、実施日・申込期間を設定できます。</div>
+          </section>
+
+          <section class="monthly-date-summary section-card" aria-labelledby="monthly-date-summary-title">
+            <div class="monthly-card-head"><div><p class="monthly-section-label">この月の基準日</p><h2 id="monthly-date-summary-title">日程の設定状況</h2></div></div>
+            <div class="monthly-date-cards" id="monthly-date-cards"></div>
+          </section>
+        </section>
+
+        <section class="monthly-panel is-hidden" data-monthly-panel="wishes" aria-labelledby="monthly-wishes-title">
+          <section class="monthly-placeholder section-card">
+            <span class="monthly-placeholder-icon" data-monthly-icon="clipboard" aria-hidden="true"></span>
+            <p class="monthly-section-label">申込状況</p>
+            <h2 id="monthly-wishes-title">希望の確認はシフト管理アプリで行います</h2>
+            <p>このタブでは固定の人数や氏名を表示せず、対象月の締切と現在の入口だけを案内します。</p>
+            <div class="monthly-fact" id="monthly-wishes-fact">締切：確認中</div>
+            <a class="monthly-primary-button monthly-link-button" href="./shift-create.html" target="_blank" rel="noopener">シフト管理アプリを開く <span>›</span></a>
+          </section>
+        </section>
+
+        <section class="monthly-panel is-hidden" data-monthly-panel="shifts" aria-labelledby="monthly-shifts-title">
+          <section class="monthly-placeholder section-card">
+            <span class="monthly-placeholder-icon" data-monthly-icon="check-circle" aria-hidden="true"></span>
+            <p class="monthly-section-label">シフト一覧・確認</p>
+            <h2 id="monthly-shifts-title">シフトの詳細は既存画面で確認します</h2>
+            <p>実際の作成・確認・公開状態を保ったまま、シフト管理アプリへ移動できます。</p>
+            <div class="monthly-fact" id="monthly-shifts-fact">状態：確認中</div>
+            <a class="monthly-primary-button monthly-link-button" href="./shift-create.html" target="_blank" rel="noopener">シフト管理アプリを開く <span>›</span></a>
+          </section>
+        </section>
       </main>
     </div>
     <nav class="home-bottom-nav" aria-label="スマホ用ホームナビゲーション">
@@ -844,6 +921,7 @@
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
 <script src="js/index.js?v=88"></script>
-<script src="js/home.js?v=3"></script>
+<script src="js/home.js?v=4"></script>
+<script src="js/monthly.js?v=1"></script>
 </body>
 </html>
