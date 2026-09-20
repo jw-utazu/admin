@@ -310,8 +310,12 @@ async function loadAdminData(options) {
     renderPwTypeTabs();
     renderAll();
     renderProgressStrip();
+    if (typeof renderAdminHome === 'function') renderAdminHome();
     if (currentPwType === 'normal') loadPendingCounts();
-    if (opts.initial) showInitialApp();
+    if (opts.initial) {
+      showInitialApp();
+      if (typeof setAdminHomeView === 'function') setAdminHomeView('home');
+    }
     return true;
   } catch(e) {
     if (generation !== _adminLoadGeneration) return false;
@@ -2034,7 +2038,12 @@ function renderProgressStrip() {
   if (!wrap) return;
   // 限定PWは複数月が同時に走りうるので一本道にならない。ここでは扱わない。
   // ミニボタンも隠す（calStageInfo は currentPwType!=='normal' で null を返す）
-  if (currentPwType !== 'normal') { setVisible(wrap, false); renderCalStageMini(); return; }
+  if (currentPwType !== 'normal') {
+    setVisible(wrap, false);
+    renderCalStageMini();
+    if (typeof renderAdminHome === 'function') renderAdminHome();
+    return;
+  }
   setVisible(wrap, true);
 
   const toDate = o => (o && o.y && o.m && o.d) ? new Date(o.y, o.m - 1, o.d) : null;
@@ -2148,6 +2157,7 @@ function renderProgressStrip() {
   }
 
   renderCalStageMini();
+  if (typeof renderAdminHome === 'function') renderAdminHome();
 }
 
 // ============================================================
@@ -3365,6 +3375,7 @@ function renderInboxCounts(c) {
   const total = (c.calApproval || 0) + (c.recovery || 0) + (c.requests || 0) + (c.bugs || 0);
   const el = document.getElementById('inbox-total');
   if (el) el.textContent = total > 0 ? '合計 ' + total + '件' : '';
+  if (typeof updateAdminHomeCounts === 'function') updateAdminHomeCounts(c);
 }
 
 // 「今月の作業」の予定表カードのクリック。専用のモーダルは作らず、

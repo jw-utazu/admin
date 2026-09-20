@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=61">
+  <link rel="stylesheet" href="css/index.css?v=63">
 </head>
 <body>
 
@@ -48,6 +48,109 @@
 
   <!-- PWモード切替タブ（JS で動的レンダリング） -->
   <div class="pw-type-bar" id="pw-type-bar"></div>
+
+  <!-- 新しいホーム。業務画面（下の .layout）は月次運用として残し、
+       ホームから既存の入口へ移動できる構成にする -->
+  <div id="home-view" class="is-hidden" aria-label="ホーム">
+    <div class="home-shell">
+      <aside class="home-nav" aria-label="ホームナビゲーション">
+        <div class="home-nav-brand"><span class="home-nav-logo">PW</span><span><b>管理</b><small>作業台</small></span></div>
+        <p class="home-nav-caption">今月の作業</p>
+        <nav class="home-nav-list">
+          <button type="button" class="home-nav-item active" data-home-nav="home"><span class="home-nav-icon" data-home-icon="house" aria-hidden="true"></span><span>ホーム</span></button>
+          <button type="button" class="home-nav-item" data-home-nav="monthly"><span class="home-nav-icon" data-home-icon="calendar" aria-hidden="true"></span><span>月次運用</span></button>
+          <button type="button" class="home-nav-item" data-home-nav="shift"><span class="home-nav-icon" data-home-icon="clipboard" aria-hidden="true"></span><span>シフト作成</span></button>
+          <button type="button" class="home-nav-item" data-home-nav="territory"><span class="home-nav-icon" data-home-icon="map" aria-hidden="true"></span><span>区域割り当て</span></button>
+          <button type="button" class="home-nav-item" data-home-nav="attention"><span class="home-nav-icon" data-home-icon="inbox" aria-hidden="true"></span><span>対応一覧</span><b class="home-nav-badge is-hidden" id="home-nav-badge"></b></button>
+        </nav>
+        <div class="home-nav-spacer"></div>
+        <p class="home-nav-caption">管理・設定</p>
+        <button type="button" class="home-nav-item" data-home-nav="settings"><span class="home-nav-icon" data-home-icon="settings" aria-hidden="true"></span><span>管理・設定</span></button>
+        <button type="button" class="home-account" onclick="openAccountMenu(document.getElementById('av'))">
+          <span class="home-avatar" id="home-avatar">?</span><span><b id="home-account-name">アカウント</b><small>アカウントメニュー</small></span><span class="home-account-arrow">›</span>
+        </button>
+      </aside>
+
+      <main class="home-main" id="home-main" tabindex="-1">
+        <header class="home-page-head">
+          <div>
+            <p class="home-eyebrow">ホーム</p>
+            <h1 id="home-greeting">おはようございます</h1>
+            <p class="home-lead" id="home-context-lead">対象の月とPWを読み込んでいます。</p>
+          </div>
+          <div class="home-context" aria-label="表示コンテキスト">
+            <button type="button" class="home-chip" data-home-context="pw" id="home-pw-chip">通常PW⌄</button>
+            <button type="button" class="home-chip" data-home-context="month" id="home-month-chip">年月を選ぶ⌄</button>
+          </div>
+        </header>
+
+        <div class="home-grid">
+          <div class="home-primary-column">
+            <section class="home-next section-card" aria-labelledby="home-next-title">
+              <span class="home-status" id="home-current-status">読み込み中</span>
+              <p class="home-section-label">次にすること</p>
+              <h2 id="home-next-title">月の状態を確認しています</h2>
+              <p id="home-next-detail">データの読み込みが完了すると、次の操作を表示します。</p>
+              <button type="button" class="home-button primary" id="home-primary-action">月次運用を開く <span>›</span></button>
+            </section>
+
+            <section class="home-section-block section-card" aria-labelledby="home-calendar-title">
+              <div class="home-section-head"><div><p class="home-section-label">今月の日程</p><h2 id="home-calendar-title">対象年月</h2></div><button type="button" class="home-text-button" data-home-nav="monthly">月次運用を開く ›</button></div>
+              <div class="home-calendar" id="home-calendar-grid" role="grid" aria-label="対象月の日程"></div>
+              <div class="home-legend"><span><i class="home-dot blue"></i>実施日</span><span><i class="home-dot green"></i>受付</span><span><i class="home-dot amber"></i>公開</span><small>日付を選ぶと月次運用へ移動します</small></div>
+              <div class="home-schedule-list" id="home-schedule-list"></div>
+            </section>
+
+            <section class="home-section-block section-card" aria-labelledby="home-progress-title">
+              <div class="home-section-head"><div><p class="home-section-label">今月の進行</p><h2 id="home-progress-title">公開までの状態</h2></div><button type="button" class="home-text-button" data-home-nav="monthly">詳細を開く ›</button></div>
+              <ol class="home-progress" id="home-progress"></ol>
+            </section>
+          </div>
+
+          <aside class="home-side-column">
+            <section class="home-attention section-card" id="home-attention" aria-labelledby="home-attention-title">
+              <div class="home-section-head"><div><p class="home-section-label">対応が必要</p><h2 id="home-attention-title">確認しています</h2></div><button type="button" class="home-text-button" data-home-nav="attention">すべて見る ›</button></div>
+              <div id="home-attention-list"></div>
+            </section>
+
+            <section class="home-section-block section-card" aria-labelledby="home-quick-title">
+              <div class="home-section-head"><div><p class="home-section-label">直接アクセス</p><h2 id="home-quick-title">別の作業へ移動</h2></div></div>
+              <div class="home-quick-grid">
+                <button type="button" data-home-nav="monthly"><span class="home-quick-icon blue" data-home-icon="calendar" aria-hidden="true"></span><span><b>日程を見る</b><small>日程・承認・公開</small></span><span>›</span></button>
+                <button type="button" data-home-action="shift"><span class="home-quick-icon green" data-home-icon="clipboard" aria-hidden="true"></span><span><b>シフトを見る</b><small>希望・作成・確認</small></span><span>›</span></button>
+                <button type="button" data-home-action="territory"><span class="home-quick-icon purple" data-home-icon="map" aria-hidden="true"></span><span><b>区域を管理</b><small>割当・回収・隣接</small></span><span>›</span></button>
+                <button type="button" data-home-nav="settings"><span class="home-quick-icon amber" data-home-icon="settings" aria-hidden="true"></span><span><b>管理・設定</b><small>人・表示・ログ</small></span><span>›</span></button>
+              </div>
+            </section>
+
+            <section class="home-section-block section-card" id="home-settings" aria-labelledby="home-settings-title">
+              <div class="home-section-head"><div><p class="home-section-label">管理・設定</p><h2 id="home-settings-title">目的から開く</h2></div></div>
+              <div class="home-settings-list">
+                <button type="button" data-home-action="member"><span><b>メンバー</b><small>追加・編集・有効／無効</small></span><span>›</span></button>
+                <button type="button" data-home-action="access"><span><b>アクセス許可</b><small>メール・参加者との紐付け</small></span><span>›</span></button>
+                <button type="button" data-home-action="position"><span><b>立ち位置</b><small>役割と権限の同期</small></span><span>›</span></button>
+                <button type="button" data-home-action="notice"><span><b>お知らせ</b><small>追加・編集・削除</small></span><span>›</span></button>
+                <button type="button" data-home-action="photo"><span><b>写真</b><small>カート展示写真</small></span><span>›</span></button>
+                <button type="button" data-home-action="proxy"><span><b>代理送信</b><small>希望提出の代理設定</small></span><span>›</span></button>
+                <button type="button" data-home-action="couple"><span><b>夫婦</b><small>希望提出の関係設定</small></span><span>›</span></button>
+                <button type="button" data-home-action="limited"><span><b>限定PW設定</b><small>期間・表示・対象者</small></span><span>›</span></button>
+                <button type="button" data-home-action="logs"><span><b>ログ</b><small>操作・希望提出・ログイン履歴</small></span><span>›</span></button>
+                <button type="button" data-home-action="manual"><span><b>マニュアル</b><small>使い方を確認</small></span><span>›</span></button>
+                <button type="button" data-home-action="pwa"><span><b>ホームに追加</b><small>端末へのインストール</small></span><span>›</span></button>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+    <nav class="home-bottom-nav" aria-label="スマホ用ホームナビゲーション">
+      <button type="button" class="active" data-home-nav="home"><span data-home-icon="house" aria-hidden="true"></span><small>ホーム</small></button>
+      <button type="button" data-home-nav="monthly"><span data-home-icon="calendar" aria-hidden="true"></span><small>月次</small></button>
+      <button type="button" data-home-nav="shift"><span data-home-icon="clipboard" aria-hidden="true"></span><small>シフト</small></button>
+      <button type="button" data-home-action="territory"><span data-home-icon="map" aria-hidden="true"></span><small>区域</small></button>
+      <button type="button" data-home-nav="settings"><span data-home-icon="settings" aria-hidden="true"></span><small>その他</small><b class="home-bottom-badge is-hidden" id="home-bottom-badge"></b></button>
+    </nav>
+  </div>
 
   <div class="layout">
     <!-- タブ切り替えローディングオーバーレイ -->
@@ -740,6 +843,7 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=86"></script>
+<script src="js/index.js?v=88"></script>
+<script src="js/home.js?v=3"></script>
 </body>
 </html>
