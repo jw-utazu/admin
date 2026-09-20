@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=64">
+  <link rel="stylesheet" href="css/index.css?v=65">
 </head>
 <body>
 
@@ -198,13 +198,39 @@
         </section>
 
         <section class="monthly-panel is-hidden" data-monthly-panel="wishes" aria-labelledby="monthly-wishes-title">
-          <section class="monthly-placeholder section-card">
-            <span class="monthly-placeholder-icon" data-monthly-icon="clipboard" aria-hidden="true"></span>
-            <p class="monthly-section-label">申込状況</p>
-            <h2 id="monthly-wishes-title">希望の確認はシフト管理アプリで行います</h2>
-            <p>このタブでは固定の人数や氏名を表示せず、対象月の締切と現在の入口だけを案内します。</p>
-            <div class="monthly-fact" id="monthly-wishes-fact">締切：確認中</div>
-            <a class="monthly-primary-button monthly-link-button" href="./shift-create.html" target="_blank" rel="noopener">シフト管理アプリを開く <span>›</span></a>
+          <section class="monthly-wishes-head section-card">
+            <div>
+              <p class="monthly-section-label">申込状況</p>
+              <span class="monthly-status" id="monthly-wishes-status">確認中</span>
+              <h2 id="monthly-wishes-title">希望時間、コメント、未提出者を確認</h2>
+              <p id="monthly-wishes-detail">対象月の申込状況を読み込んでいます。</p>
+            </div>
+            <div class="monthly-status-actions monthly-wishes-actions">
+              <button type="button" class="monthly-secondary-button" data-monthly-wishes-action="reload">再読み込み</button>
+              <a class="monthly-primary-button monthly-link-button" id="monthly-wishes-open" href="./shift-create.html" target="_blank" rel="noopener">希望確認を開く <span>›</span></a>
+            </div>
+          </section>
+
+          <div class="monthly-wishes-stats" id="monthly-wishes-stats" aria-live="polite"></div>
+
+          <section class="monthly-wishes-card section-card" aria-labelledby="monthly-wishes-submitted-title">
+            <header class="monthly-card-head">
+              <div><p class="monthly-section-label">提出済み</p><h2 id="monthly-wishes-submitted-title">希望を提出した人</h2></div>
+              <span class="monthly-wishes-result" id="monthly-wishes-result">確認中</span>
+            </header>
+            <div class="monthly-wishes-list" id="monthly-wishes-list"></div>
+          </section>
+
+          <section class="monthly-wishes-card section-card" aria-labelledby="monthly-wishes-unsubmitted-title">
+            <header class="monthly-card-head">
+              <div><p class="monthly-section-label">未提出</p><h2 id="monthly-wishes-unsubmitted-title">まだ希望を提出していない人</h2></div>
+              <button type="button" class="monthly-wishes-toggle" data-monthly-wishes-action="toggle-unsubmitted" aria-expanded="true" aria-controls="monthly-unsubmitted-body">
+                <span id="monthly-unsubmitted-count">確認中</span><span class="monthly-wishes-toggle-arrow" aria-hidden="true">⌄</span>
+              </button>
+            </header>
+            <div id="monthly-unsubmitted-body" class="monthly-unsubmitted-body">
+              <div class="monthly-unsubmitted-list" id="monthly-unsubmitted-list"></div>
+            </div>
           </section>
         </section>
 
@@ -922,6 +948,7 @@
 <script src="js/picker.js?v=9"></script>
 <script src="js/index.js?v=88"></script>
 <script src="js/home.js?v=4"></script>
-<script src="js/monthly.js?v=1"></script>
+<script src="js/monthly.js?v=2"></script>
+<script src="js/monthly-wishes.js?v=1"></script>
 </body>
 </html>

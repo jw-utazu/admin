@@ -1,7 +1,7 @@
 // ============================================================
-// 月次運用（フェーズ2）
-// APIはここから直接呼ばない。index.js が取得した状態と、
-// 既存の年月・日付・承認処理を新しい本文へ描画する。
+// 月次運用（フェーズ3）
+// 日程・承認・公開状態は index.js の状態を描画する。申込状況の取得と
+// 描画は monthly-wishes.js に分離し、このファイルはタブと既存操作を仲介する。
 // ============================================================
 (function () {
   const DOW = ['月', '火', '水', '木', '金', '土', '日'];
@@ -200,9 +200,7 @@
 
   function renderSubtabs() {
     const d = activeDates();
-    const wishes = document.getElementById('monthly-wishes-fact');
     const shifts = document.getElementById('monthly-shifts-fact');
-    if (wishes) wishes.textContent = `希望締切：${dateText(d.deadline)}`;
     if (shifts) shifts.textContent = shiftStatusText();
     const href = './shift-create.html' + (currentPwType !== 'normal' ? `?type=${encodeURIComponent(currentPwType)}` : '');
     document.querySelectorAll('.monthly-link-button').forEach(link => { link.href = href; });
@@ -227,6 +225,13 @@
     monthlyTab = tab === 'wishes' || tab === 'shifts' ? tab : 'schedule';
     document.querySelectorAll('[data-monthly-tab]').forEach(button => button.classList.toggle('active', button.dataset.monthlyTab === monthlyTab));
     document.querySelectorAll('[data-monthly-panel]').forEach(panel => visible(panel, panel.dataset.monthlyPanel === monthlyTab));
+    if (monthlyTab === 'wishes' && typeof loadMonthlyWishes === 'function') {
+      // 年月／PW切替の既存ローディング中は、親のオーバーレイを上書きしない。
+      // loadAdminData 完了後に同じタブを再描画して取得する。
+      if (typeof _adminSwitching !== 'undefined' && _adminSwitching) {
+        setTimeout(() => { if (monthlyTab === 'wishes') setMonthlyTab('wishes'); }, 0);
+      } else loadMonthlyWishes();
+    }
   }
 
   function renderAdminMonthly() {
@@ -311,6 +316,12 @@
       if (typeof openDaySelectModal === 'function') openDaySelectModal(parts[0], parts[1], parts[2]);
       return;
     }
+    const wishAction = event.target.closest('[data-monthly-wishes-action]');
+    if (wishAction) {
+      const actionName = wishAction.dataset.monthlyWishesAction;
+      if (actionName === 'reload' && typeof loadMonthlyWishes === 'function') return loadMonthlyWishes(true);
+      if (actionName === 'toggle-unsubmitted' && typeof toggleMonthlyWishesUnsubmitted === 'function') return toggleMonthlyWishesUnsubmitted();
+    }
     const action = event.target.closest('[data-monthly-action]');
     if (action) return openMonthlyAction(action.dataset.monthlyAction);
   }
@@ -319,4 +330,6 @@
   window.renderAdminMonthly = renderAdminMonthly;
   window.toggleMonthlyPwMenu = toggleMonthlyPwMenu;
   window.showLegacyMonthlyView = showLegacyMonthlyView;
+  window.getMonthlyActiveDates = activeDates;
+  window.getMonthlyDateText = dateText;
 })();
