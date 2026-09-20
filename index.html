@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=65">
+  <link rel="stylesheet" href="css/index.css?v=66">
 </head>
 <body>
 
@@ -235,13 +235,39 @@
         </section>
 
         <section class="monthly-panel is-hidden" data-monthly-panel="shifts" aria-labelledby="monthly-shifts-title">
-          <section class="monthly-placeholder section-card">
-            <span class="monthly-placeholder-icon" data-monthly-icon="check-circle" aria-hidden="true"></span>
-            <p class="monthly-section-label">シフト一覧・確認</p>
-            <h2 id="monthly-shifts-title">シフトの詳細は既存画面で確認します</h2>
-            <p>実際の作成・確認・公開状態を保ったまま、シフト管理アプリへ移動できます。</p>
-            <div class="monthly-fact" id="monthly-shifts-fact">状態：確認中</div>
-            <a class="monthly-primary-button monthly-link-button" href="./shift-create.html" target="_blank" rel="noopener">シフト管理アプリを開く <span>›</span></a>
+          <section class="monthly-shifts-head section-card">
+            <div>
+              <p class="monthly-section-label">シフト一覧・確認</p>
+              <span class="monthly-status" id="monthly-shifts-status">確認中</span>
+              <h2 id="monthly-shifts-title">作成結果と公開条件を確認</h2>
+              <p id="monthly-shifts-detail">対象月のシフトを読み込んでいます。</p>
+            </div>
+            <div class="monthly-status-actions monthly-shifts-actions">
+              <button type="button" class="monthly-secondary-button" data-monthly-shifts-action="reload">再読み込み</button>
+              <a class="monthly-primary-button monthly-link-button" id="monthly-shifts-open" href="./shift-create.html" target="_blank" rel="noopener">シフト管理アプリを開く <span>›</span></a>
+            </div>
+          </section>
+
+          <div class="monthly-shifts-stats" id="monthly-shifts-stats" aria-live="polite"></div>
+
+          <section class="monthly-shifts-card section-card" aria-labelledby="monthly-shifts-list-title">
+            <header class="monthly-card-head">
+              <div><p class="monthly-section-label">実施日・時間帯</p><h2 id="monthly-shifts-list-title">作成したシフト</h2></div>
+              <span class="monthly-shifts-result" id="monthly-shifts-result">確認中</span>
+            </header>
+            <div class="monthly-shifts-list" id="monthly-shifts-list"></div>
+          </section>
+
+          <section class="monthly-shifts-card section-card" aria-labelledby="monthly-shifts-approvers-title">
+            <header class="monthly-card-head">
+              <div><p class="monthly-section-label">確認者</p><h2 id="monthly-shifts-approvers-title">公開前の確認状況</h2></div>
+              <button type="button" class="monthly-wishes-toggle" data-monthly-shifts-action="toggle-approvers" aria-expanded="true" aria-controls="monthly-shift-approvers-body">
+                <span id="monthly-shifts-approver-count">確認中</span><span class="monthly-wishes-toggle-arrow" aria-hidden="true">⌄</span>
+              </button>
+            </header>
+            <div id="monthly-shift-approvers-body" class="monthly-shift-approvers-body">
+              <div class="monthly-shift-approvers" id="monthly-shift-approvers"></div>
+            </div>
           </section>
         </section>
       </main>
@@ -948,7 +974,8 @@
 <script src="js/picker.js?v=9"></script>
 <script src="js/index.js?v=88"></script>
 <script src="js/home.js?v=4"></script>
-<script src="js/monthly.js?v=2"></script>
+<script src="js/monthly.js?v=3"></script>
 <script src="js/monthly-wishes.js?v=1"></script>
+<script src="js/monthly-shifts.js?v=1"></script>
 </body>
 </html>

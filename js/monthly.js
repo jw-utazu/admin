@@ -188,20 +188,7 @@
     list.innerHTML = cards.map(card => `<div class="monthly-date-card"><small>${escapeMonthly(card[0])}</small><b>${escapeMonthly(dateText(card[1]))}</b><p>${escapeMonthly(card[2])}</p></div>`).join('');
   }
 
-  function shiftStatusText() {
-    const state = currentShift();
-    if (!state) return '対象月のシフト状態は未取得です。詳細はシフト管理アプリで確認してください。';
-    const labels = [];
-    if (state.published) labels.push('作成完了');
-    if (state.approvedAll) labels.push('確認完了');
-    if (state.notified) labels.push('公開済み');
-    return labels.length ? `状態：${labels.join('・')}` : '状態：シフト作成中または未完了';
-  }
-
   function renderSubtabs() {
-    const d = activeDates();
-    const shifts = document.getElementById('monthly-shifts-fact');
-    if (shifts) shifts.textContent = shiftStatusText();
     const href = './shift-create.html' + (currentPwType !== 'normal' ? `?type=${encodeURIComponent(currentPwType)}` : '');
     document.querySelectorAll('.monthly-link-button').forEach(link => { link.href = href; });
   }
@@ -231,6 +218,13 @@
       if (typeof _adminSwitching !== 'undefined' && _adminSwitching) {
         setTimeout(() => { if (monthlyTab === 'wishes') setMonthlyTab('wishes'); }, 0);
       } else loadMonthlyWishes();
+    }
+    if (monthlyTab === 'shifts' && typeof loadMonthlyShifts === 'function') {
+      // 年月／PW切替の既存ローディング中は、親のオーバーレイを上書きしない。
+      // loadAdminData 完了後に同じタブを再描画して取得する。
+      if (typeof _adminSwitching !== 'undefined' && _adminSwitching) {
+        setTimeout(() => { if (monthlyTab === 'shifts') setMonthlyTab('shifts'); }, 0);
+      } else loadMonthlyShifts();
     }
   }
 
@@ -321,6 +315,12 @@
       const actionName = wishAction.dataset.monthlyWishesAction;
       if (actionName === 'reload' && typeof loadMonthlyWishes === 'function') return loadMonthlyWishes(true);
       if (actionName === 'toggle-unsubmitted' && typeof toggleMonthlyWishesUnsubmitted === 'function') return toggleMonthlyWishesUnsubmitted();
+    }
+    const shiftAction = event.target.closest('[data-monthly-shifts-action]');
+    if (shiftAction) {
+      const actionName = shiftAction.dataset.monthlyShiftsAction;
+      if (actionName === 'reload' && typeof loadMonthlyShifts === 'function') return loadMonthlyShifts(true);
+      if (actionName === 'toggle-approvers' && typeof toggleMonthlyShiftsApprovers === 'function') return toggleMonthlyShiftsApprovers();
     }
     const action = event.target.closest('[data-monthly-action]');
     if (action) return openMonthlyAction(action.dataset.monthlyAction);
