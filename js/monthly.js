@@ -222,9 +222,27 @@
       if (dt.getTime() === today.getTime()) classes.push('today');
       if (key === selectedMonthlyDayKey) classes.push('selected');
       if (marks.length) classes.push('has-event');
-      if (applyTime !== null && deadlineTime !== null && dt.getTime() >= applyTime && dt.getTime() <= deadlineTime) classes.push('in-apply');
-      html += `<button type="button" class="${classes.join(' ')}" data-monthly-day="${key}" aria-label="${year}年${month}月${day}日">`;
-      html += `<span class="monthly-day-number">${day}</span>${marks.join('')}</button>`;
+      const inApplyPeriod = applyTime !== null && deadlineTime !== null && dt.getTime() >= applyTime && dt.getTime() <= deadlineTime;
+      if (inApplyPeriod) {
+        classes.push('in-apply');
+        if (applyTime === deadlineTime) classes.push('range-single');
+        else if (dt.getTime() === applyTime) classes.push('range-start');
+        else if (dt.getTime() === deadlineTime) classes.push('range-end');
+        else classes.push('range-middle');
+        if (day === 1 && dt.getTime() > applyTime) classes.push('range-window-start');
+        else if (dt.getDay() === 1 && dt.getTime() > applyTime) classes.push('range-row-start');
+        if (day === last.getDate() && dt.getTime() < deadlineTime) classes.push('range-window-end');
+        else if (dt.getDay() === 0 && dt.getTime() < deadlineTime) classes.push('range-row-end');
+      }
+      const rangeLabels = [];
+      if (sameDate(d.apply, year, month, day)) rangeLabels.push('申込開始日');
+      if (sameDate(d.deadline, year, month, day)) rangeLabels.push('希望締切日');
+      if (inApplyPeriod && !rangeLabels.length) rangeLabels.push('申込期間中');
+      const ariaLabel = `${year}年${month}月${day}日${rangeLabels.length ? `・${rangeLabels.join('・')}` : ''}`;
+      html += `<button type="button" class="${classes.join(' ')}" data-monthly-day="${key}" aria-label="${ariaLabel}">`;
+      html += `<span class="monthly-day-number">${day}</span>${marks.join('')}`;
+      if (inApplyPeriod) html += '<span class="monthly-day-range-bar" aria-hidden="true"></span>';
+      html += '</button>';
     }
     grid.innerHTML = html;
   }
