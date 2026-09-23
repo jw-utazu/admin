@@ -1073,5 +1073,65 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
 }
 
+/* ============================================================
+   対応一覧・管理設定の情報整理
+   月次ホームから独立した一覧ページへ移し、既存モーダルを詳細操作として開く。
+   ============================================================ */
+.home-workspace-main{grid-column:2;grid-row:1;min-width:0;max-width:1420px;width:100%;margin:0 auto;padding:30px 34px 48px;}
+.home-workspace-head{display:flex;align-items:center;justify-content:space-between;gap:18px;max-width:1180px;margin:0 auto 20px;}
+.home-workspace-head h1{margin-top:5px;font-size:25px;line-height:1.3;letter-spacing:-.03em;}
+.home-workspace-total{flex:none;padding:7px 11px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ink2);font-size:11px;font-weight:800;}
+.home-hub-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(270px,.75fr);gap:16px;max-width:1180px;margin:0 auto;align-items:start;}
+.home-hub-section,.home-settings-group{min-width:0;padding:18px 20px;}
+.home-hub-section .home-section-head{margin-bottom:9px;}
+.home-hub-section .home-section-head h2,.home-settings-group h2{margin-top:3px;font-size:16px;line-height:1.4;}
+.home-hub-description,.home-settings-summary{color:var(--ink2);font-size:11px;line-height:1.75;}
+.home-hub-list{display:flex;flex-direction:column;}
+.home-hub-row{display:grid;grid-template-columns:32px minmax(0,1fr) auto auto;align-items:center;gap:10px;width:100%;min-height:64px;padding:9px 4px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--ink);font-family:var(--sans);text-align:left;cursor:pointer;}
+.home-hub-row:last-child{border-bottom:0;}
+.home-hub-row:hover{background:var(--surface2);}
+.home-hub-icon{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:var(--blue-l);color:var(--blue);font-size:15px;}
+.home-hub-icon.urgent{background:var(--red-l);color:var(--red);}
+.home-hub-icon.neutral{background:var(--surface2);color:var(--ink3);}
+.home-hub-row-copy{display:block;min-width:0;}
+.home-hub-row-copy b,.home-hub-row-copy small{display:block;}
+.home-hub-row-copy b{font-size:12px;line-height:1.5;}
+.home-hub-row-copy small{margin-top:2px;color:var(--ink3);font-size:10px;line-height:1.5;}
+.home-hub-row-count{color:var(--ink3);font-size:10px;font-weight:700;white-space:nowrap;}
+.home-hub-row-count.has-items{padding:2px 8px;border-radius:999px;background:var(--red-l);color:var(--red);}
+.home-hub-row-count.neutral{padding:2px 8px;border-radius:999px;background:var(--blue-l);color:var(--blue-d);}
+.home-hub-row-action{color:var(--blue);font-size:10px;font-weight:700;white-space:nowrap;}
+.home-hub-empty{padding:14px 4px;color:var(--ink3);font-size:11px;line-height:1.8;}
+.home-hub-empty .home-button{margin-top:10px;}
+.home-settings-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:1180px;margin:0 auto;align-items:start;}
+.home-settings-group>header{margin-bottom:8px;padding-bottom:11px;border-bottom:1px solid var(--border);}
+.home-settings-group>header .home-section-label{margin-bottom:2px;}
+.home-settings-group:last-child{grid-column:1/-1;}
+.home-settings-group:last-child .home-hub-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;}
+.home-settings-group .home-hub-row{min-height:59px;}
+.home-settings-summary{margin-top:-4px;}
+
+/* 長い一覧はPCでドロワー、スマホでボトムシートとして開く。中の既存API・ボタンはそのまま使う。 */
+@media (min-width:781px){
+  .ov#m-position,.ov#m-limited-settings,.ov#m-limited-members,.ov#m-member,.ov#m-access,.ov#m-notice,.ov#m-photo-mgmt,.ov#m-proxy,.ov#m-couple,.ov#m-request,.ov#m-bug-report,.ov#m-distrib-report,.ov#m-logs,.ov#m-recovery{justify-content:flex-end;align-items:stretch;padding:0;overflow:hidden;}
+  .ov#m-position>.modal,.ov#m-limited-settings>.modal,.ov#m-limited-members>.modal,.ov#m-member>.modal,.ov#m-access>.modal,.ov#m-notice>.modal,.ov#m-photo-mgmt>.modal,.ov#m-proxy>.modal,.ov#m-couple>.modal,.ov#m-request>.modal,.ov#m-bug-report>.modal,.ov#m-distrib-report>.modal,.ov#m-logs>.modal,.ov#m-recovery>.modal{width:min(640px,92vw);max-width:min(640px,92vw)!important;height:100dvh;max-height:100dvh;border-radius:0;}
+  .ov#m-position .mbd,.ov#m-limited-settings .mbd,.ov#m-limited-members .mbd,.ov#m-member .mbd,.ov#m-access .mbd,.ov#m-notice .mbd,.ov#m-photo-mgmt .mbd,.ov#m-proxy .mbd,.ov#m-couple .mbd,.ov#m-request .mbd,.ov#m-bug-report .mbd,.ov#m-distrib-report .mbd,.ov#m-logs .mbd,.ov#m-recovery .mbd{min-height:0;flex:1;}
+}
+@media (max-width:780px){
+  .home-workspace-main{padding:21px 13px 80px;}
+  .home-workspace-head{display:block;margin-bottom:16px;}
+  .home-workspace-head h1{font-size:21px;}
+  .home-workspace-total{display:inline-flex;margin-top:10px;}
+  .home-hub-grid,.home-settings-groups{grid-template-columns:1fr;gap:12px;}
+  .home-hub-section,.home-settings-group{padding:15px 13px;}
+  .home-settings-group:last-child{grid-column:auto;}
+  .home-settings-group:last-child .home-hub-list{grid-template-columns:1fr;}
+  .home-hub-row{grid-template-columns:30px minmax(0,1fr) auto;gap:8px;min-height:58px;padding:8px 2px;}
+  .home-hub-row-action{grid-column:2;grid-row:2;margin-top:-8px;}
+  .home-hub-row-count{grid-column:3;grid-row:1 / span 2;}
+  .ov#m-position,.ov#m-limited-settings,.ov#m-limited-members,.ov#m-member,.ov#m-access,.ov#m-notice,.ov#m-photo-mgmt,.ov#m-proxy,.ov#m-couple,.ov#m-request,.ov#m-bug-report,.ov#m-distrib-report,.ov#m-logs,.ov#m-recovery{align-items:flex-end;justify-content:center;padding:0;overflow:hidden;}
+  .ov#m-position>.modal,.ov#m-limited-settings>.modal,.ov#m-limited-members>.modal,.ov#m-member>.modal,.ov#m-access>.modal,.ov#m-notice>.modal,.ov#m-photo-mgmt>.modal,.ov#m-proxy>.modal,.ov#m-couple>.modal,.ov#m-request>.modal,.ov#m-bug-report>.modal,.ov#m-distrib-report>.modal,.ov#m-logs>.modal,.ov#m-recovery>.modal{width:100%;max-width:none!important;max-height:92dvh;border-radius:16px 16px 0 0;}
+}
+
 /* キーボード操作でも現在位置を見失わないよう、各コンポーネント固有の outline:none より後で定義する */
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--blue);outline-offset:2px;}

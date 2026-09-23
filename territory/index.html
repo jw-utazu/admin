@@ -95,19 +95,18 @@
   .hdr-stat b { color: var(--blue); font-weight: 800; }
 
   /* ---- layout ---- */
-  .layout { display: grid; grid-template-columns: 1fr 280px; align-items: start; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
   @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; }
     .sb { border-left: none; border-top: 1px solid var(--border); }
   }
-  main.cp { padding: 20px; min-width: 0; }
+  main.cp { padding: 26px; min-width: 0; }
   .sb {
     border-left: 1px solid var(--border);
     padding: 20px 16px;
     display: flex; flex-direction: column; gap: 18px;
-    position: sticky; top: 52px;
-    height: calc(100vh - 52px);
-    overflow-y: auto;
+    position: sticky; top: 68px;
+    height: auto;
   }
 
   .plbl { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: var(--ink3); text-transform: uppercase; margin-bottom: 8px; padding: 0 2px; }
@@ -130,6 +129,15 @@
   .ab-d { font-size: 11px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ab-ar { color: var(--ink3); font-size: 15px; flex-shrink: 0; }
   .sb-foot { font-size: 10.5px; color: var(--ink3); line-height: 1.7; padding: 0 2px; }
+  .hdr-home { display:inline-flex; align-items:center; gap:5px; flex:none; padding:6px 9px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); color:var(--ink2); font-size:11px; font-weight:700; text-decoration:none; white-space:nowrap; }
+  .hdr-home:hover { border-color:var(--blue); background:var(--blue-l); color:var(--blue); }
+  .page-nav { display:flex; flex-direction:column; gap:6px; }
+  .abtn.active { border-color:var(--blue); background:var(--blue-l); }
+  .area-page-nav { display:flex; align-items:center; gap:6px; overflow-x:auto; margin:0 0 14px; padding:0 0 4px; }
+  .area-page-nav .btn { flex:none; }
+  .area-page-nav .btn.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .area-page-body { padding:16px; }
+  .area-back { border:0; background:none; color:var(--blue); font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
 
   /* ---- dashboard ---- */
   .pagehead { margin-bottom: 18px; display: flex; flex-direction: column; gap: 3px; }
@@ -301,11 +309,32 @@
     font-size: 14px; font-weight: 700;
     visibility: visible;
   }
+  @media (max-width:860px) {
+    .layout { display:flex; flex-direction:column; }
+    main.cp { width:100%; padding:16px; }
+    .sb { order:-1; position:static; width:100%; height:auto; padding:10px 14px; border:0; border-bottom:1px solid var(--border); }
+    .sb > div:first-child { min-width:0; }
+    .sb .plbl { margin-bottom:5px; }
+    .page-nav { flex-direction:row; overflow-x:auto; gap:6px; padding-bottom:3px; }
+    .page-nav .abtn { width:auto; min-width:max-content; padding:7px 10px; }
+    .page-nav .ab-d,.sb-foot { display:none; }
+    .page-nav .ab-ic { width:25px; height:25px; }
+  }
+  @media (max-width:520px) {
+    .hdr { gap:7px; padding:0 9px; }
+    .hdr-home { width:30px; height:30px; justify-content:center; padding:0; font-size:18px; }
+    .hdr-home span:last-child { display:none; }
+    .hdr-stat { max-width:44vw; overflow:hidden; text-overflow:ellipsis; font-size:9px; padding:4px 7px; }
+    main.cp { padding:14px 10px; }
+    .area-page-body { padding:12px 9px; }
+    .area-back { font-size:10px; }
+  }
 </style>
 <script>document.documentElement.classList.add("area-auth-pending");</script>
 
 <header class="hdr">
   <div class="hdr-logo">区</div>
+  <a class="hdr-home" href="../index.html" aria-label="管理画面へ戻る"><span aria-hidden="true">‹</span><span>管理画面へ戻る</span></a>
   <div class="hdr-titles">
     <span class="hdr-eyebrow">宇多津・坂出</span>
     <span class="hdr-name">区域割り当て管理</span>
@@ -561,7 +590,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   var state = await loadInitialState();
   document.documentElement.classList.remove("area-auth-pending");
   var ui = {
-    openModal: null,
+    activePage: "dashboard",
     territoryFilter: "all",
     assignGroupId: state.groups[0] ? state.groups[0].id : null,
     manualActivateId: null,
@@ -852,8 +881,17 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
 
   // ---------- mutations ----------
 
-  window.openModal = function (id) { ui.openModal = id; render(); };
-  window.closeModal = function () { ui.openModal = null; ui.manualActivateId = null; ui.assignmentEditId = null; render(); };
+  // 旧モーダルの入口は維持し、同じ機能をページ内の作業面へ表示する。
+  // 選択・保存処理は従来の MODAL_BODY とハンドラーをそのまま使う。
+  window.openModal = function (id) {
+    if (id === "dashboard" || MODAL_BODY[id]) {
+      ui.activePage = id;
+      ui.manualActivateId = null;
+      ui.assignmentEditId = null;
+      render();
+    }
+  };
+  window.closeModal = function () { ui.activePage = "dashboard"; ui.manualActivateId = null; ui.assignmentEditId = null; render(); };
 
   window.setTerritoryFilter = function (f) { ui.territoryFilter = f; render(); };
 
@@ -1106,7 +1144,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   function render() {
     renderHeader();
     renderSidebar();
-    document.getElementById("main").innerHTML = renderDashboard();
+    document.getElementById("main").innerHTML = renderPage();
     renderModals();
   }
 
@@ -1121,6 +1159,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     var pendingCount = state.territories.filter(function (t) { return t.status === "pending"; }).length;
     var stockCount = state.territories.filter(function (t) { return t.status === "stock" && t.purpose === "normal"; }).length;
     var actions = [
+      { id: "dashboard", icon: "⌂", iconBg: "var(--blue-l)", iconColor: "var(--blue)", name: "区域の現況", desc: "保持数・期限・回収待ち" },
       { id: "territories", icon: "📋", iconBg: "var(--blue-l)", iconColor: "var(--blue)", name: "区域一覧・割当操作",
         desc: "割当 " + activeTerritories().length + "・ストック " + stockCount + "・回収待ち " + pendingCount },
       { id: "adjacency", icon: "🗺", iconBg: "var(--purple-l)", iconColor: "var(--purple)", name: "隣接関係",
@@ -1133,12 +1172,33 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
         desc: "書き出し・読み込み・初期化" }
     ];
     document.getElementById("sbActions").innerHTML = actions.map(function (a) {
-      return '<button class="abtn" onclick="openModal(\'' + a.id + '\')">' +
+      return '<button class="abtn' + (ui.activePage === a.id ? ' active' : '') + '" data-area-page="' + a.id + '" onclick="openModal(\'' + a.id + '\')">' +
         '<div class="ab-ic" style="background:' + a.iconBg + ';color:' + a.iconColor + ';">' + a.icon + '</div>' +
         '<div class="ab-tx"><span class="ab-n">' + esc(a.name) + '</span><span class="ab-d">' + esc(a.desc) + '</span></div>' +
         '<span class="ab-ar">›</span></button>';
     }).join("");
     document.getElementById("sbFoot").innerHTML = "Supabase DBに保存されます。オフライン時は一時的にこの端末に保持し、再接続時に送信します。";
+  }
+
+  function renderPage() {
+    var page = ui.activePage || "dashboard";
+    if (page === "dashboard") return renderDashboard();
+    var pages = {
+      territories: { label: "割り当て", title: "区域一覧・割当操作", detail: "区域の状態を確認し、割当・編集・回収を行います。" },
+      adjacency: { label: "区域データ", title: "隣接関係", detail: "区域を選び、隣接関係を登録します。" },
+      pools: { label: "区域データ", title: "プール管理", detail: "合同奉仕やキャンペーン用に確保する区域を管理します。" },
+      groups: { label: "区域データ", title: "グループ管理", detail: "グループ名と区域の目標保持数を管理します。" },
+      backup: { label: "保守", title: "バックアップ", detail: "区域データの書き出し・読み込み・初期化を行います。" }
+    };
+    var info = pages[page];
+    if (!info || !MODAL_BODY[page]) return renderDashboard();
+    var nav = ["dashboard", "territories", "adjacency", "pools", "groups", "backup"].map(function (id) {
+      var item = id === "dashboard" ? { title: "現況" } : pages[id];
+      return '<button type="button" class="btn' + (page === id ? ' active' : '') + '" onclick="openModal(\'' + id + '\')">' + esc(item.title) + '</button>';
+    }).join("");
+    return '<div class="pagehead"><span class="eyebrow">' + esc(info.label) + '</span><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h1>' + esc(info.title) + '</h1><button type="button" class="area-back" onclick="openModal(\'dashboard\')">← 現況に戻る</button></div><p>' + esc(info.detail) + '</p></div>' +
+      '<nav class="area-page-nav" aria-label="区域の作業">' + nav + '</nav>' +
+      '<section class="card area-page-body">' + MODAL_BODY[page]() + '</section>';
   }
 
   function statusChip(t) {
@@ -1197,7 +1257,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
       "新規割当時に自動でチェックされます。 " +
       '<a href="#" onclick="dismissSetup();return false;">この案内を閉じる</a></div></div>';
 
-    return '<div class="pagehead"><span class="eyebrow">Overview</span><h1>ダッシュボード</h1><p>グループごとの保持数と、期限が近い区域・回収待ちの区域をひと目で確認できます。操作は右のカードから行ってください。</p></div>' +
+    return '<div class="pagehead"><span class="eyebrow">区域割り当て</span><h1>区域の現況</h1><p>保持数、期限、回収待ちの区域を確認し、作業へ進みます。</p></div>' +
       banner +
       '<div class="stack">' +
       '<div><div class="section-title">グループ別 保持数</div><div class="grid cols-4">' + groupTiles + "</div></div>" +
@@ -1238,12 +1298,8 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   function renderModals() {
     ["territories", "adjacency", "pools", "groups", "backup"].forEach(function (id) {
       var ov = document.getElementById("ov-" + id);
-      if (ui.openModal === id) {
-        ov.classList.add("show");
-        document.getElementById("mbd-" + id).innerHTML = MODAL_BODY[id]();
-      } else {
-        ov.classList.remove("show");
-      }
+      // 旧DOMは互換性のため残す。各操作は #main 内に描画する。
+      if (ov) ov.classList.remove("show");
     });
   }
 

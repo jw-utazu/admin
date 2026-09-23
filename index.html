@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=66">
+  <link rel="stylesheet" href="css/index.css?v=67">
 </head>
 <body>
 
@@ -124,20 +124,8 @@
             </section>
 
             <section class="home-section-block section-card" id="home-settings" aria-labelledby="home-settings-title">
-              <div class="home-section-head"><div><p class="home-section-label">管理・設定</p><h2 id="home-settings-title">目的から開く</h2></div></div>
-              <div class="home-settings-list">
-                <button type="button" data-home-action="member"><span><b>メンバー</b><small>追加・編集・有効／無効</small></span><span>›</span></button>
-                <button type="button" data-home-action="access"><span><b>アクセス許可</b><small>メール・参加者との紐付け</small></span><span>›</span></button>
-                <button type="button" data-home-action="position"><span><b>立ち位置</b><small>役割と権限の同期</small></span><span>›</span></button>
-                <button type="button" data-home-action="notice"><span><b>お知らせ</b><small>追加・編集・削除</small></span><span>›</span></button>
-                <button type="button" data-home-action="photo"><span><b>写真</b><small>カート展示写真</small></span><span>›</span></button>
-                <button type="button" data-home-action="proxy"><span><b>代理送信</b><small>希望提出の代理設定</small></span><span>›</span></button>
-                <button type="button" data-home-action="couple"><span><b>夫婦</b><small>希望提出の関係設定</small></span><span>›</span></button>
-                <button type="button" data-home-action="limited"><span><b>限定PW設定</b><small>期間・表示・対象者</small></span><span>›</span></button>
-                <button type="button" data-home-action="logs"><span><b>ログ</b><small>操作・希望提出・ログイン履歴</small></span><span>›</span></button>
-                <button type="button" data-home-action="manual"><span><b>マニュアル</b><small>使い方を確認</small></span><span>›</span></button>
-                <button type="button" data-home-action="pwa"><span><b>ホームに追加</b><small>端末へのインストール</small></span><span>›</span></button>
-              </div>
+              <div class="home-section-head"><div><p class="home-section-label">管理・設定</p><h2 id="home-settings-title">目的別にまとまっています</h2></div><button type="button" class="home-text-button" data-home-nav="settings">管理・設定を開く ›</button></div>
+              <p class="home-settings-summary">人と権限、表示内容、限定PW、ログなどの低頻度の操作は、専用ページから選べます。</p>
             </section>
           </aside>
         </div>
@@ -270,6 +258,58 @@
             </div>
           </section>
         </section>
+      </main>
+
+      <main class="home-workspace-main is-hidden" id="inbox-view" tabindex="-1" aria-label="対応一覧">
+        <header class="home-workspace-head">
+          <div><p class="home-eyebrow">対応一覧</p><h1>対応が必要なもの</h1><p class="home-lead" id="inbox-context-lead">未対応件数を読み込んでいます。</p></div>
+          <span class="home-workspace-total" id="inbox-workspace-total" aria-live="polite">確認中</span>
+        </header>
+        <div class="home-hub-grid">
+          <section class="home-hub-section section-card" aria-labelledby="inbox-pending-title">
+            <header class="home-section-head"><div><p class="home-section-label">未対応</p><h2 id="inbox-pending-title">順に確認する項目</h2></div></header>
+            <div class="home-hub-list" id="inbox-pending-list" aria-live="polite"></div>
+          </section>
+          <section class="home-hub-section section-card" aria-labelledby="inbox-record-title">
+            <header class="home-section-head"><div><p class="home-section-label">記録</p><h2 id="inbox-record-title">配布報告</h2></div></header>
+            <p class="home-hub-description">配布報告は対応件数に含めず、記録として確認できます。</p>
+            <div class="home-hub-list" id="inbox-record-list" aria-live="polite"></div>
+          </section>
+        </div>
+      </main>
+
+      <main class="home-workspace-main is-hidden" id="settings-view" tabindex="-1" aria-label="管理・設定">
+        <header class="home-workspace-head">
+          <div><p class="home-eyebrow">管理・設定</p><h1>アプリ全体の管理</h1><p class="home-lead">月次作業に直接関係しない設定を目的別にまとめています。</p></div>
+        </header>
+        <div class="home-settings-groups">
+          <section class="home-settings-group section-card" aria-labelledby="settings-people-title">
+            <header><p class="home-section-label">人と権限</p><h2 id="settings-people-title">人と権限</h2></header>
+            <div class="home-hub-list">
+              <button type="button" class="home-hub-row normal-only" data-home-action="member"><span class="home-hub-icon" data-home-icon="users" aria-hidden="true"></span><span class="home-hub-row-copy"><b>メンバー</b><small>追加・編集・有効／無効</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row normal-only" data-home-action="access"><span class="home-hub-icon" data-home-icon="mail" aria-hidden="true"></span><span class="home-hub-row-copy"><b>アクセス許可</b><small>メール・参加者との紐付け</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row normal-only" data-home-action="position"><span class="home-hub-icon" data-home-icon="user-cog" aria-hidden="true"></span><span class="home-hub-row-copy"><b>立ち位置</b><small>役割と権限の同期</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row normal-only" data-home-action="proxy"><span class="home-hub-icon" data-home-icon="arrow-left-right" aria-hidden="true"></span><span class="home-hub-row-copy"><b>代理送信</b><small>希望提出の代理設定</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row normal-only" data-home-action="couple"><span class="home-hub-icon" data-home-icon="heart-handshake" aria-hidden="true"></span><span class="home-hub-row-copy"><b>夫婦</b><small>希望提出の関係設定</small></span><span class="home-hub-row-action">開く ›</span></button>
+            </div>
+          </section>
+          <section class="home-settings-group section-card" aria-labelledby="settings-content-title">
+            <header><p class="home-section-label">表示内容</p><h2 id="settings-content-title">表示内容</h2></header>
+            <div class="home-hub-list">
+              <button type="button" class="home-hub-row normal-only" data-home-action="notice"><span class="home-hub-icon" data-home-icon="megaphone" aria-hidden="true"></span><span class="home-hub-row-copy"><b>お知らせ</b><small>追加・編集・削除</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row" data-home-action="photo"><span class="home-hub-icon" data-home-icon="image" aria-hidden="true"></span><span class="home-hub-row-copy"><b>写真</b><small>カート展示写真</small></span><span class="home-hub-row-action">開く ›</span></button>
+            </div>
+          </section>
+          <section class="home-settings-group section-card" aria-labelledby="settings-other-title">
+            <header><p class="home-section-label">限定PW・その他</p><h2 id="settings-other-title">限定PW・その他</h2></header>
+            <div class="home-hub-list">
+              <button type="button" class="home-hub-row" data-home-action="limited"><span class="home-hub-icon" data-home-icon="lock" aria-hidden="true"></span><span class="home-hub-row-copy"><b>限定PW設定</b><small>期間・表示・対象メンバー</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row normal-only" data-home-action="logs"><span class="home-hub-icon" data-home-icon="clipboard" aria-hidden="true"></span><span class="home-hub-row-copy"><b>ログ</b><small>操作・希望提出・ログイン履歴</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row" data-home-action="manual"><span class="home-hub-icon" data-home-icon="book-open" aria-hidden="true"></span><span class="home-hub-row-copy"><b>マニュアル</b><small>操作手順を確認</small></span><span class="home-hub-row-action">開く ›</span></button>
+              <button type="button" class="home-hub-row" data-home-action="pwa"><span class="home-hub-icon" data-home-icon="smartphone" aria-hidden="true"></span><span class="home-hub-row-copy"><b>ホームに追加</b><small>端末へのインストール</small></span><span class="home-hub-row-action">開く ›</span></button>
+            </div>
+          </section>
+        </div>
       </main>
     </div>
     <nav class="home-bottom-nav" aria-label="スマホ用ホームナビゲーション">
@@ -973,7 +1013,7 @@
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
 <script src="js/index.js?v=88"></script>
-<script src="js/home.js?v=4"></script>
+<script src="js/home.js?v=5"></script>
 <script src="js/monthly.js?v=3"></script>
 <script src="js/monthly-wishes.js?v=1"></script>
 <script src="js/monthly-shifts.js?v=1"></script>

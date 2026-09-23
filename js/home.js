@@ -288,6 +288,48 @@
     }).join('');
   }
 
+  function renderInboxHub() {
+    const pending = document.getElementById('inbox-pending-list');
+    const records = document.getElementById('inbox-record-list');
+    const lead = document.getElementById('inbox-context-lead');
+    const totalEl = document.getElementById('inbox-workspace-total');
+    if (!pending || !records || !lead || !totalEl) return;
+    if (currentPwType !== 'normal') {
+      lead.textContent = '対応一覧は通常PWのデータを表示します。';
+      totalEl.textContent = '通常PW';
+      pending.innerHTML = '<div class="home-hub-empty"><p>通常PWに切り替えると、対応件数を確認できます。</p><button type="button" class="home-button secondary" data-home-context="pw">通常PWを選ぶ</button></div>';
+      records.innerHTML = '<div class="home-hub-empty">配布報告は通常PWで確認します。</div>';
+      renderHomeIcons();
+      return;
+    }
+    if (!homeInboxCounts) {
+      lead.textContent = '未対応件数を読み込んでいます。';
+      totalEl.textContent = '確認中';
+      pending.innerHTML = '<div class="home-hub-empty">対応件数を読み込んでいます。</div>';
+      records.innerHTML = '<div class="home-hub-empty">配布報告の件数を読み込んでいます。</div>';
+      renderHomeIcons();
+      return;
+    }
+
+    const rows = [
+      { key: 'calApproval', label: '予定表の承認・公開', detail: '対象月の状態と次の操作を確認', action: 'calendar-stage', icon: 'calendar' },
+      { key: 'recovery', label: 'ログイン救済', detail: '未対応の救済依頼を確認', action: 'recovery', icon: 'key' },
+      { key: 'requests', label: '要望', detail: '未対応の要望を確認', action: 'requests', icon: 'message-circle' },
+      { key: 'bugs', label: 'バグ報告', detail: '未対応の報告を確認', action: 'bugs', icon: 'triangle-alert' },
+    ];
+    const total = rows.reduce((sum, row) => sum + Number(homeInboxCounts[row.key] || 0), 0);
+    lead.textContent = total ? `未対応 ${total}件を種類ごとに確認できます。` : '現在、対応が必要な項目はありません。';
+    totalEl.textContent = total ? `未対応 ${total}件` : '未対応 0件';
+    pending.innerHTML = rows.map(row => {
+      const count = Number(homeInboxCounts[row.key] || 0);
+      return `<button type="button" class="home-hub-row" data-home-action="${row.action}"><span class="home-hub-icon${count ? ' urgent' : ''}" data-home-icon="${row.icon}" aria-hidden="true"></span><span class="home-hub-row-copy"><b>${row.label}</b><small>${row.detail}</small></span><span class="home-hub-row-count${count ? ' has-items' : ''}">${count ? `${count}件` : '対応なし'}</span><span class="home-hub-row-action">開く ›</span></button>`;
+    }).join('');
+
+    const distribution = Number(homeInboxCounts.distribution || 0);
+    records.innerHTML = `<button type="button" class="home-hub-row" data-home-action="distribution"><span class="home-hub-icon neutral" data-home-icon="package" aria-hidden="true"></span><span class="home-hub-row-copy"><b>配布報告</b><small>対応件数に含めない記録</small></span><span class="home-hub-row-count neutral">${distribution}件</span><span class="home-hub-row-action">記録を見る ›</span></button>`;
+    renderHomeIcons();
+  }
+
   function renderHomeAccount() {
     const nameEl = document.getElementById('home-account-name');
     const avatarEl = document.getElementById('home-avatar');
@@ -319,14 +361,17 @@
     renderHomeProgress(state);
     renderHomeCalendar();
     renderHomeAttention();
+    renderInboxHub();
     renderHomeAccount();
     if (typeof renderAdminMonthly === 'function') renderAdminMonthly();
   }
 
   function updateNavActive(view) {
+    const navView = view === 'inbox' ? 'attention' : view;
     document.querySelectorAll('[data-home-nav]').forEach(button => {
       const target = button.dataset.homeNav;
-      const active = target === view;
+      const mobileMore = view === 'inbox' && target === 'settings' && button.closest('.home-bottom-nav');
+      const active = target === navView || !!mobileMore;
       button.classList.toggle('active', active);
     });
   }
@@ -334,26 +379,27 @@
   function setAdminHomeView(view) {
     const app = document.getElementById('app');
     const home = document.getElementById('home-view');
-    const homeMain = document.getElementById('home-main');
-    const monthly = document.getElementById('monthly-view');
+    const pages = {
+      home: document.getElementById('home-main'),
+      monthly: document.getElementById('monthly-view'),
+      inbox: document.getElementById('inbox-view'),
+      settings: document.getElementById('settings-view'),
+    };
     const layout = document.querySelector('.layout');
-    const showHome = view === 'home';
-    const showWorkspace = showHome || view === 'monthly';
-    homeView = showHome ? 'home' : 'monthly';
+    const nextView = Object.prototype.hasOwnProperty.call(pages, view) ? view : 'home';
+    const showWorkspace = true;
+    homeView = nextView;
     if (app) app.classList.toggle('home-mode', showWorkspace);
     setHomeVisible(home, showWorkspace);
-    setHomeVisible(homeMain, showHome);
-    setHomeVisible(monthly, !showHome && showWorkspace);
+    Object.entries(pages).forEach(([key, page]) => setHomeVisible(page, key === nextView));
     setHomeVisible(layout, !showWorkspace);
-    updateNavActive(showHome ? 'home' : 'monthly');
+    if (home) home.scrollTop = 0;
+    updateNavActive(nextView);
     if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
-    if (showHome) {
-      renderAdminHome();
-      requestAnimationFrame(() => document.getElementById('home-main')?.focus({ preventScroll: true }));
-    } else if (showWorkspace) {
-      if (typeof renderAdminMonthly === 'function') renderAdminMonthly();
-      requestAnimationFrame(() => document.getElementById('monthly-view')?.focus({ preventScroll: true }));
-    }
+    if (nextView === 'home') renderAdminHome();
+    else if (nextView === 'monthly' && typeof renderAdminMonthly === 'function') renderAdminMonthly();
+    else if (nextView === 'inbox') renderInboxHub();
+    requestAnimationFrame(() => pages[nextView]?.focus({ preventScroll: true }));
   }
 
   function openMonthlyContext(kind) {
@@ -394,7 +440,6 @@
       proxy: 'openProxyModal', couple: 'openCoupleModal', limited: 'openLimitedSettingsModal', logs: 'openLogModal',
     };
     if (action === 'manual' || action === 'pwa') {
-      setAdminHomeView('monthly');
       return setTimeout(() => {
         if (action === 'manual' && typeof openM === 'function') openM('m-manual');
         if (action === 'pwa' && typeof window.openPwaModal === 'function') window.openPwaModal();
@@ -402,7 +447,6 @@
     }
     const fnName = actions[action];
     if (!fnName || typeof window[fnName] !== 'function') return;
-    setAdminHomeView('monthly');
     setTimeout(() => {
       if (action === 'photo') window[fnName]('exhibit');
       else window[fnName]();
@@ -418,14 +462,8 @@
       if (target === 'monthly') return setAdminHomeView('monthly');
       if (target === 'shift') return openExistingAction('shift');
       if (target === 'territory') return openExistingAction('territory');
-      if (target === 'attention') {
-        setAdminHomeView('home');
-        return document.getElementById('home-attention')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      if (target === 'settings') {
-        setAdminHomeView('home');
-        return document.getElementById('home-settings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      if (target === 'attention') return setAdminHomeView('inbox');
+      if (target === 'settings') return setAdminHomeView('settings');
     }
     const context = event.target.closest('[data-home-context]');
     if (context) return openMonthlyContext(context.dataset.homeContext);
@@ -438,6 +476,8 @@
   function updateAdminHomeCounts(counts) {
     homeInboxCounts = counts ? Object.assign({}, counts) : null;
     renderHomeAttention();
+    renderInboxHub();
+    renderHomeIcons();
   }
 
   document.addEventListener('click', handleHomeClick);
