@@ -1116,6 +1116,28 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     }
   };
 
+  // 誤って割り当てた区域を、回収履歴を残さずストックへ戻す。
+  // 回収（completeReturn）は実績として history に残すが、取り消しは「割当そのものが無かった」扱いにする。
+  window.cancelAssignment = function (id) {
+    var t = findTerritory(id);
+    if (!t || (t.status !== "active" && t.status !== "pending")) return;
+    var gname = groupName(t.currentGroupId);
+    var msg = "区域 " + id + " の「" + gname + "」への割当を取り消し、通常ストックに戻します。\n" +
+      "回収の履歴には記録されません。誤って割り当てた場合にお使いください。\nよろしいですか？";
+    showConfirm(msg, function () {
+      if (t.status !== "active" && t.status !== "pending") return;
+      t.status = "stock";
+      t.currentGroupId = null;
+      t.assignedDate = null;
+      t.dueDate = null;
+      t.collectedDate = null;
+      if (ui.assignmentEditId === t.id) ui.assignmentEditId = null;
+      if (ui.manualActivateId === t.id) ui.manualActivateId = null;
+      saveState(); render();
+      toast("区域 " + id + " の割当を取り消し、ストックに戻しました");
+    });
+  };
+
   window.startReturn = function (id) {
     var t = findTerritory(id); if (!t || t.status !== "active") return;
     t.status = "pending"; saveState(); render();
@@ -1497,13 +1519,15 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
           action = '<span class="chip plain">確保中</span>';
         } else if (t.status === "active") {
           action = '<div class="field-row"><button class="btn small" onclick="startAssignmentEdit(' + t.id + ')">割当を編集</button>' +
-            '<button class="btn small" onclick="startReturn(' + t.id + ')">回収待ちへ</button></div>';
+            '<button class="btn small" onclick="startReturn(' + t.id + ')">回収待ちへ</button>' +
+            '<button class="btn btn-d small" onclick="cancelAssignment(' + t.id + ')">割当を取消</button></div>';
         } else {
           action = '<div class="field-row">' +
             '<input class="inp-w122" type="date" id="returnDate_' + t.id + '" value="' + todayISO() + '">' +
             '<button class="btn small" onclick="startAssignmentEdit(' + t.id + ')">割当を編集</button>' +
             '<button class="btn btn-p small" onclick="completeReturn(' + t.id + ')">回収完了</button>' +
             '<button class="btn small" onclick="undoReturn(' + t.id + ')">戻す</button>' +
+            '<button class="btn btn-d small" onclick="cancelAssignment(' + t.id + ')">割当を取消</button>' +
             "</div>";
         }
 
