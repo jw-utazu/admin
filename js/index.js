@@ -1160,6 +1160,113 @@ function closeSlotDetail(){
 // ============================================================
 let daySelectTarget = null;
 
+// ============================================================
+// 日程種別 → 日付選択モーダル
+// 「申込開始日などを何日にするか」を項目の側から決めるための入口。
+// 日付クリック起点の openDaySelectModal と並存する
+// ============================================================
+const DATE_KIND_META = {
+  apply:    { label:'申込開始日',   short:'申込', hint:'奉仕者が予定表を確認できる開始日', color:'var(--green)' },
+  deadline: { label:'締切日',       short:'締切', hint:'希望提出の締切日',                 color:'var(--red)' },
+  open:     { label:'シフト公開日', short:'公開', hint:'確認済みシフトの公開予定日',       color:'var(--blue)' },
+};
+let dateKindTarget = null;
+
+// 通常PWは dates／slots、限定PWは選択中フェーズを見る
+function dateKindDates() {
+  if (currentPwType === 'normal') return dates || {};
+  return adminPhases[currentPhaseIndex] || {};
+}
+function dateKindSlots() {
+  if (currentPwType === 'normal') return Array.isArray(slots) ? slots : [];
+  const ph = adminPhases[currentPhaseIndex] || {};
+  return Array.isArray(ph.slots) ? ph.slots : [];
+}
+function dateKindText(obj) {
+  if (!obj) return '未設定';
+  const dt = new Date(obj.y, obj.m-1, obj.d);
+  return obj.y+'年'+obj.m+'月'+obj.d+'日（'+DOW7[dt.getDay()===0?6:dt.getDay()-1]+'）';
+}
+
+function openDateKindPicker(kind) {
+  if (!DATE_KIND_META[kind]) return;
+  dateKindTarget = kind;
+  document.getElementById('m-date-kind-title').textContent = DATE_KIND_META[kind].label + 'を選ぶ';
+  buildDateKindPicker();
+  openM('m-date-kind');
+}
+
+// 前月・対象月・翌月に加えて、設定済みの日がその範囲外ならその月も出す
+function dateKindMonths() {
+  const list = [];
+  const push = (y, m) => { if (!list.some(v => v.y === y && v.m === m)) list.push({ y, m }); };
+  for (let offset = -1; offset <= 1; offset++) {
+    const dt = new Date(Number(curY), Number(curM) - 1 + offset, 1);
+    push(dt.getFullYear(), dt.getMonth() + 1);
+  }
+  const cur = dateKindDates()[dateKindTarget];
+  if (cur) push(Number(cur.y), Number(cur.m));
+  return list.sort((a, b) => a.y - b.y || a.m - b.m);
+}
+
+function buildDateKindPicker() {
+  const kind = dateKindTarget;
+  if (!kind) return;
+  const meta = DATE_KIND_META[kind];
+  const d = dateKindDates();
+  const cur = d[kind] || null;
+  const lead = document.getElementById('m-date-kind-lead');
+  if (lead) {
+    lead.innerHTML = `<b style="color:${meta.color};">${meta.label}</b>を何日にするか選びます。<br>`
+      + `<span class="dkp-hint">${meta.hint}</span><br>`
+      + `現在：<b>${dateKindText(cur)}</b>`
+      + (currentPwType === 'normal' ? '' : `　<span class="dkp-hint">（フェーズ${currentPhaseIndex+1}）</span>`);
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const html = dateKindMonths().map(({y, m}) => {
+    const first = new Date(y, m-1, 1);
+    const last  = new Date(y, m, 0);
+    const offset = first.getDay() === 0 ? 6 : first.getDay() - 1;
+    let cells = DOW7.map((n, i) => `<span class="dkp-dow${i===5?' sat':i===6?' sun':''}">${n}</span>`).join('');
+    for (let i = 0; i < offset; i++) cells += '<span class="dkp-empty" aria-hidden="true"></span>';
+    for (let day = 1; day <= last.getDate(); day++) {
+      const dt = new Date(y, m-1, day);
+      const marks = [];
+      ['apply','deadline','open'].forEach(k => {
+        if (d[k] && Number(d[k].y)===y && Number(d[k].m)===m && Number(d[k].d)===day) marks.push(DATE_KIND_META[k].short);
+      });
+      if (dateKindSlots().some(s => Number(s.y)===y && Number(s.m)===m && Number(s.d)===day)) marks.push('実施');
+      const cls = ['dkp-day'];
+      if (cur && Number(cur.y)===y && Number(cur.m)===m && Number(cur.d)===day) cls.push('sel');
+      if (dt.getTime() === today.getTime()) cls.push('today');
+      if (dt.getDay() === 6) cls.push('sat');
+      if (dt.getDay() === 0) cls.push('sun');
+      cells += `<button type="button" class="${cls.join(' ')}" onclick="pickDateKindDay(${y},${m},${day})" aria-label="${y}年${m}月${day}日を${meta.label}にする"><span class="dkp-num">${day}</span>${marks.length?`<span class="dkp-mk">${marks.join('・')}</span>`:''}</button>`;
+    }
+    const isTarget = y === Number(curY) && m === Number(curM);
+    return `<div class="dkp-month"><div class="dkp-mhd">${y}年${m}月${isTarget?'（対象月）':''}</div><div class="dkp-grid">${cells}</div></div>`;
+  }).join('');
+  const body = document.getElementById('m-date-kind-body');
+  if (body) body.innerHTML = html;
+  setVisible(document.getElementById('m-date-kind-clear'), !!cur);
+}
+
+async function pickDateKindDay(y, m, d) {
+  const kind = dateKindTarget;
+  if (!kind) return;
+  closeM('m-date-kind');
+  await applyDateKind(kind, {y, m, d});
+  toast(DATE_KIND_META[kind].label + 'を ' + dateKindText({y, m, d}) + ' に設定しました', 's');
+}
+
+async function clearDateKind() {
+  const kind = dateKindTarget;
+  if (!kind) return;
+  closeM('m-date-kind');
+  await applyDateKind(kind, null);
+  toast(DATE_KIND_META[kind].label + 'を未設定に戻しました', 's');
+}
+
 function openDaySelectModal(y,m,d) {
   if(d < 1) return;
   daySelectTarget = {y,m,d};
@@ -1226,6 +1333,16 @@ function switchPhaseInModal(i) {
 async function setDayAs(kind) {
   if(!daySelectTarget) return;
   const {y,m,d} = daySelectTarget;
+  closeM('m-day-select');
+  await applyDateKind(kind, {y,m,d});
+}
+
+// 申込開始日・締切日・シフト公開日を「どの日にするか」決めて保存する。
+// 日付クリック起点（setDayAs）と、項目クリック起点（openDateKindPicker）の共通入口。
+// value が null なら、その日程を未設定に戻す
+async function applyDateKind(kind, value) {
+  if (!DATE_KIND_META[kind]) return;
+  const val = value ? {y:Number(value.y), m:Number(value.m), d:Number(value.d)} : null;
   const isLimited = currentPwType !== 'normal';
   if (isLimited) {
     if (adminPhases.length === 0) {
@@ -1233,20 +1350,20 @@ async function setDayAs(kind) {
       currentPhaseIndex = 0;
     }
     const ph = adminPhases[currentPhaseIndex];
-    ph[kind] = {y,m,d};
-    ph[kind+'Raw'] = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    closeM('m-day-select');
+    ph[kind] = val;
+    ph[kind+'Raw'] = val ? `${val.y}-${String(val.m).padStart(2,'0')}-${String(val.d).padStart(2,'0')}` : null;
     buildPhaseManageArea(true);
     buildCalScroll();
-    savePhases();
+    await savePhases();
   } else {
-    dates[kind] = {y,m,d};
-    closeM('m-day-select');
+    dates[kind] = val;
     updDateViews();
     buildCalScroll();
     buildInfoArea();
     await saveNormalDates();
   }
+  if (typeof renderAdminHome === 'function') renderAdminHome();
+  if (typeof renderAdminMonthly === 'function') renderAdminMonthly();
 }
 
 function setDayAsSlot() {

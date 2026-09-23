@@ -114,11 +114,11 @@
     }
 
     const stages = [
-      { label: '日程設定', state: scheduleReady ? 'done' : 'current', sub: hasDates ? '設定済み' : '未設定' },
-      { label: '希望受付', state: !scheduleReady ? 'todo' : wishesDone ? 'done' : 'current', sub: dates.deadline ? `締切 ${dateLabel(dates.deadline, false)}` : '未設定' },
+      { label: '日程設定', state: scheduleReady ? 'done' : 'current', sub: hasDates ? '設定済み' : '未設定', dateKind: 'apply' },
+      { label: '希望受付', state: !scheduleReady ? 'todo' : wishesDone ? 'done' : 'current', sub: dates.deadline ? `締切 ${dateLabel(dates.deadline, false)}` : '未設定', dateKind: 'deadline' },
       { label: 'シフト作成', state: !wishesDone ? 'todo' : created ? 'done' : 'current', sub: created ? '作成完了' : '未完了' },
       { label: '確認', state: !created ? 'todo' : approved ? 'done' : 'wait', sub: !created ? '未開始' : approved ? '確認完了' : '確認待ち' },
-      { label: '公開', state: !approved ? 'todo' : notified ? 'done' : 'current', sub: notified ? '公開済み' : dates.open ? `予定 ${dateLabel(dates.open, false)}` : '公開待ち' },
+      { label: '公開', state: !approved ? 'todo' : notified ? 'done' : 'current', sub: notified ? '公開済み' : dates.open ? `予定 ${dateLabel(dates.open, false)}` : '公開待ち', dateKind: 'open' },
     ];
     let current = '日程を設定する';
     if (scheduleReady && !wishesDone) current = '希望受付中';
@@ -203,7 +203,11 @@
     if (!list) return;
     list.innerHTML = state.stages.map((stage, index) => {
       const mark = stage.state === 'done' ? '✓' : String(index + 1);
-      return `<li class="${escapeHome(stage.state)}"><span class="home-progress-dot">${mark}</span><b>${escapeHome(stage.label)}</b><small>${escapeHome(stage.sub || '')}</small></li>`;
+      // 日程に対応する段は、その日程を何日にするか決める入口にする
+      const kindAttr = stage.dateKind
+        ? ` data-home-date-kind="${escapeHome(stage.dateKind)}" role="button" tabindex="0" title="タップして日付を変更"`
+        : '';
+      return `<li class="${escapeHome(stage.state)}${stage.dateKind ? ' is-editable' : ''}"${kindAttr}><span class="home-progress-dot">${mark}</span><b>${escapeHome(stage.label)}</b><small>${escapeHome(stage.sub || '')}</small></li>`;
     }).join('');
     const title = document.getElementById('home-progress-title');
     if (title) {
@@ -220,19 +224,21 @@
     const calendarSlots = currentPwType === 'normal'
       ? (Array.isArray(slots) ? slots : [])
       : (limitedPhase && Array.isArray(limitedPhase.slots) ? limitedPhase.slots : []);
-    const add = (value, label, kind, detail) => {
+    // dateKind は「申込開始日などを何日にするか」を選ぶ入口に使う種別キー
+    const add = (value, label, kind, detail, dateKind) => {
       const key = dateKey(value);
       if (!key) return;
-      const current = events.get(key) || { value, labels: [], kinds: [], details: [] };
+      const current = events.get(key) || { value, labels: [], kinds: [], details: [], dateKinds: [] };
       if (!current.labels.includes(label)) current.labels.push(label);
       if (!current.kinds.includes(kind)) current.kinds.push(kind);
       if (detail && !current.details.includes(detail)) current.details.push(detail);
+      if (dateKind && !current.dateKinds.includes(dateKind)) current.dateKinds.push(dateKind);
       events.set(key, current);
     };
-    add(calendarDates.apply, '受付', 'green', '申込開始');
-    add(calendarDates.deadline, '締切', 'amber', '希望締切');
-    add(calendarDates.open, '公開', 'amber', 'シフト公開');
-    calendarSlots.forEach(slot => add(slot, '実施', 'blue', slot.time || '実施日'));
+    add(calendarDates.apply, '受付', 'green', '申込開始', 'apply');
+    add(calendarDates.deadline, '締切', 'amber', '希望締切', 'deadline');
+    add(calendarDates.open, '公開', 'amber', 'シフト公開', 'open');
+    calendarSlots.forEach(slot => add(slot, '実施', 'blue', slot.time || '実施日', 'slot'));
     return events;
   }
 
@@ -264,7 +270,13 @@
 
     const rows = [...events.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, event]) => {
       const kind = event.kinds.includes('blue') ? 'blue' : event.kinds.includes('green') ? 'green' : 'amber';
-      return `<button type="button" class="home-schedule-row" data-home-day="${dateKey(event.value)}"><span class="home-schedule-date">${escapeHome(dateLabel(event.value, true))}</span><span><b>${escapeHome(event.labels.join('・'))}</b><small>${escapeHome(event.details.join('・'))}</small></span><span class="home-dot ${kind}"></span></button>`;
+      // 基準日が1つだけの行は、その日程を何日にするか選び直す入口にする
+      const dateKinds = event.dateKinds || [];
+      const dateKind = dateKinds.length === 1 && dateKinds[0] !== 'slot' ? dateKinds[0] : '';
+      const attr = dateKind
+        ? `data-home-date-kind="${dateKind}" title="タップして日付を変更"`
+        : `data-home-day="${dateKey(event.value)}"`;
+      return `<button type="button" class="home-schedule-row" ${attr}><span class="home-schedule-date">${escapeHome(dateLabel(event.value, true))}</span><span><b>${escapeHome(event.labels.join('・'))}</b><small>${escapeHome(event.details.join('・'))}</small></span><span class="home-dot ${kind}"></span></button>`;
     });
     list.innerHTML = rows.length ? rows.join('') : '<div class="home-empty">この月の実施日・日程はまだ設定されていません。</div>';
   }
@@ -716,6 +728,11 @@
       inboxState.selectedKey = inboxItem.dataset.inboxItem;
       return renderInboxHub();
     }
+    const dateKind = event.target.closest('[data-home-date-kind]');
+    if (dateKind) {
+      if (typeof openDateKindPicker === 'function') openDateKindPicker(dateKind.dataset.homeDateKind);
+      return;
+    }
     const day = event.target.closest('[data-home-day]');
     if (day) return openHomeDay(day.dataset.homeDay);
     const action = event.target.closest('[data-home-action]');
@@ -746,6 +763,14 @@
   }
 
   document.addEventListener('click', handleHomeClick);
+  // 進捗の段は li のため、Enter／Space でも日付選択を開けるようにする
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target.closest && event.target.closest('li[data-home-date-kind]');
+    if (!target) return;
+    event.preventDefault();
+    if (typeof openDateKindPicker === 'function') openDateKindPicker(target.dataset.homeDateKind);
+  });
   window.addEventListener('admin:inbox-mutated', event => {
     if (!applyInboxMutation(event.detail || {}) && typeof loadPendingCounts === 'function') loadPendingCounts();
   });

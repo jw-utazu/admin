@@ -1216,3 +1216,33 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #monthly-shifts-list .monthly-shift-row-action{color:var(--blue);font-size:10px;font-weight:700;white-space:nowrap;}
 @media(max-width:780px){#monthly-shifts-list .monthly-shift-row-action{display:block;margin-top:8px;}}
 .monthly-day-detail-actions .monthly-link-button{margin:0;padding:7px 9px;font-size:10px;}
+
+/* 日程種別 → 日付選択モーダル（申込開始日などを何日にするか決める） */
+.dkp-lead{margin-bottom:12px;font-size:12px;line-height:1.7;color:var(--ink2);}
+.dkp-lead .dkp-hint{color:var(--ink3);font-size:11px;}
+.dkp-months{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.dkp-month{padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);}
+.dkp-mhd{margin-bottom:6px;font-size:11px;font-weight:700;color:var(--ink2);text-align:center;}
+.dkp-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;}
+.dkp-dow{padding:2px 0;color:var(--ink3);font-size:9px;font-weight:700;text-align:center;}
+.dkp-dow.sat{color:var(--blue);}.dkp-dow.sun{color:var(--red);}
+.dkp-empty{min-height:34px;}
+.dkp-day{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:34px;padding:3px 1px;border:1px solid transparent;border-radius:5px;background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:11px;cursor:pointer;}
+.dkp-day:hover{border-color:var(--blue);background:var(--blue-l);}
+.dkp-day:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;}
+.dkp-day.sat .dkp-num{color:var(--blue);}.dkp-day.sun .dkp-num{color:var(--red);}
+.dkp-day.today{border-color:var(--border2);font-weight:800;}
+.dkp-day.sel{border-color:var(--blue);background:var(--blue);}
+.dkp-day.sel .dkp-num,.dkp-day.sel .dkp-mk{color:#fff;}
+.dkp-num{font-size:11px;line-height:1.2;}
+.dkp-mk{color:var(--ink3);font-size:8px;line-height:1.1;}
+@media (max-width:780px){
+  .dkp-months{grid-template-columns:1fr;gap:10px;}
+  .dkp-day,.dkp-empty{min-height:40px;}
+}
+.monthly-date-card.is-unset{border-style:dashed;}
+.monthly-date-card.is-unset b{color:var(--ink3);}
+.monthly-date-card .monthly-date-card-hint{margin-top:5px;color:var(--blue);font-size:10px;font-weight:700;}
+.home-progress li.is-editable{cursor:pointer;border-radius:6px;padding-top:2px;padding-bottom:2px;}
+.home-progress li.is-editable:hover{background:var(--blue-l);}
+.home-progress li.is-editable:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}

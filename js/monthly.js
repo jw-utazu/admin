@@ -262,13 +262,22 @@
     const list = document.getElementById('monthly-date-cards');
     if (!list) return;
     const d = activeDates();
-    const cards = currentPwType === 'normal'
-      ? [
-        ['申込開始', d.apply, '奉仕者が予定表を確認できる開始日'],
-        ['希望締切', d.deadline, '希望提出の締切日'],
-        ['シフト公開', d.open, '確認済みシフトの公開予定日'],
-      ]
-      : (() => {
+    // 通常PWの3つの基準日は「項目をクリックして日付を決める」入口にする
+    if (currentPwType === 'normal') {
+      const kinds = [
+        ['apply', '申込開始', d.apply, '奉仕者が予定表を確認できる開始日'],
+        ['deadline', '希望締切', d.deadline, '希望提出の締切日'],
+        ['open', 'シフト公開', d.open, '確認済みシフトの公開予定日'],
+      ];
+      list.innerHTML = kinds.map(([kind, label, date, description]) => {
+        const text = isDate(date) ? dateText(date) : '未設定';
+        const content = `<small>${escapeMonthly(label)}</small><b>${escapeMonthly(text)}</b><p>${escapeMonthly(description)}</p><p class="monthly-date-card-hint">タップして日付を${isDate(date) ? '変更' : '設定'}</p>`;
+        return `<button type="button" class="monthly-date-card${isDate(date) ? '' : ' is-unset'}" data-monthly-date-kind="${kind}" aria-label="${escapeMonthly(label)}、${escapeMonthly(text)}。日付を選び直す">${content}</button>`;
+      }).join('');
+      return;
+    }
+    // 限定PWはフェーズの実施日枠を並べる
+    const cards = (() => {
         const byDate = new Map();
         activeSlots().forEach(slot => {
           const key = `${Number(slot.y)}-${Number(slot.m)}-${Number(slot.d)}`;
@@ -551,6 +560,11 @@
           openDaySelectModal(parts[0], parts[1], parts[2]);
         }
       }
+      return;
+    }
+    const dateKind = event.target.closest('[data-monthly-date-kind]');
+    if (dateKind) {
+      if (typeof openDateKindPicker === 'function') openDateKindPicker(dateKind.dataset.monthlyDateKind);
       return;
     }
     const milestone = event.target.closest('[data-monthly-milestone]');

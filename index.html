@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=72">
+<link rel="stylesheet" href="css/index.css?v=73">
 </head>
 <body>
 
@@ -1030,6 +1030,21 @@
   </div>
 </div>
 
+<!-- 日程種別クリック: 日付選択モーダル（申込開始日などを何日にするか決める） -->
+<div class="ov" id="m-date-kind">
+  <div class="modal">
+    <div class="mhd"><span class="mt" id="m-date-kind-title">日付を選ぶ</span><button class="mx" onclick="closeM('m-date-kind')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button></div>
+    <div class="mbd">
+      <p class="dkp-lead" id="m-date-kind-lead"></p>
+      <div class="dkp-months" id="m-date-kind-body"></div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-g" onclick="closeM('m-date-kind')">キャンセル</button>
+      <button class="btn btn-d is-hidden" id="m-date-kind-clear" onclick="clearDateKind()">未設定に戻す</button>
+    </div>
+  </div>
+</div>
+
 <!-- 限定PW 実施日設定モーダル -->
 <div class="ov" id="m-slot-edit">
   <div class="modal sm">
@@ -1060,9 +1075,9 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=93"></script>
-<script src="js/home.js?v=13"></script>
-<script src="js/monthly.js?v=8"></script>
+<script src="js/index.js?v=94"></script>
+<script src="js/home.js?v=14"></script>
+<script src="js/monthly.js?v=9"></script>
 <script src="js/monthly-wishes.js?v=2"></script>
 <script src="js/monthly-shifts.js?v=2"></script>
 </body>
