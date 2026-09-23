@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>区域割り当て管理</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<script>if (new URLSearchParams(location.search).get("embedded") === "1") document.documentElement.classList.add("is-embedded");</script>
 <style>
   :root {
     --ink: #18181b; --ink2: #52525b; --ink3: #a1a1aa;
@@ -96,6 +97,10 @@
 
   /* ---- layout ---- */
   .layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
+  html.is-embedded, html.is-embedded body { height: auto; min-height: 100%; }
+  html.is-embedded .hdr, html.is-embedded .sb { display: none; }
+  html.is-embedded .layout { grid-template-columns: minmax(0, 1fr); }
+  html.is-embedded main.cp { width: 100%; padding: 16px; }
   @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; }
     .sb { border-left: none; border-top: 1px solid var(--border); }

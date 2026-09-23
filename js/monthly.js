@@ -191,41 +191,53 @@
       const aria = active ? ' aria-current="step"' : '';
       const content = `<span class="monthly-workflow-index">${index + 1}</span><span class="monthly-workflow-copy"><b>${escapeMonthly(step.label)}</b><small>${escapeMonthly(step.caption)}</small></span>`;
       if (step.tab) return `<button type="button" class="${classes}" data-monthly-tab="${step.tab}"${aria}>${content}</button>`;
-      return `<a class="${classes}" href="${escapeMonthly(step.href)}" target="_blank" rel="noopener">${content}</a>`;
+      return `<a class="${classes}" href="${escapeMonthly(step.href)}" data-home-nav="shift">${content}</a>`;
     }).join('<span class="monthly-workflow-connector" aria-hidden="true"></span>');
   }
 
-  function renderCalendar() {
-    const grid = document.getElementById('monthly-calendar-grid');
-    if (!grid || typeof curY === 'undefined' || typeof curM === 'undefined') return;
+  function renderCalendarMonth(gridId, year, month) {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
     const d = activeDates();
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const first = new Date(curY, curM - 1, 1);
-    const last = new Date(curY, curM, 0);
+    const first = new Date(year, month - 1, 1);
+    const last = new Date(year, month, 0);
     let html = DOW.map((name, index) => `<div class="monthly-calendar-dow${index === 5 ? ' sat' : index === 6 ? ' sun' : ''}" role="columnheader">${name}</div>`).join('');
     const offset = first.getDay() === 0 ? 6 : first.getDay() - 1;
     for (let i = 0; i < offset; i++) html += '<div class="monthly-day-empty" aria-hidden="true"></div>';
+    const applyTime = isDate(d.apply) ? new Date(Number(d.apply.y), Number(d.apply.m) - 1, Number(d.apply.d)).getTime() : null;
+    const deadlineTime = isDate(d.deadline) ? new Date(Number(d.deadline.y), Number(d.deadline.m) - 1, Number(d.deadline.d)).getTime() : null;
     for (let day = 1; day <= last.getDate(); day++) {
-      const dt = new Date(curY, curM - 1, day);
-      const key = `${curY}-${String(curM).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const applyTime = isDate(d.apply) ? new Date(Number(d.apply.y), Number(d.apply.m) - 1, Number(d.apply.d)).getTime() : null;
-      const deadlineTime = isDate(d.deadline) ? new Date(Number(d.deadline.y), Number(d.deadline.m) - 1, Number(d.deadline.d)).getTime() : null;
-      const slotsForDay = activeSlots().filter(slot => Number(slot.y) === curY && Number(slot.m) === curM && Number(slot.d) === day);
+      const dt = new Date(year, month - 1, day);
+      const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const slotsForDay = activeSlots().filter(slot => Number(slot.y) === year && Number(slot.m) === month && Number(slot.d) === day);
       const marks = [];
       if (slotsForDay.length) marks.push(`<span class="monthly-day-mark purple">実施日 ${slotsForDay.length}枠</span>`);
-      if (sameDate(d.apply, curY, curM, day)) marks.push('<span class="monthly-day-mark green">申込開始</span>');
-      if (sameDate(d.deadline, curY, curM, day)) marks.push('<span class="monthly-day-mark amber">希望締切</span>');
-      if (sameDate(d.open, curY, curM, day)) marks.push('<span class="monthly-day-mark blue">公開日</span>');
+      if (sameDate(d.apply, year, month, day)) marks.push('<span class="monthly-day-mark green">申込開始</span>');
+      if (sameDate(d.deadline, year, month, day)) marks.push('<span class="monthly-day-mark amber">希望締切</span>');
+      if (sameDate(d.open, year, month, day)) marks.push('<span class="monthly-day-mark blue">公開日</span>');
       const classes = ['monthly-day'];
       if (dt.getDay() === 6) classes.push('sat');
       if (dt.getDay() === 0) classes.push('sun');
       if (dt.getTime() === today.getTime()) classes.push('today');
+      if (key === selectedMonthlyDayKey) classes.push('selected');
       if (marks.length) classes.push('has-event');
       if (applyTime !== null && deadlineTime !== null && dt.getTime() >= applyTime && dt.getTime() <= deadlineTime) classes.push('in-apply');
-      html += `<button type="button" class="${classes.join(' ')}" data-monthly-day="${key}" aria-label="${curY}年${curM}月${day}日">`;
+      html += `<button type="button" class="${classes.join(' ')}" data-monthly-day="${key}" aria-label="${year}年${month}月${day}日">`;
       html += `<span class="monthly-day-number">${day}</span>${marks.join('')}</button>`;
     }
     grid.innerHTML = html;
+  }
+
+  function renderCalendar() {
+    if (typeof curY === 'undefined' || typeof curM === 'undefined') return;
+    const previous = new Date(Number(curY), Number(curM) - 2, 1);
+    const previousTitle = document.getElementById('monthly-previous-calendar-title');
+    const currentTitle = document.getElementById('monthly-current-calendar-title');
+    if (previousTitle) previousTitle.textContent = `${previous.getFullYear()}年${previous.getMonth() + 1}月（前月）`;
+    if (currentTitle) currentTitle.textContent = `${curY}年${curM}月（対象月）`;
+    renderCalendarMonth('monthly-previous-calendar-grid', previous.getFullYear(), previous.getMonth() + 1);
+    renderCalendarMonth('monthly-current-calendar-grid', Number(curY), Number(curM));
   }
 
   function renderDateCards() {
@@ -279,6 +291,7 @@
       primary.innerHTML = '日程またはシフトを開く <span>›</span>';
       primary.removeAttribute('href');
       primary.dataset.monthlyDayPrimary = '';
+      delete primary.dataset.homeNav;
       primary.classList.add('is-disabled');
       primary.setAttribute('aria-disabled', 'true');
       primary.setAttribute('tabindex', '-1');
@@ -322,8 +335,13 @@
     primary.classList.remove('is-disabled');
     primary.setAttribute('aria-disabled', 'false');
     primary.setAttribute('tabindex', '0');
-    if (primaryKind === 'shift') primary.href = shiftCreateHref();
-    else primary.removeAttribute('href');
+    if (primaryKind === 'shift') {
+      primary.href = shiftCreateHref();
+      primary.dataset.homeNav = 'shift';
+    } else {
+      primary.removeAttribute('href');
+      delete primary.dataset.homeNav;
+    }
     note.textContent = slotsForDay.length
       ? '対象月とPWを引き継いで、既存のシフト管理画面を開きます。'
       : '日程の変更は既存の日程設定画面で行います。';

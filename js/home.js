@@ -9,6 +9,7 @@
   const HOME_DOW = ['月', '火', '水', '木', '金', '土', '日'];
   let homeInboxCounts = null;
   let homeView = 'home';
+  let toolReturnView = 'home';
   const inboxState = {
     filter: 'all', statusFilter: 'pending', selectedKey: '', loading: false, loaded: false,
     errors: {}, items: { recovery: [], requests: [], bugs: [] },
@@ -567,6 +568,27 @@
     });
   }
 
+  function loadHomeTool(view) {
+    const frame = document.getElementById(view === 'shift' ? 'shift-workspace-frame' : 'territory-workspace-frame');
+    if (!frame || frame.dataset.loaded === 'true') return;
+    const wrap = frame.closest('[data-tool-frame-wrap]');
+    const hideLoading = () => wrap && wrap.classList.remove('is-loading');
+    if (wrap) wrap.classList.add('is-loading');
+    frame.addEventListener('load', hideLoading, { once: true });
+    if (view === 'shift') {
+      const url = new URL(shiftCreateHref(), location.href);
+      url.searchParams.set('embedded', '1');
+      frame.src = url.toString();
+    } else {
+      frame.src = './territory/?embedded=1';
+    }
+    frame.dataset.loaded = 'true';
+  }
+
+  function returnFromAdminTool() {
+    setAdminHomeView(toolReturnView);
+  }
+
   function setAdminHomeView(view) {
     const app = document.getElementById('app');
     const home = document.getElementById('home-view');
@@ -575,12 +597,17 @@
       monthly: document.getElementById('monthly-view'),
       inbox: document.getElementById('inbox-view'),
       settings: document.getElementById('settings-view'),
+      shift: document.getElementById('shift-view'),
+      territory: document.getElementById('territory-view'),
     };
     const layout = document.querySelector('.layout');
     const nextView = Object.prototype.hasOwnProperty.call(pages, view) ? view : 'home';
     const showWorkspace = true;
+    const isToolView = nextView === 'shift' || nextView === 'territory';
+    if (isToolView && homeView !== 'shift' && homeView !== 'territory') toolReturnView = homeView;
     homeView = nextView;
     if (app) app.classList.toggle('home-mode', showWorkspace);
+    if (app) app.classList.toggle('home-tool-mode', isToolView);
     setHomeVisible(home, showWorkspace);
     Object.entries(pages).forEach(([key, page]) => setHomeVisible(page, key === nextView));
     setHomeVisible(layout, !showWorkspace);
@@ -593,6 +620,7 @@
       renderInboxHub();
       loadInboxWorkspace(false);
     }
+    else if (isToolView) loadHomeTool(nextView);
     requestAnimationFrame(() => pages[nextView]?.focus({ preventScroll: true }));
   }
 
@@ -620,13 +648,10 @@
       return setTimeout(() => { if (typeof calStageAction === 'function') calStageAction(); }, 0);
     }
     if (action === 'shift') {
-      const link = document.getElementById('btn-shift-create');
-      if (link) link.href = shiftCreateHref();
-      return link ? link.click() : window.open('./shift-create.html', '_blank', 'noopener');
+      return setAdminHomeView('shift');
     }
     if (action === 'territory') {
-      const link = document.getElementById('btn-territory');
-      return link ? link.click() : window.open('./territory/', '_blank', 'noopener');
+      return setAdminHomeView('territory');
     }
     const actions = {
       recovery: 'openRecoveryModal', requests: 'openRequestModal', bugs: 'openBugReportModal',
@@ -727,4 +752,5 @@
   window.renderAdminHome = renderAdminHome;
   window.updateAdminHomeCounts = updateAdminHomeCounts;
   window.setAdminHomeView = setAdminHomeView;
+  window.returnFromAdminTool = returnFromAdminTool;
 })();

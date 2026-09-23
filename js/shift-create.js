@@ -2994,7 +2994,16 @@ async function returnToAdmin() {
       await flushPendingSave();
     }
     if (typeof pwgwsCloseAccountMenu === 'function') pwgwsCloseAccountMenu();
-    location.replace('./index.html');
+    let returnedToToolShell = false;
+    if (new URLSearchParams(location.search).get('embedded') === '1' && window.parent !== window) {
+      try {
+        if (typeof window.parent.returnFromAdminTool === 'function') {
+          window.parent.returnFromAdminTool();
+          returnedToToolShell = true;
+        }
+      } catch (_) {}
+    }
+    if (!returnedToToolShell) location.replace('./index.html');
   } catch (e) {
     toast('保存に失敗したため戻れませんでした: ' + e.message, 'e');
   } finally {

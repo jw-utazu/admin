@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/index.css?v=70">
+<link rel="stylesheet" href="css/index.css?v=71">
 </head>
 <body>
 
@@ -179,8 +179,17 @@
                 <button type="button" class="monthly-month-button" data-monthly-month="1" aria-label="次月">›</button>
               </div>
             </header>
-            <div class="monthly-calendar-legend"><span><i class="monthly-dot purple"></i>実施日</span><span><i class="monthly-dot green"></i>申込期間</span><span><i class="monthly-dot blue"></i>公開日</span><small>日付を選ぶと詳細と次の操作を表示</small></div>
-            <div class="monthly-calendar-grid" id="monthly-calendar-grid" role="grid" aria-label="対象月の日程"></div>
+            <div class="monthly-calendar-legend"><span><i class="monthly-dot purple"></i>実施日</span><span><i class="monthly-dot green"></i>申込期間</span><span><i class="monthly-dot blue"></i>公開日</span><small>前月・対象月の両方から日程を設定できます</small></div>
+            <div class="monthly-calendars" id="monthly-calendars">
+              <section class="monthly-calendar-month" aria-labelledby="monthly-previous-calendar-title">
+                <h3 class="monthly-calendar-month-title" id="monthly-previous-calendar-title">前月</h3>
+                <div class="monthly-calendar-grid" id="monthly-previous-calendar-grid" role="grid" aria-label="前月の日程"></div>
+              </section>
+              <section class="monthly-calendar-month" aria-labelledby="monthly-current-calendar-title">
+                <h3 class="monthly-calendar-month-title" id="monthly-current-calendar-title">対象月</h3>
+                <div class="monthly-calendar-grid" id="monthly-current-calendar-grid" role="grid" aria-label="対象月の日程"></div>
+              </section>
+            </div>
             <section class="monthly-selected-day is-empty" id="monthly-selected-day" aria-live="polite" aria-label="選択中の日程">
               <div class="monthly-day-detail-copy">
                 <p class="monthly-section-label">選択中の日程</p>
@@ -190,7 +199,7 @@
                 <p class="monthly-day-detail-note" id="monthly-selected-day-note">日付を選ぶと、実施枠や申込期間を確認できます。</p>
               </div>
               <div class="monthly-day-detail-actions">
-                <a class="monthly-primary-button monthly-link-button is-disabled" id="monthly-selected-day-primary" data-monthly-day-action="primary" target="_blank" rel="noopener" aria-disabled="true" tabindex="-1">日程またはシフトを開く <span>›</span></a>
+                <a class="monthly-primary-button monthly-link-button is-disabled" id="monthly-selected-day-primary" data-monthly-day-action="primary" aria-disabled="true" tabindex="-1">日程またはシフトを開く <span>›</span></a>
                 <button type="button" class="monthly-secondary-button" id="monthly-selected-day-configure" data-monthly-day-action="configure" disabled>この日の日程を開く</button>
                 <button type="button" class="monthly-secondary-button" data-monthly-tab="wishes">申込状況を見る</button>
                 <button type="button" class="monthly-secondary-button" data-monthly-tab="shifts">シフト一覧を見る</button>
@@ -214,7 +223,7 @@
             </div>
             <div class="monthly-status-actions monthly-wishes-actions">
               <button type="button" class="monthly-secondary-button" data-monthly-wishes-action="reload">再読み込み</button>
-              <a class="monthly-primary-button monthly-link-button" id="monthly-wishes-open" href="./shift-create.html" target="_blank" rel="noopener">希望確認を開く <span>›</span></a>
+              <a class="monthly-primary-button monthly-link-button" id="monthly-wishes-open" data-home-nav="shift" href="./shift-create.html">希望確認を開く <span>›</span></a>
             </div>
           </section>
 
@@ -251,7 +260,7 @@
             </div>
             <div class="monthly-status-actions monthly-shifts-actions">
               <button type="button" class="monthly-secondary-button" data-monthly-shifts-action="reload">再読み込み</button>
-              <a class="monthly-primary-button monthly-link-button" id="monthly-shifts-open" href="./shift-create.html" target="_blank" rel="noopener">シフト管理アプリを開く <span>›</span></a>
+              <a class="monthly-primary-button monthly-link-button" id="monthly-shifts-open" data-home-nav="shift" href="./shift-create.html">シフト管理アプリを開く <span>›</span></a>
             </div>
           </section>
 
@@ -337,12 +346,25 @@
           </section>
         </div>
       </main>
+
+      <main class="home-tool-main is-hidden" id="shift-view" tabindex="-1" aria-label="シフト作成">
+        <div class="home-tool-frame-wrap is-loading" data-tool-frame-wrap="shift">
+          <div class="home-tool-loading"><span class="spin" aria-hidden="true"></span><b>シフト作成を読み込んでいます</b></div>
+          <iframe class="home-tool-frame" id="shift-workspace-frame" title="シフト作成" loading="lazy"></iframe>
+        </div>
+      </main>
+      <main class="home-tool-main is-hidden" id="territory-view" tabindex="-1" aria-label="区域管理">
+        <div class="home-tool-frame-wrap is-loading" data-tool-frame-wrap="territory">
+          <div class="home-tool-loading"><span class="spin" aria-hidden="true"></span><b>区域管理を読み込んでいます</b></div>
+          <iframe class="home-tool-frame" id="territory-workspace-frame" title="区域管理" loading="lazy"></iframe>
+        </div>
+      </main>
     </div>
     <nav class="home-bottom-nav" aria-label="スマホ用ホームナビゲーション">
       <button type="button" class="active" data-home-nav="home"><span data-home-icon="house" aria-hidden="true"></span><small>ホーム</small></button>
       <button type="button" data-home-nav="monthly"><span data-home-icon="calendar" aria-hidden="true"></span><small>月次</small></button>
       <button type="button" data-home-nav="shift"><span data-home-icon="clipboard" aria-hidden="true"></span><small>シフト</small></button>
-      <button type="button" data-home-action="territory"><span data-home-icon="map" aria-hidden="true"></span><small>区域</small></button>
+      <button type="button" data-home-nav="territory"><span data-home-icon="map" aria-hidden="true"></span><small>区域</small></button>
       <button type="button" data-home-nav="settings"><span data-home-icon="settings" aria-hidden="true"></span><small>その他</small><b class="home-bottom-badge is-hidden" id="home-bottom-badge"></b></button>
     </nav>
   </div>
@@ -1039,8 +1061,8 @@
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
 <script src="js/index.js?v=93"></script>
-<script src="js/home.js?v=12"></script>
-<script src="js/monthly.js?v=6"></script>
+<script src="js/home.js?v=13"></script>
+<script src="js/monthly.js?v=7"></script>
 <script src="js/monthly-wishes.js?v=2"></script>
 <script src="js/monthly-shifts.js?v=2"></script>
 </body>
