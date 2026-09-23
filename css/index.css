@@ -1220,7 +1220,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 /* 日程種別 → 日付選択モーダル（申込開始日などを何日にするか決める） */
 .dkp-lead{margin-bottom:12px;font-size:12px;line-height:1.7;color:var(--ink2);}
 .dkp-lead .dkp-hint{color:var(--ink3);font-size:11px;}
-.dkp-months{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.dkp-months{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .dkp-month{padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);}
 .dkp-mhd{margin-bottom:6px;font-size:11px;font-weight:700;color:var(--ink2);text-align:center;}
 .dkp-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;}

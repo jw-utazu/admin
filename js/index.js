@@ -1196,11 +1196,12 @@ function openDateKindPicker(kind) {
   openM('m-date-kind');
 }
 
-// 前月・対象月・翌月に加えて、設定済みの日がその範囲外ならその月も出す
+// 日程は前月か対象月にしか入らないので、この2か月だけを出す。
+// 設定済みの日がそれより前の月にあるときだけ、その月も足す
 function dateKindMonths() {
   const list = [];
   const push = (y, m) => { if (!list.some(v => v.y === y && v.m === m)) list.push({ y, m }); };
-  for (let offset = -1; offset <= 1; offset++) {
+  for (let offset = -1; offset <= 0; offset++) {
     const dt = new Date(Number(curY), Number(curM) - 1 + offset, 1);
     push(dt.getFullYear(), dt.getMonth() + 1);
   }
