@@ -534,9 +534,23 @@
     }
 
     try {
-      var auth = recoveryToken
-        ? await apiPost({ action: "validateRecoverySession" })
-        : await apiAuthGet("", "admin");
+      // 権限確認と区域データ取得は territoryBootstrap で1往復にまとめる。
+      // 以前は auth の応答を待ってから getTerritoryState を呼ぶ直列2往復で、
+      // その間ずっと area-auth-pending で画面を伏せていた
+      var auth = null;
+      try {
+        // タイムアウトは置き換え前の apiAuthGet と同じ30秒に揃える。
+        // 既定の180秒だと、応答が返らないとき画面を伏せたまま3分待つことになる
+        auth = await apiRequest("territoryBootstrap", {}, 30000);
+      } catch (bootErr) {
+        // Edge Function（Supabase）と この画面（GitHub Pages）はデプロイが別。
+        // territoryBootstrap がまだ本番に無いときだけ旧経路へ1度戻す。
+        // 401・403・通信エラーはここで握りつぶさず、そのまま外のcatchへ送る
+        if (String(bootErr && bootErr.message) !== "unknown_action") throw bootErr;
+        auth = recoveryToken
+          ? await apiPost({ action: "validateRecoverySession" })
+          : await apiAuthGet("", "admin");
+      }
       if (!auth || !auth.ok || !auth.isAdmin) {
         if (typeof PWGWS_FORM_URL !== "undefined" && PWGWS_FORM_URL) {
           location.replace(PWGWS_FORM_URL);
@@ -545,9 +559,12 @@
         }
         return false;
       }
-      // area-auth-pending の解除は、区域データ本体の読み込み完了後（territory側のIIFE）まで遅らせる。
-      // ここで先に解除すると、getTerritoryState の応答待ちの間、空の画面が一瞬見えてしまう。
-      return true;
+      // area-auth-pending の解除は、区域データ本体の反映後（territory側のIIFE）まで遅らせる。
+      // ここで先に解除すると、描画前の空の画面が一瞬見えてしまう。
+      //
+      // 解決値は「不許可なら false、許可なら取得済み区域データを持つオブジェクト」。
+      // 旧経路へ戻ったときは state が無いので、受け取る側が getTerritoryState を呼ぶ
+      return { state: auth.state || null };
     } catch (e) {
       document.documentElement.classList.remove("area-auth-pending");
       document.body.innerHTML =
@@ -563,8 +580,10 @@
 })();
 </script>
 <script>
-window.areaAccessReady.then(async function (areaAccessGranted) {
-  if (!areaAccessGranted) return;
+window.areaAccessReady.then(async function (areaAccess) {
+  if (!areaAccess) return;
+  // 起動時の territoryBootstrap で取得済みの区域データ（旧経路へ戻った場合は null）
+  var bootstrapState = areaAccess.state || null;
   await (async function () {
   "use strict";
 
@@ -663,7 +682,9 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
 
   async function loadInitialState() {
     try {
-      var res = await apiPost({ action: "getTerritoryState" });
+      // 起動時にまとめて取得できていればそれを使い、無いときだけ取りに行く
+      var res = bootstrapState || await apiPost({ action: "getTerritoryState" });
+      bootstrapState = null;
       if (!res || !res.ok || !Array.isArray(res.groups) || !Array.isArray(res.territories)) {
         throw new Error("invalid_response");
       }
