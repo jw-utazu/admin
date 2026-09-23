@@ -222,6 +222,12 @@
     border: 1px solid var(--border); background: var(--surface); color: var(--ink);
   }
   select:focus, input:focus, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .sm-only { display: none; }
+  .inp-w60 { width: 60px; }
+  .inp-w110 { width: 110px; }
+  .inp-w120 { width: 120px; }
+  .inp-w122 { width: 122px; }
+  .inp-w160 { width: 160px; }
   label { font-size: 11px; color: var(--ink2); display: flex; flex-direction: column; gap: 3px; }
   .field-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 
@@ -362,6 +368,60 @@
     .area-page-nav .btn { padding:6px 8px; font-size:10px; }
     .area-page-summary { gap:4px; }
     .area-page-summary span { padding:3px 6px; font-size:9px; }
+  }
+  /* ---- 画面が狭いとき：テーブルは横スクロールせずカードに積み上げる ---- */
+  @media (max-width: 860px) {
+    .table-wrap { overflow-x: visible; }
+    .table-wrap table, .table-wrap tbody, .table-wrap tr, .table-wrap td { display: block; width: 100%; }
+    .table-wrap thead { display: none; }
+    .table-wrap tbody tr {
+      border: 1px solid var(--border); border-radius: var(--r);
+      background: var(--surface); padding: 8px 10px; margin-bottom: 8px;
+    }
+    .table-wrap tbody tr:last-child { margin-bottom: 0; }
+    .table-wrap tbody tr:hover { background: var(--surface); }
+    .table-wrap td {
+      border-bottom: none; padding: 3px 0;
+      display: flex; align-items: center; gap: 10px; justify-content: space-between;
+    }
+    .table-wrap td::before {
+      content: attr(data-label);
+      flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--ink3);
+    }
+    .table-wrap td:not([data-label])::before { content: none; }
+    .table-wrap td.cell-main {
+      justify-content: flex-start; gap: 8px; flex-wrap: wrap;
+      padding: 0 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border);
+      font-weight: 700;
+    }
+    .table-wrap td.cell-main::before { content: none; }
+    .table-wrap td.cell-hide-sm { display: none; }
+    .sm-only { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .table-wrap td.cell-actions { flex-direction: column; align-items: stretch; gap: 6px; padding-top: 6px; }
+    .table-wrap td.cell-actions .field-row { width: 100%; }
+    .table-wrap td.cell-actions .btn { justify-content: center; flex: 1 1 auto; }
+    .table-wrap tr.row-form td, .table-wrap tr.row-empty td { display: block; padding: 0; }
+    .table-wrap tr.row-form td::before, .table-wrap tr.row-empty td::before { content: none; }
+    .table-wrap tr.row-empty { border: none; background: none; padding: 0; }
+    .table-wrap td .field-row { gap: 6px; }
+    .table-wrap td select, .table-wrap td .inp-fill { width: 100%; min-width: 0; }
+    .table-wrap td .inp-w122 { width: 100%; }
+    .table-wrap td label { width: 100%; }
+    .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  }
+
+  /* ---- スマホ幅の調整 ---- */
+  @media (max-width: 640px) {
+    .tb { padding: 7px 9px; }
+    .adj-grid { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); }
+    .proposal-head { flex-direction: column; align-items: stretch; gap: 8px; }
+    /* ナビも横スクロールさせず折り返す */
+    .page-nav { flex-wrap: wrap; overflow-x: visible; }
+    .page-nav-group { flex: 0 1 100%; min-width: 0; }
+    .page-nav-items { flex-wrap: wrap; }
+    .area-page-nav { flex-wrap: wrap; overflow-x: visible; gap: 8px 10px; }
+    .area-page-nav-items { flex-wrap: wrap; }
+    .field-row > label { width: 100%; }
   }
 </style>
 <script>document.documentElement.classList.add("area-auth-pending");</script>
@@ -1304,8 +1364,8 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
 
     var dueRows = due.length ? due.map(function (x) {
       var badge = x.rd < 0 ? '<span class="chip critical">期限超過 ' + (-x.rd) + "日</span>" : '<span class="chip pending">残り' + x.rd + "日</span>";
-      return "<tr><td><span class=\"pack\">" + x.t.id + '</span></td><td>' + esc(groupName(x.t.currentGroupId)) + "</td><td>" + fmtDate(x.t.assignedDate) + "</td><td>" + fmtDate(x.t.dueDate) + "</td><td>" + badge + "</td></tr>";
-    }).join("") : '<tr><td colspan="5" class="empty-note">期限が近い区域はありません</td></tr>';
+      return '<tr><td class="cell-main" data-label="区域"><span class="pack">' + x.t.id + '</span></td><td data-label="グループ">' + esc(groupName(x.t.currentGroupId)) + '</td><td data-label="開始日">' + fmtDate(x.t.assignedDate) + '</td><td data-label="期限">' + fmtDate(x.t.dueDate) + '</td><td data-label="状態">' + badge + "</td></tr>";
+    }).join("") : '<tr class="row-empty"><td colspan="5" class="empty-note">期限が近い区域はありません</td></tr>';
 
     var pendingList = state.territories.filter(function (t) { return t.status === "pending"; });
     var pendingRows = pendingList.length ? pendingList.map(function (t) {
@@ -1396,7 +1456,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
       var rows = list.map(function (t) {
         var manualRow = "";
         if (ui.manualActivateId === t.id) {
-          manualRow = '<tr><td colspan="7"><div class="field-row">' +
+          manualRow = '<tr class="row-form"><td colspan="7"><div class="field-row">' +
             '<label>グループ<select id="manualGroupSelect">' + groupOpts + "</select></label>" +
             '<label>開始日<input type="date" id="manualDateInput" value="' + todayISO() + '"></label>' +
             '<button class="btn btn-p small" onclick="confirmManualActivate(' + t.id + ')">設定する</button>' +
@@ -1416,7 +1476,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
             return '<option value="' + x.id + '">区域 ' + x.id + (x.area ? "（" + esc(x.area) + "）" : "") + "</option>";
           }).join("");
           var editConflict = t.status === "active" && isAdjacentToActive(t, groupMap, t.currentGroupId);
-          editRow = '<tr><td colspan="7"><div class="field-row" style="align-items:flex-end">' +
+          editRow = '<tr class="row-form"><td colspan="7"><div class="field-row" style="align-items:flex-end">' +
             '<label>割当先グループ<select id="editGroupSelect_' + t.id + '" onchange="updateAssignmentEditConflict(' + t.id + ', this.value)">' + editGroupOpts + "</select></label>" +
             '<label>開始日<input type="date" id="editDateInput_' + t.id + '" value="' + (t.assignedDate || todayISO()) + '"></label>' +
             '<label>差し替え区域<select id="editReplacementSelect_' + t.id + '"><option value="">現在の区域のまま</option>' + replacementOpts + '</select></label>' +
@@ -1429,7 +1489,7 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
           var conflict = isAdjacentToActive(t, groupMap, ui.assignGroupId);
           action = '<div class="field-row">' +
             (conflict ? '<span class="chip pending">別グループと隣接</span>' : '') +
-            '<input type="date" id="assignDate_' + t.id + '" value="' + todayISO() + '" style="width:122px">' +
+            '<input class="inp-w122" type="date" id="assignDate_' + t.id + '" value="' + todayISO() + '">' +
             '<button class="btn btn-p small" onclick="assignTerritory(' + t.id + ')">割当する</button>' +
             '<button class="btn small" onclick="markActiveManually(' + t.id + ')">手動設定</button>' +
             "</div>";
@@ -1440,21 +1500,22 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
             '<button class="btn small" onclick="startReturn(' + t.id + ')">回収待ちへ</button></div>';
         } else {
           action = '<div class="field-row">' +
-            '<input type="date" id="returnDate_' + t.id + '" value="' + todayISO() + '" style="width:122px">' +
+            '<input class="inp-w122" type="date" id="returnDate_' + t.id + '" value="' + todayISO() + '">' +
             '<button class="btn small" onclick="startAssignmentEdit(' + t.id + ')">割当を編集</button>' +
             '<button class="btn btn-p small" onclick="completeReturn(' + t.id + ')">回収完了</button>' +
             '<button class="btn small" onclick="undoReturn(' + t.id + ')">戻す</button>' +
             "</div>";
         }
 
-        return "<tr><td><span class=\"pack\">" + t.id + "</span></td><td>" + statusChip(t) + " " + purposeChip(t.purpose) + "</td>" +
-          "<td>" + esc(groupName(t.currentGroupId)) + "</td>" +
-          "<td>" + fmtDate(t.assignedDate) + "</td><td>" + fmtDate(t.dueDate) + "</td>" +
-          "<td>" + t.adjacentIds.length + "件</td>" +
-          "<td>" + action + "</td></tr>" + editRow + manualRow;
+        return '<tr><td class="cell-main" data-label="区域"><span class="pack">' + t.id + '</span><span class="sm-only">' + statusChip(t) + " " + purposeChip(t.purpose) + "</span></td>" +
+          '<td class="cell-hide-sm" data-label="状態">' + statusChip(t) + " " + purposeChip(t.purpose) + "</td>" +
+          '<td data-label="グループ">' + esc(groupName(t.currentGroupId)) + "</td>" +
+          '<td data-label="開始日">' + fmtDate(t.assignedDate) + '</td><td data-label="期限">' + fmtDate(t.dueDate) + "</td>" +
+          '<td data-label="隣接">' + t.adjacentIds.length + "件</td>" +
+          '<td class="cell-actions" data-label="操作">' + action + "</td></tr>" + editRow + manualRow;
       }).join("");
 
-      if (!list.length) rows = '<tr><td colspan="7" class="empty-note">該当する区域はありません</td></tr>';
+      if (!list.length) rows = '<tr class="row-empty"><td colspan="7" class="empty-note">該当する区域はありません</td></tr>';
 
       var proposalButton = ui.showAssignmentProposal ? "割当案を再計算" : "隣接を考慮して割当案を作成";
       return '<div class="field-row" style="justify-content:space-between;align-items:center;margin-bottom:12px"><span style="color:var(--ink2);font-size:12px">割当前に候補を確認できます。割当中・回収待ちは各行の「割当を編集」から修正できます。</span>' +
@@ -1488,9 +1549,9 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
         var opts = Object.keys(PURPOSE_LABEL).map(function (k) {
           return '<option value="' + k + '"' + (t.purpose === k ? " selected" : "") + ">" + PURPOSE_LABEL[k] + "</option>";
         }).join("");
-        return "<tr><td><span class=\"pack\">" + t.id + "</span></td><td>" + statusChip(t) + '</td><td><select onchange="setPurpose(' + t.id + ', this.value)">' + opts + "</select></td>" +
-          '<td><input type="text" value="' + esc(t.area) + '" placeholder="宇多津 / 坂出" onchange="setArea(' + t.id + ', this.value)" style="width:120px"></td>' +
-          '<td><input type="text" value="' + esc(t.note) + '" placeholder="メモ" onchange="setNote(' + t.id + ', this.value)" style="width:160px"></td></tr>';
+        return '<tr><td class="cell-main" data-label="区域"><span class="pack">' + t.id + '</span><span class="sm-only">' + statusChip(t) + '</span></td><td class="cell-hide-sm" data-label="状態">' + statusChip(t) + '</td><td data-label="用途"><select class="inp-fill" onchange="setPurpose(' + t.id + ', this.value)">' + opts + "</select></td>" +
+          '<td data-label="地域"><input class="inp-fill inp-w120" type="text" value="' + esc(t.area) + '" placeholder="宇多津 / 坂出" onchange="setArea(' + t.id + ', this.value)"></td>' +
+          '<td data-label="メモ"><input class="inp-fill inp-w160" type="text" value="' + esc(t.note) + '" placeholder="メモ" onchange="setNote(' + t.id + ', this.value)"></td></tr>';
       }).join("");
       return '<p style="margin:0 0 12px;color:var(--ink2);font-size:12.5px">通常割当以外に確保しておく区域（合同奉仕・キャンペーン確保）を指定します。確保中の区域は新規割当の候補から除外されます。</p>' +
         '<div class="table-wrap"><table><thead><tr><th>区域</th><th>状態</th><th>用途</th><th>地域</th><th>メモ</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
@@ -1499,10 +1560,10 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     groups: function () {
       var rows = state.groups.map(function (g) {
         var count = state.territories.filter(function (t) { return t.status === "active" && t.currentGroupId === g.id; }).length;
-        return "<tr><td><input type=\"text\" value=\"" + esc(g.name) + "\" onchange=\"updateGroupName('" + g.id + "', this.value)\" style=\"width:110px\"></td>" +
-          '<td><input type="number" min="0" value="' + g.targetActiveCount + "\" onchange=\"updateGroupTarget('" + g.id + "', this.value)\" style=\"width:60px\"></td>" +
-          "<td>" + count + "件</td>" +
-          "<td><button class=\"btn btn-d small\" onclick=\"removeGroup('" + g.id + "')\">削除</button></td></tr>";
+        return '<tr><td data-label="グループ名"><input class="inp-fill inp-w110" type="text" value="' + esc(g.name) + '" onchange="updateGroupName(\'' + g.id + '\', this.value)"></td>' +
+          '<td data-label="目標"><input class="inp-w60" type="number" min="0" value="' + g.targetActiveCount + '" onchange="updateGroupTarget(\'' + g.id + '\', this.value)"></td>' +
+          '<td data-label="現在">' + count + "件</td>" +
+          '<td class="cell-actions"><button class="btn btn-d small" onclick="removeGroup(\'' + g.id + '\')">削除</button></td></tr>';
       }).join("");
       return '<p style="margin:0 0 12px;color:var(--ink2);font-size:12.5px">8月の3グループ体制への移行時は、ここでグループの改名・削除・追加や目標保持数の変更ができます。</p>' +
         '<div class="table-wrap"><table><thead><tr><th>グループ名</th><th>目標</th><th>現在</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>";
