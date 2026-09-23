@@ -477,7 +477,7 @@ function chCalM(dir) {
 }
 
 function setAdminSwitching(on) {
-  document.querySelectorAll('#cal-ym-nav button, #cal-view-nav-bar button, #pw-type-bar button')
+  document.querySelectorAll('#cal-ym-nav button, #cal-view-nav-bar button, #pw-type-bar button, #monthly-phase-switcher button')
     .forEach(button => { button.disabled = !!on; });
 }
 
@@ -572,9 +572,13 @@ function renderPwTypeTabs() {
     setVisible(b, currentPwType === 'normal');
   });
 
-  // シフト管理アプリへのリンクに現在のPWタイプを引き継ぐ
+  // シフト管理アプリへのリンクに表示中の年月とPWタイプを引き継ぐ
   const btnSc = document.getElementById('btn-shift-create');
-  if (btnSc) btnSc.href = './shift-create.html' + (currentPwType !== 'normal' ? '?type=' + encodeURIComponent(currentPwType) : '');
+  if (btnSc) {
+    const params = new URLSearchParams({ year: String(curY), month: String(curM) });
+    if (currentPwType !== 'normal') params.set('type', currentPwType);
+    btnSc.href = './shift-create.html?' + params.toString();
+  }
 }
 
 // ============================================================
@@ -587,8 +591,25 @@ async function switchPwType(type) {
   setAdminSwitching(true);
   showProc(`${label} のデータを読み込んでいます...`, '現在の画面は読み込みが完了するまで保持されます');
   try {
-    // type も取得条件として渡し、取得が全て成功した後だけ global/DOM を切り替える。
-    await loadAdminData({ year: curY, month: curM, type, rethrow: true });
+    // 限定PWはフェーズ1の対象月を既定の表示月にする。先に取得して対象月を
+    // 決めてから適用することで、切替直後に別月のフェーズを表示する状態を避ける。
+    let bundle;
+    let targetYear = curY, targetMonth = curM;
+    if (type === 'normal') {
+      await loadAdminData({ year: targetYear, month: targetMonth, type, rethrow: true });
+    } else {
+      const initialBundle = await fetchAdminMonthBundle(targetYear, targetMonth, type);
+      validateAdminBundle(initialBundle);
+      const firstPhaseMonth = limitedPhaseYM((initialBundle.data.phases || [])[0]);
+      if (firstPhaseMonth) {
+        targetYear = firstPhaseMonth.y;
+        targetMonth = firstPhaseMonth.m;
+      }
+      bundle = targetYear === curY && targetMonth === curM
+        ? initialBundle
+        : await fetchAdminMonthBundle(targetYear, targetMonth, type);
+      await loadAdminData({ year: targetYear, month: targetMonth, type, bundle, rethrow: true });
+    }
     const slotName = limitedSlots.find(s => s.id === type);
     toast(type === 'normal' ? '通常PWモードに切り替えました' : `${slotName ? slotName.name : '限定PW'}モードに切り替えました`, 's');
   } catch (e) {
@@ -3141,6 +3162,7 @@ async function resolveRequest(rowIndex) {
     const res = await apiPost({ action: 'resolveRequest', rowIndex });
     if (!res.ok) throw new Error(res.error || '更新失敗');
     await refreshRequestModal();
+    window.dispatchEvent(new CustomEvent('admin:inbox-mutated', { detail: { kind: 'requests', rowIndex, status: '対応済み' } }));
     hideProc();
     toast('対応済みにしました', 's');
   } catch (e) { hideProc(); toast('更新失敗: ' + e.message, 'e'); }
@@ -3201,6 +3223,7 @@ async function resolveBugReport(rowIndex) {
     const res = await apiPost({ action: 'resolveBugReport', rowIndex });
     if (!res.ok) throw new Error(res.error || '更新失敗');
     await refreshBugReportModal();
+    window.dispatchEvent(new CustomEvent('admin:inbox-mutated', { detail: { kind: 'bugs', rowIndex, status: '対応済み' } }));
     hideProc();
     toast('対応済みにしました', 's');
   } catch (e) { hideProc(); toast('更新失敗: ' + e.message, 'e'); }
@@ -3482,6 +3505,8 @@ async function approveRecoveryRequest(id) {
       };
       throw new Error(msgs[res.reason] || res.reason || '承認に失敗しました');
     }
+    await loadRecoveryRequests();
+    window.dispatchEvent(new CustomEvent('admin:inbox-mutated', { detail: { kind: 'recovery', id, status: 'approved' } }));
     hideProc();
     document.getElementById('m-recovery-otp-body').innerHTML =
       `<div class="rec-otp-name">${esc(res.name)} さんへ</div>
@@ -3509,6 +3534,7 @@ async function rejectRecoveryRequest(id) {
     const res = await apiPost({ action: 'rejectRecoveryRequest', requestId: id });
     if (!res.ok) throw new Error(res.reason || '却下に失敗しました');
     await loadRecoveryRequests();
+    window.dispatchEvent(new CustomEvent('admin:inbox-mutated', { detail: { kind: 'recovery', id, status: 'rejected' } }));
     hideProc();
     toast('申請を却下しました', 's');
   } catch (e) { hideProc(); toast('却下失敗: ' + e.message, 'e'); }

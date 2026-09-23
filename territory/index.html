@@ -131,13 +131,34 @@
   .sb-foot { font-size: 10.5px; color: var(--ink3); line-height: 1.7; padding: 0 2px; }
   .hdr-home { display:inline-flex; align-items:center; gap:5px; flex:none; padding:6px 9px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); color:var(--ink2); font-size:11px; font-weight:700; text-decoration:none; white-space:nowrap; }
   .hdr-home:hover { border-color:var(--blue); background:var(--blue-l); color:var(--blue); }
-  .page-nav { display:flex; flex-direction:column; gap:6px; }
+  .page-nav { display:flex; flex-direction:column; gap:12px; }
+  .page-nav-group { display:flex; flex-direction:column; gap:5px; }
+  .page-nav-group-title { padding:0 2px; color:var(--ink3); font-size:9px; font-weight:800; letter-spacing:.06em; }
+  .page-nav-items { display:flex; flex-direction:column; gap:6px; }
   .abtn.active { border-color:var(--blue); background:var(--blue-l); }
-  .area-page-nav { display:flex; align-items:center; gap:6px; overflow-x:auto; margin:0 0 14px; padding:0 0 4px; }
+  .area-page-nav { display:flex; align-items:flex-start; gap:10px; overflow-x:auto; margin:0 0 14px; padding:0 0 4px; }
+  .area-page-nav-group { display:flex; flex-direction:column; gap:4px; flex:none; padding:0 1px; }
+  .area-page-nav-label { padding:0 3px; color:var(--ink3); font-size:9px; font-weight:800; letter-spacing:.05em; white-space:nowrap; }
+  .area-page-nav-items { display:flex; gap:5px; }
   .area-page-nav .btn { flex:none; }
   .area-page-nav .btn.active { background:var(--blue); border-color:var(--blue); color:#fff; }
   .area-page-body { padding:16px; }
   .area-back { border:0; background:none; color:var(--blue); font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .area-page-summary { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:-6px 0 14px; }
+  .area-page-summary span { display:inline-flex; align-items:center; gap:4px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--ink2); font-size:10px; font-weight:700; }
+  .area-page-summary b { color:var(--blue); }
+  .area-page-summary .pending b { color:var(--amber); }
+  .area-dashboard-metrics .metric-pending { border-color:#fde68a; background:var(--amber-l); }
+  .area-next-action { padding:14px 16px; border-color:#fde68a; }
+  .area-next-action .section-title { margin-bottom:6px; }
+  .area-next-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; align-items:center; gap:12px; width:100%; padding:10px 4px; border:0; border-top:1px solid var(--border); background:transparent; color:var(--ink); font:inherit; text-align:left; cursor:pointer; }
+  .area-next-row:hover { background:var(--amber-l); }
+  .area-next-id { font-size:12px; font-weight:800; }
+  .area-next-copy b,.area-next-copy small { display:block; }
+  .area-next-copy b { font-size:11px; }
+  .area-next-copy small { margin-top:3px; color:var(--ink3); font-size:10px; }
+  .area-next-link { color:var(--blue); font-size:10px; font-weight:700; white-space:nowrap; }
+  .area-next-empty { padding:10px 3px; border-top:1px solid var(--border); color:var(--ink3); font-size:11px; }
 
   /* ---- dashboard ---- */
   .pagehead { margin-bottom: 18px; display: flex; flex-direction: column; gap: 3px; }
@@ -149,6 +170,7 @@
   .grid { display: grid; gap: 12px; }
   .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
   @media (max-width: 720px) { .grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px) { .area-next-row { grid-template-columns:auto minmax(0,1fr) auto; gap:7px; } .area-next-row .chip { grid-column:2; grid-row:2; justify-self:start; } .area-next-link { grid-column:3; grid-row:1 / span 2; } }
 
   .card {
     background: var(--surface); border: 1px solid var(--border);
@@ -315,7 +337,10 @@
     .sb { order:-1; position:static; width:100%; height:auto; padding:10px 14px; border:0; border-bottom:1px solid var(--border); }
     .sb > div:first-child { min-width:0; }
     .sb .plbl { margin-bottom:5px; }
-    .page-nav { flex-direction:row; overflow-x:auto; gap:6px; padding-bottom:3px; }
+    .page-nav { flex-direction:row; overflow-x:auto; gap:10px; padding-bottom:3px; }
+    .page-nav-group { flex:none; }
+    .page-nav-group-title { display:none; }
+    .page-nav-items { flex-direction:row; gap:6px; }
     .page-nav .abtn { width:auto; min-width:max-content; padding:7px 10px; }
     .page-nav .ab-d,.sb-foot { display:none; }
     .page-nav .ab-ic { width:25px; height:25px; }
@@ -328,6 +353,10 @@
     main.cp { padding:14px 10px; }
     .area-page-body { padding:12px 9px; }
     .area-back { font-size:10px; }
+    .area-page-nav { gap:8px; }
+    .area-page-nav .btn { padding:6px 8px; font-size:10px; }
+    .area-page-summary { gap:4px; }
+    .area-page-summary span { padding:3px 6px; font-size:9px; }
   }
 </style>
 <script>document.documentElement.classList.add("area-auth-pending");</script>
@@ -349,7 +378,7 @@
   <aside class="sb">
     <div>
       <div class="plbl">区域の操作</div>
-      <div class="ag" id="sbActions"></div>
+      <div class="ag page-nav" id="sbActions"></div>
     </div>
     <div class="sb-foot" id="sbFoot"></div>
     <div class="sb-foot" id="syncStatus">最終保存: —</div>
@@ -597,6 +626,20 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     assignmentEditId: null,
     adjSelected: 1,
     showAssignmentProposal: false
+  };
+
+  var AREA_NAV_GROUPS = [
+    { label: "運用", ids: ["dashboard", "territories"] },
+    { label: "区域データ", ids: ["adjacency", "pools", "groups"] },
+    { label: "保守", ids: ["backup"] }
+  ];
+  var AREA_NAV_ITEMS = {
+    dashboard: { title: "区域の現況", detail: "保持数・期限・回収待ち", icon: "⌂", iconBg: "var(--blue-l)", iconColor: "var(--blue)" },
+    territories: { title: "区域一覧・割当操作", detail: "割当・編集・回収", icon: "📋", iconBg: "var(--blue-l)", iconColor: "var(--blue)" },
+    adjacency: { title: "隣接関係", detail: "区域どうしの隣接を登録", icon: "🗺", iconBg: "var(--purple-l)", iconColor: "var(--purple)" },
+    pools: { title: "プール管理", detail: "合同奉仕・企画用の確保", icon: "📦", iconBg: "var(--teal-l)", iconColor: "var(--teal)" },
+    groups: { title: "グループ管理", detail: "グループ・目標保持数", icon: "👥", iconBg: "var(--green-l)", iconColor: "var(--green)" },
+    backup: { title: "バックアップ", detail: "書き出し・読み込み・初期化", icon: "💾", iconBg: "var(--amber-l)", iconColor: "var(--amber)" }
   };
 
   function buildSyncPayload() {
@@ -1158,26 +1201,41 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
   function renderSidebar() {
     var pendingCount = state.territories.filter(function (t) { return t.status === "pending"; }).length;
     var stockCount = state.territories.filter(function (t) { return t.status === "stock" && t.purpose === "normal"; }).length;
-    var actions = [
-      { id: "dashboard", icon: "⌂", iconBg: "var(--blue-l)", iconColor: "var(--blue)", name: "区域の現況", desc: "保持数・期限・回収待ち" },
-      { id: "territories", icon: "📋", iconBg: "var(--blue-l)", iconColor: "var(--blue)", name: "区域一覧・割当操作",
-        desc: "割当 " + activeTerritories().length + "・ストック " + stockCount + "・回収待ち " + pendingCount },
-      { id: "adjacency", icon: "🗺", iconBg: "var(--purple-l)", iconColor: "var(--purple)", name: "隣接関係",
-        desc: "区域どうしの隣接を登録" },
-      { id: "pools", icon: "📦", iconBg: "var(--teal-l)", iconColor: "var(--teal)", name: "プール管理",
-        desc: "合同奉仕・キャンペーン確保" },
-      { id: "groups", icon: "👥", iconBg: "var(--green-l)", iconColor: "var(--green)", name: "グループ管理",
-        desc: state.groups.length + "グループ・目標保持数の設定" },
-      { id: "backup", icon: "💾", iconBg: "var(--amber-l)", iconColor: "var(--amber)", name: "バックアップ",
-        desc: "書き出し・読み込み・初期化" }
-    ];
-    document.getElementById("sbActions").innerHTML = actions.map(function (a) {
-      return '<button class="abtn' + (ui.activePage === a.id ? ' active' : '') + '" data-area-page="' + a.id + '" onclick="openModal(\'' + a.id + '\')">' +
-        '<div class="ab-ic" style="background:' + a.iconBg + ';color:' + a.iconColor + ';">' + a.icon + '</div>' +
-        '<div class="ab-tx"><span class="ab-n">' + esc(a.name) + '</span><span class="ab-d">' + esc(a.desc) + '</span></div>' +
-        '<span class="ab-ar">›</span></button>';
+    var descriptions = {
+      territories: "割当 " + activeTerritories().length + "・ストック " + stockCount + "・回収待ち " + pendingCount,
+      groups: state.groups.length + "グループ・目標保持数の設定"
+    };
+    document.getElementById("sbActions").innerHTML = AREA_NAV_GROUPS.map(function (group) {
+      var buttons = group.ids.map(function (id) {
+        var item = AREA_NAV_ITEMS[id];
+        var desc = descriptions[id] || item.detail;
+        return '<button type="button" class="abtn' + (ui.activePage === id ? ' active' : '') + '" data-area-page="' + id + '" aria-current="' + (ui.activePage === id ? 'page' : 'false') + '" onclick="openModal(\'' + id + '\')">' +
+          '<div class="ab-ic" style="background:' + item.iconBg + ';color:' + item.iconColor + ';">' + item.icon + '</div>' +
+          '<div class="ab-tx"><span class="ab-n">' + esc(item.title) + '</span><span class="ab-d">' + esc(desc) + '</span></div>' +
+          '<span class="ab-ar">›</span></button>';
+      }).join("");
+      return '<section class="page-nav-group"><span class="page-nav-group-title">' + esc(group.label) + '</span><div class="page-nav-items">' + buttons + '</div></section>';
     }).join("");
     document.getElementById("sbFoot").innerHTML = "Supabase DBに保存されます。オフライン時は一時的にこの端末に保持し、再接続時に送信します。";
+  }
+
+  function renderAreaNav(activeId) {
+    return AREA_NAV_GROUPS.map(function (group) {
+      var buttons = group.ids.map(function (id) {
+        var item = AREA_NAV_ITEMS[id];
+        return '<button type="button" class="btn small' + (activeId === id ? ' active' : '') + '" aria-current="' + (activeId === id ? 'page' : 'false') + '" onclick="openModal(\'' + id + '\')">' + esc(item.title) + '</button>';
+      }).join("");
+      return '<div class="area-page-nav-group"><span class="area-page-nav-label">' + esc(group.label) + '</span><div class="area-page-nav-items">' + buttons + '</div></div>';
+    }).join("");
+  }
+
+  function renderAreaSummary() {
+    var active = state.territories.filter(function (t) { return t.status === "active"; }).length;
+    var stock = state.territories.filter(function (t) { return t.status === "stock"; }).length;
+    var pending = state.territories.filter(function (t) { return t.status === "pending"; }).length;
+    return '<div class="area-page-summary" aria-label="区域の状態内訳"><span>全区域 <b>' + TOTAL_TERRITORIES + '</b></span>' +
+      '<span>割当中 <b>' + active + '</b></span><span>ストック <b>' + stock + '</b></span>' +
+      '<span class="pending">回収待ち <b>' + pending + '</b></span></div>';
   }
 
   function renderPage() {
@@ -1192,12 +1250,9 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     };
     var info = pages[page];
     if (!info || !MODAL_BODY[page]) return renderDashboard();
-    var nav = ["dashboard", "territories", "adjacency", "pools", "groups", "backup"].map(function (id) {
-      var item = id === "dashboard" ? { title: "現況" } : pages[id];
-      return '<button type="button" class="btn' + (page === id ? ' active' : '') + '" onclick="openModal(\'' + id + '\')">' + esc(item.title) + '</button>';
-    }).join("");
+    var nav = renderAreaNav(page);
     return '<div class="pagehead"><span class="eyebrow">' + esc(info.label) + '</span><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><h1>' + esc(info.title) + '</h1><button type="button" class="area-back" onclick="openModal(\'dashboard\')">← 現況に戻る</button></div><p>' + esc(info.detail) + '</p></div>' +
-      '<nav class="area-page-nav" aria-label="区域の作業">' + nav + '</nav>' +
+      renderAreaSummary() + '<nav class="area-page-nav" aria-label="区域の作業">' + nav + '</nav>' +
       '<section class="card area-page-body">' + MODAL_BODY[page]() + '</section>';
   }
 
@@ -1226,6 +1281,8 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
     }).join("");
 
     var stock = state.territories.filter(function (t) { return t.status === "stock" && t.purpose === "normal"; }).length;
+    var active = state.territories.filter(function (t) { return t.status === "active"; }).length;
+    var total = state.territories.length;
     var pending = state.territories.filter(function (t) { return t.status === "pending"; }).length;
     var joint = state.territories.filter(function (t) { return t.purpose === "joint"; }).length;
     var campaign = state.territories.filter(function (t) { return t.purpose === "campaign"; }).length;
@@ -1247,8 +1304,10 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
 
     var pendingList = state.territories.filter(function (t) { return t.status === "pending"; });
     var pendingRows = pendingList.length ? pendingList.map(function (t) {
-      return "<tr><td><span class=\"pack\">" + t.id + '</span></td><td>' + esc(groupName(t.currentGroupId)) + "</td><td>" + fmtDate(t.assignedDate) + "</td><td><button class=\"btn small\" onclick=\"openModal('territories');setTerritoryFilter('pending')\">回収処理へ</button></td></tr>";
-    }).join("") : '<tr><td colspan="4" class="empty-note">回収待ちの区域はありません</td></tr>';
+      return '<button type="button" class="area-next-row" onclick="openModal(\'territories\');setTerritoryFilter(\'pending\')">' +
+        '<span class="area-next-id">区域 ' + t.id + '</span><span class="area-next-copy"><b>' + esc(groupName(t.currentGroupId)) + '</b><small>' + fmtDate(t.assignedDate) + 'から割当中</small></span>' +
+        '<span class="chip pending">回収待ち</span><span class="area-next-link">回収処理へ ›</span></button>';
+    }).join("") : '<div class="area-next-empty">回収待ちの区域はありません。</div>';
 
     var banner = state.setupDismissed ? "" :
       '<div class="banner" style="margin-bottom:16px"><span>&#9888;</span><div>' +
@@ -1258,12 +1317,17 @@ window.areaAccessReady.then(async function (areaAccessGranted) {
       '<a href="#" onclick="dismissSetup();return false;">この案内を閉じる</a></div></div>';
 
     return '<div class="pagehead"><span class="eyebrow">区域割り当て</span><h1>区域の現況</h1><p>保持数、期限、回収待ちの区域を確認し、作業へ進みます。</p></div>' +
+      '<nav class="area-page-nav dashboard-area-nav" aria-label="区域の作業">' + renderAreaNav("dashboard") + '</nav>' +
       banner +
       '<div class="stack">' +
+      '<div class="grid cols-4 area-dashboard-metrics" aria-label="区域の状態"><div class="card tile"><span class="tl">割当中</span><span class="tv">' + active + '</span><span class="ts">使用中の区域</span></div>' +
+      '<div class="card tile metric-pending"><span class="tl">回収待ち</span><span class="tv">' + pending + '</span><span class="ts">回収完了日の入力待ち</span></div>' +
+      '<div class="card tile"><span class="tl">通常ストック</span><span class="tv">' + stock + '</span><span class="ts">新規割当に使用可能</span></div>' +
+      '<div class="card tile"><span class="tl">全区域</span><span class="tv">' + total + '</span><span class="ts">区域データの合計</span></div></div>' +
+      '<section class="card area-next-action"><div class="section-title"><span>次の処理</span><button type="button" class="btn small" onclick="openModal(\'territories\');setTerritoryFilter(\'pending\')">回収待ち一覧を開く</button></div>' + pendingRows + '</section>' +
       '<div><div class="section-title">グループ別 保持数</div><div class="grid cols-4">' + groupTiles + "</div></div>" +
       '<div><div class="section-title">プール状況</div><div class="grid cols-4">' + poolTiles + "</div></div>" +
       '<div class="card"><div class="section-title">期限が近い区域（21日以内）</div><div class="table-wrap"><table><thead><tr><th>区域</th><th>グループ</th><th>開始日</th><th>期限</th><th>状態</th></tr></thead><tbody>' + dueRows + "</tbody></table></div></div>" +
-      '<div class="card"><div class="section-title">回収待ちの区域</div><div class="table-wrap"><table><thead><tr><th>区域</th><th>グループ</th><th>開始日</th><th></th></tr></thead><tbody>' + pendingRows + "</tbody></table></div></div>" +
       "</div>";
   }
 

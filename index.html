@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="シフト管理">
 <meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/index.css?v=67">
+<link rel="stylesheet" href="css/index.css?v=70">
 </head>
 <body>
 
@@ -40,6 +40,7 @@
     <div class="hdr-logo" id="hdr-logo"><img src="logo.png" alt="PW" onerror="this.parentNode.textContent='PW'"></div>
     <span class="hdr-title">PW管理アプリ</span>
     <div class="hdr-actions">
+      <button class="legacy-home-return is-hidden" id="legacy-home-return" type="button" onclick="returnToNewHome()">新しいホームへ</button>
       <!-- アイコンを押すとアカウント切り替えメニューが開く（ログアウトもこの中） -->
       <button class="av" id="av" type="button" aria-label="アカウントメニューを開く" aria-haspopup="menu"
            onclick="openAccountMenu(this)"></button>
@@ -151,6 +152,9 @@
           <button type="button" class="monthly-tab" data-monthly-tab="shifts">シフト一覧・確認</button>
         </nav>
 
+        <nav class="monthly-workflow" id="monthly-workflow" aria-label="通常PWの月次進行"></nav>
+        <nav class="monthly-phase-switcher is-hidden" id="monthly-phase-switcher" aria-label="限定PWのフェーズ"></nav>
+
         <section class="monthly-panel" data-monthly-panel="schedule">
           <section class="monthly-status-card section-card" aria-labelledby="monthly-status-title">
             <div>
@@ -161,6 +165,7 @@
             </div>
             <div class="monthly-status-actions">
               <button type="button" class="monthly-primary-button" id="monthly-primary-action">日程を確認する <span>›</span></button>
+              <button type="button" class="monthly-secondary-button is-hidden" id="monthly-approval-detail" data-monthly-action="approval-detail">承認状況の詳細</button>
               <button type="button" class="monthly-secondary-button" data-monthly-action="legacy">従来の月次画面を開く</button>
             </div>
           </section>
@@ -174,9 +179,23 @@
                 <button type="button" class="monthly-month-button" data-monthly-month="1" aria-label="次月">›</button>
               </div>
             </header>
-            <div class="monthly-calendar-legend"><span><i class="monthly-dot purple"></i>実施日</span><span><i class="monthly-dot green"></i>申込期間</span><span><i class="monthly-dot blue"></i>公開日</span><small>日付を選ぶと設定画面を開きます</small></div>
+            <div class="monthly-calendar-legend"><span><i class="monthly-dot purple"></i>実施日</span><span><i class="monthly-dot green"></i>申込期間</span><span><i class="monthly-dot blue"></i>公開日</span><small>日付を選ぶと詳細と次の操作を表示</small></div>
             <div class="monthly-calendar-grid" id="monthly-calendar-grid" role="grid" aria-label="対象月の日程"></div>
-            <div class="monthly-selected-day" id="monthly-selected-day" aria-live="polite">日付を選ぶと、実施日・申込期間を設定できます。</div>
+            <section class="monthly-selected-day is-empty" id="monthly-selected-day" aria-live="polite" aria-label="選択中の日程">
+              <div class="monthly-day-detail-copy">
+                <p class="monthly-section-label">選択中の日程</p>
+                <h3 id="monthly-selected-day-title">日付を選択してください</h3>
+                <div class="monthly-day-detail-events" id="monthly-selected-day-events"></div>
+                <dl class="monthly-day-detail-meta" id="monthly-selected-day-meta"></dl>
+                <p class="monthly-day-detail-note" id="monthly-selected-day-note">日付を選ぶと、実施枠や申込期間を確認できます。</p>
+              </div>
+              <div class="monthly-day-detail-actions">
+                <a class="monthly-primary-button monthly-link-button is-disabled" id="monthly-selected-day-primary" data-monthly-day-action="primary" target="_blank" rel="noopener" aria-disabled="true" tabindex="-1">日程またはシフトを開く <span>›</span></a>
+                <button type="button" class="monthly-secondary-button" id="monthly-selected-day-configure" data-monthly-day-action="configure" disabled>この日の日程を開く</button>
+                <button type="button" class="monthly-secondary-button" data-monthly-tab="wishes">申込状況を見る</button>
+                <button type="button" class="monthly-secondary-button" data-monthly-tab="shifts">シフト一覧を見る</button>
+              </div>
+            </section>
           </section>
 
           <section class="monthly-date-summary section-card" aria-labelledby="monthly-date-summary-title">
@@ -265,11 +284,18 @@
           <div><p class="home-eyebrow">対応一覧</p><h1>対応が必要なもの</h1><p class="home-lead" id="inbox-context-lead">未対応件数を読み込んでいます。</p></div>
           <span class="home-workspace-total" id="inbox-workspace-total" aria-live="polite">確認中</span>
         </header>
-        <div class="home-hub-grid">
-          <section class="home-hub-section section-card" aria-labelledby="inbox-pending-title">
-            <header class="home-section-head"><div><p class="home-section-label">未対応</p><h2 id="inbox-pending-title">順に確認する項目</h2></div></header>
-            <div class="home-hub-list" id="inbox-pending-list" aria-live="polite"></div>
+        <div class="inbox-workspace-layout">
+          <section class="home-hub-section section-card inbox-list-panel" aria-labelledby="inbox-pending-title">
+            <header class="home-section-head"><div><p class="home-section-label">受信項目</p><h2 id="inbox-pending-title">一覧から確認する</h2></div><button type="button" class="home-button secondary inbox-refresh" data-inbox-action="reload">再読み込み</button></header>
+            <nav class="inbox-type-filters" id="inbox-type-filters" aria-label="対応項目の状態と種類"></nav>
+            <div class="home-hub-list inbox-item-list" id="inbox-pending-list" aria-live="polite"></div>
           </section>
+          <section class="home-hub-section section-card inbox-detail-panel" aria-labelledby="inbox-detail-title">
+            <header class="home-section-head"><div><p class="home-section-label">選択中の項目</p><h2 id="inbox-detail-title">詳細</h2></div></header>
+            <div id="inbox-detail-body" aria-live="polite"></div>
+          </section>
+        </div>
+        <div class="home-hub-grid inbox-record-grid">
           <section class="home-hub-section section-card" aria-labelledby="inbox-record-title">
             <header class="home-section-head"><div><p class="home-section-label">記録</p><h2 id="inbox-record-title">配布報告</h2></div></header>
             <p class="home-hub-description">配布報告は対応件数に含めず、記録として確認できます。</p>
@@ -1012,10 +1038,10 @@
 <script src="js/api.js?v=10"></script>
 <script src="js/confirm.js?v=3"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/index.js?v=88"></script>
-<script src="js/home.js?v=5"></script>
-<script src="js/monthly.js?v=3"></script>
-<script src="js/monthly-wishes.js?v=1"></script>
-<script src="js/monthly-shifts.js?v=1"></script>
+<script src="js/index.js?v=93"></script>
+<script src="js/home.js?v=12"></script>
+<script src="js/monthly.js?v=6"></script>
+<script src="js/monthly-wishes.js?v=2"></script>
+<script src="js/monthly-shifts.js?v=2"></script>
 </body>
 </html>

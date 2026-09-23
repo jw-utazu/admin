@@ -45,7 +45,9 @@
 
   function shiftCreateHref() {
     const type = contextType();
-    return './shift-create.html' + (type !== 'normal' ? `?type=${encodeURIComponent(type)}` : '');
+    const params = new URLSearchParams({ year: String(contextYear()), month: String(contextMonth()) });
+    if (type !== 'normal') params.set('type', type);
+    return `./shift-create.html?${params.toString()}`;
   }
 
   function activeDates() {

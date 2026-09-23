@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>シフト管理アプリ</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/shift-create.css?v=51">
+<link rel="stylesheet" href="css/shift-create.css?v=54">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       </div>
       <div class="hdr-spacer" style="flex:1;"></div>
       <div class="publish-actions" aria-label="確認・公開">
-        <span class="publish-actions-label">確認・公開</span>
+        <span class="publish-actions-label">作成完了・確認・公開</span>
         <span id="publish-approval" class="is-hidden" style="font-size:11px;margin-right:6px;white-space:nowrap;" onclick="openApprovalModal()"></span>
         <span id="publish-open-date" class="is-hidden" style="font-size:11px;color:var(--ink3);margin-right:6px;white-space:nowrap;"></span>
         <button class="hbtn is-hidden" id="reject-btn" onclick="rejectShift()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#B45309"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg> 差し戻す</button>
@@ -82,7 +82,28 @@
   <div class="rsz-bar is-hidden" id="split-rsz" title="ドラッグして幅を調整"></div>
   <!-- TAB2: シフト作成 -->
   <div class="tab-content" id="tab-create">
+    <nav class="sc-workflow" aria-label="シフト作成の進め方">
+      <button type="button" class="sc-workflow-step" onclick="switchMainTab('wish',document.getElementById('mtab-wish'))"><span class="sc-workflow-num">1</span><span><b>希望を確認</b><small>希望確認タブ</small></span></button>
+      <span class="sc-workflow-line" aria-hidden="true"></span>
+      <div class="sc-workflow-step active" aria-current="step"><span class="sc-workflow-num">2</span><span><b>シフトを作成</b><small>日付・時間帯ごとに配置</small></span></div>
+      <span class="sc-workflow-line" aria-hidden="true"></span>
+      <button type="button" class="sc-workflow-step" onclick="openPreflight()"><span class="sc-workflow-num">3</span><span><b>公開前チェック</b><small>配置の指摘を確認</small></span></button>
+      <span class="sc-workflow-line" aria-hidden="true"></span>
+      <button type="button" class="sc-workflow-step sc-workflow-next" id="sc-workflow-publish-step" onclick="document.getElementById('publish-btn').click()" aria-label="現在の状態に応じた作成完了・確認・公開操作"><span class="sc-workflow-num">4</span><span><b id="sc-workflow-publish-label">作成完了・公開</b><small id="sc-workflow-publish-note">状態を確認しています</small></span></button>
+    </nav>
     <div class="dtabs" id="dtabs" style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;overflow-x:auto;flex-shrink:0;align-items:center;"><div style="padding:10px 14px;font-size:12px;color:var(--ink3);">読み込み中...</div></div>
+    <section class="sc-workspace-context" aria-label="選択中のシフト作業枠">
+      <div class="sc-workspace-current">
+        <span class="sc-context-eyebrow">選択中の作業枠</span>
+        <strong id="sc-active-slot-label">読み込み中</strong>
+        <span id="sc-slot-applicant-count" aria-live="polite">希望者を確認中</span>
+      </div>
+      <div class="sc-workspace-status">
+        <span class="sc-context-publish-date is-hidden" id="sc-context-publish-date"></span>
+        <button type="button" class="sc-context-approval is-hidden" id="sc-context-approval" onclick="openApprovalModal()"></button>
+        <button type="button" class="tb-btn" onclick="openPreflight()">公開前チェック</button>
+      </div>
+    </section>
     <div class="sc-body">
       <!-- スマホでは左パネルを引き出しにするので、外をタップして閉じるための覆い -->
       <div class="lp-backdrop" id="lp-backdrop" onclick="toggleLp()"></div>
@@ -91,7 +112,8 @@
         <button class="lp-toggle" id="lpToggle" onclick="toggleLp()">◀</button>
         <div class="lp" id="lp">
           <div class="lp-hd">
-            <div class="lp-date" id="lp-date-label">-</div>
+            <p class="lp-panel-label">この時間帯の希望</p>
+            <div class="lp-head-row"><div class="lp-date" id="lp-date-label">-</div><span class="lp-head-count" id="lp-applied-count">—名</span></div>
           </div>
           <div id="lp-members"></div>
         </div>
@@ -124,6 +146,11 @@
   <div class="tab-content" id="tab-settings">
     <div class="settings-scroll">
 
+      <header class="sc-settings-head">
+        <div><p class="sc-settings-eyebrow">対象月の作業設定</p><h2>場所・カート・検証ルール</h2><p>作業に使う設定を項目ごとに確認し、各カードの保存操作で更新します。</p></div>
+      </header>
+
+      <h3 class="sc-setting-group">配置の構成</h3>
       <div class="sec-card">
         <div class="sec-hd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg> 場所管理</div>
         <div class="sec-body">
@@ -147,6 +174,7 @@
         </div>
       </div>
 
+      <h3 class="sc-setting-group">割当と確認</h3>
       <div class="sec-card">
         <div class="sec-hd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></svg> 検証ルール</div>
         <div class="sec-body">
@@ -170,6 +198,13 @@
         </div>
       </div>
 
+      <section class="sec-card sc-ai-rule-entry">
+        <div class="sec-hd">AI原案ルール</div>
+        <div class="sec-body">
+          <p class="sc-setting-note">AI原案の人数・配置ルールは、既存の原案画面で確認・調整できます。</p>
+          <button type="button" class="s-btn primary" onclick="openAiRulesFromSettings()">AI原案のルールを確認・調整</button>
+        </div>
+      </section>
 
     </div>
   </div>
@@ -310,9 +345,9 @@
 <script src="js/confirm.js?v=3"></script>
 <script src="js/validation.js?v=9"></script>
 <script src="js/picker.js?v=9"></script>
-<script src="js/dnd.js?v=17"></script>
+<script src="js/dnd.js?v=18"></script>
 <script src="js/shift-score.js?v=1"></script>
 <script src="js/shift-ai.js?v=2"></script>
-<script src="js/shift-create.js?v=60"></script>
+<script src="js/shift-create.js?v=62"></script>
 </body>
 </html>

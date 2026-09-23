@@ -254,9 +254,15 @@ function dndMoveMsg(x, y) {
 }
 
 // 表が横に長いので、端に寄せたら自動でスクロールする。
-// 横に動くのはスロット表の外枠、縦に動くのは本文全体（#main-content）で別物。
+// 横に動くのはスロット表の外枠、縦に動くのはシフト作業面（.sc-body）で別物。
 // 責任者・カート担当欄は表の上にあるので、縦が動かないと下の行から掴んだ人を
 // 役割欄まで運べない
+function dndVerticalScrollEl() {
+  const wrapper = document.getElementById('content-wrapper');
+  if (wrapper && wrapper.classList.contains('split')) return wrapper;
+  return document.querySelector('#tab-create .sc-body') || document.getElementById('main-content');
+}
+
 function dndAutoScroll() {
   if (!_dnd || !_dnd.started || _dnd.lx === undefined) return;
   // 受け皿バーの上では動かさない。バーは画面下端にあるので、
@@ -268,7 +274,7 @@ function dndAutoScroll() {
     if (_dnd.lx > r.right - DND_EDGE) wrap.scrollLeft += 12;
     else if (_dnd.lx < r.left + DND_EDGE) wrap.scrollLeft -= 12;
   }
-  const box = document.getElementById('main-content');
+  const box = dndVerticalScrollEl();
   if (box) {
     const b = box.getBoundingClientRect();
     if (_dnd.ly > b.bottom - DND_EDGE) box.scrollTop += 8;
@@ -279,7 +285,7 @@ function dndAutoScroll() {
 // 表を作り直しても横スクロール位置を保つ。ドラッグ直後に表が左端へ飛ぶと
 // いま落とした場所を見失う
 function dndRerenderBlock() {
-  const box = document.getElementById('main-content');
+  const box = dndVerticalScrollEl();
   const top = box ? box.scrollTop : 0;
   const before = dndSlotWrap();
   const left = before ? before.scrollLeft : 0;

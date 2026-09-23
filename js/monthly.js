@@ -6,6 +6,8 @@
 (function () {
   const DOW = ['月', '火', '水', '木', '金', '土', '日'];
   let monthlyTab = 'schedule';
+  let selectedMonthlyDayKey = '';
+  let selectedMonthlyDayContext = '';
 
   function escapeMonthly(value) {
     if (typeof escHtml === 'function') return escHtml(value);
@@ -33,7 +35,26 @@
   }
 
   function activeSlots() {
+    if (currentPwType !== 'normal' && Array.isArray(adminPhases) && adminPhases[currentPhaseIndex]) {
+      const phaseSlots = adminPhases[currentPhaseIndex].slots;
+      return Array.isArray(phaseSlots) ? phaseSlots : [];
+    }
     return Array.isArray(slots) ? slots : [];
+  }
+
+  function phaseMonth(phase) {
+    if (typeof limitedPhaseYM === 'function') return limitedPhaseYM(phase);
+    if (!phase) return null;
+    const directYear = Number(phase.year), directMonth = Number(phase.month);
+    if (Number.isInteger(directYear) && Number.isInteger(directMonth) && directMonth >= 1 && directMonth <= 12) {
+      return { y: directYear, m: directMonth };
+    }
+    const slot = (phase.slots || []).find(item => Number(item.y) && Number(item.m));
+    if (slot) return { y: Number(slot.y), m: Number(slot.m) };
+    for (const date of [phase.open, phase.deadline, phase.apply]) {
+      if (date && Number(date.y) && Number(date.m)) return { y: Number(date.y), m: Number(date.m) };
+    }
+    return null;
   }
 
   function isDate(value) {
@@ -61,6 +82,12 @@
 
   function currentShift() {
     return typeof isShiftStatusForCurMonth === 'function' && isShiftStatusForCurMonth() ? shiftStatus : null;
+  }
+
+  function shiftCreateHref() {
+    const params = new URLSearchParams({ year: String(curY), month: String(curM) });
+    if (currentPwType !== 'normal') params.set('type', currentPwType);
+    return `./shift-create.html?${params.toString()}`;
   }
 
   function statusInfo() {
@@ -139,6 +166,33 @@
       action.dataset.monthlyAction = info.action;
       action.innerHTML = `${escapeMonthly(info.actionLabel)} <span>›</span>`;
     }
+    const approvalDetail = document.getElementById('monthly-approval-detail');
+    if (approvalDetail) {
+      const approval = currentApproval();
+      visible(approvalDetail, currentPwType === 'normal' && !!approval && info.action !== 'approval-detail');
+    }
+  }
+
+  function renderWorkflow() {
+    const nav = document.getElementById('monthly-workflow');
+    if (!nav) return;
+    nav.setAttribute('aria-label', `${pwLabel()}の月次進行`);
+    const shiftHref = shiftCreateHref();
+    const steps = [
+      { label: '日程', caption: 'カレンダー', tab: 'schedule' },
+      { label: '希望', caption: '申込状況', tab: 'wishes' },
+      { label: '作成', caption: '配置編集', href: shiftHref },
+      { label: '確認', caption: 'シフト一覧', tab: 'shifts' },
+      { label: '公開', caption: '作成画面', href: shiftHref },
+    ];
+    nav.innerHTML = steps.map((step, index) => {
+      const active = step.tab === monthlyTab;
+      const classes = `monthly-workflow-step${active ? ' active' : ''}`;
+      const aria = active ? ' aria-current="step"' : '';
+      const content = `<span class="monthly-workflow-index">${index + 1}</span><span class="monthly-workflow-copy"><b>${escapeMonthly(step.label)}</b><small>${escapeMonthly(step.caption)}</small></span>`;
+      if (step.tab) return `<button type="button" class="${classes}" data-monthly-tab="${step.tab}"${aria}>${content}</button>`;
+      return `<a class="${classes}" href="${escapeMonthly(step.href)}" target="_blank" rel="noopener">${content}</a>`;
+    }).join('<span class="monthly-workflow-connector" aria-hidden="true"></span>');
   }
 
   function renderCalendar() {
@@ -184,13 +238,118 @@
         ['希望締切', d.deadline, '希望提出の締切日'],
         ['シフト公開', d.open, '確認済みシフトの公開予定日'],
       ]
-      : [['実施日', activeSlots()[0], activeSlots().length ? `${activeSlots().length}件の実施日枠` : '枠がまだ設定されていません']];
-    list.innerHTML = cards.map(card => `<div class="monthly-date-card"><small>${escapeMonthly(card[0])}</small><b>${escapeMonthly(dateText(card[1]))}</b><p>${escapeMonthly(card[2])}</p></div>`).join('');
+      : (() => {
+        const byDate = new Map();
+        activeSlots().forEach(slot => {
+          const key = `${Number(slot.y)}-${Number(slot.m)}-${Number(slot.d)}`;
+          if (!byDate.has(key)) byDate.set(key, { y: Number(slot.y), m: Number(slot.m), d: Number(slot.d), count: 0 });
+          byDate.get(key).count++;
+        });
+        return [...byDate.values()].sort((a, b) => a.y - b.y || a.m - b.m || a.d - b.d)
+          .map(slot => ['実施日', slot, `${slot.count}件の実施日枠`]);
+      })();
+    if (!cards.length) {
+      list.innerHTML = '<div class="monthly-date-card is-empty"><small>実施日</small><b>未設定</b><p>このフェーズに実施日枠はありません。</p></div>';
+      return;
+    }
+    list.innerHTML = cards.map(([label, date, description]) => {
+      const isSet = isDate(date);
+      const content = `<small>${escapeMonthly(label)}</small><b>${escapeMonthly(dateText(date))}</b><p>${escapeMonthly(description)}</p>`;
+      return isSet
+        ? `<button type="button" class="monthly-date-card" data-monthly-milestone="${Number(date.y)}-${Number(date.m)}-${Number(date.d)}" aria-label="${escapeMonthly(label)}、${escapeMonthly(dateText(date))}。選択日の詳細を表示">${content}</button>`
+        : `<div class="monthly-date-card is-empty">${content}</div>`;
+    }).join('');
+  }
+
+  function renderSelectedDay() {
+    const card = document.getElementById('monthly-selected-day');
+    const title = document.getElementById('monthly-selected-day-title');
+    const events = document.getElementById('monthly-selected-day-events');
+    const meta = document.getElementById('monthly-selected-day-meta');
+    const note = document.getElementById('monthly-selected-day-note');
+    const primary = document.getElementById('monthly-selected-day-primary');
+    const configure = document.getElementById('monthly-selected-day-configure');
+    if (!card || !title || !events || !meta || !note || !primary || !configure) return;
+    if (!selectedMonthlyDayKey) {
+      card.classList.add('is-empty');
+      title.textContent = '日付を選択してください';
+      events.innerHTML = '';
+      meta.innerHTML = '';
+      note.textContent = '日付を選ぶと、実施枠や申込期間を確認できます。';
+      primary.innerHTML = '日程またはシフトを開く <span>›</span>';
+      primary.removeAttribute('href');
+      primary.dataset.monthlyDayPrimary = '';
+      primary.classList.add('is-disabled');
+      primary.setAttribute('aria-disabled', 'true');
+      primary.setAttribute('tabindex', '-1');
+      configure.disabled = true;
+      return;
+    }
+    const [year, month, day] = selectedMonthlyDayKey.split('-').map(Number);
+    const d = activeDates();
+    const slotsForDay = activeSlots().filter(slot => Number(slot.y) === year && Number(slot.m) === month && Number(slot.d) === day);
+    const marks = [];
+    if (slotsForDay.length) marks.push(`実施日 ${slotsForDay.length}枠`);
+    if (sameDate(d.apply, year, month, day)) marks.push('申込開始日');
+    if (sameDate(d.deadline, year, month, day)) marks.push('希望締切日');
+    if (sameDate(d.open, year, month, day)) marks.push('シフト公開予定日');
+    card.classList.remove('is-empty');
+    title.textContent = dateText({ y: year, m: month, d: day });
+    events.innerHTML = marks.length
+      ? marks.map(mark => `<span class="monthly-day-detail-event">${escapeMonthly(mark)}</span>`).join('')
+      : '<span class="monthly-day-detail-event neutral">基準日の登録なし</span>';
+    const timeList = slotsForDay.map(slot => String(slot.time || '').trim()).filter(Boolean);
+    meta.innerHTML = '<div><dt>実施枠</dt><dd>' + (timeList.length ? timeList.map(escapeMonthly).join('・') : 'なし') + '</dd></div>' +
+      '<div><dt>日程の種類</dt><dd>' + escapeMonthly(marks.length ? marks.join('・') : '登録なし') + '</dd></div>';
+    const shift = currentShift();
+    let primaryLabel = 'この日の日程を開く';
+    let primaryKind = 'configure';
+    if (slotsForDay.length) {
+      primaryKind = 'shift';
+      primaryLabel = shift && shift.notified ? '公開済みシフトを確認する'
+        : shift && shift.rejected && !shift.published ? '差し戻し内容を確認・修正する'
+        : shift && shift.published ? '確認状況を開く'
+        : 'この月のシフト作成を開く';
+    } else if (sameDate(d.apply, year, month, day)) {
+      primaryLabel = '申込開始日の設定を開く';
+    } else if (sameDate(d.deadline, year, month, day)) {
+      primaryLabel = '希望締切日の設定を開く';
+    } else if (sameDate(d.open, year, month, day)) {
+      primaryLabel = 'シフト公開日の設定を開く';
+    }
+    primary.innerHTML = escapeMonthly(primaryLabel) + ' <span>›</span>';
+    primary.dataset.monthlyDayPrimary = primaryKind;
+    primary.classList.remove('is-disabled');
+    primary.setAttribute('aria-disabled', 'false');
+    primary.setAttribute('tabindex', '0');
+    if (primaryKind === 'shift') primary.href = shiftCreateHref();
+    else primary.removeAttribute('href');
+    note.textContent = slotsForDay.length
+      ? '対象月とPWを引き継いで、既存のシフト管理画面を開きます。'
+      : '日程の変更は既存の日程設定画面で行います。';
+    configure.textContent = 'この日の日程設定を開く';
+    configure.disabled = false;
+    configure.dataset.monthlyDayKey = selectedMonthlyDayKey;
   }
 
   function renderSubtabs() {
-    const href = './shift-create.html' + (currentPwType !== 'normal' ? `?type=${encodeURIComponent(currentPwType)}` : '');
-    document.querySelectorAll('.monthly-link-button').forEach(link => { link.href = href; });
+    const href = shiftCreateHref();
+    document.querySelectorAll('.monthly-link-button:not(#monthly-selected-day-primary)').forEach(link => { link.href = href; });
+  }
+
+  function renderPhaseSwitcher() {
+    const nav = document.getElementById('monthly-phase-switcher');
+    if (!nav) return;
+    const phases = currentPwType !== 'normal' && Array.isArray(adminPhases) ? adminPhases : [];
+    visible(nav, phases.length > 0);
+    if (!phases.length) { nav.innerHTML = ''; return; }
+    nav.innerHTML = phases.map((phase, index) => {
+      const ym = phaseMonth(phase);
+      const isActive = index === currentPhaseIndex;
+      const state = phase && phase.published === true ? '公開中' : '未公開';
+      const monthLabel = ym ? `${ym.y}年${ym.m}月` : '年月未設定';
+      return `<button type="button" class="monthly-phase-button${isActive ? ' active' : ''}" data-monthly-phase="${index}" aria-pressed="${isActive}"${typeof _adminSwitching !== 'undefined' && _adminSwitching ? ' disabled' : ''}><span>フェーズ ${index + 1}</span><small>${escapeMonthly(monthLabel)}</small><b class="${phase && phase.published === true ? 'published' : ''}">${state}</b></button>`;
+    }).join('');
   }
 
   function renderPwMenu() {
@@ -230,6 +389,11 @@
 
   function renderAdminMonthly() {
     if (typeof currentPwType === 'undefined') return;
+    const dayContext = `${currentPwType}:${curY}-${curM}:${currentPwType === 'normal' ? '' : currentPhaseIndex}`;
+    if (selectedMonthlyDayContext !== dayContext) {
+      selectedMonthlyDayContext = dayContext;
+      selectedMonthlyDayKey = '';
+    }
     const lead = document.getElementById('monthly-context-lead');
     const pw = document.getElementById('monthly-pw-chip');
     const month = document.getElementById('monthly-month-chip');
@@ -244,9 +408,12 @@
     renderStatus();
     renderCalendar();
     renderDateCards();
+    renderSelectedDay();
+    renderPhaseSwitcher();
     renderSubtabs();
     renderPwMenu();
     renderMonthlyIcons();
+    renderWorkflow();
     setMonthlyTab(monthlyTab);
   }
 
@@ -262,11 +429,18 @@
     const home = document.getElementById('home-view');
     const layout = document.querySelector('.layout');
     const bar = document.getElementById('pw-type-bar');
+    const returnButton = document.getElementById('legacy-home-return');
     if (app) app.classList.remove('home-mode');
     visible(home, false);
     visible(layout, true);
     visible(bar, true);
+    visible(returnButton, true);
     if (layout) layout.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function returnToNewHome() {
+    visible(document.getElementById('legacy-home-return'), false);
+    if (typeof setAdminHomeView === 'function') setAdminHomeView('home');
   }
 
   function openMonthlyAction(action) {
@@ -277,14 +451,24 @@
   }
 
   function selectMonthlyDay(key) {
+    selectedMonthlyDayKey = String(key || '');
     document.querySelectorAll('.monthly-day.selected').forEach(day => day.classList.remove('selected'));
     const button = document.querySelector(`[data-monthly-day="${key}"]`);
     if (button) button.classList.add('selected');
-    const target = document.getElementById('monthly-selected-day');
-    if (!target) return;
-    const [year, month, day] = String(key).split('-').map(Number);
-    const slotsForDay = activeSlots().filter(slot => Number(slot.y) === year && Number(slot.m) === month && Number(slot.d) === day);
-    target.textContent = `${dateText({ y: year, m: month, d: day })}${slotsForDay.length ? `：実施日 ${slotsForDay.length}枠` : '：この日付の設定を開きます。'}`;
+    renderSelectedDay();
+  }
+
+  async function selectMonthlyPhase(index) {
+    const phases = currentPwType !== 'normal' && Array.isArray(adminPhases) ? adminPhases : [];
+    if (!Number.isInteger(index) || index < 0 || index >= phases.length || (typeof _adminSwitching !== 'undefined' && _adminSwitching)) return;
+    const ym = phaseMonth(phases[index]);
+    if (ym && (Number(curY) !== Number(ym.y) || Number(curM) !== Number(ym.m))) {
+      if (typeof setYm !== 'function') return;
+      await setYm(ym.y, ym.m);
+      if (Number(curY) !== Number(ym.y) || Number(curM) !== Number(ym.m) || !adminPhases[index]) return;
+    }
+    if (typeof switchPhase === 'function') switchPhase(index);
+    renderAdminMonthly();
   }
 
   function handleMonthlyClick(event) {
@@ -300,14 +484,43 @@
       return;
     }
     const tab = event.target.closest('[data-monthly-tab]');
-    if (tab) return setMonthlyTab(tab.dataset.monthlyTab);
+    if (tab) {
+      setMonthlyTab(tab.dataset.monthlyTab);
+      renderWorkflow();
+      return;
+    }
+    const phase = event.target.closest('[data-monthly-phase]');
+    if (phase) return selectMonthlyPhase(Number(phase.dataset.monthlyPhase));
     const month = event.target.closest('[data-monthly-month]');
     if (month && typeof chM === 'function') return chM(Number(month.dataset.monthlyMonth));
     const day = event.target.closest('[data-monthly-day]');
     if (day) {
       selectMonthlyDay(day.dataset.monthlyDay);
-      const parts = day.dataset.monthlyDay.split('-').map(Number);
-      if (typeof openDaySelectModal === 'function') openDaySelectModal(parts[0], parts[1], parts[2]);
+      return;
+    }
+    const dayAction = event.target.closest('[data-monthly-day-action="configure"]');
+    if (dayAction) {
+      const key = dayAction.dataset.monthlyDayKey || selectedMonthlyDayKey;
+      const parts = String(key).split('-').map(Number);
+      if (parts.length === 3 && parts.every(Number.isFinite) && typeof openDaySelectModal === 'function') {
+        openDaySelectModal(parts[0], parts[1], parts[2]);
+      }
+      return;
+    }
+    const dayPrimary = event.target.closest('[data-monthly-day-action="primary"]');
+    if (dayPrimary) {
+      if (dayPrimary.dataset.monthlyDayPrimary === 'configure') {
+        const parts = String(selectedMonthlyDayKey).split('-').map(Number);
+        if (parts.length === 3 && parts.every(Number.isFinite) && typeof openDaySelectModal === 'function') {
+          openDaySelectModal(parts[0], parts[1], parts[2]);
+        }
+      }
+      return;
+    }
+    const milestone = event.target.closest('[data-monthly-milestone]');
+    if (milestone) {
+      const key = milestone.dataset.monthlyMilestone;
+      selectMonthlyDay(key);
       return;
     }
     const wishAction = event.target.closest('[data-monthly-wishes-action]');
@@ -330,6 +543,7 @@
   window.renderAdminMonthly = renderAdminMonthly;
   window.toggleMonthlyPwMenu = toggleMonthlyPwMenu;
   window.showLegacyMonthlyView = showLegacyMonthlyView;
+  window.returnToNewHome = returnToNewHome;
   window.getMonthlyActiveDates = activeDates;
   window.getMonthlyDateText = dateText;
 })();

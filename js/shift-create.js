@@ -1,5 +1,16 @@
 // API_URL / ANON_KEY / CLIENT_ID は js/api.js（共有通信層）で定義
 
+const requestedMonth = (() => {
+  try {
+    const params = new URLSearchParams(location.search);
+    const rawYear = params.get('year'), rawMonth = params.get('month');
+    if (!/^\d{4}$/.test(rawYear || '') || !/^\d{1,2}$/.test(rawMonth || '')) return null;
+    const year = Number(rawYear), month = Number(rawMonth);
+    return Number.isInteger(year) && year >= 1900 && Number.isInteger(month) && month >= 1 && month <= 12
+      ? { year, month } : null;
+  } catch (e) { return null; }
+})();
+const hasRequestedMonth = !!requestedMonth;
 let currentPwType = (() => { try { return new URLSearchParams(location.search).get('type') || 'normal'; } catch(e) { return 'normal'; } })();
 let adminUser     = null;
 let memberFlags   = {};
@@ -34,7 +45,7 @@ let shiftApproval = {
 };
 let activeDateIdx = 0;
 let activeTimeIdx = 0;
-let curYM         = null;  // 編集中の年月（ヘッダーの対象年月セレクタで切り替える）
+let curYM         = requestedMonth;  // URLの対象年月、またはヘッダーの年月セレクタで切り替える
 let ymList        = [];    // カレンダーが存在する年月 [{year,month,calPublished,shiftPublished}]
 let ymLoaded      = false; // ymList / publishedYM を取得済みか（未取得のうちは公開ボタンを制限しない）
 let publishedYM   = null;  // 申込を受け付け中のカレンダーの年月 {year,month}（通常PWでは常に最大1ヶ月）
@@ -260,7 +271,7 @@ async function loadInitData() {
     // まだ申込開始日前の先の月を指していることがある（日程だけ先に承認・公開した場合）。
     // その場合は実際に作業すべき月（作成中・受付中の月）へ補正して取り直す
     const defYm = computeDefaultYm();
-    if (defYm && curYM && (defYm.year < curYM.year || (defYm.year === curYM.year && defYm.month < curYM.month))) {
+    if (!hasRequestedMonth && defYm && curYM && (defYm.year < curYM.year || (defYm.year === curYM.year && defYm.month < curYM.month))) {
       curYM = defYm;
       renderYmSelect();
       await loadWishDataInternal();
@@ -1403,6 +1414,7 @@ function renderBlock() {
   const block = dayBlocks[activeTimeIdx];
   if (!block) {
     document.getElementById('main-content').innerHTML = '<div style="padding:24px;color:var(--ink3);text-align:center;">データがありません</div>';
+    syncCreateWorkspaceContext();
     return;
   }
   document.getElementById('main-content').innerHTML = buildBlock(block, activeTimeIdx);
@@ -1415,6 +1427,58 @@ function renderBlock() {
   }
   ug();
   refreshValidationUI();
+  syncCreateWorkspaceContext();
+}
+
+// 選択枠の情報を作業面の共通ヘッダーと希望者パネルへ反映する。
+// 希望者数は既存の枠別絞り込み結果を表示するだけで、保存状態には影響しない。
+function syncCreateWorkspaceContext(appliedCount) {
+  const tab = (window._dateTabs || [])[activeDateIdx];
+  const block = tab ? shiftDates.filter(d => d.date === tab.date)[activeTimeIdx] : null;
+  const label = document.getElementById('sc-active-slot-label');
+  const count = document.getElementById('sc-slot-applicant-count');
+  if (label) label.textContent = tab
+    ? tab.date + '（' + tab.weekday + '）' + (block && block.time ? ' · ' + block.time : '')
+    : '実施日を選択してください';
+  const total = typeof appliedCount === 'number'
+    ? appliedCount
+    : tab ? filterAppliedForSlot(tab.date, block && block.time || '').length : 0;
+  if (count) count.textContent = total + '名の希望';
+
+  const sourceApproval = document.getElementById('publish-approval');
+  const contextApproval = document.getElementById('sc-context-approval');
+  if (contextApproval) {
+    const showApproval = !!sourceApproval && !sourceApproval.classList.contains('is-hidden') && !!sourceApproval.textContent.trim();
+    contextApproval.textContent = showApproval ? sourceApproval.textContent.trim() : '';
+    contextApproval.title = showApproval ? (sourceApproval.title || '確認状況の詳細を開きます') : '';
+    contextApproval.classList.toggle('is-hidden', !showApproval);
+  }
+  const sourceDate = document.getElementById('publish-open-date');
+  const contextDate = document.getElementById('sc-context-publish-date');
+  if (contextDate) {
+    const showDate = !!sourceDate && !sourceDate.classList.contains('is-hidden') && !!sourceDate.textContent.trim();
+    contextDate.textContent = showDate ? sourceDate.textContent.trim() : '';
+    contextDate.classList.toggle('is-hidden', !showDate);
+  }
+}
+
+function syncCreateWorkflowPublishStep() {
+  const source = document.getElementById('publish-btn');
+  const step = document.getElementById('sc-workflow-publish-step');
+  const label = document.getElementById('sc-workflow-publish-label');
+  const note = document.getElementById('sc-workflow-publish-note');
+  if (!source || !step || !label || !note) return;
+  label.textContent = source.textContent.trim() || '作成完了・公開';
+  step.disabled = !!source.disabled;
+  step.title = source.title || (source.disabled ? '現在はこの操作を実行できません' : '現在の状態に応じた操作を開きます');
+  step.setAttribute('aria-disabled', source.disabled ? 'true' : 'false');
+  step.classList.toggle('is-unavailable', !!source.disabled);
+  const approval = document.getElementById('publish-approval');
+  const openDate = document.getElementById('publish-open-date');
+  const approvalText = approval && !approval.classList.contains('is-hidden') ? approval.textContent.trim() : '';
+  const openDateText = openDate && !openDate.classList.contains('is-hidden') ? openDate.textContent.trim() : '';
+  note.textContent = approvalText || openDateText || source.title || '現在の公開状態に応じて進めます';
+  syncCreateWorkspaceContext();
 }
 
 // 指定した日付・時間帯に申込んでいる人だけを絞り込む共通ロジック
@@ -1468,6 +1532,8 @@ function buildLeftPanel() {
   const applied = filterAppliedForSlot(tab.date, blockTime);
 
   document.getElementById('lp-date-label').textContent = tab.date + '（' + tab.weekday + '）' + (blockTime ? ' ' + blockTime : '');
+  const countEl = document.getElementById('lp-applied-count');
+  if (countEl) countEl.textContent = applied.length + '名';
 
   const memoKey = block ? (tab.date + '_' + block.time) : '';
   const memo = memoKey ? (memoMap[memoKey] || '') : '';
@@ -1511,7 +1577,10 @@ function buildLeftPanel() {
   // 「未申込」セクションは置かない。この一覧から人を掴むことはできず（申込が無いので
   // シフトには入れられない）、名前を眺める以外の用途が無かった。
   // 誰が申し込んでいないかは希望確認タブの未申込一覧で見られる
-  document.getElementById('lp-members').innerHTML = html;
+  document.getElementById('lp-members').innerHTML = applied.length
+    ? html
+    : memoHtml + '<div class="lp-empty">この時間帯に参加希望を出した方はいません。</div>';
+  syncCreateWorkspaceContext(applied.length);
 }
 
 function bKey(b) { return b.date + '_' + b.time; }
@@ -3317,6 +3386,7 @@ function updatePublishBtn() {
     hide(openLabel);
     hide(apprLabel);
     setVisible(rejBtn, false);
+    syncCreateWorkflowPublishStep();
     return;
   }
 
@@ -3334,6 +3404,7 @@ function updatePublishBtn() {
     hide(openLabel);
     hide(apprLabel);
     setVisible(rejBtn, false);
+    syncCreateWorkflowPublishStep();
     return;
   }
 
@@ -3404,6 +3475,7 @@ function updatePublishBtn() {
     openLabel.textContent = shiftOpenDate ? ('公開予定日: ' + shiftOpenDate) : '';
     setVisible(openLabel, !!shiftOpenDate);
   }
+  syncCreateWorkflowPublishStep();
 }
 
 // ヘッダーの確認状況ラベルをクリックしたときに開く一覧。
@@ -4041,6 +4113,11 @@ async function openAiDraftModal() {
     toast('準備に失敗しました: ' + e.message, 'e');
     closeScOverlay('ai-confirm-modal');
   } finally { setLoading(false); }
+}
+
+async function openAiRulesFromSettings() {
+  await switchMainTab('create', document.getElementById('mtab-create'));
+  if (createLoaded) await openAiDraftModal();
 }
 
 function closeAiConfirmModal() { closeScOverlay('ai-confirm-modal'); }

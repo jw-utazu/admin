@@ -1,13 +1,18 @@
 // ============================================================
 // 新ホーム（フェーズ1）
 //
-// APIはここから直接呼ばない。index.js が取得した状態を読み、
-// 既存のカレンダー・モーダル・別ページの入口へ接続する。
+// 月次状態は index.js の状態を読み、既存のカレンダー・モーダル・別ページへ接続する。
+// 対応一覧だけは既存の getRequests / getBugReports / getRecoveryRequests を使って
+// 選択一覧を作る。承認・対応済みなどの更新は従来の関数に委譲する。
 // ============================================================
 (function () {
   const HOME_DOW = ['月', '火', '水', '木', '金', '土', '日'];
   let homeInboxCounts = null;
   let homeView = 'home';
+  const inboxState = {
+    filter: 'all', statusFilter: 'pending', selectedKey: '', loading: false, loaded: false,
+    errors: {}, items: { recovery: [], requests: [], bugs: [] },
+  };
 
   function escapeHome(value) {
     if (typeof escHtml === 'function') return escHtml(value);
@@ -75,6 +80,9 @@
 
   function statusForCurrentMonth() {
     const hasDates = !!(dates && dates.apply && dates.deadline && dates.open);
+    const limitedPhase = currentPwType !== 'normal' && Array.isArray(adminPhases)
+      ? adminPhases[currentPhaseIndex] : null;
+    const limitedPhaseSlots = limitedPhase && Array.isArray(limitedPhase.slots) ? limitedPhase.slots : [];
     const approval = typeof isCalApprovalForCurMonth === 'function' && isCalApprovalForCurMonth()
       ? calApproval : null;
     const shift = typeof isShiftStatusForCurMonth === 'function' && isShiftStatusForCurMonth()
@@ -88,7 +96,7 @@
     const wishesDone = scheduleReady && (isPast(dates.deadline) || created || approved || notified);
 
     if (currentPwType !== 'normal') {
-      const hasSlots = Array.isArray(slots) && slots.length > 0;
+      const hasSlots = limitedPhaseSlots.length > 0;
       return {
         stages: [
           { label: '対象期間', state: 'done', sub: `${curY}年${curM}月` },
@@ -99,7 +107,7 @@
         ],
         current: hasSlots ? '実施日を確認中' : '実施日が未設定',
         normal: false,
-        hasDates,
+        hasSlots,
         shift,
       };
     }
@@ -121,6 +129,18 @@
   }
 
   function primaryActionForMonth(state) {
+    if (!state.normal) {
+      return {
+        status: state.hasSlots ? '実施日設定済み' : '実施日未設定',
+        statusClass: state.hasSlots ? 'current' : 'alert',
+        title: state.hasSlots ? '限定PWの実施日を確認する' : '限定PWの実施日を設定する',
+        detail: state.hasSlots
+          ? '選択中のフェーズの実施日と時間帯を確認します。'
+          : '月次運用で対象フェーズの申込日・締切日・実施日を設定します。',
+        action: 'monthly',
+        label: state.hasSlots ? 'フェーズを確認する' : '日程を設定する',
+      };
+    }
     if (!state.hasDates) {
       return {
         status: '日程未設定', statusClass: 'alert',
@@ -193,6 +213,12 @@
 
   function eventMap() {
     const events = new Map();
+    const limitedPhase = currentPwType !== 'normal' && Array.isArray(adminPhases)
+      ? adminPhases[currentPhaseIndex] : null;
+    const calendarDates = currentPwType === 'normal' ? (dates || {}) : (limitedPhase || {});
+    const calendarSlots = currentPwType === 'normal'
+      ? (Array.isArray(slots) ? slots : [])
+      : (limitedPhase && Array.isArray(limitedPhase.slots) ? limitedPhase.slots : []);
     const add = (value, label, kind, detail) => {
       const key = dateKey(value);
       if (!key) return;
@@ -202,10 +228,10 @@
       if (detail && !current.details.includes(detail)) current.details.push(detail);
       events.set(key, current);
     };
-    add(dates && dates.apply, '受付', 'green', '申込開始');
-    add(dates && dates.deadline, '締切', 'amber', '希望締切');
-    add(dates && dates.open, '公開', 'amber', 'シフト公開');
-    (Array.isArray(slots) ? slots : []).forEach(slot => add(slot, '実施', 'blue', slot.time || '実施日'));
+    add(calendarDates.apply, '受付', 'green', '申込開始');
+    add(calendarDates.deadline, '締切', 'amber', '希望締切');
+    add(calendarDates.open, '公開', 'amber', 'シフト公開');
+    calendarSlots.forEach(slot => add(slot, '実施', 'blue', slot.time || '実施日'));
     return events;
   }
 
@@ -293,41 +319,206 @@
     const records = document.getElementById('inbox-record-list');
     const lead = document.getElementById('inbox-context-lead');
     const totalEl = document.getElementById('inbox-workspace-total');
-    if (!pending || !records || !lead || !totalEl) return;
+    const filters = document.getElementById('inbox-type-filters');
+    const detail = document.getElementById('inbox-detail-body');
+    if (!pending || !records || !lead || !totalEl || !filters || !detail) return;
     if (currentPwType !== 'normal') {
       lead.textContent = '対応一覧は通常PWのデータを表示します。';
       totalEl.textContent = '通常PW';
       pending.innerHTML = '<div class="home-hub-empty"><p>通常PWに切り替えると、対応件数を確認できます。</p><button type="button" class="home-button secondary" data-home-context="pw">通常PWを選ぶ</button></div>';
+      filters.innerHTML = '';
+      detail.innerHTML = '<div class="home-hub-empty">通常PWの対応項目を選ぶと、ここに詳細を表示します。</div>';
       records.innerHTML = '<div class="home-hub-empty">配布報告は通常PWで確認します。</div>';
       renderHomeIcons();
       return;
     }
-    if (!homeInboxCounts) {
-      lead.textContent = '未対応件数を読み込んでいます。';
-      totalEl.textContent = '確認中';
-      pending.innerHTML = '<div class="home-hub-empty">対応件数を読み込んでいます。</div>';
-      records.innerHTML = '<div class="home-hub-empty">配布報告の件数を読み込んでいます。</div>';
-      renderHomeIcons();
-      return;
-    }
-
-    const rows = [
-      { key: 'calApproval', label: '予定表の承認・公開', detail: '対象月の状態と次の操作を確認', action: 'calendar-stage', icon: 'calendar' },
-      { key: 'recovery', label: 'ログイン救済', detail: '未対応の救済依頼を確認', action: 'recovery', icon: 'key' },
-      { key: 'requests', label: '要望', detail: '未対応の要望を確認', action: 'requests', icon: 'message-circle' },
-      { key: 'bugs', label: 'バグ報告', detail: '未対応の報告を確認', action: 'bugs', icon: 'triangle-alert' },
+    const items = inboxItems();
+    const pendingCount = items.filter(item => item.status === '未対応' || item.status === 'pending').length;
+    const total = items.length;
+    lead.textContent = inboxState.loading
+      ? 'ログイン救済・要望・バグ報告を読み込んでいます。'
+      : inboxState.loaded
+        ? `${total}件の項目から種類を絞り、選択した内容を確認できます。${Object.keys(inboxState.errors).length ? ` ${Object.keys(inboxState.errors).length}種類は取得できていません。` : ''}`
+        : '対応一覧を開くと、既存の申請・報告を読み込みます。';
+    totalEl.textContent = inboxState.loading ? '読み込み中' : `未対応 ${pendingCount}件／全${total}件`;
+    const filterOptions = [
+      { id: 'all', label: 'すべて' },
+      { id: 'recovery', label: 'ログイン救済' },
+      { id: 'requests', label: '要望' },
+      { id: 'bugs', label: 'バグ報告' },
     ];
-    const total = rows.reduce((sum, row) => sum + Number(homeInboxCounts[row.key] || 0), 0);
-    lead.textContent = total ? `未対応 ${total}件を種類ごとに確認できます。` : '現在、対応が必要な項目はありません。';
-    totalEl.textContent = total ? `未対応 ${total}件` : '未対応 0件';
-    pending.innerHTML = rows.map(row => {
-      const count = Number(homeInboxCounts[row.key] || 0);
-      return `<button type="button" class="home-hub-row" data-home-action="${row.action}"><span class="home-hub-icon${count ? ' urgent' : ''}" data-home-icon="${row.icon}" aria-hidden="true"></span><span class="home-hub-row-copy"><b>${row.label}</b><small>${row.detail}</small></span><span class="home-hub-row-count${count ? ' has-items' : ''}">${count ? `${count}件` : '対応なし'}</span><span class="home-hub-row-action">開く ›</span></button>`;
+    const statusFilters = [
+      { id: 'pending', label: '未対応のみ', count: pendingCount },
+      { id: 'all', label: '全状態', count: total },
+    ];
+    filters.innerHTML = '<span class="inbox-filter-group-label">状態</span>' + statusFilters.map(option =>
+      '<button type="button" class="inbox-filter' + (inboxState.statusFilter === option.id ? ' active' : '') + '" data-inbox-status="' + option.id + '" aria-pressed="' + (inboxState.statusFilter === option.id) + '">' + option.label + '<span class="inbox-filter-count">' + option.count + '</span></button>'
+    ).join('') + '<span class="inbox-filter-divider" aria-hidden="true"></span><span class="inbox-filter-group-label">種類</span>' + filterOptions.map(option => {
+      const count = option.id === 'all' ? total : inboxState.errors[option.id] ? '—' : inboxState.items[option.id].length;
+      return `<button type="button" class="inbox-filter${inboxState.filter === option.id ? ' active' : ''}" data-inbox-filter="${option.id}" aria-pressed="${inboxState.filter === option.id}">${option.label}<span class="inbox-filter-count">${count}</span></button>`;
     }).join('');
-
-    const distribution = Number(homeInboxCounts.distribution || 0);
-    records.innerHTML = `<button type="button" class="home-hub-row" data-home-action="distribution"><span class="home-hub-icon neutral" data-home-icon="package" aria-hidden="true"></span><span class="home-hub-row-copy"><b>配布報告</b><small>対応件数に含めない記録</small></span><span class="home-hub-row-count neutral">${distribution}件</span><span class="home-hub-row-action">記録を見る ›</span></button>`;
+    if (inboxState.loading) {
+      pending.innerHTML = '<div class="home-hub-empty">対応項目を読み込んでいます。</div>';
+      detail.innerHTML = '<div class="home-hub-empty">読み込みが終わると、項目を選択できます。</div>';
+    } else if (!inboxState.loaded) {
+      pending.innerHTML = '<div class="home-hub-empty">読み込みを開始しています。</div>';
+      detail.innerHTML = '<div class="home-hub-empty">一覧から項目を選択すると、ここに詳細を表示します。</div>';
+    } else {
+      const visibleItems = items
+        .filter(item => inboxState.filter === 'all' || item.kind === inboxState.filter)
+        .filter(item => inboxState.statusFilter === 'all' || isInboxPending(item))
+        .sort((a, b) => {
+          const pendingA = isInboxPending(a);
+          const pendingB = isInboxPending(b);
+          if (pendingA !== pendingB) return pendingA ? -1 : 1;
+          return (Date.parse(b.sortAt || '') || 0) - (Date.parse(a.sortAt || '') || 0);
+        });
+      if (!visibleItems.length) {
+        const hasErrors = Object.keys(inboxState.errors).length > 0;
+        const emptyText = hasErrors
+          ? '取得できた項目はありません。再読み込みするか、種類別の既存画面を開いてください。'
+          : inboxState.statusFilter === 'pending' ? '未対応の項目はありません。全状態に切り替えると、対応済みの項目も表示します。' : 'この種類の項目はありません。';
+        pending.innerHTML = '<div class="home-hub-empty">' + emptyText + '</div>';
+        detail.innerHTML = hasErrors
+          ? `<div class="home-hub-empty">${Object.entries(inboxState.errors).map(([kind, message]) => `<p>${escapeHome(inboxTypeLabel(kind))}：${escapeHome(message)}</p>`).join('')}</div>`
+          : '<div class="home-hub-empty">項目がありません。</div>';
+      } else {
+        let selected = visibleItems.find(item => item.key === inboxState.selectedKey);
+        if (!selected) {
+          selected = visibleItems[0];
+          inboxState.selectedKey = selected.key;
+        }
+        pending.innerHTML = visibleItems.map(item => {
+          const status = inboxStatus(item);
+          const iconClass = item.kind === 'recovery' ? 'recovery' : item.kind === 'bugs' ? 'bug' : 'request';
+          return `<button type="button" class="inbox-item-row${item.key === inboxState.selectedKey ? ' selected' : ''}" data-inbox-item="${escapeHome(item.key)}" aria-pressed="${item.key === inboxState.selectedKey}"><span class="inbox-item-icon ${iconClass}" aria-hidden="true">${item.kind === 'recovery' ? '救' : item.kind === 'bugs' ? '!' : '要'}</span><span class="inbox-item-copy"><b>${escapeHome(item.name || '氏名未登録')}</b><small>${escapeHome(inboxTypeLabel(item.kind))} · ${escapeHome(item.date || '日付未登録')}</small></span><span class="inbox-item-status ${status.className}">${escapeHome(status.label)}</span></button>`;
+        }).join('');
+        detail.innerHTML = renderInboxDetail(selected);
+      }
+    }
+    const distribution = Number(homeInboxCounts && homeInboxCounts.distribution || 0);
+    const calendarCount = Number(homeInboxCounts && homeInboxCounts.calApproval || 0);
+    records.innerHTML = `<button type="button" class="home-hub-row" data-home-action="calendar-stage"><span class="home-hub-icon" data-home-icon="calendar" aria-hidden="true"></span><span class="home-hub-row-copy"><b>予定表の承認・公開</b><small>対象月の状態と次の操作</small></span><span class="home-hub-row-count${calendarCount ? ' has-items' : ''}">${calendarCount || '対応なし'}</span><span class="home-hub-row-action">月次で開く ›</span></button><button type="button" class="home-hub-row" data-home-action="distribution"><span class="home-hub-icon neutral" data-home-icon="package" aria-hidden="true"></span><span class="home-hub-row-copy"><b>配布報告</b><small>対応件数に含めない記録</small></span><span class="home-hub-row-count neutral">${distribution}件</span><span class="home-hub-row-action">記録を見る ›</span></button>`;
     renderHomeIcons();
+  }
+
+  function inboxItems() {
+    return [...inboxState.items.recovery, ...inboxState.items.requests, ...inboxState.items.bugs];
+  }
+
+  function inboxTypeLabel(kind) {
+    return kind === 'recovery' ? 'ログイン救済' : kind === 'bugs' ? 'バグ報告' : '要望';
+  }
+
+  function inboxStatus(item) {
+    if (item.kind === 'recovery') {
+      if (item.status === 'pending') return { label: '未対応', className: 'pending' };
+      if (item.status === 'approved') return { label: '承認済み', className: 'approved' };
+      return { label: typeof recStatusLabel === 'function' ? recStatusLabel(item.status) : '完了', className: 'done' };
+    }
+    if (item.status === '未対応') return { label: '未対応', className: 'pending' };
+    return { label: '対応済み', className: 'done' };
+  }
+
+  function isInboxPending(item) {
+    if (!item) return false;
+    if (item.kind === 'recovery') return item.status === 'pending';
+    return item.status === '未対応' || item.status === 'pending';
+  }
+
+  function renderInboxDetail(item) {
+    const status = inboxStatus(item);
+    const title = item.kind === 'recovery' ? 'ログイン救済の申請' : inboxTypeLabel(item.kind);
+    const body = item.kind === 'recovery'
+      ? '<p class="inbox-detail-note">本人確認・承認・却下は、確認情報を重複表示しないため既存のログイン救済画面で行います。</p>'
+      : `<div class="inbox-detail-body">${escapeHome(item.body || '本文はありません。')}</div>`;
+    const actions = item.kind === 'recovery'
+      ? '<button type="button" class="home-button primary" data-inbox-open="recovery">ログイン救済画面を開く</button>'
+      : `<button type="button" class="home-button secondary" data-inbox-open="${item.kind}">既存の一覧を開く</button>${item.status === '未対応' ? `<button type="button" class="home-button primary" data-inbox-resolve="${item.kind}">対応済みにする</button>` : '<span class="inbox-status-note">対応済み</span>'}`;
+    return `<article class="inbox-detail-card"><header class="inbox-detail-head"><div><p class="home-section-label">${escapeHome(inboxTypeLabel(item.kind))}</p><h3>${escapeHome(item.name || title)}</h3><div class="inbox-detail-meta"><span>${escapeHome(item.date || '日付未登録')}</span><span class="inbox-item-status ${status.className}">${escapeHome(status.label)}</span></div></div></header>${body}<div class="inbox-detail-actions">${actions}</div></article>`;
+  }
+
+  function normalizeInboxRows(kind, rows) {
+    return (Array.isArray(rows) ? rows : []).map((row, index) => {
+      if (kind === 'recovery') {
+        const rawDate = String(row.created_at || '');
+        return {
+          kind, key: `${kind}:${String(row.id == null ? index : row.id)}`, id: row.id,
+          name: String(row.name || '氏名未登録'), date: typeof fmtRecTime === 'function' ? (fmtRecTime(rawDate) || rawDate) : rawDate,
+          sortAt: rawDate,
+          status: String(row.status || ''),
+        };
+      }
+      const id = row.rowIndex == null ? index : row.rowIndex;
+      return {
+        kind, key: `${kind}:${String(id)}`, rowIndex: id,
+        name: String(row.name || '氏名未登録'), date: String(row.sentAt || ''), sortAt: String(row.sentAt || ''),
+        body: String(row.body || ''), status: String(row.status || ''),
+      };
+    });
+  }
+
+  async function loadInboxWorkspace(force) {
+    if (inboxState.loading || (!force && inboxState.loaded)) return;
+    inboxState.loading = true;
+    inboxState.errors = {};
+    renderInboxHub();
+    if (typeof showProc === 'function') showProc('対応一覧を読み込んでいます...', 'ログイン救済・要望・バグ報告を確認しています');
+    try {
+      const results = await Promise.allSettled([
+        apiGet('getRequests'),
+        apiGet('getBugReports'),
+        apiPost({ action: 'getRecoveryRequests' }),
+      ]);
+      const apply = (index, kind, pick) => {
+        const result = results[index];
+        if (result.status === 'rejected') {
+          inboxState.errors[kind] = result.reason && result.reason.message || '取得できませんでした';
+          inboxState.items[kind] = [];
+          return;
+        }
+        try {
+          const value = result.value || {};
+          if (value.ok === false) throw new Error(value.reason === 'unauthorized' ? '権限がありません' : (value.error || value.reason || '取得失敗'));
+          inboxState.items[kind] = normalizeInboxRows(kind, pick(value));
+        } catch (error) {
+          inboxState.errors[kind] = error && error.message || '取得できませんでした';
+          inboxState.items[kind] = [];
+        }
+      };
+      apply(0, 'requests', value => value.requests);
+      apply(1, 'bugs', value => value.reports);
+      apply(2, 'recovery', value => value.requests);
+      inboxState.loaded = true;
+      const countPending = kind => inboxState.items[kind].filter(item => item.status === '未対応' || item.status === 'pending').length;
+      const refreshedCounts = {};
+      ['requests', 'bugs', 'recovery'].forEach(kind => {
+        if (!inboxState.errors[kind]) refreshedCounts[kind] = countPending(kind);
+      });
+      homeInboxCounts = Object.assign({}, homeInboxCounts || {}, refreshedCounts);
+      if (typeof setInboxCount === 'function') {
+        Object.entries(refreshedCounts).forEach(([kind, count]) => setInboxCount(kind, count));
+      }
+      inboxState.loading = false;
+      renderHomeAttention();
+      renderInboxHub();
+    } catch (error) {
+      inboxState.loaded = true;
+      inboxState.errors = { recovery: error && error.message || '取得できませんでした', requests: error && error.message || '取得できませんでした', bugs: error && error.message || '取得できませんでした' };
+      inboxState.items = { recovery: [], requests: [], bugs: [] };
+      inboxState.loading = false;
+      renderInboxHub();
+    } finally {
+      inboxState.loading = false;
+      if (typeof hideProc === 'function') hideProc();
+    }
+  }
+
+  async function resolveInboxItem(kind) {
+    const item = inboxItems().find(row => row.key === inboxState.selectedKey);
+    if (!item || item.kind !== kind || item.status !== '未対応') return;
+    if (kind === 'requests' && typeof window.resolveRequest === 'function') await window.resolveRequest(item.rowIndex);
+    if (kind === 'bugs' && typeof window.resolveBugReport === 'function') await window.resolveBugReport(item.rowIndex);
   }
 
   function renderHomeAccount() {
@@ -398,7 +589,10 @@
     if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
     if (nextView === 'home') renderAdminHome();
     else if (nextView === 'monthly' && typeof renderAdminMonthly === 'function') renderAdminMonthly();
-    else if (nextView === 'inbox') renderInboxHub();
+    else if (nextView === 'inbox') {
+      renderInboxHub();
+      loadInboxWorkspace(false);
+    }
     requestAnimationFrame(() => pages[nextView]?.focus({ preventScroll: true }));
   }
 
@@ -427,6 +621,7 @@
     }
     if (action === 'shift') {
       const link = document.getElementById('btn-shift-create');
+      if (link) link.href = shiftCreateHref();
       return link ? link.click() : window.open('./shift-create.html', '_blank', 'noopener');
     }
     if (action === 'territory') {
@@ -453,6 +648,12 @@
     }, 0);
   }
 
+  function shiftCreateHref() {
+    const params = new URLSearchParams({ year: String(curY), month: String(curM) });
+    if (currentPwType !== 'normal') params.set('type', currentPwType);
+    return `./shift-create.html?${params.toString()}`;
+  }
+
   function handleHomeClick(event) {
     const nav = event.target.closest('[data-home-nav]');
     if (nav) {
@@ -467,6 +668,29 @@
     }
     const context = event.target.closest('[data-home-context]');
     if (context) return openMonthlyContext(context.dataset.homeContext);
+    const inboxAction = event.target.closest('[data-inbox-action]');
+    if (inboxAction && inboxAction.dataset.inboxAction === 'reload') return loadInboxWorkspace(true);
+    const inboxFilter = event.target.closest('[data-inbox-filter]');
+    if (inboxFilter) {
+      inboxState.filter = inboxFilter.dataset.inboxFilter || 'all';
+      inboxState.selectedKey = '';
+      return renderInboxHub();
+    }
+    const inboxStatus = event.target.closest('[data-inbox-status]');
+    if (inboxStatus) {
+      inboxState.statusFilter = inboxStatus.dataset.inboxStatus === 'all' ? 'all' : 'pending';
+      inboxState.selectedKey = '';
+      return renderInboxHub();
+    }
+    const inboxOpen = event.target.closest('[data-inbox-open]');
+    if (inboxOpen) return openExistingAction(inboxOpen.dataset.inboxOpen);
+    const inboxResolve = event.target.closest('[data-inbox-resolve]');
+    if (inboxResolve) return resolveInboxItem(inboxResolve.dataset.inboxResolve);
+    const inboxItem = event.target.closest('[data-inbox-item]');
+    if (inboxItem) {
+      inboxState.selectedKey = inboxItem.dataset.inboxItem;
+      return renderInboxHub();
+    }
     const day = event.target.closest('[data-home-day]');
     if (day) return openHomeDay(day.dataset.homeDay);
     const action = event.target.closest('[data-home-action]');
@@ -480,7 +704,26 @@
     renderHomeIcons();
   }
 
+  function applyInboxMutation(detail) {
+    const kind = detail && detail.kind;
+    const rows = kind && inboxState.items[kind];
+    if (!inboxState.loaded || !Array.isArray(rows)) return false;
+    const id = kind === 'recovery' ? detail.id : detail.rowIndex;
+    const item = rows.find(row => String(kind === 'recovery' ? row.id : row.rowIndex) === String(id));
+    if (!item) return false;
+    item.status = String(detail.status || (kind === 'recovery' ? 'approved' : '対応済み'));
+    const pendingCount = rows.filter(isInboxPending).length;
+    homeInboxCounts = Object.assign({}, homeInboxCounts || {}, { [kind]: pendingCount });
+    if (typeof setInboxCount === 'function') setInboxCount(kind, pendingCount);
+    renderHomeAttention();
+    renderInboxHub();
+    return true;
+  }
+
   document.addEventListener('click', handleHomeClick);
+  window.addEventListener('admin:inbox-mutated', event => {
+    if (!applyInboxMutation(event.detail || {}) && typeof loadPendingCounts === 'function') loadPendingCounts();
+  });
   window.renderAdminHome = renderAdminHome;
   window.updateAdminHomeCounts = updateAdminHomeCounts;
   window.setAdminHomeView = setAdminHomeView;

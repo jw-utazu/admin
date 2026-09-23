@@ -45,7 +45,9 @@
 
   function shiftCreateHref() {
     const type = contextType();
-    return './shift-create.html' + (type !== 'normal' ? `?type=${encodeURIComponent(type)}` : '');
+    const params = new URLSearchParams({ year: String(contextYear()), month: String(contextMonth()) });
+    if (type !== 'normal') params.set('type', type);
+    return `./shift-create.html?${params.toString()}`;
   }
 
   function datesOf(data) {
@@ -171,7 +173,17 @@
       else if (state.error) detail.textContent = 'シフト一覧を取得できませんでした。再読み込みを試してください。';
       else detail.textContent = info.detail;
     }
-    if (link) link.href = shiftCreateHref();
+    if (link) {
+      link.href = shiftCreateHref();
+      const status = state.status;
+      const label = !status ? 'シフト管理アプリを開く'
+        : status.notified ? '公開済みシフトを確認する'
+        : status.rejected && !status.published ? '差し戻し内容を確認する'
+        : status.approvedAll ? '公開条件を確認する'
+        : status.published ? '確認状況を確認する'
+        : 'シフト作成を続ける';
+      link.innerHTML = escapeShift(label) + ' <span>›</span>';
+    }
   }
 
   function statCard(label, value, note, alert) {
@@ -235,7 +247,12 @@
         : '未配置';
       const emptyText = summary.emptyCount ? `・未配置セル ${summary.emptyCount}件` : '';
       const time = block.time || (block.slots || []).map(slot => slot.time).filter(Boolean).join('・') || '時間帯未設定';
-      return `<article class="monthly-shift-row"><div class="monthly-shift-date"><strong>${escapeShift(dateText(block))}</strong><small>${escapeShift(time)}</small></div><div class="monthly-shift-detail"><strong>${escapeShift(placeText)}</strong><small>${escapeShift(assignmentText + emptyText)}</small></div><span class="monthly-status ${stateForRows.className || ''}">${escapeShift(stateForRows.label)}</span></article>`;
+      const rowLabel = dateText(block) + ' ' + time + 'を含む対象月のシフト管理を開く';
+      return '<a class="monthly-shift-row" href="' + escapeShift(shiftCreateHref()) + '" target="_blank" rel="noopener" aria-label="' + escapeShift(rowLabel) + '">' +
+        '<span class="monthly-shift-date"><strong>' + escapeShift(dateText(block)) + '</strong><small>' + escapeShift(time) + '</small></span>' +
+        '<span class="monthly-shift-detail"><strong>' + escapeShift(placeText) + '</strong><small>' + escapeShift(assignmentText + emptyText) + '</small></span>' +
+        '<span class="monthly-status ' + escapeShift(stateForRows.className || '') + '">' + escapeShift(stateForRows.label) + '</span>' +
+        '<span class="monthly-shift-row-action" aria-hidden="true">対象月を開く ›</span></a>';
     }).join('');
   }
 
