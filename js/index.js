@@ -240,8 +240,22 @@ function applyEventDates(eventDates, targetYear, targetMonth) {
   dates.open     = parseEventDate(src['シフト公開'], targetYear, targetMonth);
 }
 
+// 月・PW種別の切り替えで使う4つのデータは adminMonthBundle の1リクエストで取る。
+// 以前は4リクエストに分けており、そのたびにサーバーで認証とログイン確認が4回ずつ走っていた
 async function fetchAdminMonthBundle(year, month, type) {
   const target = { year, month, type };
+  try {
+    const res = await apiGet('adminMonthBundle', target);
+    return {
+      data: res.data, calStatus: res.calStatus,
+      shiftStatusResult: res.shiftStatusResult, calApprovalResult: res.calApprovalResult,
+    };
+  } catch (e) {
+    // Edge Function（Supabase）と画面（GitHub Pages）はデプロイが別なので、
+    // adminMonthBundle がまだ本番に無いときだけ従来の4リクエストへ戻す。
+    // それ以外のエラー（権限・通信）はここで握りつぶさない
+    if (String(e && e.message) !== 'unknown_action') throw e;
+  }
   const [data, calStatus, shiftStatusResult, calApprovalResult] = await Promise.all([
     apiGet('adminData', target),
     apiGet('getCalPubStatus', { type }),
