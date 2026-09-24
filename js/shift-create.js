@@ -58,6 +58,7 @@ let _scKnownTs   = null; // シフト作成データのリアルタイム同期�
 let _scKnownWishTs = null; // シフト希望データのリアルタイム同期用（最終更新タイムスタンプ）
 let _scKnownDraftTs = null; // 未公開の作成中でも動く管理者間同期用タイムスタンプ
 let _scPollTimer = null;
+let _scPollInFlight = false; // 同期確認の多重実行防止
 let _scPollListening = false;
 let wishLoaded   = false;
 
@@ -3037,8 +3038,24 @@ async function reloadCreateData() {
 // 同じエンドポイントの wishUpdated で返ってくる。変化があれば希望確認タブと
 // 申込者リストだけを再取得する（シフト作成側のブロックには触れない）。
 // ============================================================
+// 画面が見えていないあいだは確認しない。タブが裏にある場合に加え、admin の作業画面に
+// 埋め込まれて別の画面へ切り替えられた（iframe が非表示になった）場合も document.hidden は
+// false のままなので、埋め込み枠が描画されているかも見る。戻れば次の1秒で再開する
+function isShiftCreateSyncVisible() {
+  if (document.hidden) return false;
+  try {
+    const frame = window.frameElement;
+    if (frame && frame.getClientRects().length === 0) return false;
+  } catch (_) {}
+  return true;
+}
+
 async function checkShiftCreateUpdate() {
   if (!createLoaded && !wishLoaded) return;
+  // 1秒間隔のため、応答が1秒を超えると前回の確認が終わる前に次が走り、
+  // 同じ差分の取得・反映やトーストが重複する。確認中は次を始めない
+  if (_scPollInFlight || !isShiftCreateSyncVisible()) return;
+  _scPollInFlight = true;
   try {
     const res = await apiGet('getShiftLastUpdated');
     if (!res || !res.ok) return;
@@ -3078,7 +3095,11 @@ async function checkShiftCreateUpdate() {
       _scKnownWishTs = wishTs;
       await syncWishData();
     }
-  } catch (e) { console.warn('[checkShiftCreateUpdate]', e); }
+  } catch (e) {
+    console.warn('[checkShiftCreateUpdate]', e);
+  } finally {
+    _scPollInFlight = false;
+  }
 }
 
 // 他の管理者の希望編集・奉仕者のシフト希望提出を反映する。
@@ -3641,16 +3662,17 @@ async function approveShift(force) {
 async function rejectShift() {
   if (!isStatusForCurYM()) return;
   if (isOffPublishedMonth() || !shiftApproval.isApprover || !shiftPublished) return;
-  const note = prompt('差し戻す理由を入力してください（作成担当者に通知されます）', '');
-  if (note === null) return;
   const extra = shiftApproval.notified
     ? '\n\n※ このシフトは既に奉仕者へ公開されています。差し戻すと奉仕者から見えなくなります。'
     : '';
-  if (!await uiConfirm({
+  // 理由の入力と実行の確認を1つのダイアログで行う（以前は標準の入力欄→確認ダイアログの2段だった）
+  const note = await uiPrompt({
     type: 'danger', title: 'シフトの差し戻し',
-    message: 'シフトを差し戻しますか？\n\n作成完了が取り消され、確認記録もリセットされます。' + extra,
+    message: '作成完了が取り消され、確認記録もリセットされます。\n差し戻す理由を入力してください（作成担当者に通知されます）。' + extra,
+    placeholder: '例：9/14 の責任者が未配置です',
     confirmText: '差し戻す',
-  })) return;
+  });
+  if (note === null) return;
   setLoading(true, '差し戻しています...');
   try {
     const res = await apiGet('rejectShift', ymP({ note }));

@@ -52,8 +52,15 @@
       '.uic-ok{background:var(--blue,#2563eb);color:#fff;}',
       '.uic-ok.danger{background:var(--red,#dc2626);}',
       '.uic-ok.warn{background:var(--amber,#d97706);}',
+      '.uic-in-wrap{padding:0 18px 14px 46px;}',
+      '.uic-in{width:100%;box-sizing:border-box;min-height:84px;resize:vertical;padding:8px 10px;',
+      '  border:1px solid var(--border,#e4e4e7);border-radius:var(--r,8px);background:var(--surface,#fff);',
+      '  color:var(--ink,#18181b);font-family:var(--sans),sans-serif;font-size:13px;line-height:1.6;}',
+      '.uic-in:focus{outline:2px solid var(--blue,#2563eb);outline-offset:1px;border-color:transparent;}',
+      '.uic-in-hint{margin-top:4px;font-size:11px;color:var(--ink3,#71717a);}',
       '@media (max-width:480px){',
       '  .uic-bd{padding-left:18px;}',
+      '  .uic-in-wrap{padding-left:18px;}',
       '  .uic-ft{flex-direction:column-reverse;}',
       '  .uic-ft .uic-btn{width:100%;padding:11px 16px;}',
       '}',
@@ -70,6 +77,10 @@
       '<div class="uic-box" role="alertdialog" aria-modal="true" aria-labelledby="uic-tt" aria-describedby="uic-bd">'
       + '<div class="uic-hd"><span class="uic-ic" id="uic-ic"></span><div class="uic-tt" id="uic-tt"></div></div>'
       + '<div class="uic-bd" id="uic-bd"></div>'
+      + '<div class="uic-in-wrap uic-hidden" id="uic-in-wrap">'
+      + '<textarea class="uic-in" id="uic-in" rows="3"></textarea>'
+      + '<div class="uic-in-hint" id="uic-in-hint"></div>'
+      + '</div>'
       + '<div class="uic-ft" id="uic-ft"></div>'
       + '</div>';
     document.body.appendChild(_root);
@@ -83,8 +94,15 @@
   function onKey(e) {
     if (!_resolve) return;
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
-    else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(true); }
+    else if (e.key === 'Enter') {
+      // 入力欄では Enter を改行に使う。確定は Ctrl/⌘+Enter かボタンで行う
+      if (_promptMode && !(e.ctrlKey || e.metaKey)) return;
+      if (e.isComposing) return;
+      e.preventDefault(); e.stopPropagation(); done(true);
+    }
   }
+
+  var _promptMode = false; // uiPrompt 表示中か（入力欄を表示し、結果を文字列で返す）
 
   function done(result) {
     if (!_resolve) return;
@@ -92,6 +110,8 @@
     _resolve = null;
     document.removeEventListener('keydown', onKey, true);
     _root.classList.remove('open');
+    _root.querySelector('#uic-in-wrap').classList.add('uic-hidden');
+    _promptMode = false;
     if (_prevFocus && _prevFocus.focus) { try { _prevFocus.focus(); } catch (err) {} }
     _prevFocus = null;
     r(result);
@@ -139,6 +159,32 @@
     ov.querySelector('#uic-no').focus();
     document.addEventListener('keydown', onKey, true);
     return new Promise(function (res) { _resolve = res; });
+  };
+
+  /**
+   * 入力つき確認ダイアログ。標準 prompt() の置き換え。
+   * 理由の入力と実行の確認を1つのダイアログで済ませる（prompt → confirm の2段にしない）。
+   * @param {Object} opt uiConfirm と同じ項目に加えて
+   *   placeholder 入力欄の例示
+   *   value       入力欄の初期値
+   *   hint        入力欄の下に出す補足
+   *   maxLength   入力できる最大文字数（既定：500）
+   * @returns {Promise<string|null>} 実行を選んだら入力文字列（前後の空白は除く）、キャンセルなら null
+   */
+  window.uiPrompt = function (opt) {
+    opt = opt || {};
+    var ov = build();
+    var result = window.uiConfirm(opt);
+    _promptMode = true;
+    var input = ov.querySelector('#uic-in');
+    input.value = opt.value || '';
+    input.placeholder = opt.placeholder || '';
+    input.maxLength = opt.maxLength || 500;
+    var hint = ov.querySelector('#uic-in-hint');
+    hint.textContent = opt.hint || 'Ctrl（⌘）+ Enter でも確定できます';
+    ov.querySelector('#uic-in-wrap').classList.remove('uic-hidden');
+    input.focus();
+    return result.then(function (ok) { return ok ? input.value.trim() : null; });
   };
 
   /**
