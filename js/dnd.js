@@ -254,12 +254,20 @@ function dndMoveMsg(x, y) {
 }
 
 // 表が横に長いので、端に寄せたら自動でスクロールする。
-// 横に動くのはスロット表の外枠、縦に動くのはシフト作業面（.sc-body）で別物。
-// 分割表示でも作成側の作業面だけをスクロールする。
+// 横はスロット表の外枠、縦はポインターが乗っている申込者一覧か作業面を動かす。
 // 責任者・カート担当欄は表の上にあるので、縦が動かないと下の行から掴んだ人を
 // 役割欄まで運べない
-function dndVerticalScrollEl() {
-  return document.querySelector('#tab-create .sc-body') || document.getElementById('main-content');
+function dndVerticalScrollEl(x, y) {
+  const main = document.getElementById('main-content');
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    for (const el of [document.getElementById('lp-members'), main]) {
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return el;
+    }
+    return null;
+  }
+  return main || document.querySelector('#tab-create .sc-body');
 }
 
 function dndAutoScroll() {
@@ -273,7 +281,7 @@ function dndAutoScroll() {
     if (_dnd.lx > r.right - DND_EDGE) wrap.scrollLeft += 12;
     else if (_dnd.lx < r.left + DND_EDGE) wrap.scrollLeft -= 12;
   }
-  const box = dndVerticalScrollEl();
+  const box = dndVerticalScrollEl(_dnd.lx, _dnd.ly);
   if (box) {
     const b = box.getBoundingClientRect();
     if (_dnd.ly > b.bottom - DND_EDGE) box.scrollTop += 8;

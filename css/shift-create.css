@@ -242,9 +242,10 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .dtab{padding:10px 14px;border:none;border-bottom:2px solid transparent;background:none;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink3);font-family:var(--sans);white-space:nowrap;}
 .dtab.on{color:var(--blue);border-bottom-color:var(--blue);}
 .dtab:hover:not(.on){color:var(--ink);}
-.sc-body{display:flex;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;align-items:flex-start;}
-.lp-wrap{position:relative;display:flex;flex-shrink:0;transition:width .2s ease;width:196px;}
-.lp{border-right:1px solid var(--border);background:var(--surface);overflow:visible;display:flex;flex-direction:column;width:100%;min-width:0;}
+.sc-body{display:flex;flex:1;min-height:0;overflow:hidden;align-items:stretch;}
+.lp-wrap{position:relative;display:flex;flex-shrink:0;transition:width .2s ease;width:196px;height:100%;min-height:0;}
+.lp{border-right:1px solid var(--border);background:var(--surface);overflow:hidden;display:flex;flex-direction:column;width:100%;min-width:0;min-height:0;}
+#lp-members{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
 .lp-wrap.collapsed{width:0!important;overflow:visible;}
 .lp-wrap.collapsed .lp{display:none;}
 .lp-resize{position:absolute;right:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:10;background:transparent;}
@@ -293,8 +294,8 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
    中身が動く。見えている物は何も動かないので「スクロールできない」ことになる。
    縦は外側の1つに任せ、ここは日付列の横スクロールだけを担当させる */
 .wish-snap-outer-na{overflow-x:auto;overflow-y:visible;}
-.rm-wrap{flex:1;min-width:0;overflow:visible;display:flex;flex-direction:column;align-self:flex-start;height:max-content;}
-.rm{overflow:visible;padding:14px;background:var(--bg);flex:none;}
+.rm-wrap{flex:1;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;align-self:stretch;height:100%;}
+.rm{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:14px;background:var(--bg);flex:1;min-height:0;}
 .tb{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;box-shadow:var(--sh);}
 .tb-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface2);}
 .tb-time{font-size:14px;font-weight:700;color:var(--ink);}
@@ -455,13 +456,13 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 #content-wrapper.split>#tab-wish,#content-wrapper.split>#tab-create{display:flex!important;flex:1;min-width:0;}
 #content-wrapper.split>#tab-wish{border-right:1px solid var(--border);}
 .sc-body .rm .tbl-wrap{overflow-x:auto;overflow-y:hidden;}
-.sc-body .lp-wrap{align-self:flex-start;height:max-content;}
+.sc-body .lp-wrap{align-self:stretch;height:100%;min-height:0;}
 .split-btn{padding:5px 12px;border:1px solid var(--border);border-radius:var(--r);background:none;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;color:var(--ink2);white-space:nowrap;transition:all .15s;}
 .split-btn.on{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
 /* 分割表示でも各タブの中にスクロール枠を保ち、左右を独立して動かす */
 #content-wrapper.split>#tab-wish,#content-wrapper.split>#tab-create{flex:1 1 0;min-height:0;overflow:hidden;}
 /* ===== 比較パネル ===== */
-.cmp-panel{display:none;flex-direction:column;flex:1;min-width:0;border-left:2px solid var(--purple);overflow:visible;align-self:flex-start;height:max-content;}
+.cmp-panel{display:none;flex-direction:column;flex:1;min-width:0;min-height:0;border-left:2px solid var(--purple);overflow:hidden;align-self:stretch;height:100%;}
 .cmp-panel.on{display:flex;}
 .cmp-sel-bar{padding:8px 14px;background:var(--purple-l);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
 .cmp-label{font-size:11px;color:var(--purple);font-weight:700;white-space:nowrap;}
@@ -488,7 +489,7 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .cmp-sel-bar .uic-row{flex-wrap:nowrap;overflow-x:auto;}
 
 .cmp-sel{border:1px solid #ddd6fe;border-radius:var(--r);padding:4px 8px;font-size:12px;font-family:var(--sans);outline:none;background:var(--surface);color:var(--ink);}
-.cmp-content{overflow:visible;flex:none;background:var(--bg);padding:14px;}
+.cmp-content{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;flex:1;min-height:0;background:var(--bg);padding:14px;}
 /* ===== リサイズ仕切り ===== */
 .rsz-bar{width:6px;flex-shrink:0;cursor:col-resize;user-select:none;background:var(--border2);transition:background .12s;position:relative;}
 .rsz-bar::after{content:'';position:absolute;inset:0 -3px;z-index:10;}
@@ -789,7 +790,7 @@ body.dnd-on *{cursor:grabbing !important;}
      どこまでスクロールしてもトグルが画面の縦中央に残るようにする */
   .sc-body .lp-wrap{position:sticky;top:0;z-index:70;align-self:flex-start;height:100cqh;}
   .sc-body .lp-wrap .lp{position:absolute;left:0;top:0;bottom:0;z-index:70;
-    width:min(78vw,280px);overflow-y:auto;box-shadow:2px 0 14px rgba(0,0,0,.18);}
+    width:min(78vw,280px);overflow:hidden;box-shadow:2px 0 14px rgba(0,0,0,.18);}
   .sc-body .lp-wrap.collapsed .lp{display:none;}
   /* 枠の幅が 0 なので、PC 用の right:-14px だと画面の左外へはみ出す */
   .sc-body .lp-wrap.collapsed .lp-toggle{left:0;right:auto;}
