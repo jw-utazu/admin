@@ -3113,11 +3113,14 @@ async function checkShiftCreateUpdate() {
 // 他の管理者の希望編集・奉仕者のシフト希望提出を反映する。
 // シフト作成側で編集中の内容は syncCurrentBlock() 経由で保持される
 async function syncWishData() {
+  const wishWrap = document.getElementById('wish-table-wrap');
   const outer = document.querySelector('#wish-table-wrap .wish-snap-outer');
-  const sx = outer ? outer.scrollLeft : 0, sy = outer ? outer.scrollTop : 0;
+  const sx = outer ? outer.scrollLeft : 0, sy = wishWrap ? wishWrap.scrollTop : 0;
   try { await loadWishDataInternal(); } catch (e) { console.warn('[syncWishData]', e); return; }
   const o2 = document.querySelector('#wish-table-wrap .wish-snap-outer');
-  if (o2) { o2.scrollLeft = sx; o2.scrollTop = sy; }
+  const wishWrap2 = document.getElementById('wish-table-wrap');
+  if (o2) o2.scrollLeft = sx;
+  if (wishWrap2) wishWrap2.scrollTop = sy;
   await refreshApplicantsForCreate();
   toast('シフト希望の変更を反映しました', 's');
 }

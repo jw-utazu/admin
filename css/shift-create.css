@@ -458,13 +458,8 @@ td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .sc-body .lp-wrap{align-self:flex-start;height:max-content;}
 .split-btn{padding:5px 12px;border:1px solid var(--border);border-radius:var(--r);background:none;font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;color:var(--ink2);white-space:nowrap;transition:all .15s;}
 .split-btn.on{background:var(--blue-l);color:var(--blue);border-color:var(--blue);}
-/* 分割表示ではタブごとの内容を同じ外側スクロールへ載せる */
-#content-wrapper.split{overflow-y:auto;overflow-x:hidden;align-items:flex-start;}
-#content-wrapper.split>#tab-wish,#content-wrapper.split>#tab-create{flex:1 1 0;height:max-content;min-height:100%;overflow:visible;}
-#content-wrapper.split>#tab-wish .tbl-outer{flex:none;overflow:visible;}
-#content-wrapper.split>#tab-wish .tbl-card{flex:none;overflow:visible;}
-#content-wrapper.split>#tab-wish #wish-table-wrap{flex:none;overflow:visible;}
-#content-wrapper.split>#tab-create .sc-body{flex:none;min-height:0;height:max-content;overflow:visible;}
+/* 分割表示でも各タブの中にスクロール枠を保ち、左右を独立して動かす */
+#content-wrapper.split>#tab-wish,#content-wrapper.split>#tab-create{flex:1 1 0;min-height:0;overflow:hidden;}
 /* ===== 比較パネル ===== */
 .cmp-panel{display:none;flex-direction:column;flex:1;min-width:0;border-left:2px solid var(--purple);overflow:visible;align-self:flex-start;height:max-content;}
 .cmp-panel.on{display:flex;}

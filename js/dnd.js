@@ -255,11 +255,10 @@ function dndMoveMsg(x, y) {
 
 // 表が横に長いので、端に寄せたら自動でスクロールする。
 // 横に動くのはスロット表の外枠、縦に動くのはシフト作業面（.sc-body）で別物。
+// 分割表示でも作成側の作業面だけをスクロールする。
 // 責任者・カート担当欄は表の上にあるので、縦が動かないと下の行から掴んだ人を
 // 役割欄まで運べない
 function dndVerticalScrollEl() {
-  const wrapper = document.getElementById('content-wrapper');
-  if (wrapper && wrapper.classList.contains('split')) return wrapper;
   return document.querySelector('#tab-create .sc-body') || document.getElementById('main-content');
 }
 
