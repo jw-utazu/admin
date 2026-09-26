@@ -150,6 +150,13 @@ function ymP(extra) {
   return Object.assign({}, extra || {}, curYM ? { year: curYM.year, month: curYM.month } : {});
 }
 
+// 画面タイトル。管理画面の共通ナビに埋め込まれているときは、ナビの項目名「シフト作成」に合わせる
+// （外側に「PW管理アプリ」の見出しがあるので、アプリ名を二重に出さない）
+function scTitleText(year, month) {
+  const embedded = document.documentElement.classList.contains('is-embedded');
+  return (embedded ? 'シフト作成' : 'シフト管理アプリ') + ' — ' + year + '年' + month + '月';
+}
+
 function clearSaveTracking() {
   Object.keys(_saveTimers).forEach(k => { clearTimeout(_saveTimers[k]); delete _saveTimers[k]; });
   Object.keys(_saveRetryTimers).forEach(k => { clearTimeout(_saveRetryTimers[k]); delete _saveRetryTimers[k]; });
@@ -686,7 +693,8 @@ function toggleCompareMode() {
     panel.classList.remove('on');
     setVisible(rsz, false);
     btn.innerHTML = ic('square') + ' 比較';
-    btn.style.cssText = 'border-color:var(--teal);color:var(--teal);white-space:nowrap;';
+    // 解除中は他の補助ボタン（.tb-btn）と同じ見た目に戻す。比較中だけ比較パネルと同じ紫にする
+    btn.style.cssText = 'white-space:nowrap;';
     const rmWrap = document.querySelector('#tab-create .rm-wrap');
     if (rmWrap) rmWrap.style.flex = '';
     panel.style.flex = '';
@@ -842,7 +850,7 @@ function applyWishDataBundle(bundle) {
   const year  = res.year  || new Date().getFullYear();
   const month = res.month || new Date().getMonth() + 1;
   if (!curYM) { curYM = { year, month }; renderYmSelect(); }
-  document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
+  document.getElementById('hdr-title').textContent = scTitleText(year, month);
   document.getElementById('ws-ym').textContent     = year + '年' + month + '月';
   // memberFlagsを更新（未取得だった場合）
   if (flagsRes.ok) memberFlags = flagsRes.flags || {};
@@ -1301,7 +1309,7 @@ function applyCreateDataBundle(bundle) {
   const ymChanged = ymKey(curYM) !== (year + '.' + month);
   curYM = { year, month };
   if (ymChanged) renderYmSelect();
-  document.getElementById('hdr-title').textContent = 'シフト管理アプリ — ' + year + '年' + month + '月';
+  document.getElementById('hdr-title').textContent = scTitleText(year, month);
   memberFlags  = flagsRes.flags || {};
   applicants   = appRes.applicants || [];
   shiftDates   = shiftRes.dates || [];
