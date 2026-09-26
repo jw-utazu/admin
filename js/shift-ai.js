@@ -295,7 +295,8 @@ function scAiToShiftDates(blocks, plan, draft) {
     const d = (draft.blocks || [])[bi] || {};
     // time / watch は validateShift（例: noteTime・bringFirst・respSlot 判定）と
     // 保存API（handlers_shift.ts の allowedWorkerTimes 検査）の両方が読む必須フィールド。
-    // AI は見守りフラグを決めないので watch は常に false で初期化する
+    // AI は見守りフラグを決めないので、ここで手動編集時の autoWatch（shift-create.js）と
+    // 同じ規則「1人目がいて3名そろったセルは見守りON」で付ける
     const slots = b.slotTimes.map(st => ({ time: st, places: b.places.map(() => []), watch: b.places.map(() => false) }));
     for (let p = 0; p < b.cyc; p++) {
       const pos = (d.positions || [])[p] || {};
@@ -303,7 +304,9 @@ function scAiToShiftDates(blocks, plan, draft) {
         const rep = (pos.reps || [])[r] || {};
         for (let c = 0; c < b.cols; c++) {
           const cell = (rep.places || [])[c];
-          slots[r * b.cyc + p].places[c] = (Array.isArray(cell) ? cell : [cell]).filter(Boolean);
+          const uids = (Array.isArray(cell) ? cell : [cell]).filter(Boolean);
+          slots[r * b.cyc + p].places[c] = uids;
+          slots[r * b.cyc + p].watch[c] = uids.length >= 3;
         }
       }
     }

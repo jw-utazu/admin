@@ -764,14 +764,16 @@ body.dnd-on *{cursor:grabbing !important;}
      違いは「開いても本文を押しのけない」こと：枠の幅は常に 0 のまま、
      中身の .lp だけを本文の上に重ねる。閉じている間はトグルだけが
      左端に残るので、そこから引き出す。初期状態は閉じ（JS 側で collapsed） */
-  .sc-body{position:relative;}
+  /* container-type:size で、子から .sc-body の見えている高さを 100cqh で参照できるようにする */
+  .sc-body{position:relative;container-type:size;}
   /* 幅は常に 0 なので、幅のアニメーションは要らない。
      残しておくと、裏に回ったタブでは transition が進まず幅が途中で
      固まったままになる（ブラウザが背景タブのアニメを止めるため） */
   .sc-body .lp-wrap{width:0!important;min-width:0!important;overflow:visible;transition:none;}
-  /* .lp もトグルも絶対配置なので、max-content のままだと親の高さが 0 になる。
-     親を本文の高さに伸ばし、引き出しのスクロール枠を確保する */
-  .sc-body .lp-wrap{align-self:stretch;height:auto;}
+  /* 枠を本文の全長に伸ばすと、トグル・引き出し・覆いがシフト表と一緒に
+     流れて見えなくなる。枠を「見えている高さ」にして sticky で上端に留め、
+     どこまでスクロールしてもトグルが画面の縦中央に残るようにする */
+  .sc-body .lp-wrap{position:sticky;top:0;z-index:70;align-self:flex-start;height:100cqh;}
   .sc-body .lp-wrap .lp{position:absolute;left:0;top:0;bottom:0;z-index:70;
     width:min(78vw,280px);overflow-y:auto;box-shadow:2px 0 14px rgba(0,0,0,.18);}
   .sc-body .lp-wrap.collapsed .lp{display:none;}
@@ -783,7 +785,8 @@ body.dnd-on *{cursor:grabbing !important;}
   .lp-resize{display:none;}
   /* 指で押しやすいよう、閉じているときのつまみを大きくする */
   .lp-toggle{width:18px;height:56px;}
-  .lp-backdrop{position:absolute;inset:0;z-index:69;background:rgba(0,0,0,.32);}
+  /* 覆いは幅0の枠の中にあるので、横幅は画面幅ぶん広げる */
+  .lp-backdrop{position:absolute;left:0;top:0;bottom:0;width:100vw;z-index:69;background:rgba(0,0,0,.32);}
   .lp-backdrop.on{display:block;}
   .mr{padding:10px 12px;}
 
