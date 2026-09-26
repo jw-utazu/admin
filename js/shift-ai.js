@@ -117,6 +117,8 @@ function scAiBuildBlocks(shiftDates, rules, ym) {
       b.isHead = i === 0; b.isTail = i === g.length - 1;
       b.respIdx = Math.min((b.isTail && !b.isHead) ? 1 : 0, b.slotTimes.length - 1);
       b.needBring = b.isHead; b.needTake = b.isTail;
+      // 連続する時間帯の直前ブロック。場所ごとのカート番号を入れ替えずに引き継ぐために使う
+      b.groupPrev = i > 0 ? g[i - 1] : null;
     }));
   });
 
@@ -137,17 +139,22 @@ function scAiBuildBlocks(shiftDates, rules, ym) {
 }
 
 // ---- 割当計画（shift_real.mjs 209-355 相当）----
-// 戻り値: { plan, cartWarn, unreadNotes, prevLoaded }
-function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prevLoaded) {
+// 戻り値: { plan, cartWarn, unreadNotes, winOf }
+// opts.prevCartCount … 前月のカート担当回数（uid → 回数）。当月の回数が同じときの比較に使う
+// opts.cartNumbers   … カート番号マスタ（設定タブの並び順）。場所ごとの番号の自動決定に使う
+function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prevLoaded, opts) {
+  const o = opts || {};
   const isM = u => (memberFlags[u] || {}).gender === 'M';
   const AP = {}; (applicants || []).forEach(a => AP[a.uid] = a);
   const appliedUids = {};
   const winOf = {};
+  const cartNgOf = {};
   const unreadNotes = [];
   blocks.forEach(b => {
     appliedUids[b.label] = (applicants || []).filter(a => (a.appliedSlots || []).some(s => s.slot === b.label)).map(a => a.uid);
     (applicants || []).forEach(a => (a.appliedSlots || []).forEach(s => {
       if (s.slot !== b.label) return;
+      if (s.cartNg) cartNgOf[a.uid + '|' + b.label] = true;
       const w = scAiNoteWindow(s.note);
       winOf[a.uid + '|' + b.label] = w;
       if (s.note && !w) unreadNotes.push(a.uid + '（' + b.label + '）: ' + s.note);
@@ -192,14 +199,25 @@ function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prev
       dropped: pool.filter(u => !used.has(u)) };
   });
 
-  // カート担当・責任者（shift_real.mjs 282-355 相当）
+  // カート担当・責任者（shift_real.mjs 282-355 相当。選び方は 2026-09-26 に変更）
+  // - 担当回数は人ごとに数える（持ち込み・持ち帰りをそれぞれ1回）。当月の回数が
+  //   少ない人を優先し、同じなら前月の回数が少ない人を優先する
+  // - 回数が一番少ない人が1人で全台運べる（4台の人）なら1人で担当。運べない
+  //   （2台の人）なら、組める相手のうち回数が一番少ない人と2人で担当する。
+  //   組める相手がいなければ次に回数が少ない人で同じことを試す
+  //   （以前は「4台の人がいれば必ずその人」だったため4台の人に偏っていた）
+  // - 回数が同じなら 1人目の枠（兄弟）→ 以降の申込ブロックが少ない人 の順に優先
+  // - 申込で「カート不可」にしている人は選ばない
   const cartCap = u => {
     const f = memberFlags[u] || {};
     const n = Number(f.cartCapacity);
     return Number.isFinite(n) && n > 0 ? n : (f.cartFlag ? 2 : 0);
   };
+  const prevCart = o.prevCartCount || {};
+  const cartCnt = {};
   const cartWarn = [];
-  blocks.forEach(b => {
+  const placeCartOf = scAiAssignPlaceCarts(blocks, o.cartNumbers, cartWarn);
+  blocks.forEach((b, bi) => {
     const pl = plan[b.label];
     const roster = pl.heads.concat(pl.subs);
     const need = b.cols * b.rules.cartsPerPlace;
@@ -207,24 +225,33 @@ function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prev
     const bEnd = scAiSlotRange(b.slotTimes[b.slotTimes.length - 1]).e;
     const canStart = u => { const w = winOf[u + '|' + b.label]; return !w || w.s <= bStart; };
     const canEnd = u => { const w = winOf[u + '|' + b.label]; return !w || w.e >= bEnd; };
-    const prefer = (x, y) => (pl.heads.indexOf(x) < 0) - (pl.heads.indexOf(y) < 0) || cartCap(y) - cartCap(x) || (x < y ? -1 : 1);
-    const pick = (pool, exclude) => {
-      const p = pool.filter(u => cartCap(u) > 0 && !exclude.has(u)).sort(prefer);
-      const solo = p.filter(u => cartCap(u) >= need)[0];
-      if (solo) return [solo];
-      if (!b.rules.allowMixedCartPair) {
-        for (const cap of new Set(p.map(cartCap))) {
-          if (cap * 2 < need) continue;
-          const same = p.filter(u => cartCap(u) === cap);
-          if (same.length >= 2) return [same[0], same[1]];
-        }
-        return null;
-      }
-      const half = p.filter(u => cartCap(u) * 2 >= need);
-      return half.length >= 2 ? [half[0], half[1]] : null;
+    const remainingAfter = u => blocks.slice(bi + 1).filter(x => appliedUids[x.label].includes(u)).length;
+    const prefer = (x, y) => (cartCnt[x] || 0) - (cartCnt[y] || 0)
+      || (b.rules.usePrevMonth ? (prevCart[x] || 0) - (prevCart[y] || 0) : 0)
+      || (pl.heads.indexOf(x) < 0) - (pl.heads.indexOf(y) < 0)
+      || remainingAfter(x) - remainingAfter(y)
+      || (x < y ? -1 : 1);
+    const pairable = (x, y) => x !== y && cartCap(x) * 2 >= need && cartCap(y) * 2 >= need
+      && (b.rules.allowMixedCartPair || cartCap(x) === cartCap(y));
+    // 優先順に並べた担当案（1人 or 2人）の一覧
+    const teams = (pool, exclude) => {
+      const p = pool.filter(u => cartCap(u) > 0 && !exclude.has(u) && !cartNgOf[u + '|' + b.label]).sort(prefer);
+      const out = [];
+      p.forEach(u => {
+        if (cartCap(u) >= need) out.push([u]);
+        else p.filter(y => pairable(u, y)).forEach(y => out.push([u, y]));
+      });
+      return out;
     };
+    const pick = (pool, exclude) => teams(pool, exclude)[0] || null;
 
-    let take = b.needTake ? pick(roster.filter(canEnd), new Set()) : [];
+    // 持ち帰りは、残りの人で持ち込みも決められる案を優先する
+    // （2台の人を2人使った結果、持ち込みの相手が残らなくなるのを避ける）
+    let take = [];
+    if (b.needTake) {
+      const opts = teams(roster.filter(canEnd), new Set());
+      take = (b.needBring && opts.find(t => pick(roster.filter(canStart), new Set(t)))) || opts[0] || null;
+    }
     let bring = b.needBring ? pick(roster.filter(canStart), new Set(take || [])) : [];
     if (b.needBring && !bring && b.rules.allowCartDoubleDuty) {
       bring = pick(roster.filter(canStart), new Set());
@@ -233,10 +260,14 @@ function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prev
     if (b.needTake && !take) cartWarn.push(b.label + ': 持ち帰りの担当を決められませんでした');
     if (b.needBring && !bring) cartWarn.push(b.label + ': 持ち込みの担当を決められませんでした');
     take = take || []; bring = bring || [];
+    [...take, ...bring].forEach(u => cartCnt[u] = (cartCnt[u] || 0) + 1);
 
-    const nums = [...Array(need).keys()].map(i => String(i + 1));
-    const half = Math.ceil(need / 2);
-    const numsFor = list => list.length <= 1 ? [nums.join(',')] : [nums.slice(0, half).join(','), nums.slice(half).join(',')];
+    // 2人で運ぶときは、持ち込みの2人を周1で別々の列に、持ち帰りの2人を最終周で
+    // 別々の列に置かせる（それぞれ自分が最初／最後にいる場所のカートを運ぶため）
+    // 持ち込みと持ち帰りを兼ねる人がいるときは指定しない（同じ兄弟に周1と最終周で
+    // 別々の列を指示すると「固定枠は3周とも同じ列」と矛盾するため）
+    const dual = bring.some(u => take.indexOf(u) >= 0);
+    const twoCols = list => (!dual && list.length === 2 && b.cols >= 2) ? [0, 1] : [];
 
     const posBan = {};
     bring.forEach(u => (posBan[u] = posBan[u] || new Set()).add(0));
@@ -250,10 +281,140 @@ function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prev
     const r1 = take.filter(u => pl.heads.indexOf(u) >= 0 && respOk(u))[0] || pl.heads.filter(respOk)[0] || '';
     if (!r1) cartWarn.push(b.label + ': 責任者を決められませんでした');
 
-    pl.cart = { need, bring, take, bringNums: numsFor(bring), takeNums: numsFor(take), posBan, r1 };
+    pl.cart = { need, bring, take, bringCols: twoCols(bring), takeCols: twoCols(take), posBan, r1,
+      placeCart: (placeCartOf[b.label] || []).slice() };
   });
 
   return { plan, cartWarn, unreadNotes, winOf };
+}
+
+// ---- 場所ごとのカート番号（2026-09-26 相談で決定）----
+// - マスタの番号を並び順に cartsPerPlace 台ずつの組にする（①②・③④）。余りは使わない
+// - 連続しない時間帯ごとに、次の順で一番小さくなる割り当てを選ぶ
+//   1. 選んだ組のこれまでの使用回数の合計（マスタに余分な組があるときに順番に回す）
+//   2. 「その組をその場所に置いた回数」の合計（組と場所の組み合わせを均等にする）
+//   3. 同じ曜日・同じ時間帯での 2 の回数（曜日ごとの固定化を防ぐ）
+//   4. ブロック名から作る疑似乱数（単純な交互にしない。毎回同じ結果になる）
+// - 連続する時間帯は、直前の時間帯と同じ場所には同じ番号をそのまま引き継ぐ
+// 戻り値: { [block.label]: string[]（列ごとの "1,2" 形式。決められない列は ''）}
+function scAiAssignPlaceCarts(blocks, cartNumbers, warn) {
+  const out = {};
+  const nums = (cartNumbers || []).map(x => String(x).trim()).filter(Boolean);
+  const useCnt = {}, placeCnt = {}, slotCnt = {};
+  const lexLess = (x, y) => { for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i]; return false; };
+  const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  blocks.forEach(b => {
+    const cpp = Number(b.rules.cartsPerPlace) || 2;
+    const groups = [];
+    for (let i = 0; i + cpp <= nums.length; i += cpp) groups.push(nums.slice(i, i + cpp).join(','));
+    const prev = b.groupPrev ? out[b.groupPrev.label] : null;
+    const res = b.places.map((p, ci) => {
+      if (!prev) return '';
+      const pi = b.groupPrev.places.indexOf(p);
+      return pi >= 0 ? (prev[pi] || '') : '';
+    });
+    const free = res.map((v, ci) => v ? -1 : ci).filter(ci => ci >= 0);
+    // 使用回数の少ない組だけを候補にする（使用回数の合計が最優先なので、多い組は選ばれない。
+    // マスタが大きくても総当たりが膨らまないよう上限も設ける）
+    const unused = groups.filter(g => res.indexOf(g) < 0).sort((x, y) => (useCnt[x] || 0) - (useCnt[y] || 0));
+    const cut = unused.length > free.length ? (useCnt[unused[free.length - 1]] || 0) : Infinity;
+    const avail = unused.filter(g => (useCnt[g] || 0) <= cut).slice(0, Math.max(free.length, 8));
+    const wt = b.weekday + '|' + b.time;
+    let best = null;
+    const walk = (k, used, chosen) => {
+      if (k === free.length || used.size === avail.length) {
+        const sc = [0, 0, 0];
+        chosen.forEach((g, i) => {
+          const pk = g + '|' + b.places[free[i]];
+          sc[0] += useCnt[g] || 0; sc[1] += placeCnt[pk] || 0; sc[2] += slotCnt[wt + '|' + pk] || 0;
+        });
+        sc.push(hash(b.label + '#' + chosen.join('/')));
+        // 列を多く埋められる案を最優先（番号が足りないときだけ差が出る）
+        sc.unshift(-chosen.length);
+        if (!best || lexLess(sc, best.sc)) best = { sc, chosen: chosen.slice() };
+        return;
+      }
+      avail.forEach(g => {
+        if (used.has(g)) return;
+        used.add(g); chosen.push(g);
+        walk(k + 1, used, chosen);
+        used.delete(g); chosen.pop();
+      });
+    };
+    if (free.length) walk(0, new Set(), []);
+    (best ? best.chosen : []).forEach((g, i) => {
+      const pk = g + '|' + b.places[free[i]];
+      res[free[i]] = g;
+      useCnt[g] = (useCnt[g] || 0) + 1;
+      placeCnt[pk] = (placeCnt[pk] || 0) + 1;
+      slotCnt[wt + '|' + pk] = (slotCnt[wt + '|' + pk] || 0) + 1;
+    });
+    if (res.some(v => !v)) warn.push(b.label + ': カート番号が足りないため、場所ごとの番号を一部決められませんでした');
+    out[b.label] = res;
+  });
+  return out;
+}
+
+// 番号の並びをそろえて1つにまとめる（"3,4" と "1,2" → "1,2,3,4"）
+function scAiJoinCartNums(list, order) {
+  const all = [];
+  (list || []).forEach(v => String(v || '').split(',').map(x => x.trim()).filter(Boolean).forEach(x => { if (all.indexOf(x) < 0) all.push(x); }));
+  const idx = x => { const i = (order || []).indexOf(x); return i < 0 ? Infinity : i; };
+  return all.sort((a, c) => idx(a) - idx(c) || (a < c ? -1 : a > c ? 1 : 0)).join(',');
+}
+
+// 担当者が最初（which='first'）／最後（'last'）に入っている列。見つからなければ -1。
+// 同じ時点を比べるため、見つかったスロット番号も返す
+function scAiCartCol(slots, uid, which) {
+  const n = slots.length;
+  for (let k = 0; k < n; k++) {
+    const si = which === 'first' ? k : n - 1 - k;
+    const ci = ((slots[si] || {}).places || []).findIndex(cell => (cell || []).indexOf(uid) >= 0);
+    if (ci >= 0) return { ci, si };
+  }
+  return { ci: -1, si: -1 };
+}
+
+// 担当者ごとの運ぶ番号。1人なら全部、2人ならそれぞれが最初／最後にいる場所の番号。
+// 2人が同じ場所にいるときは、より先に（持ち帰りは、より後まで）いる人がその場所、
+// もう一人が残りの場所の番号を運ぶ
+function scAiCartNumsFor(slots, list, placeCart, which, order) {
+  if (!list.length) return [];
+  if (list.length === 1) return [scAiJoinCartNums(placeCart, order)];
+  const at = list.map(u => scAiCartCol(slots, u, which));
+  const cols = placeCart.map((_, ci) => ci);
+  const own = [[], []];
+  if (at[0].ci >= 0 && at[1].ci >= 0 && at[0].ci !== at[1].ci) {
+    own[0].push(at[0].ci); own[1].push(at[1].ci);
+  } else if (at[0].ci >= 0 || at[1].ci >= 0) {
+    const better = (x, y) => which === 'first' ? x.si <= y.si : x.si >= y.si;
+    const w = at[1].ci < 0 ? 0 : at[0].ci < 0 ? 1 : (better(at[0], at[1]) ? 0 : 1);
+    own[w].push(at[w].ci);
+  }
+  cols.forEach(ci => {
+    if (own[0].indexOf(ci) >= 0 || own[1].indexOf(ci) >= 0) return;
+    (own[1].length <= own[0].length ? own[1] : own[0]).push(ci);
+  });
+  return own.map(cs => scAiJoinCartNums(cs.sort((a, c) => a - c).map(ci => placeCart[ci]), order));
+}
+
+// 2人で運ぶとき、指定した列（周1の最初／最終周の最後）に別々に置かれたかの自前検証。
+// 守られなくても番号は scAiCartNumsFor が補正して決めるので warn にとどめる
+function scAiCheckCartColumns(blocks, plan, sd) {
+  const out = [];
+  blocks.forEach((b, bi) => {
+    const slots = (sd[bi] || {}).slots || [];
+    const ct = plan[b.label].cart;
+    [['first', ct.bring, ct.bringCols, '持ち込み'], ['last', ct.take, ct.takeCols, '持ち帰り']].forEach(([which, list, cols, lbl]) => {
+      if (!cols || cols.length !== 2) return;
+      const at = list.map(u => scAiCartCol(slots, u, which).ci);
+      if (at[0] >= 0 && at[1] >= 0 && at[0] !== at[1]) return;
+      out.push({ level: 'warn', rule: 'cartColumn',
+        msg: b.label + ' の' + lbl + '担当 ' + list.join('・') + ' が' + (which === 'first' ? '最初' : '最後') + 'に同じ場所へ配置されています',
+        uids: list.slice() });
+    });
+  });
+  return out;
 }
 
 // ---- input 契約の組み立て（計画書 3-4）----
@@ -281,6 +442,9 @@ function scAiBuildInputContract(blocks, plan, winOf, prevIssues, scoreHints) {
       r1: pl.cart.r1 || '',
       cartBring: (pl.cart.bring || []).slice(),
       cartTake: (pl.cart.take || []).slice(),
+      // 2人で運ぶときだけ。担当者と同じ並びで「周1で置く列」「最終周で置く列」を指定する
+      cartBringCols: (pl.cart.bringCols || []).slice(),
+      cartTakeCols: (pl.cart.takeCols || []).slice(),
       // 既定（3名/2名）と異なる場合だけ Gateway 側が指示文を足す。既定のときは
       // 実測98点のプロンプトと完全一致させるため、あえて省略できるようにしてある
       cellTarget: b.cellTarget, cellMin: b.cellMin,
@@ -290,7 +454,7 @@ function scAiBuildInputContract(blocks, plan, winOf, prevIssues, scoreHints) {
 }
 
 // ---- 生成結果 → shiftDates 形式へ展開（shift_real.mjs 456-476 相当）----
-function scAiToShiftDates(blocks, plan, draft) {
+function scAiToShiftDates(blocks, plan, draft, cartOrder) {
   return blocks.map((b, bi) => {
     const d = (draft.blocks || [])[bi] || {};
     // time / watch は validateShift（例: noteTime・bringFirst・respSlot 判定）と
@@ -311,12 +475,20 @@ function scAiToShiftDates(blocks, plan, draft) {
       }
     }
     const ct = plan[b.label].cart;
+    // カート番号: 場所ごとの番号は事前計算済み。運ぶ番号は配置が決まった今ここで決める
+    const placeCart = b.places.map((_, ci) => (ct.placeCart || [])[ci] || '');
+    // 全部の場所の番号が決まったときだけ自動の番号を使う（一部だけだと手入力済みの番号を空で消すため）
+    const autoCart = placeCart.length > 0 && placeCart.every(Boolean);
+    const kc = autoCart ? scAiCartNumsFor(slots, ct.bring, placeCart, 'first', cartOrder) : [];
+    const oc = autoCart ? scAiCartNumsFor(slots, ct.take, placeCart, 'last', cartOrder) : [];
     return {
       date: b.dateKey, time: b.time, weekday: b.weekday, places: b.places.slice(), slots,
       responsible: { r1: ct.r1 || '', r2: '' },
-      cart: { ki1: ct.bring[0] || '', ki2: ct.bring[1] || '', ko1: ct.take[0] || '', ko2: ct.take[1] || '' },
+      cart: { ki1: ct.bring[0] || '', kc1: kc[0] || '', ki2: ct.bring[1] || '', kc2: kc[1] || '',
+              ko1: ct.take[0] || '', oc1: oc[0] || '', ko2: ct.take[1] || '', oc2: oc[1] || '' },
       usedPlaces: b.places.slice(),
-      placeCart: b.places.map(() => ''),
+      placeCart,
+      autoCart,
     };
   });
 }
@@ -437,10 +609,11 @@ async function scAiRunGenerationLoop(blocks, plan, winOf, applicants, memberFlag
     }
     if (!res || !res.ok || !res.result) { if (best) break; throw new Error((res && res.error) || 'AI原案の生成に失敗しました'); }
 
-    const sd = scAiToShiftDates(blocks, plan, res.result);
+    const sd = scAiToShiftDates(blocks, plan, res.result, opts && opts.cartOrder);
     const vout = validateShift(sd, { applicants, memberFlags, conflictMap: conflictMapArg || {}, pwType: currentPwType });
     const issues = vout.issues.filter(i => i.scope === 'live').concat(scAiCheckNoteTimes(blocks, sd, winOf))
-      .concat(scAiCheckCellOverflow(blocks, sd)).concat(scAiCheckRosterConsistency(blocks, plan, sd));
+      .concat(scAiCheckCellOverflow(blocks, sd)).concat(scAiCheckRosterConsistency(blocks, plan, sd))
+      .concat(scAiCheckCartColumns(blocks, plan, sd));
     const errs = issues.filter(i => i.level === 'error');
     const warns = issues.filter(i => i.level === 'warn');
     const sc = computeShiftScore(sd, { memberFlags, couples, meta: SCORE_META });
@@ -459,11 +632,21 @@ async function scAiRunGenerationLoop(blocks, plan, winOf, applicants, memberFlag
 }
 
 // ---- 反映用ペイロードの組み立て ----
-// AI は誰が持ち込み/持ち帰りを担当するかまでしか決めない。物理カート番号
-// （kc1/kc2/oc1/oc2）と場所ごとのカート番号（placeCart）は既存の値を引き継ぎ、
-// 担当者が変わった枠だけ空にして人に入力し直してもらう
+// 場所ごとのカート番号を自動で決められたブロック（autoCart）は、担当者・運ぶ番号・
+// 場所ごとの番号をすべて原案の値で置き換える。決められなかったブロック（マスタの
+// 番号が足りない等）は従来どおり、番号は既存の値を引き継ぎ、担当者が変わった枠
+// だけ空にして人に入力し直してもらう
 function scAiMergePayload(currentBlock, sdBlock) {
   const curCart = (currentBlock && currentBlock.cart) || {};
+  if (sdBlock.autoCart) {
+    return {
+      responsible: sdBlock.responsible,
+      cart: Object.assign({}, curCart, sdBlock.cart),
+      placeCart: sdBlock.placeCart.slice(),
+      usedPlaces: (currentBlock && currentBlock.usedPlaces) || sdBlock.usedPlaces,
+      slots: sdBlock.slots,
+    };
+  }
   const cart = Object.assign({}, curCart, {
     ki1: sdBlock.cart.ki1 || '', ki2: sdBlock.cart.ki2 || '',
     ko1: sdBlock.cart.ko1 || '', ko2: sdBlock.cart.ko2 || '',
@@ -488,18 +671,25 @@ function scAiMergePayload(currentBlock, sdBlock) {
 async function scAiLoadPrevMonthCount(type, targetYear, targetMonth) {
   try {
     const res = await apiGet('getShiftTable', { type });
-    if (!res || !res.ok || !res.published || !res.dates) return { count: {}, loaded: false, year: null, month: null };
+    if (!res || !res.ok || !res.published || !res.dates) return { count: {}, cartCount: {}, loaded: false, year: null, month: null };
     const wantY = targetMonth === 1 ? targetYear - 1 : targetYear;
     const wantM = targetMonth === 1 ? 12 : targetMonth - 1;
-    if (res.year !== wantY || res.month !== wantM) return { count: {}, loaded: false, year: res.year, month: res.month };
-    const count = {};
+    if (res.year !== wantY || res.month !== wantM) return { count: {}, cartCount: {}, loaded: false, year: res.year, month: res.month };
+    const count = {}, cartCount = {};
+    // カート担当の回数（持ち込み・持ち帰りをそれぞれ1回）
+    (res.dates || []).forEach(d => {
+      const c = d.cart || {};
+      [...(c.bring || []), ...(c.take || [])].forEach(ent => {
+        if (ent && ent.uid) cartCount[ent.uid] = (cartCount[ent.uid] || 0) + 1;
+      });
+    });
     (res.dates || []).forEach(d => (d.slots || []).forEach(s => {
       Object.values(s.places || {}).forEach(list => (list || []).forEach(ent => {
         if (ent && ent.uid) count[ent.uid] = (count[ent.uid] || 0) + 1;
       }));
     }));
-    return { count, loaded: true, year: res.year, month: res.month };
+    return { count, cartCount, loaded: true, year: res.year, month: res.month };
   } catch (_) {
-    return { count: {}, loaded: false, year: null, month: null };
+    return { count: {}, cartCount: {}, loaded: false, year: null, month: null };
   }
 }

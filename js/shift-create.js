@@ -4128,7 +4128,8 @@ async function _aiRecompute() {
   const ym = _aiYmKey();
   const blocks = scAiBuildBlocks(shiftDates, _aiState.rules, ym);
   const { plan, cartWarn, unreadNotes, winOf } = scAiBuildPlan(
-    blocks, applicants, memberFlags, _aiState.couples, _aiState.prevInfo.count, _aiState.prevInfo.loaded);
+    blocks, applicants, memberFlags, _aiState.couples, _aiState.prevInfo.count, _aiState.prevInfo.loaded,
+    { prevCartCount: _aiState.prevInfo.cartCount || {}, cartNumbers: cartNumList() });
   _aiState.blocks = blocks; _aiState.plan = plan; _aiState.winOf = winOf;
   _aiState.cartWarn = cartWarn; _aiState.unreadNotes = unreadNotes;
 }
@@ -4244,6 +4245,9 @@ function _aiRenderConfirm() {
     if (pl.dropped.length) html += '<div class="ai-block-line ai-drop">落選' + pl.dropped.length + '名: ' + pl.dropped.map(u => esc(_aiName(u)) + (pl.droppedWives.indexOf(u) >= 0 ? '（夫の落選に連動）' : '')).join('、') + '</div>';
     html += '<div class="ai-block-line">カート' + ct.need + '台 → 持ち込み: ' + (ct.bring.map(_aiName).map(esc).join('＋') || 'なし')
       + ' / 持ち帰り: ' + (ct.take.map(_aiName).map(esc).join('＋') || 'なし') + ' / 責任者: ' + esc(ct.r1 ? _aiName(ct.r1) : 'なし') + '</div>';
+    html += '<div class="ai-block-line">設置するカート: ' + b.places.map((p, ci) =>
+      esc(p || ('場所' + (ci + 1))) + ' ' + esc(cartLabel((ct.placeCart || [])[ci]))).join(' / ')
+      + (b.isHead ? '' : '（前の時間帯から引き継ぎ）') + '</div>';
     html += _aiBlockCycleRow(b);
     html += '</div>';
   });
@@ -4262,6 +4266,7 @@ async function startAiGeneration() {
     const s = _aiState;
     const best = await scAiRunGenerationLoop(s.blocks, s.plan, s.winOf, applicants, memberFlags, s.couples, conflictMap, {
       maxLoop: 5,
+      cartOrder: cartNumList().map(String),
       onProgress: (loop, maxLoop, text) => setLoading(true, text + '（15〜120秒かかることがあります）'),
     });
     s.best = best;
@@ -4281,6 +4286,12 @@ function _aiCellChanged(curBlock, sdBlock, si, ci) {
   return av !== bv;
 }
 
+// 「山田（①②）＋佐藤（③④）」の形。番号が未定の人は名前だけ
+function _aiCartWho(u1, n1, u2, n2) {
+  const one = (u, n) => u ? _aiName(u) + (n ? '（' + cartLabel(n) + '）' : '') : '';
+  return [one(u1, n1), one(u2, n2)].filter(Boolean).join('＋') || 'なし';
+}
+
 function _aiRenderDiff() {
   const s = _aiState, best = s.best;
   let html = '<div class="ai-note">' + best.loop + '回目の案（error ' + best.errs + '件 / warn ' + best.warns
@@ -4295,7 +4306,8 @@ function _aiRenderDiff() {
     const sdBlock = best.sd[bi];
     html += '<div class="ai-block"><div class="ai-block-hd">' + esc(b.label) + '</div>';
     html += '<div class="ai-diff-grid" style="grid-template-columns:80px repeat(' + b.cols + ',1fr);">';
-    html += '<div class="ai-diff-h"></div>' + b.places.map(p => '<div class="ai-diff-h">' + esc(p || '') + '</div>').join('');
+    html += '<div class="ai-diff-h"></div>' + b.places.map((p, ci) => '<div class="ai-diff-h">' + esc(p || '')
+      + ((sdBlock.placeCart || [])[ci] ? ' ' + esc(cartLabel(sdBlock.placeCart[ci])) : '') + '</div>').join('');
     b.slotTimes.forEach((st, si) => {
       html += '<div class="ai-diff-t">' + esc(st) + '</div>';
       for (let ci = 0; ci < b.cols; ci++) {
@@ -4306,8 +4318,8 @@ function _aiRenderDiff() {
     });
     html += '</div>';
     html += '<div class="ai-block-line">責任者: ' + esc(sdBlock.responsible.r1 ? _aiName(sdBlock.responsible.r1) : 'なし')
-      + ' / 持ち込み: ' + esc([sdBlock.cart.ki1, sdBlock.cart.ki2].filter(Boolean).map(_aiName).join('＋') || 'なし')
-      + ' / 持ち帰り: ' + esc([sdBlock.cart.ko1, sdBlock.cart.ko2].filter(Boolean).map(_aiName).join('＋') || 'なし') + '</div>';
+      + ' / 持ち込み: ' + esc(_aiCartWho(sdBlock.cart.ki1, sdBlock.cart.kc1, sdBlock.cart.ki2, sdBlock.cart.kc2))
+      + ' / 持ち帰り: ' + esc(_aiCartWho(sdBlock.cart.ko1, sdBlock.cart.oc1, sdBlock.cart.ko2, sdBlock.cart.oc2)) + '</div>';
     html += '</div>';
   });
   document.getElementById('ai-diff-body').innerHTML = html;
