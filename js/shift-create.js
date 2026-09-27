@@ -4123,8 +4123,8 @@ function toast(msg, type) { const ta = document.getElementById('ta'), t = docume
 function esc(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 // ============================================================
-// AI原案 — ① 確認画面 → 生成ループ → ② 差分表示 → 既存の保存経路で反映
-// 事前計算・生成ループ本体は js/shift-ai.js。ここは画面の組み立てだけを持つ
+// 原案 — ① 確認画面 → 探索 → ② 差分表示 → 既存の保存経路で反映
+// 事前計算は js/shift-ai.js、探索は js/shift-solver.js。ここは画面の組み立てだけを持つ
 // ============================================================
 let _aiState = null; // { blocks, plan, winOf, rules, cartWarn, unreadNotes, prevInfo }
 
@@ -4146,7 +4146,7 @@ async function openAiDraftModal() {
   const box = document.getElementById('ai-confirm-modal');
   document.getElementById('ai-confirm-body').innerHTML = '<div class="empty-msg">計算中...</div>';
   openScOverlay('ai-confirm-modal');
-  setLoading(true, 'AI原案の準備をしています…');
+  setLoading(true, '原案の準備をしています…');
   try {
     const ym = _aiYmKey();
     const [coupleRes, ruleRes, prevInfo] = await Promise.all([
@@ -4265,25 +4265,54 @@ function _aiRenderConfirm() {
 
 async function startAiGeneration() {
   closeAiConfirmModal();
-  const box = document.getElementById('ai-diff-modal');
-  document.getElementById('ai-diff-body').innerHTML = '<div class="empty-msg">生成中...</div>';
-  document.getElementById('ai-diff-apply').disabled = true;
+  if (_aiState) { _aiState.variant = 0; _aiState.best = null; }
+  await _aiRunSolver();
+}
+
+// 「別の案を出す」。同じ条件のまま探索の番号だけを変えて作り直す
+async function nextAiVariant() {
+  if (!_aiState || !_aiState.best) return;
+  _aiState.variant = (_aiState.variant || 0) + 1;
+  await _aiRunSolver();
+}
+
+let _aiSolving = false;
+async function _aiRunSolver() {
+  if (_aiSolving || !_aiState) return; // 連打で探索が重ならないようにする
+  _aiSolving = true;
+  const applyBtn = document.getElementById('ai-diff-apply');
+  const nextBtn = document.getElementById('ai-diff-next');
+  applyBtn.disabled = true;
+  nextBtn.disabled = true;
+  if (!_aiState.best) document.getElementById('ai-diff-body').innerHTML = '<div class="empty-msg">作成中...</div>';
   openScOverlay('ai-diff-modal');
-  setLoading(true, 'AI原案を生成中…');
+  setLoading(true, '原案を作成中…');
   try {
     const s = _aiState;
-    const best = await scAiRunGenerationLoop(s.blocks, s.plan, s.winOf, applicants, memberFlags, s.couples, conflictMap, {
-      maxLoop: 5,
+    // オーバーレイを描画させてから探索に入る（探索中はメインスレッドがふさがるため）
+    await new Promise(res => setTimeout(res, 30));
+    s.best = await scAiRunSolver(s.blocks, s.plan, s.winOf, applicants, memberFlags, s.couples, conflictMap, {
+      variant: s.variant || 0,
       cartOrder: cartNumList().map(String),
-      onProgress: (loop, maxLoop, text) => setLoading(true, text + '（15〜120秒かかることがあります）'),
+      onProgress: (done, total, text) => setLoading(true, text),
     });
-    s.best = best;
     _aiRenderDiff();
-    document.getElementById('ai-diff-apply').disabled = false;
+    applyBtn.disabled = false;
+    nextBtn.disabled = false;
   } catch (e) {
-    document.getElementById('ai-diff-body').innerHTML = '<div class="empty-msg">生成に失敗しました: ' + esc(e.message) + '</div>';
-    toast('AI原案の生成に失敗しました: ' + e.message, 'e');
-  } finally { setLoading(false); }
+    toast('原案の作成に失敗しました: ' + e.message, 'e');
+    if (_aiState.best) {
+      // 「別の案を出す」の失敗なら、直前の案を表示したまま操作できる状態に戻す
+      _aiState.variant = _aiState.best.variant;
+      applyBtn.disabled = false;
+      nextBtn.disabled = false;
+    } else {
+      document.getElementById('ai-diff-body').innerHTML = '<div class="empty-msg">作成に失敗しました: ' + esc(e.message) + '</div>';
+    }
+  } finally {
+    _aiSolving = false;
+    setLoading(false);
+  }
 }
 
 function _aiCellChanged(curBlock, sdBlock, si, ci) {
@@ -4300,10 +4329,47 @@ function _aiCartWho(u1, n1, u2, n2) {
   return [one(u1, n1), one(u2, n2)].filter(Boolean).join('＋') || 'なし';
 }
 
+// 探索が両立できずに破った規則を、氏名入りの説明文にする
+const AI_RELAXED_TEXT = {
+  overflow: (who) => 'セルの人数が上限を超えています（' + who + '）。参加者数・固定枠・セル上限を見直してください',
+  couple: (who) => '夫婦の組み方（周1と最終周は同じセル、間の周は別セル）を守れていません（' + who + '）。夫婦の候補選定や固定枠、枠数を見直してください',
+  resp: (who) => '責任者 ' + who + ' が開始スロットに入っていません。責任者または参加時間の制約を見直してください',
+  posLimit: (who) => who + ' を参加できない時間に置いています。参加可能時間や担当できる周を見直してください',
+  consec3: (who) => who + ' が3スロット以上続けて入っています。配置回数やスロット数を見直してください',
+  extraConsec: (who) => '途中参加・早退の ' + who + ' が続けて入っています。参加できる周や人数上限を見直してください',
+  extraMiss: (who) => '例外参加の ' + who + ' を参加可能な周に配置できていません。人数上限や参加枠を見直してください',
+  bringFirst: (who) => '持ち込み担当 ' + who + ' が最初の枠に入っています。持ち込み担当を替えると解消できる場合があります',
+  takeLast: (who) => '持ち帰り担当 ' + who + ' が最後の枠に入っています。持ち帰り担当を替えると解消できる場合があります',
+};
+function _aiRelaxedText(x) {
+  const who = (x.uids || []).map(_aiName).join('・');
+  const f = AI_RELAXED_TEXT[x.rule];
+  const rounds = x.reps && x.reps.length ? '（周' + x.reps.join('・') + '）' : '';
+  return x.label + rounds + ': ' + (f ? f(who) : x.rule + '（' + who + '）');
+}
+
 function _aiRenderDiff() {
   const s = _aiState, best = s.best;
-  let html = '<div class="ai-note">' + best.loop + '回目の案（error ' + best.errs + '件 / warn ' + best.warns
-    + '件 / 選好 ' + best.score + '点' + (best.modelUsed ? ' / ' + esc(best.modelUsed) : '') + '）</div>';
+  let html = '<div class="ai-note">案' + (best.variant + 1) + '（error ' + best.errs + '件 / warn ' + best.warns
+    + '件 / 選好 ' + best.score + '点）</div>';
+  if (best.timedOut && best.timedOut.length) {
+    html += '<div class="ai-warn">⚠️ 探索が時間切れになったため、途中の案です（' + best.timedOut.map(esc).join('、')
+      + '）。「別の案を出す」で作り直すと改善することがあります</div>';
+  }
+  if (best.relaxed && best.relaxed.length) {
+    const unique = new Map();
+    best.relaxed.forEach(x => {
+      const key = [x.label, x.rule, (x.uids || []).slice().sort().join(',')].join('|');
+      const item = unique.get(key);
+      if (item) {
+        (x.rep >= 0 && !item.reps.includes(x.rep + 1)) && item.reps.push(x.rep + 1);
+      } else {
+        unique.set(key, Object.assign({}, x, { reps: x.rep >= 0 ? [x.rep + 1] : [] }));
+      }
+    });
+    html += '<div class="ai-warn">⚠️ 条件が両立しないため、次の点は守れていません<br>'
+      + Array.from(unique.values()).slice(0, 10).map(x => esc(_aiRelaxedText(x))).join('<br>') + '</div>';
+  }
   if (best.issues && best.issues.length) {
     html += '<div class="ai-warn">' + best.issues.slice(0, 15).map(i =>
       '[' + esc(i.level) + '] ' + esc(i.rule) + ': ' + esc(i.msg || '')).join('<br>') + '</div>';
@@ -4336,8 +4402,8 @@ function _aiRenderDiff() {
 async function applyAiDraft() {
   const s = _aiState, best = s && s.best;
   if (!best) return;
-  if (!await uiConfirm({ title: 'AI原案で置き換える', message: '表示中の内容をこの案で上書きします。よろしいですか？', confirmText: '置き換える', type: 'warn' })) return;
-  setLoading(true, 'AI原案を反映しています…');
+  if (!await uiConfirm({ title: '原案で置き換える', message: '表示中の内容をこの案で上書きします。よろしいですか？', confirmText: '置き換える', type: 'warn' })) return;
+  setLoading(true, '原案を反映しています…');
   try {
     for (let bi = 0; bi < s.blocks.length; bi++) {
       const b = s.blocks[bi];
@@ -4355,11 +4421,11 @@ async function applyAiDraft() {
     closeAiDiffModal();
     // persistBlockSnapshot は shiftDates の該当ブロックを更新するだけで、
     // 表示中のスロット表（DOM）までは作り直さない。作り直さないと、次にセルを
-    // 1つ触っただけで DOM 側の旧配置が読み直されて AI 原案が黙って消える。
+    // 1つ触っただけで DOM 側の旧配置が読み直されて原案が黙って消える。
     // syncCurrentBlock() は逆に「DOM→shiftDates」なのでここでは呼ばない
     buildTimeTabs();
     renderBlock();
-    toast('AI原案を反映しました', 's');
+    toast('原案を反映しました', 's');
   } catch (e) {
     toast('反映中にエラーが発生しました: ' + e.message, 'e');
   } finally { setLoading(false); }

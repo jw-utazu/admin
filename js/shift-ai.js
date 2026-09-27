@@ -1,9 +1,9 @@
 // ============================================================
-// シフト原案生成（AI原案）— 事前計算・生成ループ・差分反映
+// シフト原案生成 — 事前計算・探索エンジンの呼び出し・差分反映
 //
-// PW_GWS/shift_real.mjs（試作。実データで error 0 / 選好98点）から移植。
-// 氏名は一切送らない — プロンプトへ渡すのは uid だけ（計画書
-// 「2026-08-26_シフト原案生成の本実装.md」1節）。
+// 事前計算（ブロック構築・割当計画・カート）は PW_GWS/shift_real.mjs（試作）から移植。
+// 配置は 2026-09-28 から js/shift-solver.js の探索で作る（以前は Gateway 経由の LLM。
+// 計画書「2026-09-28_シフト原案の探索エンジン化.md」）。
 //
 // このファイルは shift-create.js のグローバル状態（shiftDates / applicants /
 // memberFlags / locations / curYM / currentPwType）を読む前提で書かれている。
@@ -697,68 +697,45 @@ function scAiCheckCouplePairs(blocks, plan, couples, sd) {
   return out;
 }
 
-// validateShift の issue.msg は氏名を埋め込んで組み立てられている
-// （validation.js の nameOf 復元）。Gateway へ送る前に uid だけの文へ詰め替える。
-// これを怠ると2回目以降の生成で必ず氏名混入検査（サーバー側 422）に落ちる
-function scAiSanitizeIssues(issues) {
-  return (issues || []).map(i => ({
-    level: i.level, rule: i.rule,
-    msg: i.rule + (i.uids && i.uids.length ? '（' + i.uids.join(',') + '）' : ''),
-    uids: i.uids || [],
-  }));
-}
+// ---- 原案の生成（探索エンジン js/shift-solver.js）----
+// 2026-09-28 に Gateway（LLM）呼び出しと再生成ループをやめ、ブラウザ内の探索に置き換えた
+// （計画書「2026-09-28_シフト原案の探索エンジン化.md」）。入力は Gateway に送っていた
+// 契約と同じ、出力も同じ形なので、展開・検証・採点・反映は従来の関数をそのまま使う。
+// opts.variant … 「別の案を出す」で増やす番号。同じ入力＋同じ番号なら同じ案になる
+//   （極端に遅い端末で探索が時間切れになったブロックだけは例外。timedOut に入る）
+// onProgress(done, total, statusText) が呼ばれるたびに setLoading 等でUIを更新する想定
+async function scAiRunSolver(blocks, plan, winOf, applicants, memberFlags, couples, conflictMapArg, opts) {
+  const o = opts || {};
+  const onProgress = o.onProgress || function () {};
+  const contract = scAiBuildInputContract(blocks, plan, winOf, null, []);
+  // 全ブロック共通の夫婦一覧をブロックごとの名簿に合わせて絞り込む
+  contract.blocks.forEach((cb, bi) => {
+    const pl = plan[blocks[bi].label];
+    const roster = new Set([...pl.heads, ...pl.otherBrothers, ...pl.subs]);
+    cb.couples = (couples || []).filter(([a, c]) => roster.has(a) && roster.has(c));
+  });
+  const solved = await scSolveDraft(contract, {
+    variant: o.variant || 0,
+    onProgress: (done, total) => onProgress(done, total, '原案を作成中…（' + (done + 1) + '/' + total + 'ブロック）'),
+  });
 
-// ---- 生成ループ ----
-// onProgress(loop, maxLoop, statusText) が呼ばれるたびに setLoading 等でUIを更新する想定
-async function scAiRunGenerationLoop(blocks, plan, winOf, applicants, memberFlags, couples, conflictMapArg, opts) {
-  const onProgress = (opts && opts.onProgress) || function () {};
-  const maxLoop = (opts && opts.maxLoop) || 5;
-  const SCORE_META = blocks.map(b => ({ cyc: b.cyc, reps: b.reps, cols: b.cols,
+  const sd = scAiToShiftDates(blocks, plan, solved.draft, o.cartOrder);
+  const vout = validateShift(sd, { applicants, memberFlags, conflictMap: conflictMapArg || {}, pwType: currentPwType });
+  const issues = vout.issues.filter(i => i.scope === 'live').concat(scAiCheckNoteTimes(blocks, sd, winOf))
+    .concat(scAiCheckCellOverflow(blocks, sd)).concat(scAiCheckRosterConsistency(blocks, plan, sd))
+    .concat(scAiCheckFixedHeads(blocks, plan, sd))
+    .concat(scAiCheckCouplePairs(blocks, plan, couples, sd))
+    .concat(scAiCheckCartColumns(blocks, plan, sd));
+  const meta = blocks.map(b => ({ cyc: b.cyc, reps: b.reps, cols: b.cols,
     heads: plan[b.label].heads, otherBrothers: plan[b.label].otherBrothers,
     subs: plan[b.label].subs, extras: plan[b.label].extras }));
-
-  let prevIssues = null, scoreHints = [], best = null, stall = 0;
-  for (let loop = 1; loop <= maxLoop; loop++) {
-    onProgress(loop, maxLoop, 'AI原案を生成中…（' + loop + '/' + maxLoop + '回目）');
-    const contract = scAiBuildInputContract(blocks, plan, winOf, prevIssues, scoreHints);
-    // 全ブロック共通の夫婦一覧をブロックごとの名簿に合わせて絞り込む
-    contract.blocks.forEach((cb, bi) => {
-      const roster = new Set([...plan[blocks[bi].label].heads, ...plan[blocks[bi].label].otherBrothers,
-        ...plan[blocks[bi].label].subs]);
-      cb.couples = (couples || []).filter(([a, c]) => roster.has(a) && roster.has(c));
-    });
-
-    let res;
-    try {
-      res = await apiGet('draftShift', { input: contract });
-    } catch (e) {
-      if (best) break;
-      throw e;
-    }
-    if (!res || !res.ok || !res.result) { if (best) break; throw new Error((res && res.error) || 'AI原案の生成に失敗しました'); }
-
-    const sd = scAiToShiftDates(blocks, plan, res.result, opts && opts.cartOrder);
-    const vout = validateShift(sd, { applicants, memberFlags, conflictMap: conflictMapArg || {}, pwType: currentPwType });
-    const issues = vout.issues.filter(i => i.scope === 'live').concat(scAiCheckNoteTimes(blocks, sd, winOf))
-      .concat(scAiCheckCellOverflow(blocks, sd)).concat(scAiCheckRosterConsistency(blocks, plan, sd))
-      .concat(scAiCheckFixedHeads(blocks, plan, sd))
-      .concat(scAiCheckCouplePairs(blocks, plan, couples, sd))
-      .concat(scAiCheckCartColumns(blocks, plan, sd));
-    const errs = issues.filter(i => i.level === 'error');
-    const warns = issues.filter(i => i.level === 'warn');
-    const sc = computeShiftScore(sd, { memberFlags, couples, meta: SCORE_META });
-
-    if (!best || errs.length < best.errs || (errs.length === best.errs && sc.total > best.score)) {
-      best = { loop, errs: errs.length, warns: warns.length, score: sc.total, sd, issues, sc, usage: res.usage, modelUsed: res.modelUsed };
-    }
-    if (!errs.length && sc.total >= 95) break;
-    stall = (best.loop === loop) ? 0 : stall + 1;
-    if (stall >= 2) break;
-    prevIssues = scAiSanitizeIssues(errs.concat(warns).slice(0, 20));
-    scoreHints = errs.length ? [] : shiftScoreHints(sc, 4);
-  }
-  if (!best) throw new Error('AI原案の生成に失敗しました');
-  return best;
+  const sc = computeShiftScore(sd, { memberFlags, couples, meta });
+  return {
+    variant: o.variant || 0,
+    errs: issues.filter(i => i.level === 'error').length,
+    warns: issues.filter(i => i.level === 'warn').length,
+    score: sc.total, sd, issues, sc, relaxed: solved.relaxed, timedOut: solved.timedOut,
+  };
 }
 
 // ---- 反映用ペイロードの組み立て ----

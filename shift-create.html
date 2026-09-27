@@ -58,7 +58,7 @@
     <div id="create-tools" class="is-hidden">
       <button class="tb-btn" id="undo-btn" style="white-space:nowrap;" title="元に戻す（Ctrl+Z）／やり直す（Ctrl+Shift+Z）" onclick="doUndo()" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></svg> 元に戻す</button>
       <button class="tb-btn" style="white-space:nowrap;" onclick="openPreflight()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></svg> チェック</button>
-      <button class="tb-btn" style="white-space:nowrap;border-color:var(--purple);color:var(--purple);" onclick="openAiDraftModal()">✨ AI原案を作る</button>
+      <button class="tb-btn" style="white-space:nowrap;border-color:var(--purple);color:var(--purple);" onclick="openAiDraftModal()">原案を作る</button>
     </div>
     <button class="split-btn" id="split-btn" onclick="toggleSplitView()"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor"/></svg> 分割表示</button>
   </div>
@@ -201,10 +201,10 @@
       </div>
 
       <section class="sec-card sc-ai-rule-entry">
-        <div class="sec-hd">AI原案ルール</div>
+        <div class="sec-hd">原案ルール</div>
         <div class="sec-body">
-          <p class="sc-setting-note">AI原案の人数・配置ルールは、既存の原案画面で確認・調整できます。</p>
-          <button type="button" class="s-btn primary" onclick="openAiRulesFromSettings()">AI原案のルールを確認・調整</button>
+          <p class="sc-setting-note">原案の人数・配置ルールは、原案の確認画面で確認・調整できます。</p>
+          <button type="button" class="s-btn primary" onclick="openAiRulesFromSettings()">原案のルールを確認・調整</button>
         </div>
       </section>
 
@@ -315,25 +315,26 @@
   </div>
 </div>
 
-<!-- AI原案 ① 確認画面（事前計算の結果を見せる。ここで周期・セル人数だけ調整できる） -->
+<!-- 原案 ① 確認画面（事前計算の結果を見せる。ここで周期・セル人数だけ調整できる） -->
 <div class="popup-overlay" id="ai-confirm-modal">
   <div class="popup-box ai-modal-box">
-    <div class="popup-title">✨ AI原案 — 事前確認</div>
+    <div class="popup-title">原案 — 事前確認</div>
     <div id="ai-confirm-body"><div class="empty-msg">計算中...</div></div>
     <div class="add-form-actions" style="margin-top:14px;justify-content:space-between;">
       <button class="s-btn" onclick="closeAiConfirmModal()">キャンセル</button>
-      <button class="s-btn primary" id="ai-confirm-go" onclick="startAiGeneration()">この内容で生成する</button>
+      <button class="s-btn primary" id="ai-confirm-go" onclick="startAiGeneration()">この内容で作成する</button>
     </div>
   </div>
 </div>
 
-<!-- AI原案 ② 差分表示（現在の内容と並べ、置き換えるかを人が判断する） -->
+<!-- 原案 ② 差分表示（現在の内容と並べ、置き換えるかを人が判断する） -->
 <div class="popup-overlay" id="ai-diff-modal">
   <div class="popup-box ai-modal-box">
-    <div class="popup-title">✨ AI原案 — 差分確認</div>
+    <div class="popup-title">原案 — 差分確認</div>
     <div id="ai-diff-body"><div class="empty-msg">生成中...</div></div>
     <div class="add-form-actions" style="margin-top:14px;justify-content:space-between;">
       <button class="s-btn" onclick="closeAiDiffModal()">閉じる</button>
+      <button class="s-btn" id="ai-diff-next" onclick="nextAiVariant()">別の案を出す</button>
       <button class="s-btn primary" id="ai-diff-apply" onclick="applyAiDraft()">この内容で置き換える</button>
     </div>
   </div>
@@ -349,7 +350,8 @@
 <script src="js/picker.js?v=9"></script>
 <script src="js/dnd.js?v=20"></script>
 <script src="js/shift-score.js?v=2"></script>
-<script src="js/shift-ai.js?v=5"></script>
-<script src="js/shift-create.js?v=70"></script>
+<script src="js/shift-solver.js?v=1"></script>
+<script src="js/shift-ai.js?v=6"></script>
+<script src="js/shift-create.js?v=71"></script>
 </body>
 </html>
