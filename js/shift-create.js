@@ -892,11 +892,15 @@ function buildAssignmentMap(shiftRes) {
 }
 function wishCellClass(applied, isAssigned) {
   if (applied) return isAssigned ? 'cell-data cell-on' : 'cell-data';
-  return isAssigned ? 'cell-data cell-on' : 'cell-data cell-off';
+  return isAssigned ? 'cell-data cell-assigned-no-wish' : 'cell-data cell-off';
 }
 function wishCellInner(applied, isAssigned, hasComment) {
-  if (!applied && !isAssigned) return '';
-  return `<span class="check-mark">〇</span>${applied && hasComment ? `<span class="note-mark">${ic('square-pen')}</span>` : ''}`;
+  if (!applied) {
+    return isAssigned
+      ? '<span class="wish-assigned-no-wish-mark" role="img" aria-label="割当済み・希望なし" title="割当済み・希望なし"></span>'
+      : '';
+  }
+  return `<span class="check-mark" aria-label="希望あり">〇</span>${hasComment ? `<span class="note-mark">${ic('square-pen')}</span>` : ''}`;
 }
 
 let _wishCellContexts = [];
@@ -911,7 +915,7 @@ function bindWishCellEvents(wrap) {
   });
 }
 
-// シフト作成側の割当が変わったときに、希望確認テーブルの「割当」列と紫セル（cell-on）だけを
+// シフト作成側の割当が変わったときに、希望確認テーブルの割当数と希望セルの状態を
 // 差分更新する。テーブル全体を作り直さないのでスクロール位置が保たれ、分割表示中でも軽い。
 // 参照するのはローカルの shiftDates なので、未保存の編集もそのまま反映される。
 function refreshWishAssign() {
@@ -924,6 +928,7 @@ function refreshWishAssign() {
     const uid = td.dataset.uid, slot = td.dataset.slot;
     const isAssigned = !!(assignMap[uid] && assignMap[uid].has(slot));
     if (isAssigned) counts[uid] = (counts[uid] || 0) + 1;
+    td.dataset.assigned = isAssigned ? '1' : '0';
     const applied = td.dataset.applied === '1';
     const cls = wishCellClass(applied, isAssigned);
     if (td.className !== cls) td.className = cls;
@@ -1011,8 +1016,8 @@ function buildWishTable(data, shiftRes) {
         uid: String(uid || ''), name: String(name || ''), slot: String(slot || ''),
         applied: !!val, comment: hc ? String(val.comment) : '',
       }) - 1;
-      // data-uid / data-slot / data-applied は refreshWishAssign() の差分更新用
-      const dataAttr = `data-uid="${esc(uid)}" data-slot="${esc(slot)}" data-applied="${val ? 1 : 0}"`;
+      // data-uid / data-slot / data-applied / data-assigned は差分更新と希望編集時の確認用
+      const dataAttr = `data-uid="${esc(uid)}" data-slot="${esc(slot)}" data-applied="${val ? 1 : 0}" data-assigned="${isAssigned ? 1 : 0}"`;
       r += `<td class="${wishCellClass(!!val, isAssigned)} wish-edit-cell" ${dataAttr} data-wish-context="${contextIndex}">${wishCellInner(!!val, isAssigned, !!hc)}</td>`;
     });
     r += `<td class="cell-data" style="position:sticky;right:50px;background:var(--green4);font-weight:700;color:var(--green);z-index:2;">${slotCountFor(uid)}</td>`;
@@ -1021,7 +1026,10 @@ function buildWishTable(data, shiftRes) {
     return r;
   };
 
-  let html = '<div class="wish-snap-outer"><table class="wish-tbl">';
+  let html = '<div class="wish-cell-legend" aria-label="希望確認表の凡例">' +
+    '<span class="wish-cell-legend-item"><span class="wish-cell-legend-mark applied">〇</span>希望あり</span>' +
+    '<span class="wish-cell-legend-item"><span class="wish-cell-legend-mark assigned-no-wish" aria-hidden="true"></span>割当済み・希望なし</span>' +
+    '</div><div class="wish-snap-outer"><table class="wish-tbl">';
   html += '<thead>' + buildHeadRows() + '</thead><tbody>';
   members.forEach(m => { html += buildRow(m.uid, m.name); });
 
@@ -1075,8 +1083,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fixW
 
 // 参加希望 編集モーダル（希望確認タブのセルクリックで開く）
 let wishEditCtx = null;
-// 割当状態（isAssigned）はセルの class から読み取る。refreshWishAssign() が
-// onclick 属性を書き換えずに済むようにするため
+// 割当状態は data-assigned から読み取る。表示色や記号の変更に依存させない。
 // ===== 希望編集モーダルの備考（選択式） =====
 // 奉仕者フォーム（shift-form/js/app.js）と同じ文言を作る。
 // ここで自由入力を許すと表記がずれ、validation.js の判定から漏れるため、
@@ -1192,7 +1199,7 @@ function weOnField(which, v) {
 }
 
 function openWishEdit(el, uid, name, slot, applied, comment) {
-  const isAssigned = !!(el && el.classList.contains('cell-on'));
+  const isAssigned = !!(el && el.dataset.assigned === '1');
   wishEditCtx = { uid, name, slot, applied, isAssigned };
   document.getElementById('we-title').textContent = name + '｜' + slot;
   // comment は「カート不可」と備考が改行で連結された文字列（保存側と同じ規則）

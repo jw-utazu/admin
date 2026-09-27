@@ -194,7 +194,15 @@ td.col-name{border-right:2px solid var(--border2)!important;}
 td.cell-on{background:#dcfce7;position:relative;}
 td.cell-on:hover{background:#bbf7d0;}
 td.cell-off{background:var(--surface);}
+td.cell-assigned-no-wish{background:var(--amber-l);color:#92400e;}
+td.cell-assigned-no-wish:hover{background:#fef3c7;}
 .check-mark{font-size:16px;color:var(--green);line-height:1;}
+.wish-assigned-no-wish-mark{display:inline-block;width:12px;height:12px;border:1.5px dotted currentColor;border-radius:50%;vertical-align:middle;}
+.wish-cell-legend{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:4px 10px;color:var(--ink2);font-size:10px;}
+.wish-cell-legend-item{display:inline-flex;align-items:center;gap:5px;}
+.wish-cell-legend-mark{display:inline-flex;align-items:center;justify-content:center;}
+.wish-cell-legend-mark.applied{color:var(--green);font-size:14px;line-height:1;}
+.wish-cell-legend-mark.assigned-no-wish{width:12px;height:12px;border:1.5px dotted #92400e;border-radius:50%;background:var(--amber-l);}
 .note-mark{font-size:10px;position:absolute;top:2px;right:3px;color:var(--amber);}
 td.cell-data{padding:6px 8px;min-width:80px;height:36px;}
 .empty-msg{padding:40px;text-align:center;color:var(--ink3);}
