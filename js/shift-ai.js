@@ -13,7 +13,7 @@
 const SC_AI_RULE_DEFAULTS = {
   cellTarget: 3, cellMin: 2, cartsPerPlace: 2,
   usePrevMonth: true, prevMonths: 2,
-  dropWifeWithHusband: true, allowCartDoubleDuty: false,
+  allowCartDoubleDuty: false,
   allowMixedCartPair: false, avoidRespCartOverlap: false,
 };
 
@@ -183,19 +183,72 @@ function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prev
     });
     const headCap = b.cyc * b.cols;
     const subCap = Math.max(0, Math.round(b.cyc * b.cols * (b.cellTarget - 1)));
-    const heads = normal.filter(isM).sort(rank).slice(0, headCap);
+    const poolSet = new Set(pool);
+    const normalSet = new Set(normal);
+    const blockedCouples = new Set();
+    const husbandToWife = new Map();
+    const wifeToHusband = new Map();
+    (couples || []).forEach(([h, w]) => {
+      // 同じブロックに夫婦で申し込んでいて、どちらかが全周参加できない場合は
+      // 片方だけを候補に残さない。夫婦として扱えない部分参加ペアは2人とも落選にする。
+      if (!poolSet.has(h) || !poolSet.has(w)) return;
+      if (!normalSet.has(h) || !normalSet.has(w)) {
+        blockedCouples.add(h); blockedCouples.add(w);
+        return;
+      }
+      husbandToWife.set(h, w); wifeToHusband.set(w, h);
+    });
+    const candidates = normal.filter(u => !blockedCouples.has(u));
+    const heads = [];
+    const reservedWives = new Set();
+    candidates.filter(isM).sort(rank).some(h => {
+      if (heads.length >= headCap) return true;
+      const wife = husbandToWife.get(h);
+      if (wife && reservedWives.size >= subCap) return false;
+      heads.push(h);
+      if (wife) reservedWives.add(wife);
+      return false;
+    });
+    const subs = [...reservedWives];
+    const selected = new Set([...heads, ...subs]);
+    // 追加枠に余裕があれば、固定枠以外にも兄弟を少なくとも1人選ぶ。
+    // 夫婦の兄弟を選ぶときは、妻の席も同時に確保できる場合に限る。
+    candidates.filter(u => isM(u) && !selected.has(u)).sort(rank).find(u => {
+      const wife = husbandToWife.get(u);
+      const need = wife && !selected.has(wife) ? 2 : 1;
+      if (subCap - subs.length < need) return false;
+      subs.push(u); selected.add(u);
+      if (wife && !selected.has(wife)) { subs.push(wife); selected.add(wife); }
+      return true;
+    });
+    candidates.filter(u => !selected.has(u)).sort(rank).forEach(u => {
+      if (subs.length >= subCap || selected.has(u)) return;
+      const husband = wifeToHusband.get(u);
+      if (husband) {
+        // 妻は夫が固定枠か、夫婦2人分の追加枠を確保できる場合だけ選ぶ。
+        if (selected.has(husband)) {
+          subs.push(u); selected.add(u);
+        }
+        return;
+      }
+      const wife = husbandToWife.get(u);
+      if (wife) {
+        if (subCap - subs.length < 2) return;
+        subs.push(u, wife); selected.add(u); selected.add(wife);
+        return;
+      }
+      subs.push(u); selected.add(u);
+    });
     const droppedWives = new Set();
-    if (b.rules.dropWifeWithHusband) {
-      (couples || []).forEach(cp => {
-        const h = cp[0], w = cp[1];
-        if (normal.indexOf(h) >= 0 && heads.indexOf(h) < 0) droppedWives.add(w);
-      });
-    }
-    const subs = normal.filter(u => !isM(u) && !droppedWives.has(u)).sort(rank).slice(0, subCap);
-    const keptExtras = extras.filter(e => !droppedWives.has(e.uid));
+    (couples || []).forEach(([h, w]) => {
+      if (poolSet.has(h) && poolSet.has(w) && !selected.has(w)) droppedWives.add(w);
+    });
+    const otherBrothers = subs.filter(isM).sort(rank);
+    const sisters = subs.filter(u => !isM(u)).sort(rank);
+    const keptExtras = extras.filter(e => !blockedCouples.has(e.uid));
     const used = new Set([...heads, ...subs, ...keptExtras.map(e => e.uid)]);
     [...used].forEach(u => assignedCnt[u] = (assignedCnt[u] || 0) + 1);
-    plan[b.label] = { heads, subs, extras: keptExtras, droppedWives: [...droppedWives],
+    plan[b.label] = { heads, otherBrothers, subs: sisters, extras: keptExtras, droppedWives: [...droppedWives],
       dropped: pool.filter(u => !used.has(u)) };
   });
 
@@ -219,7 +272,7 @@ function scAiBuildPlan(blocks, applicants, memberFlags, couples, prevCount, prev
   const placeCartOf = scAiAssignPlaceCarts(blocks, o.cartNumbers, cartWarn);
   blocks.forEach((b, bi) => {
     const pl = plan[b.label];
-    const roster = pl.heads.concat(pl.subs);
+    const roster = pl.heads.concat(pl.otherBrothers, pl.subs);
     const need = b.cols * b.rules.cartsPerPlace;
     const bStart = scAiSlotRange(b.slotTimes[0]).s;
     const bEnd = scAiSlotRange(b.slotTimes[b.slotTimes.length - 1]).e;
@@ -422,7 +475,7 @@ function scAiBuildInputContract(blocks, plan, winOf, prevIssues, scoreHints) {
   const contractBlocks = blocks.map(b => {
     const pl = plan[b.label];
     const posLimits = [];
-    [...pl.heads, ...pl.subs].forEach(u => {
+    [...pl.heads, ...pl.otherBrothers, ...pl.subs].forEach(u => {
       const w = winOf[u + '|' + b.label];
       if (!w) return;
       const ok = scAiOkPositions(b, w);
@@ -433,6 +486,7 @@ function scAiBuildInputContract(blocks, plan, winOf, prevIssues, scoreHints) {
       label: b.label, cyc: b.cyc, reps: b.reps, cols: b.cols,
       slotTimes: b.slotTimes.slice(), places: b.places.slice(), respIdx: b.respIdx,
       heads: pl.heads.slice(), subs: pl.subs.slice(),
+      otherBrothers: pl.otherBrothers.slice(),
       extras: pl.extras.map(e => {
         const w = winOf[e.uid + '|' + b.label];
         return { uid: e.uid, at: e.at.map(x => ({ rep: x.rep, pos: x.pos })), win: w ? { s: w.s, e: w.e } : undefined };
@@ -468,9 +522,12 @@ function scAiToShiftDates(blocks, plan, draft, cartOrder) {
         const rep = (pos.reps || [])[r] || {};
         for (let c = 0; c < b.cols; c++) {
           const cell = (rep.places || [])[c];
-          const uids = (Array.isArray(cell) ? cell : [cell]).filter(Boolean);
+          const rawUids = Array.isArray(cell) ? cell : [cell];
+          const hasMembers = rawUids.some(Boolean);
+          const keepEmptyHead = hasMembers && rawUids.length > 0 && !rawUids[0];
+          const uids = (keepEmptyHead ? [''] : []).concat(rawUids.filter(Boolean));
           slots[r * b.cyc + p].places[c] = uids;
-          slots[r * b.cyc + p].watch[c] = uids.length >= 3;
+          slots[r * b.cyc + p].watch[c] = !!uids[0] && uids.filter(Boolean).length >= 3;
         }
       }
     }
@@ -522,7 +579,7 @@ function scAiCheckCellOverflow(blocks, sd) {
     const slots = (sd[bi] || {}).slots || [];
     slots.forEach((s, si) => {
       (s.places || []).forEach((cell, ci) => {
-        const n = (cell || []).length;
+        const n = (cell || []).filter(Boolean).length;
         if (n > b.cellTarget) {
           out.push({ level: 'error', rule: 'cellOverflow',
             msg: b.label + ' の周' + (Math.floor(si / b.cyc) + 1) + '位置' + (si % b.cyc) + ' の '
@@ -535,38 +592,107 @@ function scAiCheckCellOverflow(blocks, sd) {
   return out;
 }
 
-// 例外者以外の人が、指定していない周だけ抜けたり足されたりしていないかの自前検証
-// （2026-08-26 実機確認で発覚。「本人の申告なく途中で入ったり抜けたりしない」の担保）
+// 通常参加者が各周に1回ずつ配置され、例外者が指定位置から外れていないかの自前検証
 function scAiCheckRosterConsistency(blocks, plan, sd) {
   const out = [];
   blocks.forEach((b, bi) => {
     const slots = (sd[bi] || {}).slots || [];
     const pl = plan[b.label];
-    const extraAt = {}; // "rep|pos" -> Set(uid)
+    const expected = new Set([...(pl.heads || []), ...(pl.otherBrothers || []), ...(pl.subs || [])]);
+    const extraAt = new Map(); // uid -> Set("rep|pos")
     (pl.extras || []).forEach(e => (e.at || []).forEach(x => {
-      const k = x.rep + '|' + x.pos;
-      (extraAt[k] = extraAt[k] || new Set()).add(e.uid);
+      if (!extraAt.has(e.uid)) extraAt.set(e.uid, new Set());
+      extraAt.get(e.uid).add(x.rep + '|' + x.pos);
     }));
-    for (let p = 0; p < b.cyc; p++) {
-      let baseSet = null;
-      for (let r = 0; r < b.reps; r++) {
+    for (let r = 0; r < b.reps; r++) {
+      const counts = new Map();
+      const misplacedExtras = new Set();
+      for (let p = 0; p < b.cyc; p++) {
         const si = r * b.cyc + p;
-        const cellUids = ((slots[si] || {}).places || []).reduce((a, c) => a.concat(c || []), []);
-        const extras = extraAt[r + '|' + p] || new Set();
-        const core = new Set(cellUids.filter(u => !extras.has(u)));
-        if (baseSet === null) { baseSet = core; continue; }
-        const same = baseSet.size === core.size && [...baseSet].every(u => core.has(u));
-        if (!same) {
-          const added = [...core].filter(u => !baseSet.has(u));
-          const removed = [...baseSet].filter(u => !core.has(u));
-          out.push({ level: 'error', rule: 'rosterInconsistent',
-            msg: b.label + ' の位置' + p + 'で、周' + (r + 1) + 'の顔ぶれが周1と一致しません（例外者以外）: '
-              + (added.length ? '追加=' + added.join(',') + ' ' : '')
-              + (removed.length ? '削除=' + removed.join(',') : ''),
-            uids: [...added, ...removed] });
-        }
+        (((slots[si] || {}).places) || []).forEach(cell => (cell || []).forEach(u => {
+          if (!u) return;
+          counts.set(u, (counts.get(u) || 0) + 1);
+          if (extraAt.has(u) && !extraAt.get(u).has(r + '|' + p)) misplacedExtras.add(u);
+        }));
       }
+      expected.forEach(u => {
+        const n = counts.get(u) || 0;
+        if (n !== 1) out.push({ level: 'error', rule: 'rosterInconsistent',
+          msg: b.label + ' の周' + (r + 1) + 'で、参加予定者 ' + u + ' の配置回数が' + n + '回です（1回必要）',
+          uids: [u] });
+      });
+      counts.forEach((n, u) => {
+        if (!expected.has(u) && !extraAt.has(u)) out.push({ level: 'error', rule: 'rosterInconsistent',
+          msg: b.label + ' の周' + (r + 1) + 'に名簿外の人 ' + u + ' が配置されています', uids: [u] });
+      });
+      misplacedExtras.forEach(u => out.push({ level: 'error', rule: 'rosterInconsistent',
+        msg: b.label + ' の周' + (r + 1) + 'で、例外者 ' + u + ' が指定された位置以外に配置されています', uids: [u] }));
     }
+  });
+  return out;
+}
+
+// 固定枠の兄弟が全周同じセルの先頭に置かれ、固定枠以外の人が先頭へ入っていないか確認する。
+function scAiCheckFixedHeads(blocks, plan, sd) {
+  const out = [];
+  blocks.forEach((b, bi) => {
+    const heads = new Set(plan[b.label].heads || []);
+    const firstAtByUid = new Map();
+    for (let rep = 0; rep < b.reps; rep++) {
+      const firstAt = new Map();
+      for (let pos = 0; pos < b.cyc; pos++) {
+        const slot = ((sd[bi] || {}).slots || [])[rep * b.cyc + pos] || {};
+        (slot.places || []).forEach((cell, col) => {
+          const uid = (cell || [])[0] || '';
+          if (!uid) return;
+          const key = pos + '|' + col;
+          if (!heads.has(uid)) out.push({ level: 'error', rule: 'fixedHead',
+            msg: b.label + ' の周' + (rep + 1) + 'で、固定枠以外の人 ' + uid + ' がセルの先頭にいます', uids: [uid] });
+          firstAt.set(uid, (firstAt.get(uid) || []).concat(key));
+        });
+      }
+      heads.forEach(uid => {
+        const cells = firstAt.get(uid) || [];
+        if (cells.length !== 1) out.push({ level: 'error', rule: 'fixedHead',
+          msg: b.label + ' の周' + (rep + 1) + 'で固定枠の兄弟 ' + uid + ' が先頭に1回だけ配置されていません', uids: [uid] });
+        const key = cells[0] || '';
+        if (rep === 0) firstAtByUid.set(uid, key);
+        else if (key !== (firstAtByUid.get(uid) || '')) out.push({ level: 'error', rule: 'fixedHead',
+          msg: b.label + ' の固定枠の兄弟 ' + uid + ' が周1と同じセルの先頭にいません', uids: [uid] });
+      });
+    }
+  });
+  return out;
+}
+
+// 指定夫婦は周1と最終周で同じセル、間の周は別セルかを確認する。
+function scAiCheckCouplePairs(blocks, plan, couples, sd) {
+  const out = [];
+  blocks.forEach((b, bi) => {
+    const pl = plan[b.label];
+    const roster = new Set([...(pl.heads || []), ...(pl.otherBrothers || []), ...(pl.subs || [])]);
+    const slots = (sd[bi] || {}).slots || [];
+    (couples || []).forEach(([husband, wife]) => {
+      if (!roster.has(husband) || !roster.has(wife)) return;
+      let firstCell = null;
+      for (let rep = 0; rep < b.reps; rep++) {
+        let cellKey = null;
+        for (let pos = 0; pos < b.cyc && !cellKey; pos++) {
+          const slot = slots[rep * b.cyc + pos] || {};
+          (slot.places || []).forEach((cell, col) => {
+            if (!cellKey && Array.isArray(cell) && cell.includes(husband) && cell.includes(wife)) {
+              cellKey = pos + '|' + col;
+            }
+          });
+        }
+        if (rep === 0) firstCell = cellKey;
+        const togetherRequired = b.cols < 2 || rep === 0 || rep === b.reps - 1;
+        const valid = togetherRequired ? !!cellKey && (rep === 0 || cellKey === firstCell) : !cellKey;
+        if (!valid) out.push({ level: 'error', rule: 'couplePair',
+          msg: b.label + ' の夫婦 ' + husband + '・' + wife + ' は周1と最終周は同じセル、間の周は別セルにする（周' + (rep + 1) + '）',
+          uids: [husband, wife] });
+      }
+    });
   });
   return out;
 }
@@ -588,7 +714,8 @@ async function scAiRunGenerationLoop(blocks, plan, winOf, applicants, memberFlag
   const onProgress = (opts && opts.onProgress) || function () {};
   const maxLoop = (opts && opts.maxLoop) || 5;
   const SCORE_META = blocks.map(b => ({ cyc: b.cyc, reps: b.reps, cols: b.cols,
-    heads: plan[b.label].heads, subs: plan[b.label].subs, extras: plan[b.label].extras }));
+    heads: plan[b.label].heads, otherBrothers: plan[b.label].otherBrothers,
+    subs: plan[b.label].subs, extras: plan[b.label].extras }));
 
   let prevIssues = null, scoreHints = [], best = null, stall = 0;
   for (let loop = 1; loop <= maxLoop; loop++) {
@@ -596,7 +723,8 @@ async function scAiRunGenerationLoop(blocks, plan, winOf, applicants, memberFlag
     const contract = scAiBuildInputContract(blocks, plan, winOf, prevIssues, scoreHints);
     // 全ブロック共通の夫婦一覧をブロックごとの名簿に合わせて絞り込む
     contract.blocks.forEach((cb, bi) => {
-      const roster = new Set([...plan[blocks[bi].label].heads, ...plan[blocks[bi].label].subs]);
+      const roster = new Set([...plan[blocks[bi].label].heads, ...plan[blocks[bi].label].otherBrothers,
+        ...plan[blocks[bi].label].subs]);
       cb.couples = (couples || []).filter(([a, c]) => roster.has(a) && roster.has(c));
     });
 
@@ -613,6 +741,8 @@ async function scAiRunGenerationLoop(blocks, plan, winOf, applicants, memberFlag
     const vout = validateShift(sd, { applicants, memberFlags, conflictMap: conflictMapArg || {}, pwType: currentPwType });
     const issues = vout.issues.filter(i => i.scope === 'live').concat(scAiCheckNoteTimes(blocks, sd, winOf))
       .concat(scAiCheckCellOverflow(blocks, sd)).concat(scAiCheckRosterConsistency(blocks, plan, sd))
+      .concat(scAiCheckFixedHeads(blocks, plan, sd))
+      .concat(scAiCheckCouplePairs(blocks, plan, couples, sd))
       .concat(scAiCheckCartColumns(blocks, plan, sd));
     const errs = issues.filter(i => i.level === 'error');
     const warns = issues.filter(i => i.level === 'warn');

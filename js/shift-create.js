@@ -4244,9 +4244,10 @@ function _aiRenderConfirm() {
     const ct = pl.cart;
     html += '<div class="ai-block">';
     html += '<div class="ai-block-hd">' + esc(b.label) + '</div>';
-    html += '<div class="ai-block-line">周期' + b.cyc + ' → ' + b.reps + '周 / 定員 兄弟' + (b.cyc * b.cols)
-      + '・姉妹' + (pl.subs.length) + '（1周あたり最大' + (b.cyc * b.cols * b.cellTarget) + '席）</div>';
-    html += '<div class="ai-block-line">兄弟' + pl.heads.length + '名: ' + pl.heads.map(_aiName).map(esc).join('、') + '</div>';
+    html += '<div class="ai-block-line">周期' + b.cyc + ' → ' + b.reps + '周 / 1周あたり最大' + (b.cyc * b.cols * b.cellTarget)
+      + '席（固定枠' + (b.cyc * b.cols) + '席）</div>';
+    html += '<div class="ai-block-line">固定枠の兄弟' + pl.heads.length + '名: ' + pl.heads.map(_aiName).map(esc).join('、') + '</div>';
+    html += '<div class="ai-block-line">固定枠以外の兄弟' + pl.otherBrothers.length + '名: ' + pl.otherBrothers.map(_aiName).map(esc).join('、') + '</div>';
     html += '<div class="ai-block-line">姉妹' + pl.subs.length + '名: ' + pl.subs.map(_aiName).map(esc).join('、') + '</div>';
     if (pl.extras.length) html += '<div class="ai-block-line">例外' + pl.extras.length + '名: ' + pl.extras.map(e => esc(_aiName(e.uid))).join('、') + '</div>';
     if (pl.dropped.length) html += '<div class="ai-block-line ai-drop">落選' + pl.dropped.length + '名: ' + pl.dropped.map(u => esc(_aiName(u)) + (pl.droppedWives.indexOf(u) >= 0 ? '（夫の落選に連動）' : '')).join('、') + '</div>';
@@ -4318,7 +4319,7 @@ function _aiRenderDiff() {
     b.slotTimes.forEach((st, si) => {
       html += '<div class="ai-diff-t">' + esc(st) + '</div>';
       for (let ci = 0; ci < b.cols; ci++) {
-        const names = ((sdBlock.slots[si] || {}).places[ci] || []).map(_aiName).map(esc).join('、');
+        const names = ((sdBlock.slots[si] || {}).places[ci] || []).filter(Boolean).map(_aiName).map(esc).join('、');
         const changed = _aiCellChanged(curBlock, sdBlock, si, ci);
         html += '<div class="ai-diff-c' + (changed ? ' changed' : '') + '">' + (names || '－') + '</div>';
       }

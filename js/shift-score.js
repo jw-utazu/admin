@@ -5,10 +5,9 @@
 //
 // 2026-08-26 全面改訂。2026年7〜8月に人が組んだ7ブロックを機械解析して確認した
 // 次の構造を採点軸にした（詳細は 計画書/2026-08-23_シフト作成の暗黙知（過去実績の分析）.md）:
-//   ・1周 = スロット数 ÷ 3。その周をそのまま3回繰り返す（実測 7/7 ブロックで成立）
-//   ・各セルの先頭は必ず兄弟。3周とも同じ周内位置・同じ列に固定（実測 100%）
-//   ・2番目以降（姉妹）だけが周ごとに列を入れ替わる（2列ブロックで 6/7 名）
-//   ・夫婦は周1と周3で同セル、周2で別セル（2列ブロック 4件中 3件）
+//   ・各セルの先頭は固定枠の兄弟。固定枠以外は兄弟・姉妹とも配置し、周ごとに組み合わせる
+//   ・固定枠以外は、同じ人同士で場所だけを替える形を避けて組み合わせの多様さを優先
+//   ・指定された夫婦は周1と最終周で同じセル、間の周は別セルに置く
 //   ・時間制約のある人は入れる周にだけ足す。隣接連続になっても許容する
 //
 // Node でもブラウザでも動く素の関数。new Function(src) で読み込んで使う。
@@ -16,17 +15,16 @@
 // computeShiftScore(shiftDates, ctx)
 //   ctx.memberFlags : { uid: { gender, respFlag, cartFlag } }
 //   ctx.couples     : [[夫uid, 妻uid], ...]
-//   ctx.meta        : [{ cyc, reps, cols, heads, subs, extras }]  ブロックと同じ並び
+//   ctx.meta        : [{ cyc, reps, cols, heads, otherBrothers, subs, extras }]  ブロックと同じ並び
 //   → { total: 0〜100, items: [{ key, label, note, score, weight, count, hints }] }
 
 var SCORE_SPEC = {
-  cycleCopy:      { w: 4, label: '周のコピー',     note: '同じ周内位置の顔ぶれは3周とも同じにする' },
   headFixed:      { w: 4, label: '固定枠の兄弟',   note: 'セルの先頭は兄弟。3周とも同じ位置・同じ列に置く' },
-  rosterUsed:     { w: 3, label: '名簿どおりか',   note: '割り当てると決めた人を全員入れ、それ以外は入れない' },
+  rosterUsed:     { w: 3, label: '名簿どおりか',   note: '選定した人を各周1回ずつ入れ、それ以外は入れない' },
   cellSize:       { w: 3, label: '1セルの人数',   note: '3名が基本。2名まで可、1名は避ける' },
-  cellMix:        { w: 2, label: 'セルの男女構成', note: '兄弟と姉妹で組む' },
-  sisterRotation: { w: 2, label: '姉妹の列移動',   note: '姉妹は周ごとに列を替えて多くの人と組む' },
-  couplePattern:  { w: 2, label: '夫婦の組み方',   note: '周1と周3は同じセル、周2は別のセル' },
+  cellMix:        { w: 2, label: 'セルの男女構成', note: '兄弟だけのセルや、夫婦ペアを含まない兄弟2名・姉妹1名を避ける（夫婦1組＋兄弟は可）' },
+  partnerVariety: { w: 4, label: '組み合わせの多様さ', note: '固定枠以外は周ごとに異なる人と組む' },
+  couplePattern:  { w: 2, label: '夫婦の組み方',   note: '周1と最終周は同じセル、間の周は別セル' },
 };
 
 function ssGender(ctx, uid) {
@@ -44,7 +42,7 @@ function ssGrid(block, meta) {
     for (var r = 0; r < meta.reps; r++) {
       var s = slots[r * meta.cyc + p] || {};
       var cols = [];
-      for (var c = 0; c < meta.cols; c++) cols[c] = ((s.places || [])[c] || []).filter(Boolean);
+      for (var c = 0; c < meta.cols; c++) cols[c] = ((s.places || [])[c] || []).map(function (u) { return u || ''; });
       g[p][r] = cols;
     }
   }
@@ -69,17 +67,7 @@ function computeShiftScore(shiftDates, ctx) {
     var g = ssGrid(b, meta);
     var exempt = {};
     (meta.extras || []).forEach(function (e) { exempt[e.uid || e] = true; });
-    var flat = function (cols) { var o = []; cols.forEach(function (c) { o = o.concat(c); }); return o; };
-
-    // --- 周のコピー: 位置 p の顔ぶれが3周とも同じか（例外者は数えない）---
-    for (var p = 0; p < meta.cyc; p++) {
-      var base = flat(g[p][0]).filter(function (u) { return !exempt[u]; }).sort().join(',');
-      for (var r = 1; r < meta.reps; r++) {
-        var cur = flat(g[p][r]).filter(function (u) { return !exempt[u]; }).sort().join(',');
-        add('cycleCopy', cur === base ? 1 : 0, 1, cur === base ? null
-          : b.date + ' 位置' + p + ' の顔ぶれが周1と周' + (r + 1) + 'で違います');
-      }
-    }
+    var flat = function (cols) { var o = []; cols.forEach(function (c) { o = o.concat(c); }); return o.filter(Boolean); };
 
     // --- 固定枠: 先頭は兄弟で、3周とも同じ位置・同じ列 ---
     var headAt = {};                       // uid -> "p|c" の集合
@@ -102,7 +90,7 @@ function computeShiftScore(shiftDates, ctx) {
 
     // --- 名簿どおりか ---
     var planned = {};
-    (meta.heads || []).concat(meta.subs || []).forEach(function (u) { planned[u] = true; });
+    (meta.heads || []).concat(meta.otherBrothers || [], meta.subs || []).forEach(function (u) { planned[u] = true; });
     (meta.extras || []).forEach(function (e) { planned[e.uid || e] = true; });
     var seen = {};
     for (var p3 = 0; p3 < meta.cyc; p3++) for (var r3 = 0; r3 < meta.reps; r3++)
@@ -121,52 +109,66 @@ function computeShiftScore(shiftDates, ctx) {
       for (var c4 = 0; c4 < meta.cols; c4++) {
         var cell = g[p4][r4][c4];
         // 例外者（時間制約で最終周にだけ足す人）は基本形の外なので人数に数えない
-        var n2 = cell.filter(function (u) { return !exempt[u]; }).length;
+        var n2 = cell.filter(function (u) { return u && !exempt[u]; }).length;
         add('cellSize', n2 === 3 ? 1 : n2 === 2 ? 0.8 : n2 === 1 ? 0.2 : 0, 1, n2 === 3 ? null
           : b.date + ' 周' + (r4 + 1) + '位置' + p4 + ' の ' + ((b.places || [])[c4] || '') + ' が' + n2 + '名です');
-        var known = cell.filter(function (u) { return ssGender(ctx, u); });
+        var known = cell.filter(function (u) { return u && ssGender(ctx, u); });
         if (!known.length) continue;
         var m = known.filter(function (u) { return ssIsM(ctx, u); }).length;
+        var hasCouple = couples.some(function (cp) { return known.indexOf(cp[0]) >= 0 && known.indexOf(cp[1]) >= 0; });
         var mixed = m > 0 && m < known.length;
-        add('cellMix', mixed ? 1 : 0.5, 1, mixed ? null
-          : (m ? '兄弟だけのセルがあります（' + b.date + '）' : '姉妹だけのセルがあります（' + b.date + '）'));
+        var maleMaleFemale = m === 2 && known.length === 3 && !hasCouple;
+        var mixScore = mixed && !maleMaleFemale ? 1 : (m === 0 ? 0.5 : 0);
+        add('cellMix', mixScore, 1, mixScore ? null
+          : (m === known.length ? '兄弟だけのセルがあります（' + b.date + '）'
+            : (maleMaleFemale ? '夫婦ペアを含まない兄弟2名・姉妹1名のセルがあります（' + b.date + '）'
+              : '姉妹だけのセルがあります（' + b.date + '）')));
       }
 
-    // --- 姉妹の列移動（2列以上のときだけ意味がある）---
-    if (meta.cols >= 2) {
-      var subCols = {};
-      for (var p5 = 0; p5 < meta.cyc; p5++) for (var r5 = 0; r5 < meta.reps; r5++)
-        for (var c5 = 0; c5 < meta.cols; c5++)
-          g[p5][r5][c5].slice(1).forEach(function (u) {
-            if (exempt[u]) return;                       // 例外者は出る周が1つなので対象外
-            (subCols[u] = subCols[u] || {})[c5] = true;
+    // --- 固定枠以外の組み合わせ: 場所替えだけで同じ人と組み続ける形を避ける ---
+    var fixed = {};
+    (meta.heads || []).forEach(function (u) { fixed[u] = true; });
+    var spousePairs = {};
+    couples.forEach(function (cp) { spousePairs[JSON.stringify(cp.slice().sort())] = true; });
+    var encounters = {}, partners = {};
+    for (var p5 = 0; p5 < meta.cyc; p5++) for (var r5 = 0; r5 < meta.reps; r5++)
+      for (var c5 = 0; c5 < meta.cols; c5++) {
+        var group = g[p5][r5][c5].filter(function (u) { return u && !exempt[u]; });
+        group.forEach(function (u) {
+          if (fixed[u]) return;
+          group.forEach(function (v) {
+            if (u === v || spousePairs[JSON.stringify([u, v].sort())]) return;
+            encounters[u] = (encounters[u] || 0) + 1;
+            (partners[u] = partners[u] || {})[v] = true;
           });
-      Object.keys(subCols).forEach(function (u) {
-        var moved = Object.keys(subCols[u]).length > 1;
-        add('sisterRotation', moved ? 1 : 0, 1, moved ? null
-          : u + ' が ' + b.date + ' で同じ列にとどまっています（周ごとに列を替える）');
-      });
-    }
+        });
+      }
+    Object.keys(encounters).forEach(function (u) {
+      var unique = Object.keys(partners[u] || {}).length;
+      var ratio = unique / encounters[u];
+      add('partnerVariety', ratio, 1, ratio >= 1 ? null
+        : u + ' が ' + b.date + ' で周ごとに同じ人と組んでいます（場所だけでなく組み合わせを変える）');
+    });
 
-    // --- 夫婦: 周1と最終周は同セル、間の周は別セル ---
+    // --- 夫婦: 周1と最終周は同じセル、間の周は別セル ---
     couples.forEach(function (cp) {
       var a = cp[0], z = cp[1];
       if (!seen[a] || !seen[z]) return;
-      var together = function (r) {
+      var togetherCell = function (r) {
         for (var p6 = 0; p6 < meta.cyc; p6++) for (var c6 = 0; c6 < meta.cols; c6++) {
           var cell = g[p6][r][c6];
-          if (cell.indexOf(a) >= 0 && cell.indexOf(z) >= 0) return true;
+          if (cell.indexOf(a) >= 0 && cell.indexOf(z) >= 0) return p6 + '|' + c6;
         }
-        return false;
+        return '';
       };
+      var firstCell = togetherCell(0);
       for (var r6 = 0; r6 < meta.reps; r6++) {
-        // 列が1つしかないブロックでは夫婦を別セルにしようがない。
-        // 実績でも1列ブロックは3周とも同席なので、そこを減点してはいけない
-        var want = meta.cols < 2 ? true : (r6 === 0 || r6 === meta.reps - 1);
-        var got = together(r6);
-        add('couplePattern', got === want ? 1 : 0, 1, got === want ? null
+        var got = togetherCell(r6);
+        var togetherRequired = meta.cols < 2 || r6 === 0 || r6 === meta.reps - 1;
+        var matched = togetherRequired ? !!got && (r6 === 0 || got === firstCell) : !got;
+        add('couplePattern', matched ? 1 : 0, 1, matched ? null
           : a + ' と ' + z + ' は ' + b.date + ' の周' + (r6 + 1) + 'で'
-            + (want ? '同じセルにする' : '別のセルにする') + 'べきです');
+            + (togetherRequired ? '周1と同じセルにするべきです' : '別セルにするべきです'));
       }
     });
   });
