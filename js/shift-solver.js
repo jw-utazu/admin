@@ -25,7 +25,9 @@ var SC_SOLVER_W = {
   extraFirst: 900, // 例外者を一度も配置しない（回数より先に、各人を入れる）
   samePlace: 60,   // 固定枠以外の人が全周同じ列
   mix: 40,         // 兄弟だけのセル・夫婦を含まない兄弟2名＋姉妹1名のセル
-  partner: 10,     // 同じ人と2回以上組む
+  partner: 20,     // 同じ人と2回目に組む（夫婦・固定枠どうしは除く）
+  partner3: 150,   // 同じ人と3回目以降に組む
+  sameGroup: 150,  // セルの顔ぶれが別の周とまったく同じ
   balance: 30,     // 同じ周の中でのセル人数のばらつき（平均との差の2乗）
 };
 
@@ -242,8 +244,22 @@ function scSolverEval(m, s, report) {
       if (u < m.H && v < m.H) continue;
       if (m.spouse[u] === v) continue;
       var key = u < v ? u + ',' + v : v + ',' + u;
-      if (seen[key]) cost += W.partner; else seen[key] = 1;
+      // 2回目は軽く、3回目以降は重く（同じ相手と毎周組むのを特に避ける）
+      if (seen[key]) cost += seen[key] >= 2 ? W.partner3 : W.partner;
+      seen[key] = (seen[key] || 0) + 1;
     }
+  }
+  // 同じ顔ぶれ（夫婦2人だけのセルは除く）が別の周にもう一度できる
+  var groups = {};
+  for (var r8 = 0; r8 < reps; r8++) for (var k5 = 0; k5 < C; k5++) {
+    var gl = members[r8][k5];
+    if (gl.length < 2) continue;
+    if (gl.length === 2 && m.spouse[gl[0]] === gl[1]) continue;
+    // 顔ぶれの鍵。通し番号が53未満なら 2^番号 の和（順序によらず一意で速い）
+    var gk = 0;
+    for (var g2 = 0; g2 < gl.length; g2++) gk += gl[g2] < 53 ? Math.pow(2, gl[g2]) : NaN;
+    if (gk !== gk) gk = gl.slice().sort(function (a1, b1) { return a1 - b1; }).join(',');
+    if (groups[gk]) cost += W.sameGroup; else groups[gk] = 1;
   }
   return cost;
 }
